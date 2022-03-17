@@ -1,3 +1,7 @@
+typedef Identifier = String;
+typedef Base64Image = String;
+typedef Name = String;
+
 enum NodeTypes {
   rt,
   usr,
@@ -11,16 +15,16 @@ enum NodeTypes {
 }
 
 class Reaction {
-  final String id, sd;
-  final String? p;
-  final List<String>? pl;
-  const Reaction(this.id, this.sd, {this.p, this.pl});
+  final Identifier id, sd;
+  final Base64Image? p;
+  final List<Base64Image>? pl;
+  const Reaction({required this.id, required this.sd, this.p, this.pl});
 
   Reaction.fromJson(Map<String, dynamic> json)
-      : id = json['id'] as String,
-        sd = json['sd'] as String,
-        p = json['p'] as String?,
-        pl = json['pl'] as List<String>?;
+      : id = json['id'] as Identifier,
+        sd = json['sd'] as Identifier,
+        p = json['p'] as Base64Image?,
+        pl = json['pl'] as List<Base64Image>?;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -30,25 +34,41 @@ class Reaction {
       }..removeWhere((key, value) => value == null);
 }
 
-class Message {
-  final String id, sd, tn, nm;
-  final String? t, p;
-  final int ts;
-  final List<String>? pl, r, n;
-  const Message(this.id, this.sd, this.tn, this.nm, this.ts,
-      {this.t, this.p, this.pl, this.r, this.n});
+class Down4Message {
+  final Identifier id, sd;
+  final Base64Image tn;
+  final Name nm;
+  final String? t; // text
+  final Base64Image? p;
+  final int? ts;
+  final bool ch; // true is chat, false is post
+  final List<Base64Image>? pl; // photoloop
+  final List<Identifier>? r, n; // reactions, nodes
+  const Down4Message(
+      {required this.id,
+      required this.sd,
+      required this.tn,
+      required this.nm,
+      required this.ch,
+      this.ts,
+      this.t,
+      this.p,
+      this.pl,
+      this.r,
+      this.n});
 
-  Message.fromJson(Map<String, dynamic> json)
-      : id = json['id'] as String,
-        sd = json['id'] as String,
-        tn = json['tn'] as String,
-        nm = json['nm'] as String,
+  Down4Message.fromJson(Map<String, dynamic> json)
+      : id = json['id'] as Identifier,
+        sd = json['sd'] as Identifier,
+        tn = json['tn'] as Base64Image,
+        nm = json['nm'] as Name,
+        ch = json['ch'] as bool,
         t = json['t'] as String?,
-        p = json['p'] as String?,
+        p = json['p'] as Base64Image?,
         ts = json['ts'] as int,
-        pl = json['pl'] as List<String>?,
-        r = json['r'] as List<String>?,
-        n = json['n'] as List<String>?;
+        pl = json['pl'] as List<Base64Image>?,
+        r = json['r'] as List<Identifier>?,
+        n = json['n'] as List<Identifier>?;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -61,20 +81,26 @@ class Message {
         'pl': pl,
         'r': r,
         'n': n,
+        'ch': ch
       }..removeWhere((key, value) => value == null);
 }
 
 class Node {
   final NodeTypes t;
-  final String id, nm, im;
-  final String? tn;
-  final List<String>? rt, adm, usr, cht, mkt, cpt, jnl, itm, evt, tkt;
-  Node(
-    this.t,
-    this.id,
-    this.nm,
-    this.im, {
+  final Identifier id;
+  final Name nm;
+  final Base64Image im;
+  final Base64Image? tn;
+  final List<Identifier>? rt, adm, usr, cht, mkt, cpt, jnl, itm, evt, tkt;
+  final List<Identifier>? msg, pst;
+  Node({
+    required this.t,
+    required this.id,
+    required this.nm,
+    required this.im,
     this.tn,
+    this.msg,
+    this.pst,
     this.rt,
     this.adm,
     this.usr,
@@ -89,20 +115,22 @@ class Node {
 
   Node.fromJson(Map<String, dynamic> json)
       : t = NodeTypes.values.byName(json['t']),
-        id = json['id'] as String,
-        nm = json['nm'] as String,
-        im = json['im'] as String,
-        tn = json['tn'] as String,
-        rt = json['rt'] as List<String>?,
-        adm = json['adm'] as List<String>?,
-        usr = json['usr'] as List<String>?,
-        cht = json['cht'] as List<String>?,
-        mkt = json['mkt'] as List<String>?,
-        cpt = json['cpt'] as List<String>?,
-        jnl = json['jnl'] as List<String>?,
-        itm = json['itm'] as List<String>?,
-        evt = json['evt'] as List<String>?,
-        tkt = json['tkt'] as List<String>?;
+        id = json['id'] as Identifier,
+        nm = json['nm'] as Name,
+        im = json['im'] as Base64Image,
+        tn = json['tn'] as Base64Image,
+        rt = json['rt'] as List<Identifier>?,
+        adm = json['adm'] as List<Identifier>?,
+        usr = json['usr'] as List<Identifier>?,
+        cht = json['cht'] as List<Identifier>?,
+        mkt = json['mkt'] as List<Identifier>?,
+        cpt = json['cpt'] as List<Identifier>?,
+        jnl = json['jnl'] as List<Identifier>?,
+        itm = json['itm'] as List<Identifier>?,
+        evt = json['evt'] as List<Identifier>?,
+        tkt = json['tkt'] as List<Identifier>?,
+        pst = json['pst'] as List<Identifier>?,
+        msg = json['msg'] as List<Identifier>?;
 
   Map<String, dynamic> toJson() => {
         't': t.name,
@@ -119,6 +147,8 @@ class Node {
         'jnl': jnl,
         'itm': itm,
         'evt': evt,
-        'tkt': tkt
+        'tkt': tkt,
+        'msg': msg,
+        'pst': pst
       }..removeWhere((key, value) => value == null);
 }
