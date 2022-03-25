@@ -8,6 +8,7 @@ class PinkTheme {
   static const backGroundColor = Color.fromARGB(255, 255, 241, 242);
   static const headerColor = Color.fromARGB(255, 250, 81, 138);
   static const borderColor = Colors.black;
+  static const qrColor = Color.fromARGB(255, 56, 3, 17);
   static const black = Colors.black;
   static const Map<NodeTypes, Color> nodeColors = {
     NodeTypes.rt: Color.fromARGB(255, 53, 3, 20),
@@ -104,7 +105,7 @@ class Palette extends StatelessWidget {
   final Node node;
   final void Function(Identifier)? sel, go, snip;
   final bool selected;
-  Palette(
+  const Palette(
       {required this.node,
       this.selected = false,
       this.go,
@@ -123,8 +124,8 @@ class Palette extends StatelessWidget {
     return Down4Container(
       border: true,
       height: height,
-      borderColor: selected ? PinkTheme.black : PinkTheme.backGroundColor,
-      backgroundColor: PinkTheme.headerColor,
+      borderWidth: 1.0,
+      borderColor: selected ? Colors.black : Colors.black12,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         textDirection: TextDirection.ltr,
@@ -133,23 +134,39 @@ class Palette extends StatelessWidget {
             onTap: () => sel?.call(node.id),
             onLongPress: () => snip?.call(node.id),
             child: Down4Container(
-              child: Image.asset('lib/src/assets/hashirama.jpg'),
+              width: height - 2.0, // border width I guess
+              border: true,
+              backgroundColor: PinkTheme.headerColor,
+              borderWidth: 1.0,
+              borderColor: selected ? Colors.black : Colors.black12,
+              child: Center(
+                  child: Image.asset('lib/src/assets/hashirama.jpg',
+                      fit: BoxFit.fill)),
             ),
           ),
           Expanded(
               child: GestureDetector(
                   onTap: () => sel?.call(node.id),
                   child: Down4Container(
+                      border: true,
+                      borderColor:
+                          selected ? Colors.black : Colors.black12,
+                      borderWidth: 1.0,
                       backgroundColor: PinkTheme.headerColor,
                       paddingLeft: 10.0,
                       paddingTop: 10.0,
-                      child: Text(
-                        node.nm,
-                        textDirection: TextDirection.ltr,
-                      )))),
+                      child: Text(node.nm,
+                          textDirection: TextDirection.ltr,
+                          style: TextStyle(
+                              fontWeight: selected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal))))),
           GestureDetector(
             onTap: () => go?.call(node.id),
             child: Down4Container(
+              border: true,
+              borderColor: selected ? Colors.black : Colors.black12,
+              borderWidth: 1.0,
               backgroundColor: PinkTheme.headerColor,
               child: Image.asset('lib/src/assets/rightBlackArrow.png'),
             ),
@@ -197,18 +214,35 @@ class ConsoleButton extends StatelessWidget {
 class Console extends StatelessWidget {
   final List<ConsoleButton>? topButtons, extraButtons;
   final List<ConsoleButton> bottomButtons;
+  final String? placeHolder;
+  final void Function(String)? inputCallBack;
   const Console(
       {required this.bottomButtons,
+      this.inputCallBack,
+      this.placeHolder,
       this.topButtons,
       this.extraButtons,
       Key? key})
       : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return Down4Container(
         border: true,
         child: Column(children: [
+          inputCallBack != null
+              ? Down4Container(
+                  height: 32,
+                  border: true,
+                  borderColor: PinkTheme.black,
+                  backgroundColor: Colors.white,
+                  child: TextField(
+                      textAlignVertical: TextAlignVertical.center,
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                          hintText: placeHolder, border: InputBorder.none),
+                      textDirection: TextDirection.ltr,
+                      onChanged: (value) => inputCallBack?.call(value)))
+              : const SizedBox.shrink(),
           Row(
             children: topButtons ?? [],
             textDirection: TextDirection.ltr,
@@ -320,5 +354,30 @@ class ChatMessage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class PaletteList extends StatelessWidget {
+  final List<Palette> palettes;
+  const PaletteList({required this.palettes, Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+        child: ListView.separated(
+            itemBuilder: (c, i) => palettes[i],
+            separatorBuilder: (c, i) => Container(height: 16.0),
+            itemCount: palettes.length));
+  }
+}
+
+class MessageList extends StatelessWidget {
+  final List<ChatMessage> messages;
+  const MessageList({required this.messages, Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+        itemBuilder: (c, i) => messages[i],
+        separatorBuilder: (c, i) => Container(height: 16.0),
+        itemCount: messages.length);
   }
 }

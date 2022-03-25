@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/src/data_objects.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'render_objects.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 
-class NodePage extends StatelessWidget {
+class PalettePage extends StatelessWidget {
   final List<Palette> palettes;
   final Console console;
-  NodePage({required this.palettes, required this.console});
+  const PalettePage({required this.palettes, required this.console, Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -14,12 +17,55 @@ class NodePage extends StatelessWidget {
       padding: 16.0,
       backgroundColor: PinkTheme.backGroundColor,
       child: Column(
+        children: [PaletteList(palettes: palettes), const Spacer(), console],
+      ),
+    );
+  }
+}
+
+class MessagePage extends StatelessWidget {
+  final List<ChatMessage> messages;
+  final Console console;
+  const MessagePage({required this.messages, required this.console, Key? key})
+      : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Down4Container(
+        padding: 16.0,
+        backgroundColor: PinkTheme.backGroundColor,
+        child: Column(
+          children: [
+            ListView.separated(
+                itemBuilder: (c, i) => messages[i],
+                separatorBuilder: (c, i) => Container(height: 16.0),
+                itemCount: messages.length),
+            const Spacer(),
+            console
+          ],
+        ));
+  }
+}
+
+class AddFriendPage extends StatelessWidget {
+  final Identifier myID;
+  final List<Palette> palettes;
+  final Console console;
+  const AddFriendPage(
+      {required this.myID,
+      required this.palettes,
+      required this.console,
+      Key? key})
+      : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Down4Container(
+      backgroundColor: PinkTheme.backGroundColor,
+      padding: 16.0,
+      child: Column(
         children: [
-          ListView.separated(
-              itemBuilder: (c, i) => palettes[i],
-              separatorBuilder: (c, i) => Container(height: 16.0),
-              itemCount: palettes.length),
-          Expanded(child: Container()),
+          QrImage(data: myID, foregroundColor: PinkTheme.qrColor),
+          const Spacer(),
+          PaletteList(palettes: palettes),
           console
         ],
       ),
@@ -28,6 +74,8 @@ class NodePage extends StatelessWidget {
 }
 
 class LoadingPage extends StatelessWidget {
+  const LoadingPage({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return const Down4Container(
@@ -38,8 +86,8 @@ class LoadingPage extends StatelessWidget {
 }
 
 class UserCreationPage extends StatefulWidget {
-  void Function(Map<String, String>) callBack;
-  UserCreationPage({Key? key, required this.callBack}) : super(key: key);
+  final void Function(Map<String, String>) callBack;
+  const UserCreationPage({Key? key, required this.callBack}) : super(key: key);
   @override
   State<UserCreationPage> createState() => _UserCreationPageState();
 }
@@ -47,6 +95,7 @@ class UserCreationPage extends StatefulWidget {
 class _UserCreationPageState extends State<UserCreationPage> {
   Map<String, String> info = {};
 
+  @override
   Widget build(BuildContext context) {
     return Down4Container(
         padding: 16.0,
@@ -54,10 +103,7 @@ class _UserCreationPageState extends State<UserCreationPage> {
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Spacer(),
           Down4Container(
-              border: true,
-              borderColor: PinkTheme.headerColor,
-              borderWidth: 2.0,
-              height: Palette.height + 4 + 1,
+              height: Palette.height,
               child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   textDirection: TextDirection.ltr,
@@ -77,8 +123,9 @@ class _UserCreationPageState extends State<UserCreationPage> {
                           }
                         },
                         child: Down4Container(
-                            backgroundColor: PinkTheme.black,
-                            width: Palette.height + 1,
+                            backgroundColor: PinkTheme.headerColor,
+                            width: Palette.height,
+                            padding: 1.5,
                             child: Center(
                                 child: info['image'] == null
                                     ? Image.asset(
@@ -96,7 +143,7 @@ class _UserCreationPageState extends State<UserCreationPage> {
                                     hintText: "Pick a name and an image!",
                                     border: InputBorder.none,
                                     contentPadding: EdgeInsets.only(
-                                        bottom: (Palette.height + 1) / 2)),
+                                        bottom: (Palette.height) / 2)),
                                 textDirection: TextDirection.ltr,
                                 onChanged: ((value) =>
                                     setState(() => info['name'] = value))))),

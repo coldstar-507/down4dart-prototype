@@ -11,6 +11,8 @@ import 'package:sembast/sembast.dart';
 import 'package:sembast/sembast_io.dart';
 import 'render_pages.dart';
 
+import 'scratch.dart';
+
 Future<String> getLocalDatabasePath() async {
   var dir = await getApplicationDocumentsDirectory();
   var theDir = await dir.create(recursive: true);
@@ -61,6 +63,8 @@ class _Down4State extends State<Down4> {
   Base64Image? myImage;
   Name? myName;
 
+  String textInput = "";
+
   List<Identifier> savedMessageIDs = [];
   List<Identifier> chatMessageIDs = [];
   List<Identifier> reactionIDs = [];
@@ -71,33 +75,48 @@ class _Down4State extends State<Down4> {
   Map<Identifier, ChatMessage> liveChat = {};
   Map<Identifier, Palette> livePalette = {};
 
+  void _todo() {
+    print("TODO");
+  }
+
   void _initUser(Map<String, String> map) {
     setState(() {
       myName = map['name'];
       myImage = map['image'];
       myID = sha1(utf8.encode(map['image']! + map['name']!)).toString();
-      theState = states.welcome;
+
+      livePalette = {
+        "jeff": Palette(
+          node: Node(t: NodeTypes.usr, nm: "Jeff", id: "jeff", im: p),
+          sel: _selectPalette,
+        ),
+        "andrew": Palette(
+            node: Node(t: NodeTypes.usr, nm: "Andrew", id: "andrew", im: p),
+            sel: _selectPalette)
+      };
+
+      theState = states.home;
     });
   }
 
-  _putState(states s) {
+  void _putState(states s) {
     setState(() => theState = s);
   }
 
-  _selectPalette(Identifier id) {
+  void _selectPalette(Identifier id) {
     setState(() {
       livePalette[id] = livePalette[id]!.invertedSelection();
     });
-    return;
   }
 
-  _selectMessage(Identifier id) {
+  void _selectMessage(Identifier id) {
     setState(() {
       liveChat[id] = liveChat[id]!.invertedSelection();
     });
   }
 
-  _loadPalettes(List<Identifier> ids, [void Function()? cb]) async {
+  Future<void> _loadPalettes(List<Identifier> ids,
+      [void Function()? cb]) async {
     List<Node?> nodes =
         await widget.nodeStore.records(ids).get(widget.localDatabase);
 
@@ -114,7 +133,8 @@ class _Down4State extends State<Down4> {
     cb?.call();
   }
 
-  _loadMessages(List<Identifier> ids, [void Function()? cb]) async {
+  Future<void> _loadMessages(List<Identifier> ids,
+      [void Function()? cb]) async {
     List<Down4Message?> messages =
         await widget.messageStore.records(ids).get(widget.localDatabase);
 
@@ -127,9 +147,10 @@ class _Down4State extends State<Down4> {
             )
           : print("There is no message to load");
     }
+    cb?.call();
   }
 
-  _loadHome() async {
+  Future<void> _loadHome() async {
     Future<bool> loadUser() async {
       var userRecords = await widget.userStore
           .records(['myID', 'myImage', 'myName']).get(widget.localDatabase);
@@ -177,79 +198,109 @@ class _Down4State extends State<Down4> {
   @override
   Widget build(BuildContext context) {
     switch (theState) {
+
       case states.loading:
-        return LoadingPage();
+        return const LoadingPage();
+
       case states.userCreation:
         return UserCreationPage(callBack: _initUser);
+
       case states.welcome:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
+
       case states.home:
-        return const Center(
-            child: Text(
-          "Not yet implanted",
-          textDirection: TextDirection.ltr,
-        ));
-        break;
+        return PalettePage(
+            palettes: livePalette.values.toList(),
+            console: Console(
+              topButtons: [
+                ConsoleButton(name: "Hyperchat", onPress: _todo),
+                ConsoleButton(name: "Money", onPress: _todo),
+              ],
+              bottomButtons: [
+                ConsoleButton(name: "Browse", onPress: _todo),
+                ConsoleButton(
+                    name: "Add Friend",
+                    onPress: () => setState(() {
+                          livePalette = {};
+                          theState = states.addFriend;
+                        })),
+                ConsoleButton(name: "Favorite", onPress: _todo)
+              ],
+            ));
+
       case states.money:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
+
       case states.addFriend:
-        return const Center(
-            child: Text(
-          "Not yet implanted",
-          textDirection: TextDirection.ltr,
-        ));
-        break;
+        return AddFriendPage(
+            myID: myID!,
+            palettes: livePalette.values.toList(),
+            console: Console(
+              placeHolder: "@Search",
+              inputCallBack: (text) => setState(() => textInput = text),
+              topButtons: [
+                ConsoleButton(name: "Search", onPress: _todo),
+                ConsoleButton(name: "Add", onPress: _todo)
+              ],
+              bottomButtons: [
+                ConsoleButton(
+                    name: "Back",
+                    onPress: () async =>
+                        _loadPalettes(friendIDs, () => _putState(states.home))),
+                ConsoleButton(name: "Scan", onPress: _todo),
+                ConsoleButton(name: "Forward", onPress: _todo)
+              ],
+            ));
+
       case states.chat:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
+
       case states.node:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
+
       case states.map:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
+
       case states.nodeCreation:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
+
       case states.snip:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
+
       case states.cam:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
-        break;
     }
   }
 }
