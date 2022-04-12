@@ -6,9 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 
 class PalettePage extends StatelessWidget {
-  final List<Palette> palettes;
+  final PaletteList paletteList;
   final Console console;
-  const PalettePage({required this.palettes, required this.console, Key? key})
+  const PalettePage(
+      {required this.paletteList, required this.console, Key? key})
       : super(key: key);
 
   @override
@@ -17,16 +18,17 @@ class PalettePage extends StatelessWidget {
       padding: 16.0,
       backgroundColor: PinkTheme.backGroundColor,
       child: Column(
-        children: [PaletteList(palettes: palettes), const Spacer(), console],
+        children: [const Spacer(), paletteList, const Spacer(), console],
       ),
     );
   }
 }
 
 class MessagePage extends StatelessWidget {
-  final List<ChatMessage> messages;
+  final MessageList messageList;
   final Console console;
-  const MessagePage({required this.messages, required this.console, Key? key})
+  const MessagePage(
+      {required this.messageList, required this.console, Key? key})
       : super(key: key);
   @override
   Widget build(BuildContext context) {
@@ -34,25 +36,18 @@ class MessagePage extends StatelessWidget {
         padding: 16.0,
         backgroundColor: PinkTheme.backGroundColor,
         child: Column(
-          children: [
-            ListView.separated(
-                itemBuilder: (c, i) => messages[i],
-                separatorBuilder: (c, i) => Container(height: 16.0),
-                itemCount: messages.length),
-            const Spacer(),
-            console
-          ],
+          children: [messageList, const Spacer(), console],
         ));
   }
 }
 
 class AddFriendPage extends StatelessWidget {
   final Identifier myID;
-  final List<Palette> palettes;
+  final PaletteList paletteList;
   final Console console;
   const AddFriendPage(
       {required this.myID,
-      required this.palettes,
+      required this.paletteList,
       required this.console,
       Key? key})
       : super(key: key);
@@ -65,7 +60,7 @@ class AddFriendPage extends StatelessWidget {
         children: [
           QrImage(data: myID, foregroundColor: PinkTheme.qrColor),
           const Spacer(),
-          PaletteList(palettes: palettes),
+          paletteList,
           console
         ],
       ),
@@ -82,6 +77,24 @@ class LoadingPage extends StatelessWidget {
       backgroundColor: PinkTheme.backGroundColor,
       child: Center(child: Text("Loading...")),
     );
+  }
+}
+
+class NodePage extends StatefulWidget {
+  final Node node;
+  const NodePage({required this.node, Key? key}) : super(key: key);
+  @override
+  State<NodePage> createState() => _NodePageState();
+}
+
+enum NodeViews { messages, childs, parents, admins }
+
+class _NodePageState extends State<NodePage> {
+  NodeViews view;
+  _NodePageState({this.view = NodeViews.messages});
+  @override
+  Widget build(BuildContext context) {
+    return Container();
   }
 }
 
@@ -112,7 +125,7 @@ class _UserCreationPageState extends State<UserCreationPage> {
                         onTap: () async {
                           FilePickerResult? r = await FilePicker.platform
                               .pickFiles(
-                                  type: FileType.image,
+                                  type: FileType.custom,
                                   allowedExtensions: ['jpg', 'png'],
                                   withData: true);
                           if (r != null) {
@@ -129,9 +142,14 @@ class _UserCreationPageState extends State<UserCreationPage> {
                             child: Center(
                                 child: info['image'] == null
                                     ? Image.asset(
-                                        'lib/src/assets/picture_place_holder.png')
-                                    : Image.memory(base64Decode(info['image']!),
-                                        gaplessPlayback: true)))),
+                                        'lib/src/assets/picture_place_holder.png',
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.memory(
+                                        base64Decode(info['image']!),
+                                        gaplessPlayback: true,
+                                        fit: BoxFit.cover,
+                                      )))),
                     Expanded(
                         child: Down4Container(
                             paddingLeft: 10.0,
