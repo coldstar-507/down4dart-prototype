@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'src/kernel.dart';
 
-void main() async {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   var localDatabase = await getLocalDatabase();
   runApp(MaterialApp(home: Down4(localDatabase: localDatabase)));
 }

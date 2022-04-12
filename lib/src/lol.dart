@@ -1,13 +1,12 @@
+import 'data_objects.dart';
+Map<String, int> jeff = {};
+
+List<Map<Identifier, Node>> andrew = [];
 
 
 void main() {
-  final jeff = () => print("Hello how are you my friend!");
-  final andrew = (String lol) {
-    print("Fuck all fucking niggers!" + "$lol");
-    return 34;
-  };
+  jeff['andrew'] = 3;
+  jeff['scott'] = 4;
 
-  jeff();
-  final k = andrew("Fucking piece of shit");
-  print(k);
+  print(jeff.length);
 }
