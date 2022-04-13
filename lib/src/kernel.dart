@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:dartsv/dartsv.dart';
 import 'package:flutter/material.dart';
 import 'data_objects.dart';
@@ -35,6 +34,9 @@ enum states {
 }
 
 class _Down4State extends State<Down4> {
+
+  // ============================================================ VARIABLES ============================================================ //
+
   states _state = states.loading;
   Identifier? _id;
   Base64Image? _image;
@@ -48,7 +50,36 @@ class _Down4State extends State<Down4> {
   };
   Map<String, Map<Identifier, ChatMessage>> _messages = {};
 
-  //=======================================//
+  // ============================================================ KERNEL ============================================================ //
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHome();
+  }
+
+  Future<void> _loadHome() async {
+    Future<bool> loadUser() async {
+      _id = _boxes["User"]?.get("id");
+      _image = _boxes["User"]?.get("image");
+      _name = _boxes["User"]?.get("name");
+      if (_id == null) return false;
+      return true;
+    }
+
+    await _loadBox("User");
+    if (await loadUser()) {
+      await _loadBox("Friends");
+      _putState(states.home);
+    } else {
+      // returns false if user hasn't been initialized
+      _putState(states.userCreation);
+    }
+  }
+
+  Future<void> _loadBox(String boxName) async {
+    _boxes[boxName] = await Hive.openBox(boxName);
+  }
 
   void _todo() {
     print("TODO");
@@ -85,18 +116,17 @@ class _Down4State extends State<Down4> {
     });
   }
 
-  Future<void> _loadBox(String boxName) async {
-    _boxes[boxName] = await Hive.openBox(boxName);
+  void _putState(states s) {
+    setState(() => _state = s);
   }
+
+
+  // ============================================================ DOWN4 ============================================================ //
 
   void _addFriends(Map<Identifier, Palette3> friends) {
     var asNodes = friends.map((id, pal) => MapEntry(id, pal.node));
     _boxes["Friends"]?.putAll(asNodes);
     _palettes["Friends"]?.addAll(friends);
-  }
-
-  void _putState(states s) {
-    setState(() => _state = s);
   }
 
   void _selectPalette(String at, Identifier id) {
@@ -111,32 +141,6 @@ class _Down4State extends State<Down4> {
     });
   }
 
-  Future<void> _loadHome() async {
-    Future<bool> loadUser() async {
-      _id = _boxes["User"]?.get("id");
-      _image = _boxes["User"]?.get("image");
-      _name = _boxes["User"]?.get("name");
-      if (_id == null) return false;
-      return true;
-    }
-
-    await _loadBox("User");
-    if (await loadUser()) {
-      await _loadBox("Friends");
-      _putState(states.home);
-    } else {
-      // returns false if user hasn't been initialized
-      _putState(states.userCreation);
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadHome();
-  }
-
-  // Down4 utility functions
   Map<Identifier, Palette3> _selectedPalettes(String at) {
     var sp =  _palettes[at]!;
     sp.removeWhere((key, value) => !value.selected);
@@ -148,6 +152,14 @@ class _Down4State extends State<Down4> {
     cm.removeWhere((key, value) => !value.selected);
     return cm;
   }
+
+  void _go(String at, Palette3 p) {}
+
+  void _snip(Map<Identifier, Palette3> friends) {}
+
+  void _forward(Map<Identifier, Palette3> palettes) {}
+
+  // ============================================================ RENDER ============================================================ //
 
   @override
   Widget build(BuildContext context) {
