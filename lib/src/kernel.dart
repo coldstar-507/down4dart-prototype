@@ -5,41 +5,15 @@ import 'package:flutter/material.dart';
 import 'data_objects.dart';
 import 'render_objects.dart';
 import 'dart:async';
-import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:sembast/sembast.dart';
-import 'package:sembast/sembast_io.dart';
 import 'render_pages.dart';
 
 import 'package:hive/hive.dart';
 
 import 'scratch.dart';
 
-Future<String> getLocalDatabasePath() async {
-  var dir = await getApplicationDocumentsDirectory();
-  var theDir = await dir.create(recursive: true);
-  var dbPath = join(theDir.path, 'down4.db');
-  return dbPath;
-}
-
-Future<Database> getLocalDatabase() async {
-  String dbPath = await getLocalDatabasePath();
-  DatabaseFactory dbFactory = databaseFactoryIo;
-  Database db = await dbFactory.openDatabase(dbPath);
-  return db;
-}
 
 class Down4 extends StatefulWidget {
-  final userStore = StoreRef<String, String>.main();
-  final keyStore = StoreRef<String, List<Identifier>>.main();
-  final messageStore = StoreRef<Identifier, Down4Message>.main();
-  final nodeStore = StoreRef<Identifier, Node>.main();
-  final reactionStore = StoreRef<Identifier, Reaction>.main();
-  final Database localDatabase;
-  
-
-
-  Down4({Key? key, required this.localDatabase}) : super(key: key);
+  const Down4({Key? key}) : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
@@ -61,141 +35,95 @@ enum states {
 }
 
 class _Down4State extends State<Down4> {
-  states theState = states.loading;
+  states _state = states.loading;
+  Identifier? _id;
+  Base64Image? _image;
+  Name? _name;
+  String _input = "";
+  Node? _node;
+  Map<String, Box> _boxes = {};
+  Map<String, Map<Identifier, Palette3>> _palettes = {
+    "Friends": {},
+    "AddFriends": {}
+  };
+  Map<String, Map<Identifier, ChatMessage>> _messages = {};
 
-  Identifier? myID;
-  Base64Image? myImage;
-  Name? myName;
-
-  String textInput = "";
-
-  List<Map<String, Node>> nodes = [];
-  Map<Identifier, ChatMessage> liveChat = {};
-  Map<Identifier, Palette3> livePalette = {};
+  //=======================================//
 
   void _todo() {
     print("TODO");
   }
 
-  void _todoID(Identifier id) {
-    print("TODO: ID={$id}");
+  void _todoID(String at, Identifier id) {
+    print("TODO: at=$at, id=$id");
   }
 
-  void _initUser(Map<String, String> map) {
+  void _initUser(Map<String, String> info) {
     setState(() {
-      myName = map['name'];
-      myImage = map['image'];
-      myID = sha1(utf8.encode(map['image']! + map['name']!)).toString();
+      _name = info['name'];
+      _image = info['image'];
+      _id = info['id'];
+      //_id = sha1(utf8.encode(info['image']! + info['name']!)).toString();
 
-      livePalette = {
+      _palettes["Friends"]?.addAll({
         "jeff": Palette3(
           node: Node(t: NodeTypes.usr, nm: "Jeff", id: "jeff", im: p),
+          at: "Friends",
           imPress: _selectPalette,
           bodyPress: _selectPalette,
           goPress: _todoID,
         ),
         "andrew": Palette3(
           node: Node(t: NodeTypes.usr, nm: "Andrew", id: "andrew", im: p),
+          at: "Friends",
           imPress: _selectPalette,
           bodyPress: _selectPalette,
           goPress: _todoID,
         )
-      };
-
-      theState = states.home;
+      });
+      _state = states.home;
     });
   }
 
-  void _addFriends(List<Node> friends) async {
-    var friendBox = await Hive.openBox('friends');
+  Future<void> _loadBox(String boxName) async {
+    _boxes[boxName] = await Hive.openBox(boxName);
+  }
+
+  void _addFriends(Map<Identifier, Palette3> friends) {
+    var asNodes = friends.map((id, pal) => MapEntry(id, pal.node));
+    _boxes["Friends"]?.putAll(asNodes);
+    _palettes["Friends"]?.addAll(friends);
   }
 
   void _putState(states s) {
-    setState(() => theState = s);
+    setState(() => _state = s);
   }
 
-  void _selectPalette(Identifier id) {
+  void _selectPalette(String at, Identifier id) {
     setState(() {
-      livePalette[id] = livePalette[id]!.invertedSelection();
+      _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
     });
   }
 
-  void _selectMessage(Identifier id) {
+  void _selectMessage(String at, Identifier id) {
     setState(() {
-      liveChat[id] = liveChat[id]!.invertedSelection();
+      _messages[at]![id] = _messages[at]![id]!.invertedSelection();
     });
-  }
-
-  Future<void> _loadLocalPalettes(List<Identifier> ids,
-      [void Function()? cb]) async {
-    List<Node?> nodes =
-        await widget.nodeStore.records(ids).get(widget.localDatabase);
-
-    for (var node in nodes) {
-      node != null
-          ? livePalette[node.id] = Palette3(
-              node: node,
-              selected: false,
-              imPress: _selectPalette,
-              bodyPress: _selectPalette,
-              goPress: _todoID,
-            )
-          : print("No palette to load :(");
-    }
-
-    cb?.call();
-  }
-
-  Future<void> _loadLocalMessages(List<Identifier> ids,
-      [void Function()? cb]) async {
-    List<Down4Message?> messages =
-        await widget.messageStore.records(ids).get(widget.localDatabase);
-
-    for (var message in messages) {
-      message != null
-          ? liveChat[message.id] = ChatMessage(
-              message: message,
-              myMessage: myID == message.sd,
-              select: _selectMessage,
-            )
-          : print("There is no message to load");
-    }
-    cb?.call();
   }
 
   Future<void> _loadHome() async {
     Future<bool> loadUser() async {
-      var userRecords = await widget.userStore
-          .records(['myID', 'myImage', 'myName']).get(widget.localDatabase);
-      myID = userRecords[0];
-      myImage = userRecords[1];
-      myName = userRecords[2];
-
-      if (myID == null) return false;
+      _id = _boxes["User"]?.get("id");
+      _image = _boxes["User"]?.get("image");
+      _name = _boxes["User"]?.get("name");
+      if (_id == null) return false;
       return true;
     }
 
-    loadIdentifiers() async {
-      var records = await widget.keyStore.records([
-        'savedMessageIDs',
-        'chatMessageIDs',
-        'reactionIDs',
-        'friendIDs',
-        'nodeIDs',
-        'assetIDs'
-      ]).get(widget.localDatabase);
-
-      savedMessageIDs = records[0] ?? [];
-      chatMessageIDs = records[1] ?? [];
-      reactionIDs = records[2] ?? [];
-      friendIDs = records[3] ?? [];
-      nodeIDs = records[4] ?? [];
-      assetIDs = records[5] ?? [];
-    }
-
+    await _loadBox("User");
     if (await loadUser()) {
-      await loadIdentifiers();
-      await _loadLocalPalettes(friendIDs, () => _putState(states.home));
+      await _loadBox("Friends");
+      _putState(states.home);
     } else {
       // returns false if user hasn't been initialized
       _putState(states.userCreation);
@@ -209,17 +137,21 @@ class _Down4State extends State<Down4> {
   }
 
   // Down4 utility functions
-  List<Palette3> _selectedPalettes() {
-    return livePalette.values.where((palette) => palette.selected).toList();
+  Map<Identifier, Palette3> _selectedPalettes(String at) {
+    var sp =  _palettes[at]!;
+    sp.removeWhere((key, value) => !value.selected);
+    return sp;
   }
 
-  List<ChatMessage> _selectedMessages() {
-    return liveChat.values.where((msg) => msg.selected).toList();
+  Map<Identifier, ChatMessage> _selectedMessages(String at) {
+    var cm = _messages[at]!;
+    cm.removeWhere((key, value) => !value.selected);
+    return cm;
   }
 
   @override
   Widget build(BuildContext context) {
-    switch (theState) {
+    switch (_state) {
       case states.loading:
         return const LoadingPage();
 
@@ -235,7 +167,7 @@ class _Down4State extends State<Down4> {
 
       case states.home:
         return PalettePage(
-            paletteList: PaletteList(palettes: livePalette.values.toList()),
+            paletteList: PaletteList(palettes: _palettes["Friends"]!.values.toList()),
             console: Console(
               topButtons: [
                 ConsoleButton(name: "Hyperchat", onPress: _todo),
@@ -246,8 +178,7 @@ class _Down4State extends State<Down4> {
                 ConsoleButton(
                     name: "Add Friend",
                     onPress: () => setState(() {
-                          livePalette = {};
-                          theState = states.addFriend;
+                          _state = states.addFriend;
                         })),
                 ConsoleButton(name: "Favorite", onPress: _todo)
               ],
@@ -262,11 +193,11 @@ class _Down4State extends State<Down4> {
 
       case states.addFriend:
         return AddFriendPage(
-            myID: myID!,
-            paletteList: PaletteList(palettes: livePalette.values.toList()),
+            myID: _id!,
+            paletteList: PaletteList(palettes: _palettes["AddFriend"]!.values.toList()),
             console: Console(
               placeHolder: "@Search",
-              inputCallBack: (text) => setState(() => textInput = text),
+              inputCallBack: (text) => setState(() => _input = text),
               topButtons: [
                 ConsoleButton(name: "Search", onPress: _todo),
                 ConsoleButton(name: "Add", onPress: _todo)
@@ -274,8 +205,7 @@ class _Down4State extends State<Down4> {
               bottomButtons: [
                 ConsoleButton(
                     name: "Back",
-                    onPress: () async => _loadLocalPalettes(
-                        friendIDs, () => _putState(states.home))),
+                    onPress: () => _putState(states.home)),
                 ConsoleButton(name: "Scan", onPress: _todo),
                 ConsoleButton(name: "Forward", onPress: _todo)
               ],

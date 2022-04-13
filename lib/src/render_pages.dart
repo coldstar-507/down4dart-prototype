@@ -80,14 +80,13 @@ class LoadingPage extends StatelessWidget {
   }
 }
 
+enum NodeViews { messages, childs, parents, admins }
 class NodePage extends StatefulWidget {
   final Node node;
   const NodePage({required this.node, Key? key}) : super(key: key);
   @override
   State<NodePage> createState() => _NodePageState();
 }
-
-enum NodeViews { messages, childs, parents, admins }
 
 class _NodePageState extends State<NodePage> {
   NodeViews view;
