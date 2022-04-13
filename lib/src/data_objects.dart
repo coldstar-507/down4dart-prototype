@@ -35,11 +35,11 @@ class Reaction {
 }
 
 class Down4Message {
-  final Identifier id, sd;
+  final Identifier id, sd; // sender, live-parent
   final Base64Image tn;
   final Name nm;
   final String? t; // text
-  final Base64Image? p;
+  final Base64Image? p; // photo
   final int? ts;
   final bool ch; // true is chat, false is post
   final List<Base64Image>? pl; // photoloop
