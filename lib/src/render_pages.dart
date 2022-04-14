@@ -15,10 +15,9 @@ class PalettePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Down4Container(
-      padding: 16.0,
       backgroundColor: PinkTheme.backGroundColor,
       child: Column(
-        children: [const Spacer(), paletteList, const Spacer(), console],
+        children: [paletteList, console],
       ),
     );
   }
@@ -53,18 +52,17 @@ class AddFriendPage extends StatelessWidget {
       : super(key: key);
   @override
   Widget build(BuildContext context) {
-    return Down4Container(
+    return Scaffold(
+        body: SafeArea(
+            child: Down4Container(
       backgroundColor: PinkTheme.backGroundColor,
-      padding: 16.0,
-      child: Column(
+      child: Stack(
         children: [
           QrImage(data: myID, foregroundColor: PinkTheme.qrColor),
-          const Spacer(),
-          paletteList,
-          console
+          Column(children: [paletteList, console]),
         ],
       ),
-    );
+    )));
   }
 }
 
@@ -81,6 +79,7 @@ class LoadingPage extends StatelessWidget {
 }
 
 enum NodeViews { messages, childs, parents, admins }
+
 class NodePage extends StatefulWidget {
   final Node node;
   const NodePage({required this.node, Key? key}) : super(key: key);
