@@ -10,7 +10,6 @@ import 'package:hive/hive.dart';
 
 import 'scratch.dart';
 
-
 class Down4 extends StatefulWidget {
   const Down4({Key? key}) : super(key: key);
 
@@ -34,7 +33,6 @@ enum states {
 }
 
 class _Down4State extends State<Down4> {
-
   // ============================================================ VARIABLES ============================================================ //
 
   states _state = states.loading;
@@ -46,7 +44,7 @@ class _Down4State extends State<Down4> {
   Map<String, Box> _boxes = {};
   Map<String, Map<Identifier, Palette3>> _palettes = {
     "Friends": {},
-    "AddFriends": {}
+    "AddFriend": {}
   };
   Map<String, Map<Identifier, ChatMessage>> _messages = {};
 
@@ -93,8 +91,8 @@ class _Down4State extends State<Down4> {
     setState(() {
       _name = info['name'];
       _image = info['image'];
-      _id = info['id'];
-      //_id = sha1(utf8.encode(info['image']! + info['name']!)).toString();
+      // _id = info['id'];
+      _id = sha1(utf8.encode(info['image']! + info['name']!)).toString();
 
       _palettes["Friends"]?.addAll({
         "jeff": Palette3(
@@ -120,13 +118,36 @@ class _Down4State extends State<Down4> {
     setState(() => _state = s);
   }
 
-
   // ============================================================ DOWN4 ============================================================ //
 
-  void _addFriends(Map<Identifier, Palette3> friends) {
-    var asNodes = friends.map((id, pal) => MapEntry(id, pal.node));
-    _boxes["Friends"]?.putAll(asNodes);
-    _palettes["Friends"]?.addAll(friends);
+  void _searchFriends(Identifier nameID) {
+    setState(() {
+      _palettes["AddFriend"]![nameID] = Palette3(
+        at: "AddFriend",
+        node: Node(t: NodeTypes.usr, id: nameID, nm: nameID, im: p),
+        imPress: _selectPalette,
+        bodyPress: _selectPalette,
+        goPress: _go,
+      );
+    });
+  }
+
+  void _addFriends(Map<Identifier, Node> friends) {
+    var asPalettes = friends.map((id, node) => MapEntry(
+        id,
+        Palette3(
+            at: "Friends",
+            node: node,
+            imPress: _selectPalette,
+            bodyPress: _selectPalette,
+            goPress: _go)));
+    _palettes["Friends"]?.addAll(asPalettes);
+    _boxes["Friends"]?.putAll(friends);
+  }
+
+  List<Palette3> _palettesList(String at) {
+    var paletteList = _palettes[at]!.values.toList().reversed.toList();
+    return paletteList;
   }
 
   void _selectPalette(String at, Identifier id) {
@@ -142,9 +163,15 @@ class _Down4State extends State<Down4> {
   }
 
   Map<Identifier, Palette3> _selectedPalettes(String at) {
-    var sp =  _palettes[at]!;
+    var sp = _palettes[at]!;
     sp.removeWhere((key, value) => !value.selected);
     return sp;
+  }
+
+  Map<Identifier, Node> _selectedNodes(String at) {
+    var sp = _selectedPalettes(at);
+    var asNodes = sp.map((key, value) => MapEntry(key, value.node));
+    return asNodes;
   }
 
   Map<Identifier, ChatMessage> _selectedMessages(String at) {
@@ -153,11 +180,13 @@ class _Down4State extends State<Down4> {
     return cm;
   }
 
-  void _go(String at, Palette3 p) {}
+  void _go(String at, Identifier p) {}
 
   void _snip(Map<Identifier, Palette3> friends) {}
 
-  void _forward(Map<Identifier, Palette3> palettes) {}
+  void _forwardPalettes(Map<Identifier, Palette3> palettes) {}
+
+  void _forwardMessages(Map<Identifier, ChatMessage> messages) {}
 
   // ============================================================ RENDER ============================================================ //
 
@@ -179,7 +208,7 @@ class _Down4State extends State<Down4> {
 
       case states.home:
         return PalettePage(
-            paletteList: PaletteList(palettes: _palettes["Friends"]!.values.toList()),
+            paletteList: PaletteList(palettes: _palettesList("Friends")),
             console: Console(
               topButtons: [
                 ConsoleButton(name: "Hyperchat", onPress: _todo),
@@ -206,18 +235,20 @@ class _Down4State extends State<Down4> {
       case states.addFriend:
         return AddFriendPage(
             myID: _id!,
-            paletteList: PaletteList(palettes: _palettes["AddFriend"]!.values.toList()),
+            paletteList: PaletteList(palettes: _palettesList("AddFriend")),
             console: Console(
               placeHolder: "@Search",
               inputCallBack: (text) => setState(() => _input = text),
               topButtons: [
-                ConsoleButton(name: "Search", onPress: _todo),
-                ConsoleButton(name: "Add", onPress: _todo)
+                ConsoleButton(
+                    name: "Search", onPress: () => _searchFriends(_input)),
+                ConsoleButton(
+                    name: "Add",
+                    onPress: () => _addFriends(_selectedNodes("AddFriend")))
               ],
               bottomButtons: [
                 ConsoleButton(
-                    name: "Back",
-                    onPress: () => _putState(states.home)),
+                    name: "Back", onPress: () => _putState(states.home)),
                 ConsoleButton(name: "Scan", onPress: _todo),
                 ConsoleButton(name: "Forward", onPress: _todo)
               ],
