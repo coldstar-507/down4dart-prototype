@@ -32,6 +32,7 @@ class Down4Container extends StatelessWidget {
       radiusTopLeft,
       radiusBottomRight,
       radiusBottomLeft;
+  final double marginTop, marginBottom, marginLeft, marginRight;
   final double borderWidth;
   final Color borderColor;
   final Color backgroundColor;
@@ -49,6 +50,10 @@ class Down4Container extends StatelessWidget {
   final double radius;
   const Down4Container({
     Key? key,
+    this.marginBottom = 0.0,
+    this.marginLeft = 0.0,
+    this.marginRight = 0.0,
+    this.marginTop = 0.0,
     this.clip = true,
     this.shadow = false,
     this.borderRadius = false,
@@ -102,8 +107,12 @@ class Down4Container extends StatelessWidget {
               left: paddingLeft,
               right: paddingRight,
               top: paddingTop,
-              bottom: paddingBottom,
-            ),
+              bottom: paddingBottom),
+      margin: EdgeInsets.only(
+          left: marginLeft,
+          right: marginRight,
+          top: marginTop,
+          bottom: marginBottom),
       decoration: BoxDecoration(
           boxShadow: shadow
               ? [
@@ -144,6 +153,7 @@ class Down4Container2 extends StatelessWidget {
   final double? height, width;
   final Widget? child;
   final bool borderSpecific, borderRadiusSpecific, borderRadius, shadow, clip;
+  final double marginTop, marginBottom, marginLeft, marginRight;
   final double radiusTopRight,
       radiusTopLeft,
       radiusBottomRight,
@@ -166,6 +176,10 @@ class Down4Container2 extends StatelessWidget {
   const Down4Container2({
     Key? key,
     this.clip = true,
+    this.marginBottom = 0.0,
+    this.marginLeft = 0.0,
+    this.marginRight = 0.0,
+    this.marginTop = 0.0,
     this.shadow = false,
     this.borderRadius = false,
     this.radiusBottomLeft = 0.0,
@@ -219,6 +233,11 @@ class Down4Container2 extends StatelessWidget {
               top: paddingTop,
               bottom: paddingBottom,
             ),
+      margin: EdgeInsets.only(
+          left: marginLeft,
+          right: marginRight,
+          top: marginTop,
+          bottom: marginBottom),
       decoration: BoxDecoration(
           boxShadow: shadow
               ? [
@@ -475,6 +494,8 @@ class Palette3 extends StatelessWidget {
       height: Palette3.height,
       borderWidth: 2.0,
       borderRadius: true,
+      marginLeft: 20.0,
+      marginRight: 20.0,
       radius: 6.0,
       borderColor: selected ? PinkTheme.black : Colors.transparent,
       child: Row(
@@ -597,10 +618,13 @@ class Console extends StatelessWidget {
       : super(key: key);
   @override
   Widget build(BuildContext context) {
-    return Down4Container(
+    return Down4Container2(
+        marginLeft: 16.0,
+        marginRight: 16.0,
+        marginBottom: 16.0,
         child: Column(children: [
           inputCallBack != null
-              ? Down4Container(
+              ? Down4Container2(
                   height: ConsoleButton.height,
                   borderColor: PinkTheme.black,
                   backgroundColor: Colors.white,
@@ -731,10 +755,15 @@ class PaletteList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-        child: ListView.separated(
-            itemBuilder: (c, i) => palettes[i],
-            separatorBuilder: (c, i) => Container(height: 16.0),
-            itemCount: palettes.length));
+        child: ListView(reverse: true, children: [
+      Container(height: 16.0),
+      ListView.separated(
+          shrinkWrap: true,
+          itemBuilder: (c, i) => palettes[i],
+          separatorBuilder: (c, i) => Container(height: 16.0),
+          itemCount: palettes.length),
+      Container(height: 16.0)
+    ]));
   }
 }
 
