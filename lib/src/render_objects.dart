@@ -568,17 +568,44 @@ class ConsoleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          shape: BoxShape.rectangle,
+          color: PinkTheme.black,
+          border: Border.all(color: Colors.black, width: 0.5),
+        ),
+        child: TouchableOpacity(
+          onPress: onPress,
+          onLongPress: onLongPress,
+          child: Container(
+            color: PinkTheme.buttonColor,
+            child: Center(
+              child: Text(
+                name,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Expanded(
       child: Material(
-          child: Ink(
+          //child: Ink(
+          child: Container(
               height: height,
               decoration: BoxDecoration(
                   shape: BoxShape.rectangle,
                   color: PinkTheme.buttonColor,
                   border: Border.all(color: Colors.black, width: 0.5)),
-              child: InkWell(
+              child: TextButton(
+                  //InkWell(
                   //borderRadius: BorderRadius.zero,
-                  splashColor: Colors.black,
-                  onTap: onPress,
+                  //splashColor: Colors.black,
+                  //onTap: onPress,
+                  onPressed: onPress,
                   onLongPress: onLongPress,
                   child: Center(
                       child: Text(
