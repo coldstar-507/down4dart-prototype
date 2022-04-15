@@ -145,7 +145,12 @@ class _Down4State extends State<Down4> {
     _boxes["Friends"]?.putAll(friends);
   }
 
-  List<Palette3> _palettesList(String at) {
+  List<Palette3> _paletteList(String at) {
+    var paletteList = _palettes[at]!.values.toList();
+    return paletteList;
+  }
+
+  List<Palette3> _reversedList(String at) {
     var paletteList = _palettes[at]!.values.toList().reversed.toList();
     return paletteList;
   }
@@ -208,7 +213,7 @@ class _Down4State extends State<Down4> {
 
       case states.home:
         return PalettePage(
-            paletteList: PaletteList(palettes: _palettesList("Friends")),
+            paletteList: PaletteList(palettes: _paletteList("Friends")),
             console: Console(
               topButtons: [
                 ConsoleButton(name: "Hyperchat", onPress: _todo),
@@ -235,7 +240,7 @@ class _Down4State extends State<Down4> {
       case states.addFriend:
         return AddFriendPage(
             myID: _id!,
-            paletteList: PaletteList(palettes: _palettesList("AddFriend")),
+            paletteList: PaletteList(palettes: _reversedList("AddFriend")),
             console: Console(
               placeHolder: "@Search",
               inputCallBack: (text) => setState(() => _input = text),

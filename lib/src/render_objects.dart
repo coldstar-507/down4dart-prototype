@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'data_objects.dart';
 import 'dart:convert';
+import 'render_utility.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
   static const bodyColor = buttonColor;
   static const backGroundColor = Color.fromARGB(255, 255, 241, 242);
-  static const headerColor = Color.fromARGB(255, 250, 81, 138);
+  static const headerColor = Color.fromRGBO(255, 103, 154, 1);
   static const imageBorderColor = Color.fromARGB(255, 143, 29, 67);
   static const borderColor = Colors.black;
   static const qrColor = Color.fromARGB(255, 56, 3, 17);
@@ -242,8 +243,8 @@ class Down4Container2 extends StatelessWidget {
           boxShadow: shadow
               ? [
                   const BoxShadow(
-                      color: Colors.black87,
-                      blurRadius: 12.0,
+                      color: Colors.black54,
+                      blurRadius: 6.0,
                       spreadRadius: -6.0,
                       offset: Offset(8.0, 8.0),
                       blurStyle: BlurStyle.normal)
@@ -494,8 +495,8 @@ class Palette3 extends StatelessWidget {
       height: Palette3.height,
       borderWidth: 2.0,
       borderRadius: true,
-      marginLeft: 20.0,
-      marginRight: 20.0,
+      marginLeft: 22.0,
+      marginRight: 22.0,
       radius: 6.0,
       borderColor: selected ? PinkTheme.black : Colors.transparent,
       child: Row(
@@ -517,7 +518,7 @@ class Palette3 extends StatelessWidget {
             child: GestureDetector(
               onTap: () => bodyPress?.call(at, node.id),
               onLongPress: () => bodyLongPress?.call(at, node.id),
-              child: Down4Container2(
+              child: Down4Container(
                 borderSpecific: true,
                 borderLeftColor:
                     selected ? PinkTheme.black : PinkTheme.headerColor,
@@ -755,15 +756,17 @@ class PaletteList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-        child: ListView(reverse: true, children: [
-      Container(height: 16.0),
-      ListView.separated(
-          shrinkWrap: true,
-          itemBuilder: (c, i) => palettes[i],
-          separatorBuilder: (c, i) => Container(height: 16.0),
-          itemCount: palettes.length),
-      Container(height: 16.0)
-    ]));
+        child: ScrollConfiguration(
+            behavior: NoGlow(),
+            child: ListView.separated(
+                reverse: true,
+                itemBuilder: (c, i) => i == 0
+                    ? const SizedBox.shrink()
+                    : i == palettes.length + 2 - 1
+                        ? const SizedBox.shrink()
+                        : palettes[i - 1],
+                separatorBuilder: (c, i) => Container(height: 16.0),
+                itemCount: palettes.length + 2)));
   }
 }
 
@@ -772,9 +775,16 @@ class MessageList extends StatelessWidget {
   const MessageList({required this.messages, Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-        itemBuilder: (c, i) => messages[i],
-        separatorBuilder: (c, i) => Container(height: 16.0),
-        itemCount: messages.length);
+    return Expanded(
+        child: ScrollConfiguration(
+            behavior: NoGlow(),
+            child: ListView.separated(
+                itemBuilder: (c, i) => i == 0
+                    ? const SizedBox.shrink()
+                    : i == messages.length + 2 - 1
+                        ? const SizedBox.shrink()
+                        : messages[i],
+                separatorBuilder: (c, i) => Container(height: 16.0),
+                itemCount: messages.length + 2)));
   }
 }
