@@ -14,12 +14,13 @@ class PalettePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-        child: Container(
-            color: PinkTheme.backGroundColor,
-            child: Column(
-              children: [paletteList, console],
-            )));
+    return Scaffold(
+        body: SafeArea(
+            child: Container(
+                color: PinkTheme.backGroundColor,
+                child: Column(
+                  children: [paletteList, console],
+                ))));
   }
 }
 
