@@ -202,7 +202,9 @@ class _Down4State extends State<Down4> {
         return const LoadingPage();
 
       case states.userCreation:
-        return UserCreationPage(callBack: _initUser);
+        return PaletteMakerPage(
+            kernelInfoCallBack: (infos) => _initUser(infos["user"]!),
+            makingUser: true);
 
       case states.welcome:
         return const Center(
