@@ -1,9 +1,13 @@
+import 'package:camera/camera.dart';
 import 'package:dartsv/dartsv.dart';
 import 'package:flutter/material.dart';
 import 'data_objects.dart';
 import 'dart:convert';
 import 'render_utility.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'dart:math' as math;
+import 'package:video_player/video_player.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
@@ -144,13 +148,19 @@ class Palette3 extends StatelessWidget {
 class ConsoleButton extends StatelessWidget {
   static const double height = 30.0;
   final String name;
+  final bool isSpecial, isMode, shouldBeDownButIsnt;
   final void Function() onPress;
   final void Function()? onLongPress;
+  final void Function()? onLongPressUp;
 
   const ConsoleButton({
     required this.name,
     required this.onPress,
+    this.shouldBeDownButIsnt = false,
+    this.isMode = false,
+    this.isSpecial = false,
     this.onLongPress,
+    this.onLongPressUp,
     Key? key,
   }) : super(key: key);
 
@@ -164,73 +174,56 @@ class ConsoleButton extends StatelessWidget {
                 color: PinkTheme.black,
                 border: Border.all(color: Colors.black, width: 0.5)),
             child: TouchableOpacity(
+                shouldBeDownButIsnt: shouldBeDownButIsnt,
                 onPress: onPress,
                 onLongPress: onLongPress,
+                onLongPressUp: onLongPressUp,
                 child: Material(
                     child: Container(
                         color: PinkTheme.buttonColor,
                         child: Center(
                             child: Text(name,
-                                style: const TextStyle(
+                                style: TextStyle(
+                                    fontFamily: isSpecial ? "Kaushan" : null,
+                                    // fontSize: isSpecial ? 20 : null,
+                                    fontStyle: isMode
+                                        ? FontStyle.italic
+                                        : FontStyle.normal,
                                     fontWeight: FontWeight.bold))))))));
-
-    return Expanded(
-      child: Material(
-          //child: Ink(
-          child: Container(
-              height: height,
-              decoration: BoxDecoration(
-                  shape: BoxShape.rectangle,
-                  color: PinkTheme.buttonColor,
-                  border: Border.all(color: Colors.black, width: 0.5)),
-              child: TextButton(
-                  //InkWell(
-                  //borderRadius: BorderRadius.zero,
-                  //splashColor: Colors.black,
-                  //onTap: onPress,
-                  onPressed: onPress,
-                  onLongPress: onLongPress,
-                  child: Center(
-                      child: Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ))))),
-
-      // child: Down4Container(
-      //     padding: 1.0,
-      //     height: height,
-      //     borderColor: PinkTheme.black,
-      //     child: TextButton(
-      //       style:
-      //         TextButton.styleFrom(
-      //             backgroundColor: PinkTheme.buttonColor,
-      //             primary: PinkTheme.black),
-      //         onPressed: onPress,
-      //         onLongPress: onLongPress,
-      //         child: Center(
-      //           child: Text(name),
-      //         ))),
-    );
   }
 }
 
 class Console extends StatelessWidget {
   final List<ConsoleButton>? topButtons, extraButtons;
   final List<ConsoleButton> bottomButtons;
+  final CameraPreview? cameraPreview;
+  final double? aspectRatio;
+  final bool? toMirror;
+  final String? imagePreviewPath;
+  final VideoPlayerController? videoPlayerController;
   final String? placeHolder;
   final TextInputType? textInputType;
   final void Function(String)? inputCallBack;
   const Console(
       {required this.bottomButtons,
+      this.imagePreviewPath,
+      this.videoPlayerController,
       this.inputCallBack,
+      this.toMirror,
+      this.aspectRatio,
+      this.cameraPreview,
       this.textInputType,
       this.placeHolder,
       this.topButtons,
       this.extraButtons,
       Key? key})
       : super(key: key);
+
   @override
   Widget build(BuildContext context) {
+    // both margin (16+16=32) + 1 = 0.5x1 for the Main container border
+    final double mirror = toMirror == true ? math.pi : 0;
+    var camWidthAndHeight = MediaQuery.of(context).size.width - 33.0;
     return Container(
       margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
       decoration:
@@ -248,10 +241,53 @@ class Console extends StatelessWidget {
                         textAlignVertical: TextAlignVertical.center,
                         textAlign: TextAlign.center,
                         decoration: InputDecoration(
-                            hintText: placeHolder, border: InputBorder.none),
+                            contentPadding: const EdgeInsets.all(10.0),
+                            hintText: placeHolder,
+                            border: InputBorder.none),
                         textDirection: TextDirection.ltr,
                         onChanged: (value) => inputCallBack?.call(value))))
-            : const SizedBox.shrink(),
+            : cameraPreview != null
+                ? Container(
+                    width: camWidthAndHeight,
+                    height: camWidthAndHeight,
+                    clipBehavior: Clip.hardEdge,
+                    decoration: BoxDecoration(
+                        border: Border.all(color: Colors.black, width: .5)),
+                    child: Transform.scale(
+                        alignment: Alignment.center,
+                        scaleY: aspectRatio,
+                        child: AspectRatio(
+                            aspectRatio: aspectRatio!, child: cameraPreview!)))
+                : imagePreviewPath != null
+                    ? Container(
+                        width: camWidthAndHeight,
+                        height: camWidthAndHeight,
+                        decoration: BoxDecoration(
+                            border:
+                                Border.all(color: Colors.black, width: 0.5)),
+                        child: Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.rotationY(mirror),
+                            child: Image.file(
+                              File(imagePreviewPath!),
+                              fit: BoxFit.cover,
+                            )))
+                    : videoPlayerController != null
+                        ? Container(
+                            clipBehavior: Clip.hardEdge,
+                            width: camWidthAndHeight,
+                            height: camWidthAndHeight,
+                            decoration: BoxDecoration(
+                                border: Border.all(
+                                    color: Colors.black, width: 0.5)),
+                            child: Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.rotationY(mirror),
+                                child: Transform.scale(
+                                    scaleY: aspectRatio,
+                                    child:
+                                        VideoPlayer(videoPlayerController!))))
+                        : const SizedBox.shrink(),
         Row(
           children: topButtons ?? [],
           textDirection: TextDirection.ltr,
@@ -367,6 +403,7 @@ class PaletteList extends StatelessWidget {
         child: ScrollConfiguration(
             behavior: NoGlow(),
             child: ListView.separated(
+                padding: const EdgeInsets.only(top: 0),
                 reverse: true,
                 itemBuilder: (c, i) => i == 0
                     ? const SizedBox.shrink()
@@ -387,6 +424,7 @@ class MessageList extends StatelessWidget {
         child: ScrollConfiguration(
             behavior: NoGlow(),
             child: ListView.separated(
+                padding: const EdgeInsets.only(top: 0),
                 itemBuilder: (c, i) => i == 0
                     ? const SizedBox.shrink()
                     : i == messages.length + 2 - 1
@@ -399,12 +437,14 @@ class MessageList extends StatelessWidget {
 
 class PaletteMaker extends StatefulWidget {
   final void Function(Map<String, String>) infoCallBack;
+  final Map<String, String> inheritedInfo;
   final void Function(Identifier)? go;
   final Identifier parentID;
   final NodeTypes type;
   final NodeTypes? parentType;
-  PaletteMaker(
+  const PaletteMaker(
       {required this.infoCallBack,
+      this.inheritedInfo = const {},
       this.go,
       this.type = NodeTypes.usr,
       this.parentType,
@@ -467,10 +507,15 @@ class _PaletteMakerState extends State<PaletteMaker> {
                       )),
                       width: Palette3.height - 2.0, // borderWidth x2
                       child: info['image'] == null
-                          ? Image.asset(
-                              'lib/src/assets/picture_place_holder_2.png',
-                              fit: BoxFit.cover,
-                            )
+                          ? widget.inheritedInfo['image'] == null
+                              ? Image.asset(
+                                  'lib/src/assets/picture_place_holder_2.png',
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.memory(
+                                  base64Decode(widget.inheritedInfo['image']!),
+                                  gaplessPlayback: true,
+                                  fit: BoxFit.cover)
                           : Image.memory(
                               base64Decode(info['image']!),
                               gaplessPlayback: true,

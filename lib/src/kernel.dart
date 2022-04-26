@@ -5,13 +5,14 @@ import 'data_objects.dart';
 import 'render_objects.dart';
 import 'dart:async';
 import 'render_pages.dart';
-
+import 'package:camera/camera.dart';
 import 'package:hive/hive.dart';
 
 import 'scratch.dart';
 
 class Down4 extends StatefulWidget {
-  const Down4({Key? key}) : super(key: key);
+  List<CameraDescription> cameras;
+  Down4({required this.cameras, Key? key}) : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
@@ -34,7 +35,6 @@ enum states {
 
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
-
   states _state = states.loading;
   Identifier? _id;
   Base64Image? _image;
@@ -47,6 +47,16 @@ class _Down4State extends State<Down4> {
     "AddFriend": {}
   };
   Map<String, Map<Identifier, ChatMessage>> _messages = {};
+  var _modes = {
+    "Currencies": {
+      "l": ["CAD", "Satoshis"],
+      "i": 0
+    },
+    "Payment": {
+      "l": ["Each", "Split"],
+      "i": 0
+    }
+  };
 
   // ============================================================ KERNEL ============================================================ //
 
@@ -93,23 +103,6 @@ class _Down4State extends State<Down4> {
       _image = info['image'];
       // _id = info['id'];
       _id = sha1(utf8.encode(info['image']! + info['name']!)).toString();
-
-      _palettes["Friends"]?.addAll({
-        "jeff": Palette3(
-          node: Node(t: NodeTypes.usr, nm: "Jeff", id: "jeff", im: p),
-          at: "Friends",
-          imPress: _selectPalette,
-          bodyPress: _selectPalette,
-          goPress: _todoID,
-        ),
-        "andrew": Palette3(
-          node: Node(t: NodeTypes.usr, nm: "Andrew", id: "andrew", im: p),
-          at: "Friends",
-          imPress: _selectPalette,
-          bodyPress: _selectPalette,
-          goPress: _todoID,
-        )
-      });
       _state = states.home;
     });
   }
@@ -167,22 +160,16 @@ class _Down4State extends State<Down4> {
     });
   }
 
-  Map<Identifier, Palette3> _selectedPalettes(String at) {
-    var sp = _palettes[at]!;
-    sp.removeWhere((key, value) => !value.selected);
-    return sp;
-  }
-
   Map<Identifier, Node> _selectedNodes(String at) {
-    var sp = _selectedPalettes(at);
-    var asNodes = sp.map((key, value) => MapEntry(key, value.node));
-    return asNodes;
+    var sp = Map<Identifier, Palette3>.from(_palettes[at]!);
+    sp.removeWhere((key, value) => !value.selected);
+    return sp.map((key, value) => MapEntry(key, value.node));
   }
 
-  Map<Identifier, ChatMessage> _selectedMessages(String at) {
-    var cm = _messages[at]!;
+  Map<Identifier, Down4Message> _selectedMessages(String at) {
+    var cm = Map<Identifier, ChatMessage>.from(_messages[at]!);
     cm.removeWhere((key, value) => !value.selected);
-    return cm;
+    return cm.map((key, value) => MapEntry(key, value.message));
   }
 
   void _go(String at, Identifier p) {}
@@ -203,6 +190,7 @@ class _Down4State extends State<Down4> {
 
       case states.userCreation:
         return PaletteMakerPage(
+            cameras: widget.cameras,
             kernelInfoCallBack: (infos) => _initUser(infos["user"]!),
             makingUser: true);
 
@@ -217,9 +205,18 @@ class _Down4State extends State<Down4> {
         return PalettePage(
             paletteList: PaletteList(palettes: _paletteList("Friends")),
             console: Console(
+              placeHolder: ":)",
+              inputCallBack: (text) => _input = text,
               topButtons: [
                 ConsoleButton(name: "Hyperchat", onPress: _todo),
-                ConsoleButton(name: "Money", onPress: _todo),
+                ConsoleButton(
+                    name: "Money",
+                    onPress: () {
+                      _palettes['Money'] = _selectedNodes("Friends").map(
+                          (key, node) =>
+                              MapEntry(key, Palette3(at: "Money", node: node)));
+                      _putState(states.money);
+                    }),
               ],
               bottomButtons: [
                 ConsoleButton(name: "Browse", onPress: _todo),
@@ -228,24 +225,59 @@ class _Down4State extends State<Down4> {
                     onPress: () => setState(() {
                           _state = states.addFriend;
                         })),
-                ConsoleButton(name: "Favorite", onPress: _todo)
+                ConsoleButton(isSpecial: true, name: "Ping", onPress: _todo)
               ],
             ));
 
       case states.money:
-        return const Center(
-            child: Text(
-          "Not yet implanted",
-          textDirection: TextDirection.ltr,
-        ));
-
+        final currencies = _modes["Currencies"]!["l"] as List<String>;
+        final iCurrencies = _modes["Currencies"]!["i"] as int;
+        final payment = _modes["Payment"]!["l"] as List<String>;
+        final iPayment = _modes["Payment"]!["i"] as int;
+        return PalettePage(
+            paletteList: PaletteList(palettes: _paletteList('Money')),
+            console: Console(
+              placeHolder: "\$",
+              inputCallBack: (text) => _input = text,
+              textInputType: TextInputType.number,
+              topButtons: [
+                ConsoleButton(name: "Pay", onPress: _todo),
+                ConsoleButton(name: "Bill", onPress: _todo)
+              ],
+              bottomButtons: [
+                ConsoleButton(
+                    name: "Back",
+                    onPress: () {
+                      _palettes['Money'] = {};
+                      _putState(states.home);
+                    }),
+                ConsoleButton(
+                    name: currencies[iCurrencies],
+                    isMode: true,
+                    onPress: () {
+                      setState(() {
+                        _modes["Currencies"]!["i"] =
+                            (iCurrencies + 1) % currencies.length;
+                      });
+                    }),
+                ConsoleButton(
+                    name: payment[iPayment],
+                    isMode: true,
+                    onPress: () {
+                      setState(() {
+                        _modes["Payment"]!["i"] =
+                            (iPayment + 1) % payment.length;
+                      });
+                    })
+              ],
+            ));
       case states.addFriend:
         return AddFriendPage(
             myID: _id!,
             paletteList: PaletteList(palettes: _reversedList("AddFriend")),
             console: Console(
               placeHolder: "@Search",
-              inputCallBack: (text) => setState(() => _input = text),
+              inputCallBack: (text) => _input = text,
               topButtons: [
                 ConsoleButton(
                     name: "Search", onPress: () => _searchFriends(_input)),
@@ -255,7 +287,11 @@ class _Down4State extends State<Down4> {
               ],
               bottomButtons: [
                 ConsoleButton(
-                    name: "Back", onPress: () => _putState(states.home)),
+                    name: "Back",
+                    onPress: () {
+                      _palettes["AddFriend"] = {};
+                      _putState(states.home);
+                    }),
                 ConsoleButton(name: "Scan", onPress: _todo),
                 ConsoleButton(name: "Forward", onPress: _todo)
               ],

@@ -12,11 +12,19 @@ class TouchableOpacity extends StatefulWidget {
   final Widget child;
   final void Function() onPress;
   final void Function()? onLongPress;
+  final void Function()? onLongPressUp;
+  final bool shouldBeDownButIsnt;
   final Duration duration = const Duration(milliseconds: 30);
   final double opacity = 0.5;
 
-  TouchableOpacity(
-      {required this.child, required this.onPress, this.onLongPress});
+  const TouchableOpacity(
+      {required this.child,
+      required this.onPress,
+      this.shouldBeDownButIsnt = false,
+      this.onLongPress,
+      this.onLongPressUp,
+      Key? key})
+      : super(key: key);
 
   @override
   _TouchableOpacityState createState() => _TouchableOpacityState();
@@ -33,10 +41,10 @@ class _TouchableOpacityState extends State<TouchableOpacity> {
       onTapCancel: () => setState(() => isDown = false),
       onTap: widget.onPress,
       onLongPress: widget.onLongPress,
-      child: AnimatedOpacity(
+      onLongPressUp: widget.onLongPressUp,
+      child: Opacity(
         child: widget.child,
-        duration: widget.duration,
-        opacity: isDown ? widget.opacity : 1,
+        opacity: isDown || widget.shouldBeDownButIsnt ? widget.opacity : 1,
       ),
     );
   }
