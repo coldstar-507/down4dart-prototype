@@ -1,31 +1,39 @@
 import 'dart:convert';
-import 'package:dartsv/dartsv.dart';
-import 'package:flutter/material.dart';
-import 'data_objects.dart';
-import 'render_objects.dart';
 import 'dart:async';
-import 'render_pages.dart';
+import 'dart:ffi';
+import 'dart:io' as io;
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart' as crypto;
+import 'package:dartsv/dartsv.dart' as sv;
+import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:hive/hive.dart';
+import 'package:http/http.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
+import 'render_pages.dart';
+import 'data_objects.dart';
+import 'render_objects.dart';
 import 'scratch.dart';
 
 class Down4 extends StatefulWidget {
-  List<CameraDescription> cameras;
-  Down4({required this.cameras, Key? key}) : super(key: key);
+  final List<CameraDescription> cameras;
+  final Box messageQueue;
+  const Down4({required this.cameras, required this.messageQueue, Key? key})
+      : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
 }
 
-enum states {
+enum States {
   loading,
   userCreation,
   welcome,
   home,
   money,
   addFriend,
-  chat,
   node,
   map,
   nodeCreation,
@@ -33,12 +41,14 @@ enum states {
   cam,
 }
 
+enum NodeViews { messages, childs, parents, admins }
+
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
-  states _state = states.loading;
-  Identifier? _id;
-  Base64Image? _image;
-  Name? _name;
+  States _state = States.loading;
+  Identifier? _id, _uid;
+  Down4Media? _image;
+  String? _name, _lastName, _phone;
   String _input = "";
   Node? _node;
   Map<String, Box> _boxes = {};
@@ -55,7 +65,8 @@ class _Down4State extends State<Down4> {
     "Payment": {
       "l": ["Each", "Split"],
       "i": 0
-    }
+    },
+    "Node": {"l": [], "i": null}
   };
 
   // ============================================================ KERNEL ============================================================ //
@@ -63,30 +74,32 @@ class _Down4State extends State<Down4> {
   @override
   void initState() {
     super.initState();
+    for (final messageData in widget.messageQueue.values) {
+      _parseMessageData(messageData);
+    }
+    widget.messageQueue.clear();
     _loadHome();
   }
 
   Future<void> _loadHome() async {
     Future<bool> loadUser() async {
-      _id = _boxes["User"]?.get("id");
-      _image = _boxes["User"]?.get("image");
-      _name = _boxes["User"]?.get("name");
+      _id = (await _box("User")).get("id");
+      _image = (await _box("User")).get("image");
+      _name = (await _box("User")).get("name");
       if (_id == null) return false;
       return true;
     }
 
-    await _loadBox("User");
     if (await loadUser()) {
-      await _loadBox("Friends");
-      _putState(states.home);
+      _putState(States.home);
     } else {
       // returns false if user hasn't been initialized
-      _putState(states.userCreation);
+      _putState(States.userCreation);
     }
   }
 
-  Future<void> _loadBox(String boxName) async {
-    _boxes[boxName] = await Hive.openBox(boxName);
+  Future<Box> _box(String boxName) async {
+    return _boxes[boxName] ?? (_boxes[boxName] = await Hive.openBox(boxName));
   }
 
   void _todo() {
@@ -97,20 +110,77 @@ class _Down4State extends State<Down4> {
     print("TODO: at=$at, id=$id");
   }
 
-  void _initUser(Map<String, String> info) {
-    setState(() {
-      _name = info['name'];
-      _image = info['image'];
-      // _id = info['id'];
-      _id = sha1(utf8.encode(info['image']! + info['name']!)).toString();
-      _state = states.home;
-    });
+  Future<void> _initUser(Map<String, dynamic> info) async {
+    String uid = info['id'] as String;
+    String base64Image = info['image'] as String;
+    String mediaID =
+        sv.sha1(uid.codeUnits + base64Decode(base64Image)).toString();
+
+    Down4Media media = Down4Media(
+        id: mediaID,
+        metadata: Down4MediaMetadata(isVideo: false, owner: uid),
+        data: base64Decode(base64Image));
+
+    _uploadDown4Media(media);
+
+    _name = info['name'];
+    _lastName = info['lastName'];
+    _image = info['image'];
+    _uid = info['uid'];
+    _phone = info['phone'];
+    _state = States.home;
+
+    setState(() {});
   }
 
-  void _putState(states s) {
+  void _putState(States s) {
     setState(() => _state = s);
   }
 
+  Future<void> _parseMessageData(final data) async {
+    final t = MessageTypes.values.byName(data["t"]);
+    switch (t) {
+      case MessageTypes.fr:
+        {
+          (await _box("FriendRequest")).put(data["data"]["id"], data["data"]);
+          break;
+        }
+      case MessageTypes.b:
+        {
+          (await _box("Bills")).put(data["data"]["id"], data["data"]);
+          break;
+        }
+      case MessageTypes.p:
+        {
+          (await _box("Payments")).put(data["data"]["id"], data["data"]);
+          break;
+        }
+      case MessageTypes.m:
+        {
+          (await _box("Messages")).put(data["data"]["id"], data["data"]);
+          var chatSource =
+              Node.fromJson((await _box("Friends")).get(data["data"]["sd"]));
+          if (chatSource.msg != null) {
+            chatSource.msg!.add(data["data"]["id"]);
+          } else {
+            chatSource.msg = [data["data"]["id"]];
+          }
+          (await _box("Friends")).put(chatSource.id, chatSource);
+          break;
+        }
+    }
+  }
+
+  Future<UploadTask?> _uploadDown4Media(Down4Media media) async {
+    if (media.data != null) {
+      UploadTask uploadTask;
+      Reference ref = FirebaseStorage.instance.ref().child(media.id);
+      uploadTask = ref.putData(
+          media.data!, SettableMetadata(customMetadata: media.jsonMetadata));
+      return Future.value(uploadTask);
+    }
+    return null;
+  }
   // ============================================================ DOWN4 ============================================================ //
 
   void _searchFriends(Identifier nameID) {
@@ -180,33 +250,50 @@ class _Down4State extends State<Down4> {
 
   void _forwardMessages(Map<Identifier, ChatMessage> messages) {}
 
+  void _unselectedSelectedPalettes(String at) {
+    _palettes[at] = _palettes[at]!.map((key, value) => value.selected
+        ? MapEntry(key, value.invertedSelection())
+        : MapEntry(key, value));
+    setState(() => {});
+  }
+
+  Map<Identifier, Down4Message> _localChat(Node node) {
+    Map<String, Down4Message> messages = {};
+    final List<Identifier>? ids = node.msg;
+    if (ids == null) return messages;
+    for (final id in ids) {
+      messages[id] = Down4Message.fromJson(_boxes["Messages"]?.get(id));
+    }
+    return messages;
+  }
+
   // ============================================================ RENDER ============================================================ //
 
   @override
   Widget build(BuildContext context) {
     switch (_state) {
-      case states.loading:
+      case States.loading:
         return const LoadingPage();
 
-      case states.userCreation:
-        return PaletteMakerPage(
-            cameras: widget.cameras,
-            kernelInfoCallBack: (infos) => _initUser(infos["user"]!),
-            makingUser: true);
+      case States.userCreation:
+        return UserMakerPage(
+            cameras: widget.cameras, kernelCallBack: _initUser);
 
-      case states.welcome:
+      case States.welcome:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
 
-      case states.home:
+      case States.home:
         return PalettePage(
             paletteList: PaletteList(palettes: _paletteList("Friends")),
             console: Console(
-              placeHolder: ":)",
-              inputCallBack: (text) => _input = text,
+              inputs: [
+                InputObjects(
+                    inputCallBack: (text) => _input = text, placeHolder: ":)")
+              ],
               topButtons: [
                 ConsoleButton(name: "Hyperchat", onPress: _todo),
                 ConsoleButton(
@@ -215,7 +302,7 @@ class _Down4State extends State<Down4> {
                       _palettes['Money'] = _selectedNodes("Friends").map(
                           (key, node) =>
                               MapEntry(key, Palette3(at: "Money", node: node)));
-                      _putState(states.money);
+                      _putState(States.money);
                     }),
               ],
               bottomButtons: [
@@ -223,13 +310,13 @@ class _Down4State extends State<Down4> {
                 ConsoleButton(
                     name: "Add Friend",
                     onPress: () => setState(() {
-                          _state = states.addFriend;
+                          _state = States.addFriend;
                         })),
                 ConsoleButton(isSpecial: true, name: "Ping", onPress: _todo)
               ],
             ));
 
-      case states.money:
+      case States.money:
         final currencies = _modes["Currencies"]!["l"] as List<String>;
         final iCurrencies = _modes["Currencies"]!["i"] as int;
         final payment = _modes["Payment"]!["l"] as List<String>;
@@ -237,9 +324,12 @@ class _Down4State extends State<Down4> {
         return PalettePage(
             paletteList: PaletteList(palettes: _paletteList('Money')),
             console: Console(
-              placeHolder: "\$",
-              inputCallBack: (text) => _input = text,
-              textInputType: TextInputType.number,
+              inputs: [
+                InputObjects(
+                    inputCallBack: (text) => _input = text,
+                    placeHolder: "\$",
+                    type: TextInputType.number)
+              ],
               topButtons: [
                 ConsoleButton(name: "Pay", onPress: _todo),
                 ConsoleButton(name: "Bill", onPress: _todo)
@@ -249,7 +339,7 @@ class _Down4State extends State<Down4> {
                     name: "Back",
                     onPress: () {
                       _palettes['Money'] = {};
-                      _putState(states.home);
+                      _putState(States.home);
                     }),
                 ConsoleButton(
                     name: currencies[iCurrencies],
@@ -271,68 +361,69 @@ class _Down4State extends State<Down4> {
                     })
               ],
             ));
-      case states.addFriend:
+
+      case States.addFriend:
         return AddFriendPage(
             myID: _id!,
             paletteList: PaletteList(palettes: _reversedList("AddFriend")),
             console: Console(
-              placeHolder: "@Search",
-              inputCallBack: (text) => _input = text,
+              inputs: [
+                InputObjects(
+                    inputCallBack: (text) => _input = text,
+                    placeHolder: "@Search")
+              ],
               topButtons: [
                 ConsoleButton(
                     name: "Search", onPress: () => _searchFriends(_input)),
                 ConsoleButton(
                     name: "Add",
-                    onPress: () => _addFriends(_selectedNodes("AddFriend")))
+                    onPress: () {
+                      _addFriends(_selectedNodes("AddFriend"));
+                      _unselectedSelectedPalettes("AddFriend");
+                    })
               ],
               bottomButtons: [
                 ConsoleButton(
                     name: "Back",
                     onPress: () {
                       _palettes["AddFriend"] = {};
-                      _putState(states.home);
+                      _putState(States.home);
                     }),
                 ConsoleButton(name: "Scan", onPress: _todo),
                 ConsoleButton(name: "Forward", onPress: _todo)
               ],
             ));
 
-      case states.chat:
+      case States.node:
+        return Container(
+          color: PinkTheme.backGroundColor,
+          child: Column(
+            children: [],
+          ),
+        );
+
+      case States.map:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
 
-      case states.node:
+      case States.nodeCreation:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
 
-      case states.map:
+      case States.snip:
         return const Center(
             child: Text(
           "Not yet implanted",
           textDirection: TextDirection.ltr,
         ));
 
-      case states.nodeCreation:
-        return const Center(
-            child: Text(
-          "Not yet implanted",
-          textDirection: TextDirection.ltr,
-        ));
-
-      case states.snip:
-        return const Center(
-            child: Text(
-          "Not yet implanted",
-          textDirection: TextDirection.ltr,
-        ));
-
-      case states.cam:
+      case States.cam:
         return const Center(
             child: Text(
           "Not yet implanted",

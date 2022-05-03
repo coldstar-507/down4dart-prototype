@@ -1,11 +1,14 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:camera/camera.dart';
 import 'package:dartsv/dartsv.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'data_objects.dart';
-import 'dart:convert';
 import 'render_utility.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:io';
+import 'dart:io' as io;
 import 'dart:math' as math;
 import 'package:video_player/video_player.dart';
 
@@ -13,7 +16,7 @@ class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
   static const bodyColor = buttonColor;
   static const backGroundColor = Color.fromARGB(255, 255, 241, 242);
-  static const headerColor = Color.fromRGBO(255, 103, 154, 1);
+  static const headerColor = Color.fromARGB(255, 236, 155, 182);
   static const imageBorderColor = Color.fromARGB(255, 143, 29, 67);
   static const borderColor = Colors.black;
   static const qrColor = Color.fromARGB(255, 56, 3, 17);
@@ -104,49 +107,79 @@ class Palette3 extends StatelessWidget {
                         bottomLeft: Radius.circular(4.0),
                       )),
                       width: Palette3.height - 2.0, // borderWidth x2
-                      child: Image.asset('lib/src/assets/hashirama.jpg',
-                          fit: BoxFit.fill))),
+                      child: Image.memory(base64Decode(node.im),
+                          fit: BoxFit.cover, gaplessPlayback: true))),
               Expanded(
-                  child: GestureDetector(
-                      onTap: () => bodyPress?.call(at, node.id),
-                      onLongPress: () => bodyLongPress?.call(at, node.id),
-                      child: Material(
-                          child: Container(
-                              decoration: BoxDecoration(
-                                  color: PinkTheme.headerColor,
-                                  border: Border(
-                                      left: BorderSide(
-                                          color: selected
-                                              ? PinkTheme.black
-                                              : PinkTheme.headerColor,
-                                          width: 1.0))),
-                              padding:
-                                  const EdgeInsets.only(left: 9.0, top: 10.0),
-                              child: Text(
-                                node.nm,
-                                style: TextStyle(
-                                    fontWeight: selected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal),
-                              ))))),
-              GestureDetector(
+                child: GestureDetector(
                   onTap: () => bodyPress?.call(at, node.id),
                   onLongPress: () => bodyLongPress?.call(at, node.id),
-                  child: Container(
-                    padding: const EdgeInsets.all(2.0),
-                    decoration: const BoxDecoration(
-                        color: PinkTheme.headerColor,
-                        borderRadius: BorderRadius.only(
-                            topRight: Radius.circular(4.0),
-                            bottomRight: Radius.circular(4.0))),
-                    child: Image.asset('lib/src/assets/rightBlackArrow.png'),
-                  ))
+                  child: Material(
+                    child: Container(
+                      decoration: BoxDecoration(
+                          color: PinkTheme.headerColor,
+                          border: Border(
+                              left: BorderSide(
+                                  color: selected
+                                      ? PinkTheme.black
+                                      : PinkTheme.headerColor,
+                                  width: 1.0))),
+                      padding: const EdgeInsets.only(left: 6.0, top: 5.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            node.nm + " " + (node.ln ?? ""),
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal),
+                          ),
+                          node.t == NodeTypes.usr
+                              ? Text(
+                                  "@" + node.id,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: selected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal),
+                                )
+                              : const SizedBox.shrink(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              goPress != null
+                  ? GestureDetector(
+                      onTap: () => goPress?.call(at, node.id),
+                      onLongPress: () => goLongPress?.call(at, node.id),
+                      child: Container(
+                        padding: const EdgeInsets.all(2.0),
+                        decoration: const BoxDecoration(
+                            color: PinkTheme.headerColor,
+                            borderRadius: BorderRadius.only(
+                                topRight: Radius.circular(4.0),
+                                bottomRight: Radius.circular(4.0))),
+                        child:
+                            Image.asset('lib/src/assets/rightBlackArrow.png'),
+                      ))
+                  : Container(
+                      padding: const EdgeInsets.all(2.0),
+                      decoration: const BoxDecoration(
+                          color: PinkTheme.headerColor,
+                          borderRadius: BorderRadius.only(
+                              topRight: Radius.circular(4.0),
+                              bottomRight: Radius.circular(4.0))),
+                    )
             ]));
   }
 }
 
 class ConsoleButton extends StatelessWidget {
-  static const double height = 30.0;
+  static const double height = 26.0;
   final String name;
   final bool isSpecial, isMode, shouldBeDownButIsnt;
   final void Function() onPress;
@@ -167,29 +200,71 @@ class ConsoleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+            shape: BoxShape.rectangle,
+            color: PinkTheme.black,
+            border: Border.all(color: Colors.black, width: 0.5)),
+        child: TouchableOpacity(
+          shouldBeDownButIsnt: shouldBeDownButIsnt,
+          onPress: onPress,
+          onLongPress: onLongPress,
+          onLongPressUp: onLongPressUp,
+          child: Material(
+            child: Container(
+              color: PinkTheme.buttonColor,
+              child: Center(
+                child: Text(
+                  name,
+                  style: TextStyle(
+                    decoration: isSpecial ? TextDecoration.underline : null,
+                    decorationStyle: TextDecorationStyle.solid,
+                    fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class InputObjects extends StatelessWidget {
+  final TextInputType type;
+  final String placeHolder;
+  final void Function(String) inputCallBack;
+  final Key k = GlobalKey();
+  InputObjects(
+      {this.type = TextInputType.text,
+      required this.inputCallBack,
+      required this.placeHolder,
+      Key? key})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
         child: Container(
-            height: height,
+            height: ConsoleButton.height,
             decoration: BoxDecoration(
-                shape: BoxShape.rectangle,
-                color: PinkTheme.black,
+                color: Colors.white,
                 border: Border.all(color: Colors.black, width: 0.5)),
-            child: TouchableOpacity(
-                shouldBeDownButIsnt: shouldBeDownButIsnt,
-                onPress: onPress,
-                onLongPress: onLongPress,
-                onLongPressUp: onLongPressUp,
-                child: Material(
-                    child: Container(
-                        color: PinkTheme.buttonColor,
-                        child: Center(
-                            child: Text(name,
-                                style: TextStyle(
-                                    fontFamily: isSpecial ? "Kaushan" : null,
-                                    // fontSize: isSpecial ? 20 : null,
-                                    fontStyle: isMode
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                    fontWeight: FontWeight.bold))))))));
+            child: Material(
+                child: TextField(
+                    key: k,
+                    keyboardType: type,
+                    textAlignVertical: TextAlignVertical.center,
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.all(10.0),
+                        hintText: placeHolder,
+                        border: InputBorder.none),
+                    textDirection: TextDirection.ltr,
+                    onChanged: (value) => inputCallBack.call(value)))));
   }
 }
 
@@ -201,19 +276,15 @@ class Console extends StatelessWidget {
   final bool? toMirror;
   final String? imagePreviewPath;
   final VideoPlayerController? videoPlayerController;
-  final String? placeHolder;
-  final TextInputType? textInputType;
-  final void Function(String)? inputCallBack;
+  final List<InputObjects>? inputs;
   const Console(
       {required this.bottomButtons,
       this.imagePreviewPath,
       this.videoPlayerController,
-      this.inputCallBack,
       this.toMirror,
       this.aspectRatio,
       this.cameraPreview,
-      this.textInputType,
-      this.placeHolder,
+      this.inputs,
       this.topButtons,
       this.extraButtons,
       Key? key})
@@ -229,23 +300,8 @@ class Console extends StatelessWidget {
       decoration:
           BoxDecoration(border: Border.all(width: 0.5, color: Colors.black)),
       child: Column(children: [
-        inputCallBack != null
-            ? Container(
-                height: ConsoleButton.height,
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.black, width: 0.5)),
-                child: Material(
-                    child: TextField(
-                        keyboardType: textInputType,
-                        textAlignVertical: TextAlignVertical.center,
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.all(10.0),
-                            hintText: placeHolder,
-                            border: InputBorder.none),
-                        textDirection: TextDirection.ltr,
-                        onChanged: (value) => inputCallBack?.call(value))))
+        inputs != null
+            ? Row(textDirection: TextDirection.ltr, children: inputs!)
             : cameraPreview != null
                 ? Container(
                     width: camWidthAndHeight,
@@ -269,7 +325,7 @@ class Console extends StatelessWidget {
                             alignment: Alignment.center,
                             transform: Matrix4.rotationY(mirror),
                             child: Image.file(
-                              File(imagePreviewPath!),
+                              io.File(imagePreviewPath!),
                               fit: BoxFit.cover,
                             )))
                     : videoPlayerController != null
@@ -301,6 +357,58 @@ class Console extends StatelessWidget {
   }
 }
 
+class Media extends StatefulWidget {
+  final Down4Media _media;
+  const Media(Down4Media media, [Key? key])
+      : _media = media,
+        super(key: key);
+
+  @override
+  _Media createState() => _Media();
+}
+
+class _Media extends State<Media> {
+  late VideoPlayerController? _vc;
+
+  @override
+  Future<void> initState() async {
+    super.initState();
+    final m = widget._media;
+    if (m.isOnlyOnDatabase && m.isImage) {
+      await m.downloadMedia();
+    } else if (m.isOnlyOnDatabase && m.isVideo) {
+      Reference ref = FirebaseStorage.instance.ref(m.dbid);
+      String dataSource = await ref.getDownloadURL();
+      _vc = VideoPlayerController.network(dataSource);
+      await _vc!.initialize();
+    }
+  }
+
+  Widget display() {
+    final m = widget._media;
+    if (m.isImage) {
+      return Image.memory(m.data!);
+    } else if (m.isVideo && _vc != null) {
+      return GestureDetector(
+        onTap: () {
+          if (_vc!.value.isPlaying) {
+            _vc!.pause();
+          } else {
+            _vc!.play();
+          }
+        },
+        child: VideoPlayer(_vc!),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return display();
+  }
+}
+
 class ChatMessage extends StatelessWidget {
   static const double _headerHeight = 24.0;
   final Down4Message message;
@@ -328,8 +436,9 @@ class ChatMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final media = message.media;
     return Align(
-        alignment: !message.ch
+        alignment: !message.isChat
             ? Alignment.topCenter
             : myMessage
                 ? Alignment.topRight
@@ -366,30 +475,31 @@ class ChatMessage extends StatelessWidget {
                                     color: PinkTheme.headerColor,
                                     height: _headerHeight,
                                     child: Text(
-                                      message.nm,
+                                      message.name,
                                       textDirection: TextDirection.ltr,
                                     ))))
                       ]),
-                  message.t == null
+                  message.text == null
                       ? const SizedBox.shrink()
                       : GestureDetector(
                           onTap: () => select?.call(message.id),
                           child: Container(
                               padding: const EdgeInsets.all(2.0),
                               color: PinkTheme.bodyColor,
-                              child: Text(message.t!,
+                              child: Text(message.text!,
                                   textDirection: TextDirection.ltr,
                                   style:
                                       const TextStyle(color: Colors.black)))),
-                  message.p == null
+                  media == null
                       ? const SizedBox.shrink()
-                      : GestureDetector(
-                          onTap: () => select?.call(message.id),
-                          child: Container(
-                              color: PinkTheme.bodyColor,
-                              child: Image.memory(base64.decode(
-                                  base64.normalize(
-                                      message.p!.replaceAll("\n", ""))))))
+                      : media.isImage
+                          ? GestureDetector(
+                              onTap: () => select?.call(message.id),
+                              child: Container(
+                                  color: PinkTheme.bodyColor,
+                                  child: Media(media)))
+                          : Container(
+                              color: PinkTheme.bodyColor, child: Media(media))
                 ]))));
   }
 }
@@ -435,35 +545,122 @@ class MessageList extends StatelessWidget {
   }
 }
 
-class PaletteMaker extends StatefulWidget {
+class UserPaletteMaker extends StatelessWidget {
   final void Function(Map<String, String>) infoCallBack;
-  final Map<String, String> inheritedInfo;
+  final Map<String, dynamic> info;
+  const UserPaletteMaker(
+      {required this.infoCallBack, required this.info, Key? key})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final tec = TextEditingController()
+      ..text = info['id'].toLowerCase()
+      ..selection = TextSelection.collapsed(offset: info['id'].length);
+    return Container(
+      height: Palette3.height,
+      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      decoration: BoxDecoration(
+          boxShadow: const [
+            BoxShadow(
+                color: Colors.black54,
+                blurRadius: 6.0,
+                spreadRadius: -6.0,
+                offset: Offset(8.0, 8.0),
+                blurStyle: BlurStyle.normal)
+          ],
+          borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+          border: Border.all(width: 2.0, color: Colors.transparent)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        textDirection: TextDirection.ltr,
+        children: [
+          GestureDetector(
+            onTap: () async {
+              FilePickerResult? r = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['jpg', 'png', 'jpeg'],
+                  withData: true);
+              if (r?.files.single.bytes != null) {
+                infoCallBack(
+                  {...info, 'image': base64Encode(r!.files.single.bytes!)},
+                );
+              }
+            },
+            child: Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(4.0),
+                bottomLeft: Radius.circular(4.0),
+              )),
+              width: Palette3.height - 2.0, // borderWidth x2
+              child: info['image'] == null || info['image'] == ""
+                  ? Image.asset(
+                      'lib/src/assets/picture_place_holder_2.png',
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    )
+                  : Image.memory(
+                      base64Decode(info['image']!),
+                      gaplessPlayback: true,
+                      fit: BoxFit.cover,
+                    ),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(
+                color: PinkTheme.headerColor,
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(4.0),
+                  bottomRight: Radius.circular(4.0),
+                ),
+              ),
+              padding: const EdgeInsets.only(left: 10.0, top: 10.0),
+              child: TextField(
+                controller: tec,
+                textAlignVertical: TextAlignVertical.top,
+                style: const TextStyle(fontSize: 12),
+                decoration: InputDecoration(
+                  isDense: true,
+                  prefixText: info['id'] == "" ? "" : "@",
+                  hintText: "@username",
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.only(bottom: Palette3.height / 2),
+                ),
+                textDirection: TextDirection.ltr,
+                onChanged: ((value) {
+                  infoCallBack({...info, 'id': value.toLowerCase()});
+                }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PaletteMaker extends StatelessWidget {
+  final void Function(String infoKey, Map<String, dynamic>) infoCallBack;
+  final Map<String, dynamic> info;
   final void Function(Identifier)? go;
-  final Identifier parentID;
+  final Identifier parentID, infoKey;
   final NodeTypes type;
   final NodeTypes? parentType;
   const PaletteMaker(
       {required this.infoCallBack,
-      this.inheritedInfo = const {},
+      required this.infoKey,
+      required this.info,
       this.go,
       this.type = NodeTypes.usr,
       this.parentType,
       this.parentID = "",
       Key? key})
       : super(key: key);
-
-  @override
-  State<PaletteMaker> createState() => _PaletteMakerState();
-}
-
-class _PaletteMakerState extends State<PaletteMaker> {
-  Map<String, String> info = {};
-  late NodeTypes type;
-  @override
-  void initState() {
-    super.initState();
-    type = widget.type;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -486,41 +683,39 @@ class _PaletteMakerState extends State<PaletteMaker> {
             textDirection: TextDirection.ltr,
             children: [
               GestureDetector(
-                  onTap: () async {
-                    FilePickerResult? r = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: ['jpg', 'png', 'jpeg'],
-                        withData: true);
-                    if (r != null) {
-                      setState(() {
-                        info['image'] = base64Encode(r.files.single.bytes!);
-                      });
-                      widget.infoCallBack(info);
-                    }
-                  },
-                  child: Container(
-                      clipBehavior: Clip.hardEdge,
-                      decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(4.0),
-                        bottomLeft: Radius.circular(4.0),
-                      )),
-                      width: Palette3.height - 2.0, // borderWidth x2
-                      child: info['image'] == null
-                          ? widget.inheritedInfo['image'] == null
-                              ? Image.asset(
-                                  'lib/src/assets/picture_place_holder_2.png',
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.memory(
-                                  base64Decode(widget.inheritedInfo['image']!),
-                                  gaplessPlayback: true,
-                                  fit: BoxFit.cover)
-                          : Image.memory(
-                              base64Decode(info['image']!),
-                              gaplessPlayback: true,
-                              fit: BoxFit.cover,
-                            ))),
+                onTap: () async {
+                  FilePickerResult? r = await FilePicker.platform.pickFiles(
+                      type: FileType.custom,
+                      allowedExtensions: ['jpg', 'png', 'jpeg'],
+                      withData: true);
+                  if (r?.files.single.bytes != null) {
+                    infoCallBack(
+                      infoKey,
+                      {...info, 'image': base64Encode(r!.files.single.bytes!)},
+                    );
+                  }
+                },
+                child: Container(
+                  clipBehavior: Clip.hardEdge,
+                  decoration: const BoxDecoration(
+                      borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(4.0),
+                    bottomLeft: Radius.circular(4.0),
+                  )),
+                  width: Palette3.height - 2.0, // borderWidth x2
+                  child: info['image'] == null || info['image'] == ""
+                      ? Image.asset(
+                          'lib/src/assets/picture_place_holder_2.png',
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        )
+                      : Image.memory(
+                          base64Decode(info['image']!),
+                          gaplessPlayback: true,
+                          fit: BoxFit.cover,
+                        ),
+                ),
+              ),
               Expanded(
                   child: Material(
                       child: Container(
@@ -534,25 +729,27 @@ class _PaletteMakerState extends State<PaletteMaker> {
                                   contentPadding: EdgeInsets.only(
                                       bottom: (Palette3.height) / 2)),
                               textDirection: TextDirection.ltr,
-                              onChanged: ((value) {
-                                setState(() => info['name'] = value);
-                                widget.infoCallBack(info);
-                              }))))),
+                              onChanged: ((value) => infoCallBack(
+                                  infoKey, {...info, 'name': value})))))),
               GestureDetector(
-                  onTap: () => info['name'] != null
-                      ? widget.go?.call(sha1(widget.parentID.codeUnits +
-                              info['name']!.codeUnits)
-                          .toString())
-                      : {},
+                  onTap: () {
+                    if (info['name'] != null) {
+                      go?.call(
+                          sha1(parentID.codeUnits + info['name']!.codeUnits)
+                              .toString());
+                    }
+                  },
                   child: Container(
+                      clipBehavior: Clip.hardEdge,
                       padding: const EdgeInsets.all(2.0),
-                      width: Palette3.height - 2.0,
+                      width:
+                          type != NodeTypes.usr ? Palette3.height - 2.0 : 4.0,
                       decoration: const BoxDecoration(
                           color: PinkTheme.headerColor,
                           borderRadius: BorderRadius.only(
                               topRight: Radius.circular(4.0),
                               bottomRight: Radius.circular(4.0))),
-                      child: widget.type != NodeTypes.usr
+                      child: type != NodeTypes.usr
                           ? Image.asset('lib/src/assets/rightBlackArrow.png')
                           : const SizedBox.shrink()))
             ]));

@@ -44,7 +44,11 @@ dependencies:
   hive: ^2.1.0
   camera: ^0.9.4+19
   video_player: ^2.3.0
-  camerawesome: ^0.3.0+1
+  firebase_core: ^1.15.0
+  flutter_image_compress: ^1.1.0
+  firebase_messaging: ^11.2.15
+  firebase_storage: ^10.2.14
+  firebase_auth: ^3.3.17
 
 
 dev_dependencies:
@@ -88,6 +92,33 @@ flutter:
   # list giving the asset and other descriptors for the font. For
   # example:
   fonts:
+    - family: Merriweather
+      fonts:
+      - asset: lib/src/assets/fonts/Merriweather-Regular.ttf
+    - family: Alegreya
+      fonts:
+      - asset: lib/src/assets/fonts/Alegreya-Regular.ttf
+    - family: Alice
+      fonts:
+      - asset: lib/src/assets/fonts/Alice-Regular.ttf
+    - family: EBGaramond
+      fonts:
+      - asset: lib/src/assets/fonts/EBGaramond-Regular.ttf
+    - family: Handlee
+      fonts:
+      - asset: lib/src/assets/fonts/Handlee-Regular.ttf
+    - family: LobsterTwo
+      fonts:
+      - asset: lib/src/assets/fonts/LobsterTwo-Regular.ttf
+    - family: SourceCodePro
+      fonts:
+      - asset: lib/src/assets/fonts/SourceCodePro-Regular.ttf
+    - family: NotoSerif
+      fonts:
+      - asset: lib/src/assets/fonts/NotoSerif-Regular.ttf
+    - family: Tapestry
+      fonts:
+      - asset: lib/src/assets/fonts/Tapestry-Regular.ttf
     - family: MonteCarlo
       fonts:
       - asset: lib/src/assets/fonts/MonteCarlo-Regular.ttf
@@ -99,16 +130,13 @@ flutter:
       - asset: lib/src/assets/fonts/KaushanScript-Regular.ttf
     - family: Kalam
       fonts:
-      - asset: lib/src/assets/fonts/Kalam-Bold.ttf
-        weight: 700
       - asset: lib/src/assets/fonts/Kalam-Regular.ttf
     - family: Ubuntu
       fonts:
-         - asset: lib/src/assets/fonts/Ubuntu-Medium.ttf
-  #         style: italic
+      - asset: lib/src/assets/fonts/Ubuntu-Regular.ttf
     - family: Updock
       fonts:
-        - asset: lib/src/assets/fonts/Updock-Regular.ttf
+      - asset: lib/src/assets/fonts/Updock-Regular.ttf
   #       - asset: fonts/TrajanPro_Bold.ttf
   #         weight: 700
   #

@@ -9,11 +9,9 @@ import 'down4_utility.dart';
 class CameraConsole extends StatefulWidget {
   final List<CameraDescription> cameras;
   final void Function(String?) cameraCallBack;
-  final Console prevConsole;
   const CameraConsole(
       {required this.cameras,
       required this.cameraCallBack,
-      required this.prevConsole,
       Key? key})
       : super(key: key);
 
@@ -24,7 +22,7 @@ class CameraConsole extends StatefulWidget {
 class _CameraConsoleState extends State<CameraConsole> {
   CameraController? _cameraController;
   String? _filePath;
-  late Console _console;
+  Console? _console;
   int _currentCameraIndex = 0;
   bool _audio = true;
   FlashMode _flashMode = FlashMode.off;
@@ -34,7 +32,6 @@ class _CameraConsoleState extends State<CameraConsole> {
   @override
   void initState() {
     super.initState();
-    _console = widget.prevConsole;
     _setCapturingConsole();
   }
 
@@ -196,7 +193,18 @@ class _CameraConsoleState extends State<CameraConsole> {
 
   Future<void> _takePicture() async {
     try {
-      _filePath = (await _cameraController?.takePicture())?.path;
+      final xfile = await _cameraController?.takePicture();
+      final path = xfile?.path;
+      final bytes = await xfile?.readAsBytes();
+      print("""
+      --
+
+        file path = $path
+        file size = ${bytes?.length}
+
+      --
+      """);
+      _filePath = path;
     } catch (e) {
       widget.cameraCallBack(null);
     }
@@ -215,18 +223,21 @@ class _CameraConsoleState extends State<CameraConsole> {
   Future<void> _stopRecording() async {
     try {
       XFile? f = await _cameraController?.stopVideoRecording();
+      final path = f?.path;
+      final bytes = await f?.readAsBytes();
       print('''
 ===============================================================================
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-                  Size of video=${await f?.length()}
+                  Size of video=${bytes?.length}
+                  Path of video=$path
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ================================================================================
 ''');
-      _filePath = f?.path;
+      _filePath = path;
     } catch (e) {
       widget.cameraCallBack(null);
     }
@@ -235,6 +246,6 @@ class _CameraConsoleState extends State<CameraConsole> {
 
   @override
   Widget build(BuildContext context) {
-    return _console;
+    return _console ?? Container();
   }
 }

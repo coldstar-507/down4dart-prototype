@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "141478909490",
+    "firebase_url": "https://down4-26ee1-default-rtdb.firebaseio.com",
+    "project_id": "down4-26ee1",
+    "storage_bucket": "down4-26ee1.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141478909490:android:aff9b6a9ba236d36708e2b",
+        "android_client_info": {
+          "package_name": "com.down4"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGcwaJCbAb8VxzUPRMJiB5FWtASm-39d4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141478909490:android:6bc20f0eb0b1daa4708e2b",
+        "android_client_info": {
+          "package_name": "com.example.flutter_testproject"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGcwaJCbAb8VxzUPRMJiB5FWtASm-39d4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141478909490:android:b4171fb7824e5693708e2b",
+        "android_client_info": {
+          "package_name": "com.newdown4"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGcwaJCbAb8VxzUPRMJiB5FWtASm-39d4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
