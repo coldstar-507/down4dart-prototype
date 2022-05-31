@@ -8,9 +8,11 @@ import 'down4_utility.dart';
 
 class CameraConsole extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final void Function(String?) cameraCallBack;
+  final void Function(String?, bool?) cameraCallBack;
+  final void Function() cameraBack;
   const CameraConsole(
       {required this.cameras,
+      required this.cameraBack,
       required this.cameraCallBack,
       Key? key})
       : super(key: key);
@@ -85,7 +87,7 @@ class _CameraConsoleState extends State<CameraConsole> {
       await _cameraController?.initialize();
       await _cameraController?.setFlashMode(_flashMode);
     } catch (err) {
-      widget.cameraCallBack(null);
+      widget.cameraCallBack(null, null);
     }
     setState(() {});
   }
@@ -113,8 +115,7 @@ class _CameraConsoleState extends State<CameraConsole> {
               onPress: _nextResolution)
         ],
         bottomButtons: [
-          ConsoleButton(
-              name: "Back", onPress: () => widget.cameraCallBack(null)),
+          ConsoleButton(name: "Back", onPress: widget.cameraBack),
           ConsoleButton(
               isMode: true,
               name: _flashMode.name.capitalize(),
@@ -135,7 +136,7 @@ class _CameraConsoleState extends State<CameraConsole> {
       await _videoPlayerController?.setLooping(true);
       await _videoPlayerController?.play();
     } catch (err) {
-      widget.cameraCallBack(null);
+      widget.cameraCallBack(null, null);
     }
     setState(() {
       _console = Console(
@@ -144,7 +145,8 @@ class _CameraConsoleState extends State<CameraConsole> {
         toMirror: _currentCameraIndex == 1,
         topButtons: [
           ConsoleButton(
-              name: "Accept", onPress: () => widget.cameraCallBack(_filePath)),
+              name: "Accept",
+              onPress: () => widget.cameraCallBack(_filePath, true)),
         ],
         bottomButtons: [
           ConsoleButton(
@@ -155,7 +157,7 @@ class _CameraConsoleState extends State<CameraConsole> {
                 _setCapturingConsole();
               }),
           ConsoleButton(
-              name: "Cancel", onPress: () => widget.cameraCallBack(null))
+              name: "Cancel", onPress: () => widget.cameraCallBack(null, null))
         ],
       );
     });
@@ -168,12 +170,13 @@ class _CameraConsoleState extends State<CameraConsole> {
         toMirror: _currentCameraIndex == 1,
         topButtons: [
           ConsoleButton(
-              name: "Accept", onPress: () => widget.cameraCallBack(_filePath))
+              name: "Accept",
+              onPress: () => widget.cameraCallBack(_filePath, false))
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: _setCapturingConsole),
           ConsoleButton(
-              name: "Cancel", onPress: () => widget.cameraCallBack(null))
+              name: "Cancel", onPress: () => widget.cameraCallBack(null, null))
         ],
       );
     });
@@ -206,7 +209,7 @@ class _CameraConsoleState extends State<CameraConsole> {
       """);
       _filePath = path;
     } catch (e) {
-      widget.cameraCallBack(null);
+      widget.cameraCallBack(null, null);
     }
     _setImagePreviewConsole();
   }
@@ -216,7 +219,7 @@ class _CameraConsoleState extends State<CameraConsole> {
       await _cameraController?.startVideoRecording();
       _drawCapturingConsole();
     } catch (e) {
-      widget.cameraCallBack(null);
+      widget.cameraCallBack(null, null);
     }
   }
 
@@ -239,7 +242,7 @@ class _CameraConsoleState extends State<CameraConsole> {
 ''');
       _filePath = path;
     } catch (e) {
-      widget.cameraCallBack(null);
+      widget.cameraCallBack(null, null);
     }
     _setVideoPreviewConsole();
   }

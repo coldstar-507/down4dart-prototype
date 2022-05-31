@@ -1,18 +1,26 @@
-void Function(String)? caca;
+import 'dart:convert';
 
-jeff(int niggerIQ, void Function()? j) {
-  print("nigger has $niggerIQ IQ");
-  j?.call();
-}
+var nigger = ["jeff", null, "shitfuck", null, "nigger"].join("\$");
+var nigger2 = [].join(" ");
+var nigger8 = ["", "", "", ""].join("^");
 
-Function? j = (args) => print(args ?? "default");
 
-Function g = () => print("FJSKDLFJKL");
+var jsonString = '[ {"jeff": 3}, {"nigger": true} ]';
+
+
+var nigg = '{"jj": [1,2,3,4,5], "fuck": false }';
 
 void main() {
-  //j?.call();
-  j?.call(null);
-  j?.call("Jeff");
+  var dec = jsonDecode(nigg);
 
-  g(2);
+  for ( var i in dec["jj"]) {
+    print(i);
+  }
+
+  if(!dec["fuck"]) {
+    print("nigger");
+  } else {
+    print("lol");
+  }
+
 }

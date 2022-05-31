@@ -1,27 +1,30 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:ffi';
-import 'dart:io' as io;
+import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart' as crypto;
 import 'package:dartsv/dartsv.dart' as sv;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:hive/hive.dart';
-import 'package:http/http.dart';
+import 'web_requests.dart' as r;
+import 'boxes.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'render_pages.dart';
 import 'data_objects.dart';
 import 'render_objects.dart';
-import 'scratch.dart';
+import 'scratch.dart' as scratch;
 
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final Box messageQueue;
-  const Down4({required this.cameras, required this.messageQueue, Key? key})
-      : super(key: key);
+  final String? token;
+  const Down4({
+    required this.cameras,
+    this.token,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
@@ -33,6 +36,8 @@ enum States {
   welcome,
   home,
   money,
+  hyperchat,
+  chat,
   addFriend,
   node,
   map,
@@ -46,51 +51,78 @@ enum NodeViews { messages, childs, parents, admins }
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
   States _state = States.loading;
-  Identifier? _id, _uid;
-  Down4Media? _image;
-  String? _name, _lastName, _phone;
-  String _input = "";
-  Node? _node;
-  Map<String, Box> _boxes = {};
-  Map<String, Map<Identifier, Palette3>> _palettes = {
-    "Friends": {},
-    "AddFriend": {}
-  };
-  Map<String, Map<Identifier, ChatMessage>> _messages = {};
-  var _modes = {
-    "Currencies": {
-      "l": ["CAD", "Satoshis"],
-      "i": 0
-    },
-    "Payment": {
-      "l": ["Each", "Split"],
-      "i": 0
-    },
-    "Node": {"l": [], "i": null}
-  };
+  String _kernelInput = "";
+  Node? _user;
+  MoneyInfo? _moneyInfo;
+  UserCredential? _credential;
+  // Map<String, Map<Identifier, Palette3>> _palettes = {
+  //   "Friends": {},
+  //   "AddFriend": {}
+  // };
+  // Map<String, Map<Identifier, ChatMessage>> _messages = {};
+  // var _modes = {
+  //   "Currencies": {
+  //     "l": ["CAD", "Satoshis"],
+  //     "i": 0
+  //   },
+  //   "Payment": {
+  //     "l": ["Each", "Split"],
+  //     "i": 0
+  //   },
+  //   "Node": {"l": [], "i": null}
+  // };
 
   // ============================================================ KERNEL ============================================================ //
 
   @override
   void initState() {
     super.initState();
-    for (final messageData in widget.messageQueue.values) {
-      _parseMessageData(messageData);
-    }
-    widget.messageQueue.clear();
+    _processMessageQueue();
+    _anonymousLogin();
+    _loadTokenChangeListener();
     _loadHome();
   }
 
-  Future<void> _loadHome() async {
-    Future<bool> loadUser() async {
-      _id = (await _box("User")).get("id");
-      _image = (await _box("User")).get("image");
-      _name = (await _box("User")).get("name");
-      if (_id == null) return false;
-      return true;
-    }
+  void _onMessage() {
+    FirebaseMessaging.onMessage.listen((event) async {
+      final d = event.data;
+      Down4Media? m;
+      if (d["id"] != "") {
+        m = await r.getMessageMedia(d["id"]);
+      }
+    });
+  }
 
-    if (await loadUser()) {
+  void _loadTokenChangeListener() {
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      final res = await r.refreshTokenRequest(newToken);
+    });
+  }
+
+  Future<void> _processMessageQueue() async {
+    for (final messageData in Boxes.instance.messageQueue.values) {
+      await _parseMessageData(messageData);
+    }
+    await Boxes.instance.messageQueue.clear();
+    Boxes.instance.messageQueue.close();
+  }
+
+  Future<void> _anonymousLogin() async {
+    try {
+      _credential = await FirebaseAuth.instance.signInAnonymously();
+      print("Anonymous uid: ${_credential?.user?.uid}");
+    } catch (e) {
+      print("Error logging in: $e");
+    }
+  }
+
+  Future<void> _loadHome() async {
+    final userData = Boxes.instance.user.get('user');
+    if (userData != null) {
+      _user = Node.fromJson(jsonDecode(userData));
+      final moneyData = Boxes.instance.user.get('money');
+      _moneyInfo =
+          MoneyInfo.fromJson(jsonDecode(moneyData)); // if this crashes gg
       _putState(States.home);
     } else {
       // returns false if user hasn't been initialized
@@ -98,39 +130,37 @@ class _Down4State extends State<Down4> {
     }
   }
 
-  Future<Box> _box(String boxName) async {
-    return _boxes[boxName] ?? (_boxes[boxName] = await Hive.openBox(boxName));
-  }
+  Future<bool> _initUser(Map<String, dynamic> info) async {
+    String uid = info['id'];
+    Uint8List imageData = info['imagedata'];
 
-  void _todo() {
-    print("TODO");
-  }
+    Down4Media image = Down4Media(
+      id: sv.sha1(uid.codeUnits + imageData).toString(),
+      data: imageData,
+    );
+    await image.generateThumbnail();
 
-  void _todoID(String at, Identifier id) {
-    print("TODO: at=$at, id=$id");
-  }
+    _user = Node(
+      type: NodeTypes.usr,
+      id: uid,
+      image: image,
+      name: info['name'],
+      lastName: info['lastname'],
+    );
 
-  Future<void> _initUser(Map<String, dynamic> info) async {
-    String uid = info['id'] as String;
-    String base64Image = info['image'] as String;
-    String mediaID =
-        sv.sha1(uid.codeUnits + base64Decode(base64Image)).toString();
+    if (!await r.initUser(jsonEncode(_user))) {
+      return false;
+    }
 
-    Down4Media media = Down4Media(
-        id: mediaID,
-        metadata: Down4MediaMetadata(isVideo: false, owner: uid),
-        data: base64Decode(base64Image));
+    image.localSave();
+    _uploadDown4Media(image);
 
-    _uploadDown4Media(media);
+    _moneyInfo = await r.initUserMoney(uid);
 
-    _name = info['name'];
-    _lastName = info['lastName'];
-    _image = info['image'];
-    _uid = info['uid'];
-    _phone = info['phone'];
-    _state = States.home;
+    Boxes.instance.user.put('user', jsonEncode(_user));
+    Boxes.instance.user.put('money', jsonEncode(_moneyInfo));
 
-    setState(() {});
+    return true;
   }
 
   void _putState(States s) {
@@ -138,34 +168,31 @@ class _Down4State extends State<Down4> {
   }
 
   Future<void> _parseMessageData(final data) async {
-    final t = MessageTypes.values.byName(data["t"]);
-    switch (t) {
+    final type = MessageTypes.values.byName(data["t"]);
+    switch (type) {
       case MessageTypes.fr:
         {
-          (await _box("FriendRequest")).put(data["data"]["id"], data["data"]);
+          Boxes.instance.friendRequests.put(data["data"]["id"], data["data"]);
           break;
         }
       case MessageTypes.b:
         {
-          (await _box("Bills")).put(data["data"]["id"], data["data"]);
+          Boxes.instance.bills.put(data["data"]["id"], data["data"]);
           break;
         }
       case MessageTypes.p:
         {
-          (await _box("Payments")).put(data["data"]["id"], data["data"]);
+          Boxes.instance.payments.put(data["data"]["id"], data["data"]);
           break;
         }
       case MessageTypes.m:
         {
-          (await _box("Messages")).put(data["data"]["id"], data["data"]);
-          var chatSource =
-              Node.fromJson((await _box("Friends")).get(data["data"]["sd"]));
-          if (chatSource.msg != null) {
-            chatSource.msg!.add(data["data"]["id"]);
-          } else {
-            chatSource.msg = [data["data"]["id"]];
-          }
-          (await _box("Friends")).put(chatSource.id, chatSource);
+          Boxes.instance.messages.put(data["data"]["id"], data["data"]);
+          var chatSource = Node.fromJson(
+            Boxes.instance.friends.get(data["data"]["sd"])!,
+          ); // that will crash
+          chatSource.messages?.add(data["data"]["id"]);
+          Boxes.instance.friends.put(chatSource.id, chatSource.toJson());
           break;
         }
     }
@@ -176,96 +203,111 @@ class _Down4State extends State<Down4> {
       UploadTask uploadTask;
       Reference ref = FirebaseStorage.instance.ref().child(media.id);
       uploadTask = ref.putData(
-          media.data!, SettableMetadata(customMetadata: media.jsonMetadata));
+        base64Decode(media.data!),
+        SettableMetadata(customMetadata: media.metadata.toJson()),
+      );
       return Future.value(uploadTask);
     }
     return null;
   }
   // ============================================================ DOWN4 ============================================================ //
 
+  void _sendMessage(MessageRequest message) => print("TODO");
+
   void _searchFriends(Identifier nameID) {
     setState(() {
-      _palettes["AddFriend"]![nameID] = Palette3(
+      _palettes["AddFriend"]![nameID] = SingleActionPalette(
         at: "AddFriend",
-        node: Node(t: NodeTypes.usr, id: nameID, nm: nameID, im: p),
+        node: Node(
+          type: NodeTypes.usr,
+          id: nameID,
+          name: nameID,
+          image: Down4Media(
+            id: "id",
+            usePlaceHolder: true,
+            metadata: Down4MediaMetadata(owner: nameID, isVideo: false),
+          ),
+        ),
         imPress: _selectPalette,
         bodyPress: _selectPalette,
-        goPress: _go,
+        goPress: (s, s_) => _todo(),
       );
     });
   }
 
-  void _addFriends(Map<Identifier, Node> friends) {
-    var asPalettes = friends.map((id, node) => MapEntry(
-        id,
-        Palette3(
-            at: "Friends",
-            node: node,
-            imPress: _selectPalette,
-            bodyPress: _selectPalette,
-            goPress: _go)));
-    _palettes["Friends"]?.addAll(asPalettes);
-    _boxes["Friends"]?.putAll(friends);
-  }
-
-  List<Palette3> _paletteList(String at) {
-    var paletteList = _palettes[at]!.values.toList();
-    return paletteList;
-  }
-
-  List<Palette3> _reversedList(String at) {
-    var paletteList = _palettes[at]!.values.toList().reversed.toList();
-    return paletteList;
-  }
-
-  void _selectPalette(String at, Identifier id) {
-    setState(() {
-      _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
-    });
-  }
-
-  void _selectMessage(String at, Identifier id) {
-    setState(() {
-      _messages[at]![id] = _messages[at]![id]!.invertedSelection();
-    });
-  }
-
-  Map<Identifier, Node> _selectedNodes(String at) {
-    var sp = Map<Identifier, Palette3>.from(_palettes[at]!);
-    sp.removeWhere((key, value) => !value.selected);
-    return sp.map((key, value) => MapEntry(key, value.node));
-  }
-
-  Map<Identifier, Down4Message> _selectedMessages(String at) {
-    var cm = Map<Identifier, ChatMessage>.from(_messages[at]!);
-    cm.removeWhere((key, value) => !value.selected);
-    return cm.map((key, value) => MapEntry(key, value.message));
-  }
-
-  void _go(String at, Identifier p) {}
-
-  void _snip(Map<Identifier, Palette3> friends) {}
-
-  void _forwardPalettes(Map<Identifier, Palette3> palettes) {}
-
-  void _forwardMessages(Map<Identifier, ChatMessage> messages) {}
-
-  void _unselectedSelectedPalettes(String at) {
-    _palettes[at] = _palettes[at]!.map((key, value) => value.selected
-        ? MapEntry(key, value.invertedSelection())
-        : MapEntry(key, value));
-    setState(() => {});
-  }
-
-  Map<Identifier, Down4Message> _localChat(Node node) {
-    Map<String, Down4Message> messages = {};
-    final List<Identifier>? ids = node.msg;
-    if (ids == null) return messages;
-    for (final id in ids) {
-      messages[id] = Down4Message.fromJson(_boxes["Messages"]?.get(id));
+  void _addFriends(List<Node> friends) {
+    for (final friend in friends) {
+      final palette = SingleActionPalette(
+          node: friend,
+          at: "Friends",
+          imPress: _selectPalette,
+          bodyPress: _selectPalette);
+      _palettes["Friends"]![friend.id] = palette;
+      Boxes.instance.friends.put(friend.id, jsonEncode(friend));
     }
-    return messages;
+    setState(() {});
   }
+
+  // List<Palette3> _palettesAt(String at) {
+  //   var paletteList = _palettes[at]?.values.toList();
+  //   return paletteList ?? [];
+  // }
+
+  // List<Palette3> _reversedPalettesAt(String at) {
+  //   var paletteList = _palettes[at]?.values.toList().reversed.toList();
+  //   return paletteList ?? [];
+  // }
+
+  // void _selectPalette(String at, Identifier id) {
+  //   setState(() {
+  //     _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
+  //   });
+  // }
+
+  // void _selectMessage(String at, Identifier id) {
+  //   setState(() {
+  //     _messages[at]![id] = _messages[at]![id]!.invertedSelection();
+  //   });
+  // }
+
+  // Map<Identifier, Node> _selectedNodes(String at) {
+  //   var sp = Map<Identifier, Palette3>.from(_palettes[at]!);
+  //   sp.removeWhere((key, value) => !value.selected);
+  //   return sp.map((key, value) => MapEntry(key, value.node));
+  // }
+
+  // List<Palette3> _selectedPalettes(String at) {
+  //   return _selectedNodes(at)
+  //       .values
+  //       .map((node) => Palette3(at: at, node: node))
+  //       .toList();
+  // }
+
+  // Map<Identifier, Down4Message> _selectedMessages(String at) {
+  //   var cm = Map<Identifier, ChatMessage>.from(_messages[at]!);
+  //   cm.removeWhere((key, value) => !value.selected);
+  //   return cm.map((key, value) => MapEntry(key, value.message));
+  // }
+
+  // void _todo() => print("TODO");
+
+  // void _unselectedSelectedPalettes(String at) {
+  //   _palettes[at] = _palettes[at]!.map((key, value) => value.selected
+  //       ? MapEntry(key, value.invertedSelection())
+  //       : MapEntry(key, value));
+  //   setState(() => {});
+  // }
+
+  // Map<Identifier, Down4Message> _localChat(Node node) {
+  //   Map<String, Down4Message> messages = {};
+  //   final List<Identifier>? ids = node.messages;
+  //   if (ids == null) return messages;
+  //   for (final id in ids) {
+  //     messages[id] =
+  //         Down4Message.fromJson(jsonDecode(Boxes.instance.messages.get(id)));
+  //   }
+  //   return messages;
+  // }
 
   // ============================================================ RENDER ============================================================ //
 
@@ -277,31 +319,60 @@ class _Down4State extends State<Down4> {
 
       case States.userCreation:
         return UserMakerPage(
-            cameras: widget.cameras, kernelCallBack: _initUser);
+          cameras: widget.cameras,
+          initUser: _initUser,
+          success: () => _putState(States.welcome),
+        );
 
       case States.welcome:
+        return WelcomePage(
+          mnemonic: _moneyInfo!.mnemonic,
+          userInfo: _user!,
+          understood: () => _putState(States.home),
+        );
+
+      case States.chat:
         return const Center(
-            child: Text(
-          "Not yet implanted",
-          textDirection: TextDirection.ltr,
-        ));
+          child: Text(
+            "Not yet implanted",
+            textDirection: TextDirection.ltr,
+          ),
+        );
+
+      case States.hyperchat:
+        return HyperchatPage(
+          self: _user!,
+          sendInitialMessage: _sendMessage,
+          back: () => _putState(States.home),
+          palettes: _selectedPalettes("Friends"),
+          cameras: widget.cameras,
+          afterFirstMessageCallBack: () => _putState(States.chat),
+        );
 
       case States.home:
         return PalettePage(
-            paletteList: PaletteList(palettes: _paletteList("Friends")),
+            palettes: _palettesAt("Friends"),
             console: Console(
               inputs: [
                 InputObjects(
-                    inputCallBack: (text) => _input = text, placeHolder: ":)")
+                    inputCallBack: (text) => _kernelInput = text,
+                    placeHolder: ":)")
               ],
               topButtons: [
-                ConsoleButton(name: "Hyperchat", onPress: _todo),
+                ConsoleButton(
+                    name: "Hyperchat",
+                    onPress: () {
+                      final nodes = _selectedNodes('Friends');
+                      _palettes['Hyperchat'] = nodes.map((id, node) =>
+                          MapEntry(id, SingleActionPalette(at: "Hyperchat", node: node)));
+                      _putState(States.hyperchat);
+                    }),
                 ConsoleButton(
                     name: "Money",
                     onPress: () {
                       _palettes['Money'] = _selectedNodes("Friends").map(
                           (key, node) =>
-                              MapEntry(key, Palette3(at: "Money", node: node)));
+                              MapEntry(key, SingleActionPalette(at: "Money", node: node)));
                       _putState(States.money);
                     }),
               ],
@@ -322,11 +393,11 @@ class _Down4State extends State<Down4> {
         final payment = _modes["Payment"]!["l"] as List<String>;
         final iPayment = _modes["Payment"]!["i"] as int;
         return PalettePage(
-            paletteList: PaletteList(palettes: _paletteList('Money')),
+            palettes: _selectedPalettes("Friends"),
             console: Console(
               inputs: [
                 InputObjects(
-                    inputCallBack: (text) => _input = text,
+                    inputCallBack: (text) => _kernelInput = text,
                     placeHolder: "\$",
                     type: TextInputType.number)
               ],
@@ -364,35 +435,41 @@ class _Down4State extends State<Down4> {
 
       case States.addFriend:
         return AddFriendPage(
-            myID: _id!,
-            paletteList: PaletteList(palettes: _reversedList("AddFriend")),
-            console: Console(
-              inputs: [
-                InputObjects(
-                    inputCallBack: (text) => _input = text,
-                    placeHolder: "@Search")
-              ],
-              topButtons: [
-                ConsoleButton(
-                    name: "Search", onPress: () => _searchFriends(_input)),
-                ConsoleButton(
-                    name: "Add",
-                    onPress: () {
-                      _addFriends(_selectedNodes("AddFriend"));
-                      _unselectedSelectedPalettes("AddFriend");
-                    })
-              ],
-              bottomButtons: [
-                ConsoleButton(
-                    name: "Back",
-                    onPress: () {
-                      _palettes["AddFriend"] = {};
-                      _putState(States.home);
-                    }),
-                ConsoleButton(name: "Scan", onPress: _todo),
-                ConsoleButton(name: "Forward", onPress: _todo)
-              ],
-            ));
+          self: _user!,
+          addCallback: _addFriends,
+          backCallback: () => _putState(States.home),
+        );
+      // return AddFriendPage(
+      //   myID: _user!.id,
+      //   paletteList: PaletteList(palettes: _reversedPalettesAt("AddFriend")),
+      //   console: Console(
+      //     inputs: [
+      //       InputObjects(
+      //           inputCallBack: (text) => _kernelInput = text,
+      //           placeHolder: "@Search")
+      //     ],
+      //     topButtons: [
+      //       ConsoleButton(
+      //           name: "Search", onPress: () => _searchFriends(_kernelInput)),
+      //       ConsoleButton(
+      //           name: "Add",
+      //           onPress: () {
+      //             _addFriends(_selectedNodes("AddFriend"));
+      //             _unselectedSelectedPalettes("AddFriend");
+      //           })
+      //     ],
+      //     bottomButtons: [
+      //       ConsoleButton(
+      //           name: "Back",
+      //           onPress: () {
+      //             _palettes["AddFriend"] = {};
+      //             _putState(States.home);
+      //           }),
+      //       ConsoleButton(name: "Scan", onPress: () => print("SCAN")),
+      //       ConsoleButton(name: "Forward", onPress: () => print("FORWARD"))
+      //     ],
+      //   ),
+      // );
 
       case States.node:
         return Container(

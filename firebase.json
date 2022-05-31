@@ -1,0 +1,23 @@
+{
+  "emulators": {
+    "auth": {
+      "port": 9099,
+      "host": "192.168.57.8"
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "database": {
+      "port": 9000
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true
+    }
+  }
+}

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:html' as html;
 
+import 'package:hive/hive.dart' as hive;
 import 'package:camera/camera.dart';
 import 'package:dartsv/dartsv.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -15,6 +17,7 @@ import 'package:video_player/video_player.dart';
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
   static const bodyColor = buttonColor;
+  static const inactivatedButtonColor = Color.fromARGB(255, 219, 214, 214);
   static const backGroundColor = Color.fromARGB(255, 255, 241, 242);
   static const headerColor = Color.fromARGB(255, 236, 155, 182);
   static const imageBorderColor = Color.fromARGB(255, 143, 29, 67);
@@ -34,11 +37,41 @@ class PinkTheme {
   };
 }
 
-class Palette3 extends StatelessWidget {
+class Down4ColumnBackground extends StatelessWidget {
+  List<Widget> children;
+  Down4ColumnBackground({required this.children, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: PinkTheme.backGroundColor,
+      child: Column(
+          // crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: children),
+    );
+  }
+}
+
+class Down4StackBackground extends StatelessWidget {
+  List<Widget> children;
+  Down4StackBackground({required this.children, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: PinkTheme.backGroundColor,
+      child: Stack(children: children),
+    );
+  }
+}
+
+class SingleActionPalette extends StatelessWidget {
   static const double height = 60.0;
   final Node node;
+  final int activity;
   final String at;
-  final void Function(String, Identifier)? imPress,
+  final void Function()? imPress,
       bodyPress,
       goPress,
       imLongPress,
@@ -46,8 +79,8 @@ class Palette3 extends StatelessWidget {
       goLongPress;
   final bool selected;
 
-  Palette3 invertedSelection() {
-    return Palette3(
+  SingleActionPalette invertedSelection() {
+    return SingleActionPalette(
         node: node,
         at: at,
         selected: !selected,
@@ -59,9 +92,10 @@ class Palette3 extends StatelessWidget {
         goLongPress: goLongPress);
   }
 
-  const Palette3({
+  const SingleActionPalette({
     required this.node,
-    required this.at,
+    this.activity = 1 << 63,
+    this.at = "",
     this.imPress,
     this.bodyPress,
     this.goPress,
@@ -75,113 +109,129 @@ class Palette3 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        height: Palette3.height,
-        margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-        decoration: BoxDecoration(
-            boxShadow: !selected
-                ? [
-                    const BoxShadow(
-                        color: Colors.black54,
-                        blurRadius: 6.0,
-                        spreadRadius: -6.0,
-                        offset: Offset(8.0, 8.0),
-                        blurStyle: BlurStyle.normal)
-                  ]
-                : null,
-            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-            border: Border.all(
-                width: 2.0,
-                color: selected ? PinkTheme.black : Colors.transparent)),
-        child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            textDirection: TextDirection.ltr,
-            children: [
-              GestureDetector(
-                  onTap: () => imPress?.call(at, node.id),
-                  onLongPress: () => imLongPress?.call(at, node.id),
-                  child: Container(
-                      clipBehavior: Clip.hardEdge,
-                      decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(4.0),
-                        bottomLeft: Radius.circular(4.0),
-                      )),
-                      width: Palette3.height - 2.0, // borderWidth x2
-                      child: Image.memory(base64Decode(node.im),
-                          fit: BoxFit.cover, gaplessPlayback: true))),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => bodyPress?.call(at, node.id),
-                  onLongPress: () => bodyLongPress?.call(at, node.id),
-                  child: Material(
-                    child: Container(
-                      decoration: BoxDecoration(
-                          color: PinkTheme.headerColor,
-                          border: Border(
-                              left: BorderSide(
-                                  color: selected
-                                      ? PinkTheme.black
-                                      : PinkTheme.headerColor,
-                                  width: 1.0))),
-                      padding: const EdgeInsets.only(left: 6.0, top: 5.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            node.nm + " " + (node.ln ?? ""),
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: selected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal),
-                          ),
-                          node.t == NodeTypes.usr
-                              ? Text(
-                                  "@" + node.id,
-                                  style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: selected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal),
-                                )
-                              : const SizedBox.shrink(),
-                        ],
+      height: SingleActionPalette.height,
+      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      decoration: BoxDecoration(
+        boxShadow: !selected
+            ? [
+                const BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 6.0,
+                  spreadRadius: -6.0,
+                  offset: Offset(8.0, 8.0),
+                  blurStyle: BlurStyle.normal,
+                )
+              ]
+            : null,
+        borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+        border: Border.all(
+          width: 2.0,
+          color: selected ? PinkTheme.black : Colors.transparent,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        textDirection: TextDirection.ltr,
+        children: [
+          GestureDetector(
+            onTap: imPress,
+            onLongPress: imLongPress,
+            child: Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4.0),
+                  bottomLeft: Radius.circular(4.0),
+                ),
+              ),
+              width: SingleActionPalette.height - 2.0, // borderWidth x2
+              child: Image.memory(
+                node.image.data,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: bodyPress,
+              onLongPress: bodyLongPress,
+              child: Material(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: PinkTheme.headerColor,
+                    border: Border(
+                      left: BorderSide(
+                        color:
+                            selected ? PinkTheme.black : PinkTheme.headerColor,
+                        width: 1.0,
                       ),
                     ),
                   ),
+                  padding: const EdgeInsets.only(left: 6.0, top: 5.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        node.name + " " + (node.lastName ?? ""),
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight:
+                                selected ? FontWeight.bold : FontWeight.normal),
+                      ),
+                      node.type == NodeTypes.usr
+                          ? Text(
+                              "@" + node.id,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ],
+                  ),
                 ),
               ),
-              goPress != null
-                  ? GestureDetector(
-                      onTap: () => goPress?.call(at, node.id),
-                      onLongPress: () => goLongPress?.call(at, node.id),
-                      child: Container(
-                        padding: const EdgeInsets.all(2.0),
-                        decoration: const BoxDecoration(
-                            color: PinkTheme.headerColor,
-                            borderRadius: BorderRadius.only(
-                                topRight: Radius.circular(4.0),
-                                bottomRight: Radius.circular(4.0))),
-                        child:
-                            Image.asset('lib/src/assets/rightBlackArrow.png'),
-                      ))
-                  : Container(
-                      padding: const EdgeInsets.all(2.0),
-                      decoration: const BoxDecoration(
-                          color: PinkTheme.headerColor,
-                          borderRadius: BorderRadius.only(
-                              topRight: Radius.circular(4.0),
-                              bottomRight: Radius.circular(4.0))),
-                    )
-            ]));
+            ),
+          ),
+          goPress != null
+              ? GestureDetector(
+                  onTap: goPress,
+                  onLongPress: goLongPress,
+                  child: Container(
+                    padding: const EdgeInsets.all(2.0),
+                    decoration: const BoxDecoration(
+                      color: PinkTheme.headerColor,
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(4.0),
+                        bottomRight: Radius.circular(4.0),
+                      ),
+                    ),
+                    child: Image.asset('lib/src/assets/rightBlackArrow.png'),
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.all(2.0),
+                  decoration: const BoxDecoration(
+                    color: PinkTheme.headerColor,
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(4.0),
+                      bottomRight: Radius.circular(4.0),
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
   }
 }
 
 class ConsoleButton extends StatelessWidget {
   static const double height = 26.0;
   final String name;
-  final bool isSpecial, isMode, shouldBeDownButIsnt;
+  final bool isSpecial, isMode, shouldBeDownButIsnt, isActivated;
   final void Function() onPress;
   final void Function()? onLongPress;
   final void Function()? onLongPressUp;
@@ -192,6 +242,7 @@ class ConsoleButton extends StatelessWidget {
     this.shouldBeDownButIsnt = false,
     this.isMode = false,
     this.isSpecial = false,
+    this.isActivated = true,
     this.onLongPress,
     this.onLongPressUp,
     Key? key,
@@ -206,65 +257,125 @@ class ConsoleButton extends StatelessWidget {
             shape: BoxShape.rectangle,
             color: PinkTheme.black,
             border: Border.all(color: Colors.black, width: 0.5)),
-        child: TouchableOpacity(
-          shouldBeDownButIsnt: shouldBeDownButIsnt,
-          onPress: onPress,
-          onLongPress: onLongPress,
-          onLongPressUp: onLongPressUp,
-          child: Material(
-            child: Container(
-              color: PinkTheme.buttonColor,
-              child: Center(
-                child: Text(
-                  name,
-                  style: TextStyle(
-                    decoration: isSpecial ? TextDecoration.underline : null,
-                    decorationStyle: TextDecorationStyle.solid,
-                    fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                    fontWeight: FontWeight.bold,
+        child: isActivated
+            ? TouchableOpacity(
+                shouldBeDownButIsnt: shouldBeDownButIsnt,
+                onPress: onPress,
+                onLongPress: onLongPress,
+                onLongPressUp: onLongPressUp,
+                child: Material(
+                  child: Container(
+                    color: PinkTheme.buttonColor,
+                    child: Center(
+                      child: Text(
+                        name,
+                        style: TextStyle(
+                          decoration:
+                              isSpecial ? TextDecoration.underline : null,
+                          decorationStyle: TextDecorationStyle.solid,
+                          fontStyle:
+                              isMode ? FontStyle.italic : FontStyle.normal,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : Material(
+                child: Container(
+                  color: PinkTheme.inactivatedButtonColor,
+                  child: Center(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        decoration: isSpecial ? TextDecoration.underline : null,
+                        decorationStyle: TextDecorationStyle.solid,
+                        fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ),
       ),
     );
   }
 }
 
-class InputObjects extends StatelessWidget {
+class InputObjects extends StatefulWidget {
   final TextInputType type;
   final String placeHolder;
+  final String value;
+  final String prefix;
   final void Function(String) inputCallBack;
   final Key k = GlobalKey();
   InputObjects(
       {this.type = TextInputType.text,
       required this.inputCallBack,
       required this.placeHolder,
+      this.prefix = "",
+      this.value = "",
       Key? key})
       : super(key: key);
 
   @override
+  _InputObjectState createState() => _InputObjectState();
+}
+
+class _InputObjectState extends State<InputObjects> {
+  var tec = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    tec = tec
+      ..text = widget.value
+      ..selection = TextSelection.collapsed(offset: widget.value.length);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Expanded(
-        child: Container(
-            height: ConsoleButton.height,
-            decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.black, width: 0.5)),
-            child: Material(
-                child: TextField(
-                    key: k,
-                    keyboardType: type,
-                    textAlignVertical: TextAlignVertical.center,
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.all(10.0),
-                        hintText: placeHolder,
-                        border: InputBorder.none),
-                    textDirection: TextDirection.ltr,
-                    onChanged: (value) => inputCallBack.call(value)))));
+      child: Container(
+        height: ConsoleButton.height,
+        decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.black, width: 0.5)),
+        child: Material(
+          child: TextField(
+            controller: tec,
+            key: widget.k,
+            keyboardType: widget.type,
+            textAlignVertical: TextAlignVertical.center,
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+                contentPadding: const EdgeInsets.all(10.0),
+                hintText: widget.placeHolder,
+                border: InputBorder.none),
+            textDirection: TextDirection.ltr,
+            onChanged: (value) {
+              if (value.isNotEmpty) {
+                String output;
+                if (value.substring(0, widget.prefix.length) != widget.prefix) {
+                  output = widget.prefix + value;
+                } else {
+                  output = value;
+                }
+                setState(() {
+                  tec.text = output;
+                  tec.selection =
+                      TextSelection.collapsed(offset: output.length);
+                });
+                widget.inputCallBack(output.substring(widget.prefix.length));
+              } else {
+                widget.inputCallBack(value);
+              }
+            },
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -276,7 +387,7 @@ class Console extends StatelessWidget {
   final bool? toMirror;
   final String? imagePreviewPath;
   final VideoPlayerController? videoPlayerController;
-  final List<InputObjects>? inputs;
+  final List<InputObjects>? inputs, topInputs;
   const Console(
       {required this.bottomButtons,
       this.imagePreviewPath,
@@ -285,6 +396,7 @@ class Console extends StatelessWidget {
       this.aspectRatio,
       this.cameraPreview,
       this.inputs,
+      this.topInputs,
       this.topButtons,
       this.extraButtons,
       Key? key})
@@ -300,22 +412,36 @@ class Console extends StatelessWidget {
       decoration:
           BoxDecoration(border: Border.all(width: 0.5, color: Colors.black)),
       child: Column(children: [
-        inputs != null
-            ? Row(textDirection: TextDirection.ltr, children: inputs!)
-            : cameraPreview != null
+        Row(textDirection: TextDirection.ltr, children: topInputs ?? []),
+        Row(textDirection: TextDirection.ltr, children: inputs ?? []),
+        cameraPreview != null
+            ? Container(
+                width: camWidthAndHeight,
+                height: camWidthAndHeight,
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: .5)),
+                child: Transform.scale(
+                    alignment: Alignment.center,
+                    scaleY: aspectRatio,
+                    child: AspectRatio(
+                        aspectRatio: aspectRatio!, child: cameraPreview!)))
+            : imagePreviewPath != null
                 ? Container(
                     width: camWidthAndHeight,
                     height: camWidthAndHeight,
-                    clipBehavior: Clip.hardEdge,
                     decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black, width: .5)),
-                    child: Transform.scale(
+                        border: Border.all(color: Colors.black, width: 0.5)),
+                    child: Transform(
                         alignment: Alignment.center,
-                        scaleY: aspectRatio,
-                        child: AspectRatio(
-                            aspectRatio: aspectRatio!, child: cameraPreview!)))
-                : imagePreviewPath != null
+                        transform: Matrix4.rotationY(mirror),
+                        child: Image.file(
+                          io.File(imagePreviewPath!),
+                          fit: BoxFit.cover,
+                        )))
+                : videoPlayerController != null
                     ? Container(
+                        clipBehavior: Clip.hardEdge,
                         width: camWidthAndHeight,
                         height: camWidthAndHeight,
                         decoration: BoxDecoration(
@@ -324,26 +450,10 @@ class Console extends StatelessWidget {
                         child: Transform(
                             alignment: Alignment.center,
                             transform: Matrix4.rotationY(mirror),
-                            child: Image.file(
-                              io.File(imagePreviewPath!),
-                              fit: BoxFit.cover,
-                            )))
-                    : videoPlayerController != null
-                        ? Container(
-                            clipBehavior: Clip.hardEdge,
-                            width: camWidthAndHeight,
-                            height: camWidthAndHeight,
-                            decoration: BoxDecoration(
-                                border: Border.all(
-                                    color: Colors.black, width: 0.5)),
-                            child: Transform(
-                                alignment: Alignment.center,
-                                transform: Matrix4.rotationY(mirror),
-                                child: Transform.scale(
-                                    scaleY: aspectRatio,
-                                    child:
-                                        VideoPlayer(videoPlayerController!))))
-                        : const SizedBox.shrink(),
+                            child: Transform.scale(
+                                scaleY: aspectRatio,
+                                child: VideoPlayer(videoPlayerController!))))
+                    : const SizedBox.shrink(),
         Row(
           children: topButtons ?? [],
           textDirection: TextDirection.ltr,
@@ -357,155 +467,222 @@ class Console extends StatelessWidget {
   }
 }
 
-class Media extends StatefulWidget {
-  final Down4Media _media;
-  const Media(Down4Media media, [Key? key])
-      : _media = media,
-        super(key: key);
+// class Media extends StatefulWidget {
+//   final Down4Media _media;
+//   const Media(Down4Media media, [Key? key])
+//       : _media = media,
+//         super(key: key);
 
-  @override
-  _Media createState() => _Media();
-}
+//   @override
+//   _Media createState() => _Media();
+// }
 
-class _Media extends State<Media> {
-  late VideoPlayerController? _vc;
+// class _Media extends State<Media> {
+//   VideoPlayerController? _vc;
+//   dynamic theMedia;
 
-  @override
-  Future<void> initState() async {
-    super.initState();
-    final m = widget._media;
-    if (m.isOnlyOnDatabase && m.isImage) {
-      await m.downloadMedia();
-    } else if (m.isOnlyOnDatabase && m.isVideo) {
-      Reference ref = FirebaseStorage.instance.ref(m.dbid);
-      String dataSource = await ref.getDownloadURL();
-      _vc = VideoPlayerController.network(dataSource);
-      await _vc!.initialize();
-    }
-  }
+//   @override
+//   void initState() {
+//     super.initState();
+//     final m = widget._media;
+//     if (m.hasThumbnail) {
+//       theMedia = Image.memory(
+//         base64Decode(m.thumbnail),
+//         gaplessPlayback: true,
+//         fit: BoxFit.cover,
+//       );
+//     }
+//     _fetchMedia();
+//   }
 
-  Widget display() {
-    final m = widget._media;
-    if (m.isImage) {
-      return Image.memory(m.data!);
-    } else if (m.isVideo && _vc != null) {
-      return GestureDetector(
-        onTap: () {
-          if (_vc!.value.isPlaying) {
-            _vc!.pause();
-          } else {
-            _vc!.play();
-          }
-        },
-        child: VideoPlayer(_vc!),
-      );
-    }
-    return const SizedBox.shrink();
-  }
+//   Future<void> _fetchMedia() async {
+//     var m = widget._media;
 
-  @override
-  Widget build(BuildContext context) {
-    return display();
-  }
-}
+//     if (m.usePlaceHolder) {
+//       theMedia = Image.asset(
+//         'lib/src/assets/hashirama.jpg',
+//         gaplessPlayback: true,
+//         fit: BoxFit.cover,
+//       );
+//     } else if (m.isImage && m.hasData) {
+//       theMedia = Image.memory(
+//         base64Decode(m.data),
+//         gaplessPlayback: true,
+//         fit: BoxFit.cover,
+//       );
+//     } else if (m.isOnlyOnDatabase && m.isImage) {
+//       await m.downloadData();
+//       theMedia = m.hasData
+//           ? Image.memory(
+//               base64Decode(m.data),
+//               gaplessPlayback: true,
+//               fit: BoxFit.cover,
+//             )
+//           : null;
+//     } else if (m.isOnlyOnDatabase && m.isVideo) {
+//       String dataSource;
+//       if (!m.hasURL) {
+//         dataSource = await m.downloadURL();
+//       } else {
+//         dataSource = m.url;
+//       }
+//       _vc = VideoPlayerController.network(dataSource);
+//       await _vc?.initialize();
+//       if (_vc != null) {
+//         theMedia = GestureDetector(
+//           onTap: () {
+//             if (_vc!.value.isPlaying) {
+//               _vc!.pause();
+//             } else {
+//               _vc!.play();
+//             }
+//           },
+//           child: VideoPlayer(_vc!),
+//         );
+//       }
+//       theMedia = null;
+//     }
+//     setState(() {});
+//   }
 
-class ChatMessage extends StatelessWidget {
-  static const double _headerHeight = 24.0;
+//   @override
+//   Widget build(BuildContext context) {
+//     return theMedia ?? const SizedBox.shrink();
+//   }
+// }
+
+class ChatMessage extends StatefulWidget {
+  static const double headerHeight = 24.0;
   final Down4Message message;
-  final bool myMessage, selected;
+  final bool myMessage;
   final void Function(Identifier)? select;
   final List<Identifier>? reactionIDs;
-  const ChatMessage(
-      {required this.message,
-      required this.myMessage,
-      this.select,
-      this.selected = false,
-      this.reactionIDs,
-      Key? key})
-      : super(key: key);
+  const ChatMessage({
+    required this.message,
+    required this.myMessage,
+    this.select,
+    this.reactionIDs,
+    Key? key,
+  }) : super(key: key);
 
-  ChatMessage invertedSelection() {
-    return ChatMessage(
-      message: message,
-      myMessage: myMessage,
-      selected: !selected,
-      select: select,
-      reactionIDs: reactionIDs,
-    );
+  @override
+  _ChatMessageState createState() => _ChatMessageState();
+}
+
+class _ChatMessageState extends State<ChatMessage> {
+  VideoPlayerController? _videoController;
+  dynamic media;
+  bool selected = false;
+
+  void _select() {
+    setState(() => selected = true);
+  }
+
+  @override
+  void initState() async {
+    super.initState();
+    if (widget.message.media != null) {
+      if (widget.message.isVideo) {
+        final blob = html.Blob([widget.message.media!.data]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        _videoController = VideoPlayerController.network(url);
+        await _videoController!.initialize();
+        media = GestureDetector(
+          onTap: () {
+            if (_videoController!.value.isPlaying) {
+              _videoController!.pause();
+            } else {
+              _videoController!.play();
+            }
+          },
+          child: VideoPlayer(_videoController!),
+        );
+      } else {
+        media = GestureDetector(
+          onTap: _select,
+          child: Image.memory(
+            widget.message.media!.data,
+            fit: BoxFit.cover,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final media = message.media;
     return Align(
-        alignment: !message.isChat
-            ? Alignment.topCenter
-            : myMessage
-                ? Alignment.topRight
-                : Alignment.topLeft,
-        child: Container(
-            constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.66),
-            decoration: BoxDecoration(
-                border: Border.all(
-                    width: 2.0,
-                    color: selected ? Colors.black : Colors.transparent)),
-            child: IntrinsicWidth(
-                child: Column(
-                    textDirection: TextDirection.ltr,
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                  Row(
-                      mainAxisSize: MainAxisSize.min,
-                      textDirection: TextDirection.ltr,
-                      children: [
-                        GestureDetector(
-                            onTap: () => select?.call(message.id),
-                            child: SizedBox(
-                                height: _headerHeight,
-                                child: Image.asset(
-                                    'lib/src/assets/hashirama.jpg'))),
-                        Expanded(
-                            child: GestureDetector(
-                                onTap: () => select?.call(message.id),
-                                child: Container(
-                                    padding: const EdgeInsets.only(
-                                        left: 2.0, top: 2.0, right: 2.0),
-                                    color: PinkTheme.headerColor,
-                                    height: _headerHeight,
-                                    child: Text(
-                                      message.name,
-                                      textDirection: TextDirection.ltr,
-                                    ))))
-                      ]),
-                  message.text == null
-                      ? const SizedBox.shrink()
-                      : GestureDetector(
-                          onTap: () => select?.call(message.id),
-                          child: Container(
-                              padding: const EdgeInsets.all(2.0),
-                              color: PinkTheme.bodyColor,
-                              child: Text(message.text!,
-                                  textDirection: TextDirection.ltr,
-                                  style:
-                                      const TextStyle(color: Colors.black)))),
-                  media == null
-                      ? const SizedBox.shrink()
-                      : media.isImage
-                          ? GestureDetector(
-                              onTap: () => select?.call(message.id),
-                              child: Container(
-                                  color: PinkTheme.bodyColor,
-                                  child: Media(media)))
-                          : Container(
-                              color: PinkTheme.bodyColor, child: Media(media))
-                ]))));
+      alignment: widget.message.isChat == false
+          ? Alignment.topCenter
+          : widget.myMessage
+              ? Alignment.topRight
+              : Alignment.topLeft,
+      child: Container(
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.66),
+        decoration: BoxDecoration(
+            border: Border.all(
+                width: 2.0,
+                color: selected ? Colors.black : Colors.transparent)),
+        child: IntrinsicWidth(
+          child: Column(
+            textDirection: TextDirection.ltr,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                textDirection: TextDirection.ltr,
+                children: [
+                  GestureDetector(
+                    onTap: _select,
+                    child: SizedBox(
+                      height: ChatMessage.headerHeight,
+                      child: Image.memory(widget.message.thumbnail),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _select,
+                      child: Container(
+                        padding: const EdgeInsets.only(
+                            left: 2.0, top: 2.0, right: 2.0),
+                        color: PinkTheme.headerColor,
+                        height: ChatMessage.headerHeight,
+                        child: Text(
+                          widget.message.name,
+                          textDirection: TextDirection.ltr,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              widget.message.text == null
+                  ? const SizedBox.shrink()
+                  : GestureDetector(
+                      onTap: _select,
+                      child: Container(
+                        padding: const EdgeInsets.all(2.0),
+                        color: PinkTheme.bodyColor,
+                        child: Text(
+                          widget.message.text!,
+                          textDirection: TextDirection.ltr,
+                          style: const TextStyle(color: Colors.black),
+                        ),
+                      ),
+                    ),
+              media ?? const SizedBox.shrink()
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
 class PaletteList extends StatelessWidget {
-  final List<Palette3> palettes;
+  final List<SingleActionPalette> palettes;
   const PaletteList({required this.palettes, Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
@@ -558,7 +735,7 @@ class UserPaletteMaker extends StatelessWidget {
       ..text = info['id'].toLowerCase()
       ..selection = TextSelection.collapsed(offset: info['id'].length);
     return Container(
-      height: Palette3.height,
+      height: SingleActionPalette.height,
       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
       decoration: BoxDecoration(
           boxShadow: const [
@@ -594,7 +771,7 @@ class UserPaletteMaker extends StatelessWidget {
                 topLeft: Radius.circular(4.0),
                 bottomLeft: Radius.circular(4.0),
               )),
-              width: Palette3.height - 2.0, // borderWidth x2
+              width: SingleActionPalette.height - 2.0, // borderWidth x2
               child: info['image'] == null || info['image'] == ""
                   ? Image.asset(
                       'lib/src/assets/picture_place_holder_2.png',
@@ -628,13 +805,120 @@ class UserPaletteMaker extends StatelessWidget {
                   prefixText: info['id'] == "" ? "" : "@",
                   hintText: "@username",
                   border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.only(bottom: Palette3.height / 2),
+                  contentPadding: const EdgeInsets.only(
+                      bottom: SingleActionPalette.height / 2),
                 ),
                 textDirection: TextDirection.ltr,
                 onChanged: ((value) {
                   infoCallBack({...info, 'id': value.toLowerCase()});
                 }),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class UserMakerPalette extends StatelessWidget {
+  static const double height = 60.0;
+  final String name, lastName, id;
+  final Uint8List image;
+  final void Function() selectFile;
+
+  const UserMakerPalette({
+    required this.name,
+    required this.lastName,
+    required this.id,
+    required this.selectFile,
+    required this.image,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: SingleActionPalette.height,
+      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      decoration: BoxDecoration(
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 6.0,
+            spreadRadius: -6.0,
+            offset: Offset(8.0, 8.0),
+            blurStyle: BlurStyle.normal,
+          ),
+        ],
+        borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+        border: Border.all(width: 2.0, color: Colors.transparent),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        textDirection: TextDirection.ltr,
+        children: [
+          GestureDetector(
+            onTap: selectFile,
+            child: Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4.0),
+                  bottomLeft: Radius.circular(4.0),
+                ),
+              ),
+              width: SingleActionPalette.height - 2.0, // borderWidth x2
+              child: image.isNotEmpty
+                  ? Image.memory(
+                      image,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    )
+                  : Image.asset(
+                      'lib/src/assets/picture_place_holder_2.png',
+                      fit: BoxFit.cover,
+                    ),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: PinkTheme.headerColor,
+                border: Border(
+                  left: BorderSide(color: PinkTheme.headerColor, width: 1.0),
+                ),
+              ),
+              padding: const EdgeInsets.only(left: 6.0, top: 5.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (name == '' ? "Name" : name) +
+                        " " +
+                        (lastName == '' ? "" : lastName),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                  Text(
+                    "@" + (id == '' ? "username" : id),
+                    style: const TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.normal),
+                  )
+                ],
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(2.0),
+            decoration: const BoxDecoration(
+              color: PinkTheme.headerColor,
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(4.0),
+                bottomRight: Radius.circular(4.0),
               ),
             ),
           ),
@@ -665,7 +949,7 @@ class PaletteMaker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        height: Palette3.height,
+        height: SingleActionPalette.height,
         margin: const EdgeInsets.only(left: 22.0, right: 22.0),
         decoration: BoxDecoration(
             boxShadow: const [
@@ -702,7 +986,7 @@ class PaletteMaker extends StatelessWidget {
                     topLeft: Radius.circular(4.0),
                     bottomLeft: Radius.circular(4.0),
                   )),
-                  width: Palette3.height - 2.0, // borderWidth x2
+                  width: SingleActionPalette.height - 2.0, // borderWidth x2
                   child: info['image'] == null || info['image'] == ""
                       ? Image.asset(
                           'lib/src/assets/picture_place_holder_2.png',
@@ -727,7 +1011,8 @@ class PaletteMaker extends StatelessWidget {
                                   hintText: "Pick a name and an image!",
                                   border: InputBorder.none,
                                   contentPadding: EdgeInsets.only(
-                                      bottom: (Palette3.height) / 2)),
+                                      bottom:
+                                          (SingleActionPalette.height) / 2)),
                               textDirection: TextDirection.ltr,
                               onChanged: ((value) => infoCallBack(
                                   infoKey, {...info, 'name': value})))))),
@@ -742,8 +1027,9 @@ class PaletteMaker extends StatelessWidget {
                   child: Container(
                       clipBehavior: Clip.hardEdge,
                       padding: const EdgeInsets.all(2.0),
-                      width:
-                          type != NodeTypes.usr ? Palette3.height - 2.0 : 4.0,
+                      width: type != NodeTypes.usr
+                          ? SingleActionPalette.height - 2.0
+                          : 4.0,
                       decoration: const BoxDecoration(
                           color: PinkTheme.headerColor,
                           borderRadius: BorderRadius.only(
