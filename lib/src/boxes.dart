@@ -11,7 +11,8 @@ class Boxes {
       messages,
       messageQueue,
       bills,
-      payments;
+      payments,
+      hyperchats;
   Boxes()
       : images = Hive.box("Images"),
         friends = Hive.box("Friends"),
@@ -22,7 +23,8 @@ class Boxes {
         messages = Hive.box("Messages"),
         messageQueue = Hive.box("MessageQueue"),
         bills = Hive.box("Bills"),
-        payments = Hive.box("Payments");
+        payments = Hive.box("Payments"),
+        hyperchats = Hive.box("Hyperchats");
 
   //static Boxes get instance => _instance ?? _instance = Boxes();
   static Boxes get instance =>

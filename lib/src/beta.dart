@@ -1,26 +1,16 @@
-import 'dart:convert';
-
-var nigger = ["jeff", null, "shitfuck", null, "nigger"].join("\$");
-var nigger2 = [].join(" ");
-var nigger8 = ["", "", "", ""].join("^");
-
-
-var jsonString = '[ {"jeff": 3}, {"nigger": true} ]';
-
-
-var nigg = '{"jj": [1,2,3,4,5], "fuck": false }';
-
 void main() {
-  var dec = jsonDecode(nigg);
+  Map<String, Map<String, int>> jeff = {"Friends": {}, "Niggers": {}};
 
-  for ( var i in dec["jj"]) {
-    print(i);
-  }
+  var nig = {"a": 7, "b": 2, "c": 3};
+  var j = {"k": 1, "h": 45};
+  var caca = {"hh": 4, "bb": 99};
+  var nig2 = nig.values.followedBy(j.values).toList()
+    ..sort(((a, b) => a.compareTo(b)))
+    ..addAll(caca.values);
+  // var nig3 = nig2..addAll(caca.values);
 
-  if(!dec["fuck"]) {
-    print("nigger");
-  } else {
-    print("lol");
-  }
+  <String,int>{"jeff": 3}.values;
 
+  print(nig);
+  print(nig2);
 }

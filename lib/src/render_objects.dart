@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:html' as html;
 
 import 'package:hive/hive.dart' as hive;
 import 'package:camera/camera.dart';
@@ -71,7 +70,7 @@ class SingleActionPalette extends StatelessWidget {
   final Node node;
   final int activity;
   final String at;
-  final void Function()? imPress,
+  final void Function(String, String)? imPress,
       bodyPress,
       goPress,
       imLongPress,
@@ -90,6 +89,10 @@ class SingleActionPalette extends StatelessWidget {
         bodyLongPress: bodyLongPress,
         goPress: goPress,
         goLongPress: goLongPress);
+  }
+
+  SingleActionPalette deactivated() {
+    return SingleActionPalette(node: node);
   }
 
   const SingleActionPalette({
@@ -134,8 +137,8 @@ class SingleActionPalette extends StatelessWidget {
         textDirection: TextDirection.ltr,
         children: [
           GestureDetector(
-            onTap: imPress,
-            onLongPress: imLongPress,
+            onTap: () => imPress?.call(at, node.id),
+            onLongPress: () => imLongPress?.call(at, node.id),
             child: Container(
               clipBehavior: Clip.hardEdge,
               decoration: const BoxDecoration(
@@ -153,8 +156,8 @@ class SingleActionPalette extends StatelessWidget {
           ),
           Expanded(
             child: GestureDetector(
-              onTap: bodyPress,
-              onLongPress: bodyLongPress,
+              onTap: () => bodyPress?.call(at, node.id),
+              onLongPress: () => bodyLongPress?.call(at, node.id),
               child: Material(
                 child: Container(
                   decoration: BoxDecoration(
@@ -198,8 +201,165 @@ class SingleActionPalette extends StatelessWidget {
           ),
           goPress != null
               ? GestureDetector(
-                  onTap: goPress,
-                  onLongPress: goLongPress,
+                  onTap: () => goPress?.call(at, node.id),
+                  onLongPress: () => goLongPress?.call(at, node.id),
+                  child: Container(
+                    padding: const EdgeInsets.all(2.0),
+                    decoration: const BoxDecoration(
+                      color: PinkTheme.headerColor,
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(4.0),
+                        bottomRight: Radius.circular(4.0),
+                      ),
+                    ),
+                    child: Image.asset('lib/src/assets/rightBlackArrow.png'),
+                  ),
+                )
+              : Container(
+                  padding: const EdgeInsets.all(2.0),
+                  decoration: const BoxDecoration(
+                    color: PinkTheme.headerColor,
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(4.0),
+                      bottomRight: Radius.circular(4.0),
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+}
+
+class SingleActionPalette2 extends StatefulWidget {
+  static const double height = 60.0;
+  final Node node;
+  final String at;
+  final void Function()? imPress,
+      bodyPress,
+      goPress,
+      imLongPress,
+      bodyLongPress,
+      goLongPress;
+
+  const SingleActionPalette2({
+    required this.node,
+    this.at = "",
+    this.imPress,
+    this.bodyPress,
+    this.goPress,
+    this.imLongPress,
+    this.bodyLongPress,
+    this.goLongPress,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  _SingleActionPalette2State createState() => _SingleActionPalette2State();
+}
+
+class _SingleActionPalette2State extends State<SingleActionPalette2> {
+  bool selected = false;
+  int activity = 1 << 63;
+
+  invertSelection() => setState(() => selected = !selected);
+
+  set setActivity(int a) => activity = a;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: SingleActionPalette.height,
+      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      decoration: BoxDecoration(
+        boxShadow: !selected
+            ? [
+                const BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 6.0,
+                  spreadRadius: -6.0,
+                  offset: Offset(8.0, 8.0),
+                  blurStyle: BlurStyle.normal,
+                )
+              ]
+            : null,
+        borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+        border: Border.all(
+          width: 2.0,
+          color: selected ? PinkTheme.black : Colors.transparent,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        textDirection: TextDirection.ltr,
+        children: [
+          GestureDetector(
+            onTap: widget.imPress,
+            onLongPress: widget.imLongPress,
+            child: Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4.0),
+                  bottomLeft: Radius.circular(4.0),
+                ),
+              ),
+              width: SingleActionPalette.height - 2.0, // borderWidth x2
+              child: Image.memory(
+                widget.node.image.data,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: widget.bodyPress,
+              onLongPress: widget.bodyLongPress,
+              child: Material(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: PinkTheme.headerColor,
+                    border: Border(
+                      left: BorderSide(
+                        color:
+                            selected ? PinkTheme.black : PinkTheme.headerColor,
+                        width: 1.0,
+                      ),
+                    ),
+                  ),
+                  padding: const EdgeInsets.only(left: 6.0, top: 5.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.node.name + " " + (widget.node.lastName ?? ""),
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight:
+                                selected ? FontWeight.bold : FontWeight.normal),
+                      ),
+                      widget.node.type == NodeTypes.usr
+                          ? Text(
+                              "@" + widget.node.id,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          widget.goPress != null
+              ? GestureDetector(
+                  onTap: widget.goPress,
+                  onLongPress: widget.goLongPress,
                   child: Container(
                     padding: const EdgeInsets.all(2.0),
                     decoration: const BoxDecoration(
@@ -467,154 +627,37 @@ class Console extends StatelessWidget {
   }
 }
 
-// class Media extends StatefulWidget {
-//   final Down4Media _media;
-//   const Media(Down4Media media, [Key? key])
-//       : _media = media,
-//         super(key: key);
-
-//   @override
-//   _Media createState() => _Media();
-// }
-
-// class _Media extends State<Media> {
-//   VideoPlayerController? _vc;
-//   dynamic theMedia;
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     final m = widget._media;
-//     if (m.hasThumbnail) {
-//       theMedia = Image.memory(
-//         base64Decode(m.thumbnail),
-//         gaplessPlayback: true,
-//         fit: BoxFit.cover,
-//       );
-//     }
-//     _fetchMedia();
-//   }
-
-//   Future<void> _fetchMedia() async {
-//     var m = widget._media;
-
-//     if (m.usePlaceHolder) {
-//       theMedia = Image.asset(
-//         'lib/src/assets/hashirama.jpg',
-//         gaplessPlayback: true,
-//         fit: BoxFit.cover,
-//       );
-//     } else if (m.isImage && m.hasData) {
-//       theMedia = Image.memory(
-//         base64Decode(m.data),
-//         gaplessPlayback: true,
-//         fit: BoxFit.cover,
-//       );
-//     } else if (m.isOnlyOnDatabase && m.isImage) {
-//       await m.downloadData();
-//       theMedia = m.hasData
-//           ? Image.memory(
-//               base64Decode(m.data),
-//               gaplessPlayback: true,
-//               fit: BoxFit.cover,
-//             )
-//           : null;
-//     } else if (m.isOnlyOnDatabase && m.isVideo) {
-//       String dataSource;
-//       if (!m.hasURL) {
-//         dataSource = await m.downloadURL();
-//       } else {
-//         dataSource = m.url;
-//       }
-//       _vc = VideoPlayerController.network(dataSource);
-//       await _vc?.initialize();
-//       if (_vc != null) {
-//         theMedia = GestureDetector(
-//           onTap: () {
-//             if (_vc!.value.isPlaying) {
-//               _vc!.pause();
-//             } else {
-//               _vc!.play();
-//             }
-//           },
-//           child: VideoPlayer(_vc!),
-//         );
-//       }
-//       theMedia = null;
-//     }
-//     setState(() {});
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return theMedia ?? const SizedBox.shrink();
-//   }
-// }
-
-class ChatMessage extends StatefulWidget {
+class ChatMessage extends StatelessWidget {
   static const double headerHeight = 24.0;
+  final String at;
   final Down4Message message;
-  final bool myMessage;
-  final void Function(Identifier)? select;
-  final List<Identifier>? reactionIDs;
+  final bool myMessage, selected;
+  final void Function(Identifier, Identifier)? select;
   const ChatMessage({
     required this.message,
     required this.myMessage,
+    required this.at,
+    this.selected = false,
     this.select,
-    this.reactionIDs,
     Key? key,
   }) : super(key: key);
 
-  @override
-  _ChatMessageState createState() => _ChatMessageState();
-}
-
-class _ChatMessageState extends State<ChatMessage> {
-  VideoPlayerController? _videoController;
-  dynamic media;
-  bool selected = false;
-
-  void _select() {
-    setState(() => selected = true);
-  }
-
-  @override
-  void initState() async {
-    super.initState();
-    if (widget.message.media != null) {
-      if (widget.message.isVideo) {
-        final blob = html.Blob([widget.message.media!.data]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        _videoController = VideoPlayerController.network(url);
-        await _videoController!.initialize();
-        media = GestureDetector(
-          onTap: () {
-            if (_videoController!.value.isPlaying) {
-              _videoController!.pause();
-            } else {
-              _videoController!.play();
-            }
-          },
-          child: VideoPlayer(_videoController!),
-        );
-      } else {
-        media = GestureDetector(
-          onTap: _select,
-          child: Image.memory(
-            widget.message.media!.data,
-            fit: BoxFit.cover,
-          ),
-        );
-      }
-    }
+  ChatMessage invertedSelection() {
+    return ChatMessage(
+      message: message,
+      myMessage: myMessage,
+      at: at,
+      select: select,
+      selected: !selected,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: widget.message.isChat == false
+      alignment: message.isChat == false
           ? Alignment.topCenter
-          : widget.myMessage
+          : myMessage
               ? Alignment.topRight
               : Alignment.topLeft,
       child: Container(
@@ -635,22 +678,22 @@ class _ChatMessageState extends State<ChatMessage> {
                 textDirection: TextDirection.ltr,
                 children: [
                   GestureDetector(
-                    onTap: _select,
+                    onTap: () => select?.call(at, message.id),
                     child: SizedBox(
                       height: ChatMessage.headerHeight,
-                      child: Image.memory(widget.message.thumbnail),
+                      child: Image.memory(message.thumbnail),
                     ),
                   ),
                   Expanded(
                     child: GestureDetector(
-                      onTap: _select,
+                      onTap: () => select?.call(at, message.id),
                       child: Container(
                         padding: const EdgeInsets.only(
                             left: 2.0, top: 2.0, right: 2.0),
                         color: PinkTheme.headerColor,
                         height: ChatMessage.headerHeight,
                         child: Text(
-                          widget.message.name,
+                          message.name,
                           textDirection: TextDirection.ltr,
                         ),
                       ),
@@ -658,25 +701,72 @@ class _ChatMessageState extends State<ChatMessage> {
                   ),
                 ],
               ),
-              widget.message.text == null
+              message.text == null
                   ? const SizedBox.shrink()
                   : GestureDetector(
-                      onTap: _select,
+                      onTap: () => select?.call(at, message.id),
                       child: Container(
                         padding: const EdgeInsets.all(2.0),
                         color: PinkTheme.bodyColor,
                         child: Text(
-                          widget.message.text!,
+                          message.text!,
                           textDirection: TextDirection.ltr,
                           style: const TextStyle(color: Colors.black),
                         ),
                       ),
                     ),
-              media ?? const SizedBox.shrink()
+              message.image != null
+                  ? GestureDetector(
+                      onTap: () => select?.call(at, message.id),
+                      child: Image.memory(
+                        message.image!.data,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : message.video != null
+                      ? Down4VideoPlayer(url: message.video!.url)
+                      : const SizedBox.shrink()
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class Down4VideoPlayer extends StatefulWidget {
+  final String url;
+  const Down4VideoPlayer({required this.url, Key? key}) : super(key: key);
+
+  @override
+  _Down4VideoPlayerState createState() => _Down4VideoPlayerState();
+}
+
+class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
+  VideoPlayerController? _videoController;
+
+  @override
+  void initState() async {
+    super.initState();
+    _videoController = VideoPlayerController.network(widget.url);
+    await _videoController?.initialize();
+  }
+
+  void touch() {
+    if (_videoController?.value.isPlaying == true) {
+      _videoController?.pause();
+    } else {
+      _videoController?.play();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: touch,
+      child: _videoController != null
+          ? VideoPlayer(_videoController!)
+          : const SizedBox.shrink(),
     );
   }
 }
@@ -824,7 +914,7 @@ class UserPaletteMaker extends StatelessWidget {
 class UserMakerPalette extends StatelessWidget {
   static const double height = 60.0;
   final String name, lastName, id;
-  final Uint8List image;
+  final List<int> image;
   final void Function() selectFile;
 
   const UserMakerPalette({
@@ -871,7 +961,7 @@ class UserMakerPalette extends StatelessWidget {
               width: SingleActionPalette.height - 2.0, // borderWidth x2
               child: image.isNotEmpty
                   ? Image.memory(
-                      image,
+                      Uint8List.fromList(image),
                       fit: BoxFit.cover,
                       gaplessPlayback: true,
                     )

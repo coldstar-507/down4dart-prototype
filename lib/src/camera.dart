@@ -146,14 +146,14 @@ class _CameraConsoleState extends State<CameraConsole> {
         topButtons: [
           ConsoleButton(
               name: "Accept",
-              onPress: () => widget.cameraCallBack(_filePath, true)),
+              onPress: () {
+                widget.cameraCallBack(_filePath, true);
+              }),
         ],
         bottomButtons: [
           ConsoleButton(
               name: "Back",
-              onPress: () async {
-                await _videoPlayerController?.dispose();
-                _videoPlayerController = null;
+              onPress: () {
                 _setCapturingConsole();
               }),
           ConsoleButton(
@@ -184,9 +184,9 @@ class _CameraConsoleState extends State<CameraConsole> {
 
   @override
   Future<void> dispose() async {
+    super.dispose();
     await _cameraController?.dispose();
     await _videoPlayerController?.dispose();
-    super.dispose();
   }
 
   void _nextCam() {

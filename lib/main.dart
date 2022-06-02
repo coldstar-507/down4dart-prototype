@@ -15,16 +15,17 @@ import 'firebase_options.dart';
 import 'src/kernel.dart';
 
 Future<void> _openAllBoxes() async {
-  await Hive.openBox("Images");
+  Hive.openBox("Images");
   await Hive.openBox("Friends");
   await Hive.openBox("User");
-  await Hive.openBox("Reactions");
-  await Hive.openBox("Others");
+  Hive.openBox("Reactions");
+  Hive.openBox("Others");
   await Hive.openBox("FriendRequests");
-  await Hive.openBox("Messages");
+  Hive.openBox("Messages");
   await Hive.openBox("MessageQueue");
-  await Hive.openBox("Bills");
-  await Hive.openBox("Payments");
+  Hive.openBox("Bills");
+  Hive.openBox("Payments");
+  await Hive.openBox("Hyperchats");
 }
 
 Future<void> _firebaseMessagingOnTokenChange() async {}

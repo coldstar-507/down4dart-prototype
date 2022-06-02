@@ -3,11 +3,11 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'render_objects.dart';
 import 'dart:convert';
+import 'boxes.dart';
 import 'camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:file_picker/file_picker.dart';
@@ -87,6 +87,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
               final tn = await widget.self.image.generateThumbnail();
               widget.sendInitialMessage(
                 MessageRequest(
+                  isVideo: _isVideo ?? false,
                   b64Thumbnail: base64Encode(tn),
                   sender: widget.self.id,
                   targets: widget.palettes.map((e) => e.node.id).toList(),
@@ -135,6 +136,73 @@ class _HyperchatPageState extends State<HyperchatPage> {
   }
 }
 
+class MoneyPage extends StatefulWidget {
+  List<SingleActionPalette> palettes;
+  VoidCallback back;
+  MoneyPage({
+    required this.palettes,
+    required this.back,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  _MoneyPageState createState() => _MoneyPageState();
+}
+
+class _MoneyPageState extends State<MoneyPage> {
+  String _moneyInput = "";
+  final Map<String, dynamic> _currencies = {
+    "l": ["CAD", "Satoshis"],
+    "i": 0
+  };
+  final Map<String, dynamic> _paymentMethod = {
+    "l": ["Each", "Split"],
+    "i": 0
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = _currencies["l"][_currencies["i"]] as String;
+    final paymentMethod = _paymentMethod["l"][_paymentMethod["i"]] as String;
+    return PalettePage(
+      palettes: widget.palettes,
+      console: Console(
+        inputs: [
+          InputObjects(
+              inputCallBack: (text) => _moneyInput = text,
+              placeHolder: "\$",
+              type: TextInputType.number)
+        ],
+        topButtons: [
+          ConsoleButton(name: "Pay", onPress: () => print("TODO")),
+          ConsoleButton(name: "Bill", onPress: () => print("TODO"))
+        ],
+        bottomButtons: [
+          ConsoleButton(name: "Back", onPress: widget.back),
+          ConsoleButton(
+              name: currency,
+              isMode: true,
+              onPress: () {
+                setState(() {
+                  _currencies["i"] = (_currencies["i"] + 1) %
+                      (_currencies["l"] as List<String>).length;
+                });
+              }),
+          ConsoleButton(
+              name: paymentMethod,
+              isMode: true,
+              onPress: () {
+                setState(() {
+                  _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
+                      (_paymentMethod["l"] as List<String>).length;
+                });
+              })
+        ],
+      ),
+    );
+  }
+}
+
 class MessagePage extends StatelessWidget {
   final MessageList messageList;
   final Console console;
@@ -175,6 +243,11 @@ class _AddFriendPageState extends State<AddFriendPage> {
     console = _loadConsole();
   }
 
+  void _selectePalette(String _, String id) {
+    _palettes[id] = _palettes[id]!.invertedSelection();
+    setState(() {});
+  }
+
   Console _loadConsole() {
     return Console(
       inputs: [
@@ -188,19 +261,15 @@ class _AddFriendPageState extends State<AddFriendPage> {
         ConsoleButton(
             name: "Search",
             onPress: () async {
-              var node = await r.getNodes([_input]);
+              var node = (await r.getNodes([_input]))?.first;
               if (node != null) {
-                _palettes = {
-                  ..._palettes,
-                  _input: SingleActionPalette(
-                    at: "",
-                    node: node.first,
-                    imPress: (s, ss) {
-                      _palettes[node.first.id]?.invertedSelection();
-                      setState(() {});
-                    },
+                _palettes.addAll({
+                  node.id: SingleActionPalette(
+                    node: node,
+                    imPress: _selectePalette,
+                    bodyPress: _selectePalette,
                   )
-                };
+                });
                 setState(() {});
               }
             }),
@@ -217,13 +286,14 @@ class _AddFriendPageState extends State<AddFriendPage> {
               (key, value) => MapEntry(
                   key, value.selected ? value.invertedSelection() : value),
             );
+            setState(() {});
           },
         )
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.backCallback),
         ConsoleButton(name: "Scan", onPress: () => print("SCAN")),
-        ConsoleButton(name: "Forward", onPress: () => print("FORWARD"))
+        ConsoleButton(name: "Forward", onPress: () => print("FORWARD")),
       ],
     );
   }
@@ -279,15 +349,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
   final buttonKey = GlobalKey();
   Map<String, dynamic> infos = {
     'id': '',
-    'name': '',
-    'imagedata': Uint8List(0),
-    'lastname': '',
-    'phone': '',
+    'nm': '',
+    'im': <int>[],
+    'ln': '',
   }; // "user" redondance because of paletteMaker
   dynamic console;
   dynamic inputs;
   bool _isValidUsername = false;
-  bool _isReady = false;
   bool _errorTryAgain = false;
 
   @override
@@ -295,6 +363,10 @@ class _UserMakerPageState extends State<UserMakerPage> {
     super.initState();
     _loadInputs();
     _loadInitConsole();
+  }
+
+  bool _isReady() {
+    return _isValidUsername && infos['im'].isNotEmpty && infos['nm'] != '';
   }
 
   void _loadInputs() {
@@ -311,17 +383,17 @@ class _UserMakerPageState extends State<UserMakerPage> {
           value: infos['id'] == '' ? '' : '@' + infos['id']),
       InputObjects(
         inputCallBack: (firstName) {
-          setState(() => infos['name'] = firstName);
+          setState(() => infos['nm'] = firstName);
         },
         placeHolder: 'First Name',
-        value: infos['name'],
+        value: infos['nm'],
       ),
       InputObjects(
         inputCallBack: (lastName) {
-          setState(() => infos['lastname'] = lastName);
+          setState(() => infos['ln'] = lastName);
         },
         placeHolder: "(Last Name)",
-        value: infos['lastname'],
+        value: infos['ln'],
       )
     ];
   }
@@ -335,7 +407,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),
         ConsoleButton(
             key: buttonKey,
-            isActivated: _isReady,
+            isActivated: _isReady(),
             name: "Proceed",
             onPress: () async {
               _errorTryAgain = !await widget.initUser(infos);
@@ -344,7 +416,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
               } else {
                 widget.success();
               }
-            })
+            }),
       ],
     );
     setState(() {});
@@ -373,7 +445,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             """);
-            infos["imagedata"] = compressedBytes!;
+            infos["im"] = compressedBytes!.toList();
           }
           _loadInputs();
           _loadInitConsole();
@@ -383,9 +455,6 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
   @override
   Widget build(BuildContext context) {
-    _isReady = _isValidUsername &&
-        infos['imagedata'].isNotEmpty &&
-        infos['name'] != '';
     return Down4ColumnBackground(
       children: [
         _errorTryAgain
@@ -410,13 +479,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
                 minWidth: 520,
                 quality: 40,
               );
-              setState(() => infos['imagedata'] = compressedBytes);
+              setState(() => infos['im'] = compressedBytes.toList());
             }
           },
-          name: infos['name'],
+          name: infos['nm'],
           id: infos['id'],
-          lastName: infos['lastname'],
-          image: infos['imagedata'],
+          lastName: infos['ln'],
+          image: infos['im'],
         ),
         const SizedBox(height: 16.0),
         console,
@@ -488,103 +557,297 @@ class WelcomePage extends StatelessWidget {
 }
 
 class HomePage extends StatefulWidget {
-  Map<Identifier, Node> friends, friendRequests, hyperchats, groups;
-
-  HomePage({
-    required this.friends,
-    required this.friendRequests,
-    required this.hyperchats,
-    required this.groups,
-    Key? key,
-  }) : super(key: key);
+  List<CameraDescription> cameras;
+  Node self;
+  HomePage({required this.cameras, required this.self, Key? key})
+      : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
 }
 
+enum HomePageRenderState { loading, home, addFriend, money, hyperchat, chat }
+
 class _HomePageState extends State<HomePage> {
-  Map<String, SingleActionPalette> _sp = {};
-
-  void _selectNode(String id) {
-    _sp[id] = _sp[id]!.invertedSelection();
-    setState(() {});
-  }
-
-  void _initMessageListener() {
-    FirebaseMessaging.onMessage.listen((event) {
-      final d = event.data;
-      
-    });
-  }
+  HomePageRenderState _state = HomePageRenderState.loading;
+  Map<String, Map<String, SingleActionPalette>> _palettes = {
+    "Friends": {},
+    "FriendRequests": {},
+    "Hyperchats": {},
+    "Temporal": {},
+  };
+  Map<String, Map<String, ChatMessage>> _messages = {};
+  String _pingInput = "";
 
   @override
   void initState() {
     super.initState();
+    _loadLocalFriends();
+    _loadLocalFriendRequests();
+    _loadLocalHyperchats();
+    _putState(HomePageRenderState.home);
+  }
 
-    final friends = widget.friends.map((key, value) => MapEntry(
-        key,
-        SingleActionPalette(
-          node: value,
-          imPress: () => _selectNode(value.id),
-        )));
+  void _putState(HomePageRenderState s) {
+    setState(() => _state = s);
+  }
 
-    final hyperchats = widget.hyperchats.map((key, value) => MapEntry(
-        key,
-        SingleActionPalette(
-          node: value,
-          imPress: () => _selectNode(value.id),
-        )));
+  void _initializeMessageListener() {
+    FirebaseMessaging.onMessage.listen((event) async {
+      final notif = MessageNotification.fromNotification(event.data);
+      switch (notif.type) {
+        case MessageTypes.chat:
+          final msg = (await notif.toDown4Message())..saveLocally();
+          if (_messages[msg.root] != null) {
+            _messages[msg.root] = {
+              msg.id: ChatMessage(
+                message: msg,
+                myMessage: msg.sender == widget.self.id,
+                at: msg.root,
+              ),
+            };
+            setState(() {});
+          }
+          break;
 
-    final groups = widget.groups.map((key, value) => MapEntry(
-        key,
-        SingleActionPalette(
-          node: value,
-          imPress: () => _selectNode(value.id),
-        )));
+        case MessageTypes.friendRequest:
+          {
+            break;
+          }
+        case MessageTypes.payment:
+          {
+            break;
+          }
+        case MessageTypes.bill:
+          {
+            break;
+          }
+      }
+    });
+  }
 
-    _sp.addAll(friends);
-    _sp.addAll(hyperchats);
-    _sp.addAll(groups);
+  void _select(String at, String id) {
+    _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
+    setState(() {});
+  }
+
+  void _selectMessage(String id, String at) {
+    _messages[at]?[id] = _messages[at]![id]!.invertedSelection();
+    setState(() {});
+  }
+
+  void _openChat(String at, String id) {
+    print("TODO");
+    setState(() {});
+  }
+
+  void _sendMessage(MessageRequest mr) async {
+    r.messageRequest(mr);
+  }
+
+  void _loadLocalMessages(String nodeID, String nodeLocation) {
+    // The sessions starts at null for every node mapping to their messages
+    // We local load them once, then they get added to memory and to disk with the _onMessage function
+    if (_messages[nodeID] == null) {
+      _messages[nodeID] = {};
+      final node = _palettes[nodeLocation]?[nodeID]?.node;
+      for (final msgID in node?.messages ?? <String>[]) {
+        final d4msg = Down4Message.fromLocal(msgID);
+        _messages[nodeID] = {
+          msgID: ChatMessage(
+            at: nodeID,
+            message: d4msg,
+            myMessage: widget.self.id == d4msg.sender,
+            select: _selectMessage,
+          )
+        };
+      }
+    }
+  }
+
+  void _initMessageListener() {
+    FirebaseMessaging.onMessage.listen((event) async {
+      final notif = MessageNotification.fromNotification(event.data);
+      switch (notif.type) {
+        case MessageTypes.chat:
+          final msg = await notif.toDown4Message();
+          _messages[msg.root] = {
+            msg.id: ChatMessage(
+              message: msg,
+              myMessage: msg.sender == widget.self.id,
+              select: _selectMessage,
+              at: msg.root,
+            ),
+          };
+          setState(() {});
+          break;
+        case MessageTypes.friendRequest:
+          break;
+        case MessageTypes.payment:
+          break;
+        case MessageTypes.bill:
+          break;
+      }
+    });
+  }
+
+  void _loadLocalFriends() {
+    final jsonEncodedFriends = Boxes.instance.friends.values;
+    for (final jsonEncodedFriend in jsonEncodedFriends) {
+      final node = Node.fromJson(jsonDecode(jsonEncodedFriend));
+      _palettes["Friends"]?.putIfAbsent(
+          node.id,
+          () => SingleActionPalette(
+                node: node,
+                at: "Friends",
+                bodyPress: _select,
+                goPress: _openChat,
+              ));
+    }
+    ;
+  }
+
+  void _loadLocalFriendRequests() {
+    final jsonFriendRequests = Boxes.instance.friendRequests.values;
+    for (final jsonFriendRequest in jsonFriendRequests) {
+      final node = Node.fromJson(jsonFriendRequest);
+      _palettes["FriendRequests"]?.addAll(
+          {node.id: SingleActionPalette(node: node, at: "FriendRequests")});
+    }
+  }
+
+  void _loadLocalHyperchats() {
+    final jsonHyperchats = Boxes.instance.hyperchats.values;
+    for (final jsonHyperchat in jsonHyperchats) {
+      final node = Node.fromJson(jsonHyperchat);
+      _palettes["Hyperchats"]?.addAll({
+        node.id: SingleActionPalette(
+          node: node,
+          at: "Hyperchats",
+          bodyPress: _select,
+          goPress: _openChat,
+        ),
+      });
+    }
+  }
+
+  void _addFriends(List<Node> friends) {
+    for (final friend in friends) {
+      _palettes["Friends"]!.putIfAbsent(friend.id, () {
+        friend.saveLocally();
+        return SingleActionPalette(
+          node: friend,
+          bodyPress: _select,
+          goPress: _openChat,
+        );
+      });
+    }
+  }
+
+  // ======================================================== VIEWS RELATED ============================================================ //
+
+  List<SingleActionPalette> _formatedHomePalettes() {
+    return _palettes["Friends"]!
+        .values
+        .followedBy(_palettes["Hyperchats"]!.values)
+        .toList()
+      ..sort((a, b) => a.activity.compareTo(b.activity))
+      ..addAll(_palettes["FriendRequests"]!.values);
+  }
+
+  List<SingleActionPalette> _selectedHomePalettes() {
+    var selectedHyperchats =
+        _palettes["Hyperchats"]!.values.where((hc) => hc.selected);
+    var idsOfSelHyperchats = [];
+    for (final shc in selectedHyperchats) {
+      for (final uid in shc.node.friends ?? <String>[]) {
+        if (!idsOfSelHyperchats.contains(uid)) {
+          idsOfSelHyperchats.add(uid);
+        }
+      }
+    }
+    var palettes = <SingleActionPalette>[];
+    for (final pal in _palettes["Friends"]!.values) {
+      if (idsOfSelHyperchats.contains(pal.node.id)) {
+        palettes.add(pal.deactivated());
+      }
+    }
+    for (final pal in _palettes["Temporal"]!.values) {
+      if (idsOfSelHyperchats.contains(pal.node.id)) {
+        palettes.add(pal.deactivated());
+      }
+    }
+
+    var selectedFriends = _palettes["Friends"]!.values.where((e) => e.selected);
+    for (final f in selectedFriends) {
+      if (!idsOfSelHyperchats.contains(f.node.id)) {
+        palettes.add(f.deactivated());
+      }
+    }
+
+    return palettes;
   }
 
   @override
   Widget build(BuildContext context) {
-    return PalettePage(
-        palettes: _sp.values.toList()
-          ..sort((a, b) => a.activity.compareTo(b.activity)),
-        console: Console(
-          inputs: [
-            InputObjects(
-                inputCallBack: (text) => _kernelInput = text, placeHolder: ":)")
-          ],
-          topButtons: [
-            ConsoleButton(
-                name: "Hyperchat",
-                onPress: () {
-                  final nodes = _selectedNodes('Friends');
-                  _palettes['Hyperchat'] = nodes.map((id, node) => MapEntry(
-                      id, SingleActionPalette(at: "Hyperchat", node: node)));
-                  _putState(States.hyperchat);
-                }),
-            ConsoleButton(
-                name: "Money",
-                onPress: () {
-                  _palettes['Money'] = _selectedNodes("Friends").map(
-                      (key, node) => MapEntry(
-                          key, SingleActionPalette(at: "Money", node: node)));
-                  _putState(States.money);
-                }),
-          ],
-          bottomButtons: [
-            ConsoleButton(name: "Browse", onPress: _todo),
-            ConsoleButton(
-                name: "Add Friend",
-                onPress: () => setState(() {
-                      _state = States.addFriend;
-                    })),
-            ConsoleButton(isSpecial: true, name: "Ping", onPress: _todo)
-          ],
-        ));
+    switch (_state) {
+      case HomePageRenderState.loading:
+        return const LoadingPage();
+
+      case HomePageRenderState.home:
+        return PalettePage(
+            palettes: _formatedHomePalettes(),
+            console: Console(
+              inputs: [
+                InputObjects(
+                  inputCallBack: (text) => _pingInput = text,
+                  placeHolder: ":)",
+                )
+              ],
+              topButtons: [
+                ConsoleButton(
+                    name: "Hyperchat",
+                    onPress: () => _putState(HomePageRenderState.hyperchat)),
+                ConsoleButton(
+                    name: "Money",
+                    onPress: () => _putState(HomePageRenderState.money)),
+              ],
+              bottomButtons: [
+                ConsoleButton(name: "Browse", onPress: () => print("TODO")),
+                ConsoleButton(
+                    name: "Add Friend",
+                    onPress: () => _putState(HomePageRenderState.addFriend)),
+                ConsoleButton(
+                    isSpecial: true, name: "Ping", onPress: () => print("TODO"))
+              ],
+            ));
+
+      case HomePageRenderState.hyperchat:
+        return HyperchatPage(
+          self: widget.self,
+          sendInitialMessage: _sendMessage,
+          back: () => _putState(HomePageRenderState.home),
+          palettes: _selectedHomePalettes(),
+          cameras: widget.cameras,
+          afterFirstMessageCallBack: () => print("TODO"),
+        );
+
+      case HomePageRenderState.chat:
+        return Container();
+
+      case HomePageRenderState.addFriend:
+        return AddFriendPage(
+          self: widget.self,
+          addCallback: _addFriends,
+          backCallback: () => _putState(HomePageRenderState.home),
+        );
+
+      case HomePageRenderState.money:
+        return MoneyPage(
+          palettes: _selectedHomePalettes(),
+          back: () => _putState(HomePageRenderState.home),
+        );
+    }
   }
 }
 // TODO
