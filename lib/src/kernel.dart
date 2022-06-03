@@ -30,27 +30,14 @@ class Down4 extends StatefulWidget {
   State<Down4> createState() => _Down4State();
 }
 
-enum States {
-  loading,
-  userCreation,
-  welcome,
-  home,
-  money,
-  hyperchat,
-  chat,
-  addFriend,
-  node,
-  map,
-  nodeCreation,
-  snip,
-  cam,
-}
+enum InitializationStates { loading, createUser, welcome, home }
 
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
   Node? _user;
   MoneyInfo? _moneyInfo;
   UserCredential? _credential;
+  InitializationStates _state = InitializationStates.loading;
   Widget? _page;
 
   // ============================================================ KERNEL ============================================================ //
@@ -62,6 +49,10 @@ class _Down4State extends State<Down4> {
     _anonymousLogin();
     _loadTokenChangeListener();
     _loadHome();
+  }
+
+  void _putState(InitializationStates s) {
+    setState(() => _state = s);
   }
 
   void _loadTokenChangeListener() {
@@ -94,34 +85,11 @@ class _Down4State extends State<Down4> {
       final moneyData = Boxes.instance.user.get('money');
       _moneyInfo =
           MoneyInfo.fromJson(jsonDecode(moneyData)); // if this crashes gg
-      setState(() => _page = _homePage());
+      _putState(InitializationStates.home);
     } else {
       // returns false if user hasn't been initialized
-      setState(() => _page = _userCreationPage());
+      _putState(InitializationStates.createUser);
     }
-  }
-
-  Widget _userCreationPage() {
-    return UserMakerPage(
-      cameras: widget.cameras,
-      initUser: _initUser,
-      success: () => setState(() => _page = _welcomePage()),
-    );
-  }
-
-  Widget _welcomePage() {
-    return WelcomePage(
-      mnemonic: _moneyInfo!.mnemonic,
-      userInfo: _user!,
-      understood: () => setState(() => _page = _homePage()),
-    );
-  }
-
-  Widget _homePage() {
-    return HomePage(
-      cameras: widget.cameras,
-      self: _user!,
-    );
   }
 
   Future<bool> _initUser(Map<String, dynamic> info) async {
@@ -158,31 +126,32 @@ class _Down4State extends State<Down4> {
     return true;
   }
 
-  Future<void> _parseMessageData(final data) async {
-    final type = MessageTypes.values.byName(data["t"]);
+  Future<void> _parseMessageData(final notification) async {
+    final type = MessageTypes.values.byName(notification["t"]);
+    final messageData = notification["data"];
     switch (type) {
       case MessageTypes.friendRequest:
         {
-          Boxes.instance.friendRequests.put(data["data"]["id"], data["data"]);
+          Boxes.instance.friendRequests.put(messageData["id"], messageData);
           break;
         }
       case MessageTypes.bill:
         {
-          Boxes.instance.bills.put(data["data"]["id"], data["data"]);
+          Boxes.instance.bills.put(messageData["id"], messageData);
           break;
         }
       case MessageTypes.payment:
         {
-          Boxes.instance.payments.put(data["data"]["id"], data["data"]);
+          Boxes.instance.payments.put(messageData["id"], messageData);
           break;
         }
       case MessageTypes.chat:
         {
-          Boxes.instance.messages.put(data["data"]["id"], data["data"]);
+          Boxes.instance.messages.put(messageData["id"], messageData);
           var chatSource = Node.fromJson(
-            Boxes.instance.friends.get(data["data"]["sd"])!,
+            Boxes.instance.friends.get(messageData["sd"])!,
           ); // that will crash
-          chatSource.messages?.add(data["data"]["id"]);
+          chatSource.messages?.add(messageData["id"]);
           Boxes.instance.friends.put(chatSource.id, chatSource.toLocal());
           break;
         }
@@ -193,6 +162,28 @@ class _Down4State extends State<Down4> {
 
   @override
   Widget build(BuildContext context) {
+    switch (_state) {
+      case InitializationStates.loading:
+        return const LoadingPage();
+      case InitializationStates.home:
+        return HomePage(
+          cameras: widget.cameras,
+          self: _user!,
+        );
+      case InitializationStates.createUser:
+        return UserMakerPage(
+          cameras: widget.cameras,
+          initUser: _initUser,
+          success: () => _putState(InitializationStates.welcome),
+        );
+      case InitializationStates.welcome:
+        return WelcomePage(
+          mnemonic: _moneyInfo!.mnemonic,
+          userInfo: _user!,
+          understood: () => _putState(InitializationStates.home),
+        );
+    }
+
     return _page ?? const LoadingPage();
   }
 }

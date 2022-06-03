@@ -626,7 +626,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _select(String at, String id) {
+  void _select(String id, String at) {
     _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
     setState(() {});
   }
@@ -636,7 +636,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
-  void _openChat(String at, String id) {
+  void _openChat(String id, String at) {
     print("TODO");
     setState(() {});
   }
@@ -737,6 +737,7 @@ class _HomePageState extends State<HomePage> {
         friend.saveLocally();
         return SingleActionPalette(
           node: friend,
+          at: "Friends",
           bodyPress: _select,
           goPress: _openChat,
         );

@@ -89,7 +89,9 @@ Future<void> main() async {
     print("Available cameras error $err");
   }
 
+  print("Getting messaging token");
   final token = await FirebaseMessaging.instance.getToken();
+  print("Got messaging token: $token");
 
   print(FirebaseAuth.instance.app);
   // await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);

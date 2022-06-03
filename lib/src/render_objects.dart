@@ -137,8 +137,8 @@ class SingleActionPalette extends StatelessWidget {
         textDirection: TextDirection.ltr,
         children: [
           GestureDetector(
-            onTap: () => imPress?.call(at, node.id),
-            onLongPress: () => imLongPress?.call(at, node.id),
+            onTap: () => imPress?.call(node.id, at),
+            onLongPress: () => imLongPress?.call(node.id, at),
             child: Container(
               clipBehavior: Clip.hardEdge,
               decoration: const BoxDecoration(
@@ -156,8 +156,8 @@ class SingleActionPalette extends StatelessWidget {
           ),
           Expanded(
             child: GestureDetector(
-              onTap: () => bodyPress?.call(at, node.id),
-              onLongPress: () => bodyLongPress?.call(at, node.id),
+              onTap: () => bodyPress?.call(node.id, at),
+              onLongPress: () => bodyLongPress?.call(node.id, at),
               child: Material(
                 child: Container(
                   decoration: BoxDecoration(
@@ -201,8 +201,8 @@ class SingleActionPalette extends StatelessWidget {
           ),
           goPress != null
               ? GestureDetector(
-                  onTap: () => goPress?.call(at, node.id),
-                  onLongPress: () => goLongPress?.call(at, node.id),
+                  onTap: () => goPress?.call(node.id, at),
+                  onLongPress: () => goLongPress?.call(node.id, at),
                   child: Container(
                     padding: const EdgeInsets.all(2.0),
                     decoration: const BoxDecoration(
