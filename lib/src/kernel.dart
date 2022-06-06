@@ -9,8 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'web_requests.dart' as r;
 import 'boxes.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:crypto/crypto.dart' as crypto;
+import 'package:pointycastle/digests/sha1.dart';
+// import 'package:firebase_storage/firebase_storage.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 
 import 'render_pages.dart';
 import 'data_objects.dart';
@@ -36,7 +38,7 @@ class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
   Node? _user;
   MoneyInfo? _moneyInfo;
-  UserCredential? _credential;
+  // UserCredential? _credential;
   InitializationStates _state = InitializationStates.loading;
   Widget? _page;
 
@@ -46,7 +48,7 @@ class _Down4State extends State<Down4> {
   void initState() {
     super.initState();
     _processMessageQueue();
-    _anonymousLogin();
+    // _anonymousLogin();
     _loadTokenChangeListener();
     _loadHome();
   }
@@ -69,14 +71,14 @@ class _Down4State extends State<Down4> {
     Boxes.instance.messageQueue.close();
   }
 
-  Future<void> _anonymousLogin() async {
-    try {
-      _credential = await FirebaseAuth.instance.signInAnonymously();
-      print("Anonymous uid: ${_credential?.user?.uid}");
-    } catch (e) {
-      print("Error logging in: $e");
-    }
-  }
+  // Future<void> _anonymousLogin() async {
+  //   try {
+  //     _credential = await FirebaseAuth.instance.signInAnonymously();
+  //     print("Anonymous uid: ${_credential?.user?.uid}");
+  //   } catch (e) {
+  //     print("Error logging in: $e");
+  //   }
+  // }
 
   Future<void> _loadHome() async {
     final userData = Boxes.instance.user.get('user');
@@ -92,32 +94,53 @@ class _Down4State extends State<Down4> {
     }
   }
 
-  Future<bool> _initUser(Map<String, dynamic> info) async {
+  Future<bool> _initUser(
+      String id, String name, String lastName, Uint8List imData) async {
     final token = await FirebaseMessaging.instance.getToken();
-    info["tkn"] = token;
+    final data = {
+      'id': id,
+      'nm': name,
+      'ln': lastName,
+      'im': imData,
+      'tkn': token,
+    };
 
-    if (!(await r.initUser(jsonEncode(info)))) {
+    final success = await r.initUser(jsonEncode(data));
+
+    if (!success) {
       print("Failed to init user!");
       return false;
     }
 
-    String uid = info["id"];
-    List<int> imData = info["im"];
+    final imageID = sv.sha1(id.codeUnits + imData.toList()).toString();
+
     Down4Image image = Down4Image(
-      id: sv.sha1(uid.codeUnits + imData).toString(),
-      data: Uint8List.fromList(imData),
+      id: imageID,
+      data: imData,
     );
+
     await image.generateThumbnail();
 
     _user = Node(
       type: NodeTypes.usr,
-      id: info["id"],
+      id: id,
       image: image,
-      name: info["nm"],
-      lastName: info["ln"],
+      name: name,
+      lastName: lastName,
     );
 
-    _moneyInfo = await r.initUserMoney(uid);
+    _moneyInfo = await r.initUserMoney(id);
+
+    if (_moneyInfo == null) {
+      print("Failed to initalize money!");
+      return false;
+    }
+
+    final xpriv = sv.HDPrivateKey.fromXpriv(_moneyInfo!.down4Priv);
+    final nextPriv =
+        xpriv.deriveChildNumber(_moneyInfo!.upperIndex + 2).privateKey;
+
+    print("next privateKey: $nextPriv");
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user!.toLocal()));

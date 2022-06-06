@@ -63,6 +63,16 @@ Future<Down4Image?> getMessageMedia(String id) async {
   return null;
 }
 
+Future<String?> getMessageMediaURL(String id) async {
+  final uri = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMediaURL");
+  final res = await http.post(uri, body: id);
+  if (res.statusCode == 200) {
+    return res.body;
+  }
+  return null;
+}
+
 Future<int> refreshTokenRequest(String newToken) async {
   final uri =
       Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/RefreshToken");

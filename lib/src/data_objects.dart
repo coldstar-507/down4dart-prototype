@@ -2,11 +2,30 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+// import 'package:firebase_storage/firebase_storage.dart';
 import 'boxes.dart';
 import 'web_requests.dart' as r;
 
 typedef Identifier = String;
+
+enum MessageTypes {
+  friendRequest, // friend request
+  bill, // bill
+  payment, // payment
+  chat, // message
+}
+
+enum NodeTypes {
+  rt,
+  usr,
+  cht,
+  mkt,
+  cpt,
+  jnl,
+  itm,
+  evt,
+  tkt,
+}
 
 class MoneyInfo {
   String mnemonic, down4Priv, master;
@@ -174,25 +193,6 @@ class Down4Image {
       };
 }
 
-enum MessageTypes {
-  friendRequest, // friend request
-  bill, // bill
-  payment, // payment
-  chat, // message
-}
-
-enum NodeTypes {
-  rt,
-  usr,
-  cht,
-  mkt,
-  cpt,
-  jnl,
-  itm,
-  evt,
-  tkt,
-}
-
 class Reaction {
   final Identifier id, sender;
   final Down4Image image; // target, sender
@@ -230,10 +230,10 @@ class Reaction {
 class MessageNotification {
   final MessageTypes type;
   final Identifier id, sender, root;
-  final Identifier? imageID;
+  final Identifier? imageID, videoID;
   final int timestamp;
   final String base64Thumbnail, name;
-  final String? text, videoURL;
+  final String? text;
   final List<Identifier>? nodes, reactions;
   final bool isChat;
   MessageNotification({
@@ -245,7 +245,7 @@ class MessageNotification {
     required this.name,
     required this.isChat,
     required this.timestamp,
-    this.videoURL,
+    this.videoID,
     this.imageID,
     this.text,
     this.nodes,
@@ -265,7 +265,7 @@ class MessageNotification {
       name: notification["nm"],
       isChat: notification["ch"] == "true",
       text: notification["txt"] == "" ? null : notification["txt"],
-      videoURL: notification["url"] == "" ? null : notification["url"],
+      videoID: notification["vid"] == "" ? null : notification["vid"],
       nodes: notification["n"] == ""
           ? null
           : (notification["n"] as String).split(" "),
@@ -276,10 +276,13 @@ class MessageNotification {
   }
 
   Future<Down4Message> toDown4Message() async {
-    Down4Image? m;
-    Down4Video? v;
+    Down4Image? im;
+    Down4Video? vid;
     if (imageID != null) {
-      m = await r.getMessageMedia(imageID!);
+      im = await r.getMessageMedia(imageID!);
+    } else if (videoID != null) {
+      final url = await r.getMessageMediaURL(videoID!);
+      vid = url != null ? Down4Video(id: id, url: url) : null;
     }
     return Down4Message(
       id: id,
@@ -288,6 +291,8 @@ class MessageNotification {
       root: root,
       name: name,
       timestamp: timestamp,
+      image: im,
+      video: vid,
     );
   }
 }
@@ -358,7 +363,8 @@ class Down4Message {
     return Down4Message(
       id: decodedJson["id"],
       thumbnail: base64Decode(decodedJson["tn"]),
-      image: Down4Image.fromJson(decodedJson["m"]),
+      image: Down4Image.fromJson(decodedJson["im"]),
+      video: Down4Video.fromJson(decodedJson["vid"]),
       sender: decodedJson["sd"],
       root: decodedJson["rt"],
       name: decodedJson["nm"],
@@ -377,21 +383,22 @@ class Down4Message {
     return Down4Message.fromJson(decodedJson);
   }
 
-  Map<String, String> toFirebase() => {
+  Map<String, dynamic> toForward(String targetRoot) => {
         'id': id,
         'sd': sender,
-        'rt': root,
-        'tn': base64Encode(thumbnail),
+        'rt': targetRoot,
         'nm': name,
         'ts': timestamp.toString(),
         'ch': isChat.toString(),
-        if (text != null) 'txt': text!,
-        if (reactions != null) 'r': reactions!.join(" "),
-        if (nodes != null) 'n': nodes!.join(" "),
+        'tn': base64Encode(thumbnail),
+        if (text != null) 'txt': text,
+        if (reactions != null) 'r': reactions,
+        if (nodes != null) 'n': nodes,
         if (image != null) 'im': image!.id,
+        if (video != null) 'vid': video!.id
       };
 
-  Map<String, dynamic> toLocal() => {
+  Map<String, dynamic> toJson() => {
         'id': id,
         'sd': sender,
         'rt': root,
@@ -399,10 +406,11 @@ class Down4Message {
         'nm': name,
         'ts': timestamp.toString(),
         'ch': isChat.toString(),
-        if (text != null) 'txt': text!,
-        if (reactions != null) 'r': reactions!.join(" "),
-        if (nodes != null) 'n': nodes!.join(" "),
+        if (text != null) 'txt': text,
+        if (reactions != null) 'r': reactions,
+        if (nodes != null) 'n': nodes,
         if (image != null) 'im': image!.toJson(),
+        if (video != null) 'vid': video!.toJson()
       };
 
   void saveLocally() {

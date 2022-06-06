@@ -11,7 +11,7 @@ import 'boxes.dart';
 import 'camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:dartsv/dartsv.dart' as sv;
+// import 'package:dartsv/dartsv.dart' as sv;
 import 'web_requests.dart' as r;
 
 class PalettePage extends StatelessWidget {
@@ -31,10 +31,10 @@ class HyperchatPage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final Node self;
   final List<SingleActionPalette> palettes;
-  void Function(MessageRequest) sendInitialMessage;
-  void Function() afterFirstMessageCallBack;
-  void Function() back;
-  HyperchatPage({
+  final void Function(MessageRequest) sendInitialMessage;
+  final void Function() afterFirstMessageCallBack;
+  final void Function() back;
+  const HyperchatPage({
     required this.self,
     required this.sendInitialMessage,
     required this.back,
@@ -84,9 +84,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ConsoleButton(
             name: "Send",
             onPress: () async {
-              final tn = await widget.self.image.generateThumbnail();
-              widget.sendInitialMessage(
-                MessageRequest(
+              if (_input != "" || _media != null) {
+                final tn = await widget.self.image.generateThumbnail();
+                final mr = MessageRequest(
                   isVideo: _isVideo ?? false,
                   b64Thumbnail: base64Encode(tn),
                   sender: widget.self.id,
@@ -96,9 +96,10 @@ class _HyperchatPageState extends State<HyperchatPage> {
                   timestamp: DateTime.now().millisecondsSinceEpoch,
                   media: _media,
                   text: _input,
-                ),
-              );
-              widget.afterFirstMessageCallBack();
+                );
+                widget.sendInitialMessage(mr);
+                widget.afterFirstMessageCallBack();
+              }
             }),
       ],
       bottomButtons: [
@@ -243,7 +244,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     console = _loadConsole();
   }
 
-  void _selectePalette(String _, String id) {
+  void _selectePalette(String id, String _) {
     _palettes[id] = _palettes[id]!.invertedSelection();
     setState(() {});
   }
@@ -331,7 +332,7 @@ class LoadingPage extends StatelessWidget {
 }
 
 class UserMakerPage extends StatefulWidget {
-  final Future<bool> Function(Map<String, dynamic>) initUser;
+  final Future<bool> Function(String, String, String, Uint8List) initUser;
   final void Function() success;
   final List<CameraDescription> cameras;
   const UserMakerPage({
@@ -347,16 +348,14 @@ class UserMakerPage extends StatefulWidget {
 
 class _UserMakerPageState extends State<UserMakerPage> {
   final buttonKey = GlobalKey();
-  Map<String, dynamic> infos = {
-    'id': '',
-    'nm': '',
-    'im': <int>[],
-    'ln': '',
-  }; // "user" redondance because of paletteMaker
+  String id = "";
+  String name = "";
+  String lastName = "";
+  Uint8List image = Uint8List(0);
   dynamic console;
   dynamic inputs;
-  bool _isValidUsername = false;
-  bool _errorTryAgain = false;
+  bool isValidUsername = false;
+  bool errorTryAgain = false;
 
   @override
   void initState() {
@@ -366,7 +365,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   }
 
   bool _isReady() {
-    return _isValidUsername && infos['im'].isNotEmpty && infos['nm'] != '';
+    return isValidUsername && image.isNotEmpty && name.isNotEmpty;
   }
 
   void _loadInputs() {
@@ -374,26 +373,26 @@ class _UserMakerPageState extends State<UserMakerPage> {
       // preloading inputs here so they don't redraw on setState because the redraw hides the keyboard which is very undesirable
       InputObjects(
           inputCallBack: (id) async {
-            _isValidUsername = await r.usernameIsValid(id);
-            infos['id'] = id.toLowerCase();
+            isValidUsername = await r.usernameIsValid(id);
+            id = id.toLowerCase();
             _loadInitConsole();
           },
           prefix: '@',
           placeHolder: "@username",
-          value: infos['id'] == '' ? '' : '@' + infos['id']),
+          value: id == '' ? '' : '@' + id),
       InputObjects(
         inputCallBack: (firstName) {
-          setState(() => infos['nm'] = firstName);
+          setState(() => name = firstName);
         },
         placeHolder: 'First Name',
-        value: infos['nm'],
+        value: name,
       ),
       InputObjects(
         inputCallBack: (lastName) {
-          setState(() => infos['ln'] = lastName);
+          setState(() => lastName = lastName);
         },
         placeHolder: "(Last Name)",
-        value: infos['ln'],
+        value: lastName,
       )
     ];
   }
@@ -410,8 +409,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
             isActivated: _isReady(),
             name: "Proceed",
             onPress: () async {
-              _errorTryAgain = !await widget.initUser(infos);
-              if (_errorTryAgain) {
+              errorTryAgain = !await widget.initUser(id, name, lastName, image);
+              if (errorTryAgain) {
                 setState(() {});
               } else {
                 widget.success();
@@ -445,7 +444,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             """);
-            infos["im"] = compressedBytes!.toList();
+            image = compressedBytes ?? Uint8List(0);
           }
           _loadInputs();
           _loadInitConsole();
@@ -457,7 +456,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   Widget build(BuildContext context) {
     return Down4ColumnBackground(
       children: [
-        _errorTryAgain
+        errorTryAgain
             ? Container(
                 margin: const EdgeInsets.symmetric(horizontal: 22.0),
                 child: const Text(
@@ -479,13 +478,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
                 minWidth: 520,
                 quality: 40,
               );
-              setState(() => infos['im'] = compressedBytes.toList());
+              setState(() => image = compressedBytes);
             }
           },
-          name: infos['nm'],
-          id: infos['id'],
-          lastName: infos['ln'],
-          image: infos['im'],
+          name: name,
+          id: id,
+          lastName: lastName,
+          image: image,
         ),
         const SizedBox(height: 16.0),
         console,

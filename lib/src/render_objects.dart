@@ -1,10 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:hive/hive.dart' as hive;
 import 'package:camera/camera.dart';
-import 'package:dartsv/dartsv.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'data_objects.dart';
 import 'render_utility.dart';
@@ -1018,136 +1015,136 @@ class UserMakerPalette extends StatelessWidget {
   }
 }
 
-class PaletteMaker extends StatelessWidget {
-  final void Function(String infoKey, Map<String, dynamic>) infoCallBack;
-  final Map<String, dynamic> info;
-  final void Function(Identifier)? go;
-  final Identifier parentID, infoKey;
-  final NodeTypes type;
-  final NodeTypes? parentType;
-  const PaletteMaker(
-      {required this.infoCallBack,
-      required this.infoKey,
-      required this.info,
-      this.go,
-      this.type = NodeTypes.usr,
-      this.parentType,
-      this.parentID = "",
-      Key? key})
-      : super(key: key);
+// class PaletteMaker extends StatelessWidget {
+//   final void Function(String infoKey, Map<String, dynamic>) infoCallBack;
+//   final Map<String, dynamic> info;
+//   final void Function(Identifier)? go;
+//   final Identifier parentID, infoKey;
+//   final NodeTypes type;
+//   final NodeTypes? parentType;
+//   const PaletteMaker(
+//       {required this.infoCallBack,
+//       required this.infoKey,
+//       required this.info,
+//       this.go,
+//       this.type = NodeTypes.usr,
+//       this.parentType,
+//       this.parentID = "",
+//       Key? key})
+//       : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-        height: SingleActionPalette.height,
-        margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-        decoration: BoxDecoration(
-            boxShadow: const [
-              BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 6.0,
-                  spreadRadius: -6.0,
-                  offset: Offset(8.0, 8.0),
-                  blurStyle: BlurStyle.normal)
-            ],
-            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-            border: Border.all(width: 2.0, color: Colors.transparent)),
-        child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            textDirection: TextDirection.ltr,
-            children: [
-              GestureDetector(
-                onTap: () async {
-                  FilePickerResult? r = await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['jpg', 'png', 'jpeg'],
-                      withData: true);
-                  if (r?.files.single.bytes != null) {
-                    infoCallBack(
-                      infoKey,
-                      {...info, 'image': base64Encode(r!.files.single.bytes!)},
-                    );
-                  }
-                },
-                child: Container(
-                  clipBehavior: Clip.hardEdge,
-                  decoration: const BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(4.0),
-                    bottomLeft: Radius.circular(4.0),
-                  )),
-                  width: SingleActionPalette.height - 2.0, // borderWidth x2
-                  child: info['image'] == null || info['image'] == ""
-                      ? Image.asset(
-                          'lib/src/assets/picture_place_holder_2.png',
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                        )
-                      : Image.memory(
-                          base64Decode(info['image']!),
-                          gaplessPlayback: true,
-                          fit: BoxFit.cover,
-                        ),
-                ),
-              ),
-              Expanded(
-                  child: Material(
-                      child: Container(
-                          padding: const EdgeInsets.only(left: 10.0, top: 10.0),
-                          color: PinkTheme.headerColor,
-                          child: TextField(
-                              textAlignVertical: TextAlignVertical.top,
-                              decoration: const InputDecoration(
-                                  hintText: "Pick a name and an image!",
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.only(
-                                      bottom:
-                                          (SingleActionPalette.height) / 2)),
-                              textDirection: TextDirection.ltr,
-                              onChanged: ((value) => infoCallBack(
-                                  infoKey, {...info, 'name': value})))))),
-              GestureDetector(
-                  onTap: () {
-                    if (info['name'] != null) {
-                      go?.call(
-                          sha1(parentID.codeUnits + info['name']!.codeUnits)
-                              .toString());
-                    }
-                  },
-                  child: Container(
-                      clipBehavior: Clip.hardEdge,
-                      padding: const EdgeInsets.all(2.0),
-                      width: type != NodeTypes.usr
-                          ? SingleActionPalette.height - 2.0
-                          : 4.0,
-                      decoration: const BoxDecoration(
-                          color: PinkTheme.headerColor,
-                          borderRadius: BorderRadius.only(
-                              topRight: Radius.circular(4.0),
-                              bottomRight: Radius.circular(4.0))),
-                      child: type != NodeTypes.usr
-                          ? Image.asset('lib/src/assets/rightBlackArrow.png')
-                          : const SizedBox.shrink()))
-            ]));
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//         height: SingleActionPalette.height,
+//         margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+//         decoration: BoxDecoration(
+//             boxShadow: const [
+//               BoxShadow(
+//                   color: Colors.black54,
+//                   blurRadius: 6.0,
+//                   spreadRadius: -6.0,
+//                   offset: Offset(8.0, 8.0),
+//                   blurStyle: BlurStyle.normal)
+//             ],
+//             borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+//             border: Border.all(width: 2.0, color: Colors.transparent)),
+//         child: Row(
+//             crossAxisAlignment: CrossAxisAlignment.stretch,
+//             textDirection: TextDirection.ltr,
+//             children: [
+//               GestureDetector(
+//                 onTap: () async {
+//                   FilePickerResult? r = await FilePicker.platform.pickFiles(
+//                       type: FileType.custom,
+//                       allowedExtensions: ['jpg', 'png', 'jpeg'],
+//                       withData: true);
+//                   if (r?.files.single.bytes != null) {
+//                     infoCallBack(
+//                       infoKey,
+//                       {...info, 'image': base64Encode(r!.files.single.bytes!)},
+//                     );
+//                   }
+//                 },
+//                 child: Container(
+//                   clipBehavior: Clip.hardEdge,
+//                   decoration: const BoxDecoration(
+//                       borderRadius: BorderRadius.only(
+//                     topLeft: Radius.circular(4.0),
+//                     bottomLeft: Radius.circular(4.0),
+//                   )),
+//                   width: SingleActionPalette.height - 2.0, // borderWidth x2
+//                   child: info['image'] == null || info['image'] == ""
+//                       ? Image.asset(
+//                           'lib/src/assets/picture_place_holder_2.png',
+//                           fit: BoxFit.cover,
+//                           gaplessPlayback: true,
+//                         )
+//                       : Image.memory(
+//                           base64Decode(info['image']!),
+//                           gaplessPlayback: true,
+//                           fit: BoxFit.cover,
+//                         ),
+//                 ),
+//               ),
+//               Expanded(
+//                   child: Material(
+//                       child: Container(
+//                           padding: const EdgeInsets.only(left: 10.0, top: 10.0),
+//                           color: PinkTheme.headerColor,
+//                           child: TextField(
+//                               textAlignVertical: TextAlignVertical.top,
+//                               decoration: const InputDecoration(
+//                                   hintText: "Pick a name and an image!",
+//                                   border: InputBorder.none,
+//                                   contentPadding: EdgeInsets.only(
+//                                       bottom:
+//                                           (SingleActionPalette.height) / 2)),
+//                               textDirection: TextDirection.ltr,
+//                               onChanged: ((value) => infoCallBack(
+//                                   infoKey, {...info, 'name': value})))))),
+//               GestureDetector(
+//                   onTap: () {
+//                     if (info['name'] != null) {
+//                       go?.call(
+//                           sha1(parentID.codeUnits + info['name']!.codeUnits)
+//                               .toString());
+//                     }
+//                   },
+//                   child: Container(
+//                       clipBehavior: Clip.hardEdge,
+//                       padding: const EdgeInsets.all(2.0),
+//                       width: type != NodeTypes.usr
+//                           ? SingleActionPalette.height - 2.0
+//                           : 4.0,
+//                       decoration: const BoxDecoration(
+//                           color: PinkTheme.headerColor,
+//                           borderRadius: BorderRadius.only(
+//                               topRight: Radius.circular(4.0),
+//                               bottomRight: Radius.circular(4.0))),
+//                       child: type != NodeTypes.usr
+//                           ? Image.asset('lib/src/assets/rightBlackArrow.png')
+//                           : const SizedBox.shrink()))
+//             ]));
+//   }
+// }
 
-class PaletteMakerList extends StatelessWidget {
-  final List<PaletteMaker> palettes;
-  const PaletteMakerList({required this.palettes, Key? key}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-        child: ScrollConfiguration(
-            behavior: NoGlow(),
-            child: ListView.separated(
-                reverse: true,
-                itemBuilder: (c, i) => i == 0
-                    ? const SizedBox.shrink()
-                    : i == palettes.length + 2 - 1
-                        ? const SizedBox.shrink()
-                        : palettes[i - 1],
-                separatorBuilder: (c, i) => Container(height: 16.0),
-                itemCount: palettes.length + 2)));
-  }
-}
+// class PaletteMakerList extends StatelessWidget {
+//   final List<PaletteMaker> palettes;
+//   const PaletteMakerList({required this.palettes, Key? key}) : super(key: key);
+//   @override
+//   Widget build(BuildContext context) {
+//     return Expanded(
+//         child: ScrollConfiguration(
+//             behavior: NoGlow(),
+//             child: ListView.separated(
+//                 reverse: true,
+//                 itemBuilder: (c, i) => i == 0
+//                     ? const SizedBox.shrink()
+//                     : i == palettes.length + 2 - 1
+//                         ? const SizedBox.shrink()
+//                         : palettes[i - 1],
+//                 separatorBuilder: (c, i) => Container(height: 16.0),
+//                 itemCount: palettes.length + 2)));
+//   }
+// }
