@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/boxes.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
@@ -27,8 +24,6 @@ Future<void> _openAllBoxes() async {
   Hive.openBox("Payments");
   await Hive.openBox("Hyperchats");
 }
-
-Future<void> _firebaseMessagingOnTokenChange() async {}
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // If you're going to use other Firebase services in the background, such as Firestore,
@@ -89,10 +84,6 @@ Future<void> main() async {
     print("Available cameras error $err");
   }
 
-  print("Getting messaging token");
-  final token = await FirebaseMessaging.instance.getToken();
-  print("Got messaging token: $token");
-
   // await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
   runApp(
     MaterialApp(
@@ -101,7 +92,6 @@ Future<void> main() async {
         body: SafeArea(
           child: Down4(
             cameras: cameras,
-            token: token,
           ),
         ),
       ),

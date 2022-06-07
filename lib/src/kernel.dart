@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:dartsv/dartsv.dart' as sv;
@@ -10,21 +9,19 @@ import 'package:camera/camera.dart';
 import 'web_requests.dart' as r;
 import 'boxes.dart';
 // import 'package:crypto/crypto.dart' as crypto;
-import 'package:pointycastle/digests/sha1.dart';
+// import 'package:pointycastle/digests/sha1.dart';
 // import 'package:firebase_storage/firebase_storage.dart';
 // import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:convert/convert.dart';
+import 'package:hex/hex.dart';
 
 import 'render_pages.dart';
 import 'data_objects.dart';
-import 'render_objects.dart';
-import 'scratch.dart' as scratch;
 
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final String? token;
   const Down4({
     required this.cameras,
-    this.token,
     Key? key,
   }) : super(key: key);
 
@@ -97,7 +94,7 @@ class _Down4State extends State<Down4> {
   Future<bool> _initUser(
       String id, String name, String lastName, Uint8List imData) async {
     final token = await FirebaseMessaging.instance.getToken();
-    final data = {
+    final nodeInfo = {
       'id': id,
       'nm': name,
       'ln': lastName,
@@ -105,7 +102,7 @@ class _Down4State extends State<Down4> {
       'tkn': token,
     };
 
-    final success = await r.initUser(jsonEncode(data));
+    final success = await r.initUser(jsonEncode(nodeInfo));
 
     if (!success) {
       print("Failed to init user!");
@@ -140,7 +137,20 @@ class _Down4State extends State<Down4> {
     final nextPriv =
         xpriv.deriveChildNumber(_moneyInfo!.upperIndex + 2).privateKey;
 
-    print("next privateKey: $nextPriv");
+    final hexpriv = nextPriv.toHex();
+
+    var sig = sv.SVSignature.fromPrivateKey(nextPriv);
+
+    const message = "Jeff is a nigger";
+    final hexEncodedMessage = HEX.encode(message.codeUnits);
+
+    final signedMessage = sig.sign(hexEncodedMessage);
+
+    final verifSig = sv.SVSignature.fromPublicKey(nextPriv.publicKey);
+    // final isValid = verifSig.verify(signedMessage);
+
+    print(
+        "next privateKey in hex: $hexpriv\nMessage: Jeff is a nigger\nSigned message: $signedMessage");
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user!.toLocal()));

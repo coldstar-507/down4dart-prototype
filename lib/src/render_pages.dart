@@ -348,14 +348,14 @@ class UserMakerPage extends StatefulWidget {
 
 class _UserMakerPageState extends State<UserMakerPage> {
   final buttonKey = GlobalKey();
-  String id = "";
-  String name = "";
-  String lastName = "";
-  Uint8List image = Uint8List(0);
-  dynamic console;
-  dynamic inputs;
-  bool isValidUsername = false;
-  bool errorTryAgain = false;
+  String _id = "";
+  String _name = "";
+  String _lastName = "";
+  Uint8List _image = Uint8List(0);
+  dynamic _console;
+  dynamic _inputs;
+  bool _isValidUsername = false;
+  bool _errorTryAgain = false;
 
   @override
   void initState() {
@@ -365,42 +365,42 @@ class _UserMakerPageState extends State<UserMakerPage> {
   }
 
   bool _isReady() {
-    return isValidUsername && image.isNotEmpty && name.isNotEmpty;
+    return _isValidUsername && _image.isNotEmpty && _name.isNotEmpty;
   }
 
   void _loadInputs() {
-    inputs = [
+    _inputs = [
       // preloading inputs here so they don't redraw on setState because the redraw hides the keyboard which is very undesirable
       InputObjects(
           inputCallBack: (id) async {
-            isValidUsername = await r.usernameIsValid(id);
-            id = id.toLowerCase();
+            _isValidUsername = await r.usernameIsValid(id);
+            _id = id.toLowerCase();
             _loadInitConsole();
           },
           prefix: '@',
           placeHolder: "@username",
-          value: id == '' ? '' : '@' + id),
+          value: _id == '' ? '' : '@' + _id),
       InputObjects(
         inputCallBack: (firstName) {
-          setState(() => name = firstName);
+          setState(() => _name = firstName);
         },
         placeHolder: 'First Name',
-        value: name,
+        value: _name,
       ),
       InputObjects(
         inputCallBack: (lastName) {
-          setState(() => lastName = lastName);
+          setState(() => _lastName = lastName);
         },
         placeHolder: "(Last Name)",
-        value: lastName,
+        value: _lastName,
       )
     ];
   }
 
   void _loadInitConsole() {
-    console = Console(
-      topInputs: [inputs[0]],
-      inputs: [inputs[1], inputs[2]],
+    _console = Console(
+      topInputs: [_inputs[0]],
+      inputs: [_inputs[1], _inputs[2]],
       bottomButtons: [
         ConsoleButton(name: "Camera", onPress: _loadCameraConsole),
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),
@@ -409,8 +409,9 @@ class _UserMakerPageState extends State<UserMakerPage> {
             isActivated: _isReady(),
             name: "Proceed",
             onPress: () async {
-              errorTryAgain = !await widget.initUser(id, name, lastName, image);
-              if (errorTryAgain) {
+              _errorTryAgain =
+                  !await widget.initUser(_id, _name, _lastName, _image);
+              if (_errorTryAgain) {
                 setState(() {});
               } else {
                 widget.success();
@@ -422,7 +423,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   }
 
   void _loadCameraConsole() {
-    console = CameraConsole(
+    _console = CameraConsole(
         cameras: widget.cameras,
         cameraBack: _loadInitConsole,
         cameraCallBack: (path, isVideo) async {
@@ -444,7 +445,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             """);
-            image = compressedBytes ?? Uint8List(0);
+            _image = compressedBytes ?? Uint8List(0);
           }
           _loadInputs();
           _loadInitConsole();
@@ -456,7 +457,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   Widget build(BuildContext context) {
     return Down4ColumnBackground(
       children: [
-        errorTryAgain
+        _errorTryAgain
             ? Container(
                 margin: const EdgeInsets.symmetric(horizontal: 22.0),
                 child: const Text(
@@ -478,16 +479,16 @@ class _UserMakerPageState extends State<UserMakerPage> {
                 minWidth: 520,
                 quality: 40,
               );
-              setState(() => image = compressedBytes);
+              setState(() => _image = compressedBytes);
             }
           },
-          name: name,
-          id: id,
-          lastName: lastName,
-          image: image,
+          name: _name,
+          id: _id,
+          lastName: _lastName,
+          image: _image,
         ),
         const SizedBox(height: 16.0),
-        console,
+        _console,
         // console ?? Container()
       ],
     );
