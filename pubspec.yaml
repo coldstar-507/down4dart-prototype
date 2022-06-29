@@ -37,12 +37,15 @@ dependencies:
 
   # Packages
   dartsv: ^1.0.1
+  random_words: ^1.0.2
+  # base58check: ^2.0.0
   path_provider: ^2.0.9
   qr_flutter: ^4.0.0
   http: ^0.13.4
   # bip32: ^2.0.0
   file_picker: ^4.5.1
   # crypto: ^3.0.1
+  # bsv: ^1.0.6
   hive: ^2.1.0
   camera: ^0.9.4+19
   video_player: ^2.4.2

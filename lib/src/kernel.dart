@@ -10,12 +10,14 @@ import 'web_requests.dart' as r;
 import 'boxes.dart';
 // import 'package:crypto/crypto.dart' as crypto;
 // import 'package:pointycastle/digests/sha1.dart';
+import 'package:pointycastle/digests/sha256.dart' as pc256;
 // import 'package:firebase_storage/firebase_storage.dart';
 // import 'package:firebase_auth/firebase_auth.dart';
 // import 'package:convert/convert.dart';
 import 'package:hex/hex.dart';
 
 import 'render_pages.dart';
+import 'render_objects.dart';
 import 'data_objects.dart';
 
 class Down4 extends StatefulWidget {
@@ -35,19 +37,16 @@ class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
   Node? _user;
   MoneyInfo? _moneyInfo;
-  // UserCredential? _credential;
   InitializationStates _state = InitializationStates.loading;
-  Widget? _page;
 
   // ============================================================ KERNEL ============================================================ //
 
   @override
   void initState() {
     super.initState();
-    _processMessageQueue();
     // _anonymousLogin();
     _loadTokenChangeListener();
-    _loadHome();
+    _loadUser();
   }
 
   void _putState(InitializationStates s) {
@@ -60,24 +59,7 @@ class _Down4State extends State<Down4> {
     });
   }
 
-  Future<void> _processMessageQueue() async {
-    for (final messageData in Boxes.instance.messageQueue.values) {
-      await _parseMessageData(messageData);
-    }
-    await Boxes.instance.messageQueue.clear();
-    Boxes.instance.messageQueue.close();
-  }
-
-  // Future<void> _anonymousLogin() async {
-  //   try {
-  //     _credential = await FirebaseAuth.instance.signInAnonymously();
-  //     print("Anonymous uid: ${_credential?.user?.uid}");
-  //   } catch (e) {
-  //     print("Error logging in: $e");
-  //   }
-  // }
-
-  Future<void> _loadHome() async {
+  Future<void> _loadUser() async {
     final userData = Boxes.instance.user.get('user');
     if (userData != null) {
       _user = Node.fromJson(jsonDecode(userData));
@@ -92,103 +74,119 @@ class _Down4State extends State<Down4> {
   }
 
   Future<bool> _initUser(
-      String id, String name, String lastName, Uint8List imData) async {
-    final token = await FirebaseMessaging.instance.getToken();
-    final nodeInfo = {
-      'id': id,
-      'nm': name,
-      'ln': lastName,
-      'im': imData,
-      'tkn': token,
-    };
+    String id,
+    String name,
+    String lastName,
+    Uint8List imData,
+    bool toReverse,
+  ) async {
+    final mnemonic = await r.generateMnemonic();
 
-    final success = await r.initUser(jsonEncode(nodeInfo));
-
-    if (!success) {
-      print("Failed to init user!");
+    if (mnemonic == null) {
+      print("error generating mnemonic generateMnemonic");
       return false;
     }
 
-    final imageID = sv.sha1(id.codeUnits + imData.toList()).toString();
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) {
+      print("error getting firebase messaging token");
+      return false;
+    }
 
-    Down4Image image = Down4Image(
+    final concatMnemonic = mnemonic.replaceAll(" ", "");
+    print("concatenated mnemonic: $concatMnemonic");
+    final concatMnemonicCodes = concatMnemonic.codeUnits;
+    final idCodeUnits = id.codeUnits;
+    final secretData = concatMnemonicCodes + idCodeUnits;
+
+    final seed = sv.Mnemonic().toSeedHex(mnemonic);
+    final master = sv.HDPrivateKey.fromSeed(seed, sv.NetworkType.MAIN);
+    final down4priv = master.deriveChildKey("m/4'/0'/0'");
+    final neuter = down4priv.hdPublicKey;
+    print("seedHex: $seed");
+    print("masterString: ${master.toString()}");
+    print("down4priv: ${down4priv.toString()}");
+    print("neuter: ${neuter.toString()}");
+
+    final singleHash =
+        pc256.SHA256Digest().process(Uint8List.fromList(secretData));
+    final doubleHash = pc256.SHA256Digest().process(singleHash);
+    final pcDoubleHashHex = HEX.encode(doubleHash);
+
+    final doublesv = sv.sha256Twice(secretData);
+    final doublesvHex = HEX.encode(doublesv);
+
+    print("concatMnemonicCodeUnits: $concatMnemonicCodes");
+    print("idCodeUnits: $idCodeUnits");
+    print("secretData: $secretData");
+
+    print("pcDoubleHash: $doubleHash");
+    print("pcDoubleHEX: $pcDoubleHashHex");
+
+    print("doublesv: $doublesv");
+    print("doublesvHEX: $doublesvHex");
+
+    final secret = doublesvHex;
+    final isValid = doublesvHex == pcDoubleHashHex;
+
+    print("VALID SECRET IS ${doublesvHex == pcDoubleHashHex}\n");
+    if (!isValid) {
+      return false;
+    }
+
+    final imageID = HEX.encode(sv.sha1(id.codeUnits + imData.toList()));
+    Down4Media image = Down4Media(
       id: imageID,
       data: imData,
+      metadata: MediaMetadata(
+        owner: id,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+        toReverse: toReverse,
+      ),
     );
+
+    final userInfo = {
+      'id': id,
+      'nm': name,
+      'ln': lastName,
+      'sh': secret,
+      'tkn': token,
+      'nt': neuter.toString(),
+      'im': image,
+    };
+
+    final success = await r.initUser(jsonEncode(userInfo));
+
+    if (!success) {
+      print("It was not a success");
+      return false;
+    }
 
     await image.generateThumbnail();
 
     _user = Node(
-      type: NodeTypes.usr,
+      type: Nodes.user,
       id: id,
       image: image,
       name: name,
       lastName: lastName,
     );
 
-    _moneyInfo = await r.initUserMoney(id);
-
-    if (_moneyInfo == null) {
-      print("Failed to initalize money!");
-      return false;
-    }
-
-    final xpriv = sv.HDPrivateKey.fromXpriv(_moneyInfo!.down4Priv);
-    final nextPriv =
-        xpriv.deriveChildNumber(_moneyInfo!.upperIndex + 2).privateKey;
-
-    final hexpriv = nextPriv.toHex();
-
-    var sig = sv.SVSignature.fromPrivateKey(nextPriv);
-
-    const message = "Jeff is a nigger";
-    final hexEncodedMessage = HEX.encode(message.codeUnits);
-
-    final signedMessage = sig.sign(hexEncodedMessage);
-
-    final verifSig = sv.SVSignature.fromPublicKey(nextPriv.publicKey);
-    // final isValid = verifSig.verify(signedMessage);
-
-    print(
-        "next privateKey in hex: $hexpriv\nMessage: Jeff is a nigger\nSigned message: $signedMessage");
+    _moneyInfo = MoneyInfo(
+      mnemonic: mnemonic,
+      master: master,
+      down4priv: down4priv,
+      lowerIndex: 0,
+      upperIndex: 0,
+      lowerChange: 1,
+      upperChange: 1,
+    );
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user!.toLocal()));
     Boxes.instance.user.put('money', jsonEncode(_moneyInfo));
 
     return true;
-  }
-
-  Future<void> _parseMessageData(final notification) async {
-    final type = MessageTypes.values.byName(notification["t"]);
-    final messageData = notification["data"];
-    switch (type) {
-      case MessageTypes.friendRequest:
-        {
-          Boxes.instance.friendRequests.put(messageData["id"], messageData);
-          break;
-        }
-      case MessageTypes.bill:
-        {
-          Boxes.instance.bills.put(messageData["id"], messageData);
-          break;
-        }
-      case MessageTypes.payment:
-        {
-          Boxes.instance.payments.put(messageData["id"], messageData);
-          break;
-        }
-      case MessageTypes.chat:
-        {
-          Boxes.instance.messages.put(messageData["id"], messageData);
-          var chatSource = Node.fromJson(
-            Boxes.instance.friends.get(messageData["sd"])!,
-          ); // that will crash
-          chatSource.messages?.add(messageData["id"]);
-          Boxes.instance.friends.put(chatSource.id, chatSource.toLocal());
-          break;
-        }
-    }
   }
 
   // ============================================================ RENDER ============================================================ //
@@ -216,7 +214,5 @@ class _Down4State extends State<Down4> {
           understood: () => _putState(InitializationStates.home),
         );
     }
-
-    return _page ?? const LoadingPage();
   }
 }

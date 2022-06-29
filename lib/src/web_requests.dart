@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
 // import 'package:firebase_database/firebase_database.dart';
@@ -8,18 +9,23 @@ Future<bool> usernameIsValid(String username) async {
   if (username.length < 3) {
     return false;
   }
+  if (username.length > 15) {
+    return false;
+  }
   final uri = Uri.parse(
       "https://us-east1-down4-26ee1.cloudfunctions.net/IsValidUsername");
   final res = await http.post(uri, body: username);
   return res.statusCode == 200;
 }
 
-Future<MoneyInfo> initUserMoney(String username) async {
+Future<String?> generateMnemonic() async {
   final uri = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/InitUserMoney");
-  final res = await http.post(uri, body: username);
-  final data = MoneyInfo.fromJson(json.decode(res.body));
-  return data;
+      "https://us-east1-down4-26ee1.cloudfunctions.net/GenerateMnemonic");
+  final res = await http.post(uri);
+  if (res.statusCode == 200) {
+    return res.body;
+  }
+  return null;
 }
 
 Future<bool> initUser(String encodedJson) async {
@@ -29,23 +35,10 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-// Future<Node?> getUserNode(String username) async {
-//   var ref = FirebaseDatabase.instance.ref("Users/" + username);
-//   final snapshot = await ref.get();
-//   if (snapshot.exists) {
-//     final data =
-//         Map<String, dynamic>.from(snapshot.value as Map<String, dynamic>);
-//     var node = Node.fromJson(data);
-//     await node.image.downloadData();
-//     return node;
-//   }
-//   return null;
-// }
-
 Future<List<Node>?> getNodes(List<String> ids) async {
-  final uri =
+  final url =
       Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes");
-  final res = await http.post(uri, body: ids.join(" "));
+  final res = await http.post(url, body: ids.join(" "));
   final jsonLists = List<Map<String, dynamic>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
     return jsonLists.map((e) => Node.fromJson(e)).toList();
@@ -53,46 +46,53 @@ Future<List<Node>?> getNodes(List<String> ids) async {
   return null;
 }
 
-Future<Down4Image?> getMessageMedia(String id) async {
-  final uri = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMedia");
-  final res = await http.post(uri, body: id);
+Future<MediaMetadata?> getMediaMetadata(String id) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/GetMediaMetadata",
+  );
+  final res = await http.post(url, body: id);
+  if (res.statusCode != 200) {
+    return null;
+  }
+  return MediaMetadata.fromJson(jsonDecode(res.body));
+}
+
+Future<Down4Media?> getMessageMedia(String id) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMedia",
+  );
+  final res = await http.post(url, body: id);
   if (res.statusCode == 200) {
-    return Down4Image(id: id, data: res.bodyBytes);
+    return Down4Media.fromJson(jsonDecode(res.body));
   }
   return null;
 }
 
-Future<String?> getMessageMediaURL(String id) async {
-  final uri = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMediaURL");
-  final res = await http.post(uri, body: id);
-  if (res.statusCode == 200) {
-    return res.body;
+Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/MessageRequest",
+  );
+  final res = await http.post(url, body: jsonEncode(req));
+  if (res.statusCode == HttpStatus.noContent && retried == false) {
+    return messageRequest(
+      req
+        ..withUpload = true
+        ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+      true,
+    );
   }
-  return null;
+  return res.statusCode == 200;
 }
 
 Future<int> refreshTokenRequest(String newToken) async {
-  final uri =
-      Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/RefreshToken");
-  final res = await http.post(uri, body: newToken);
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/RefreshToken",
+  );
+  final res = await http.post(url, body: newToken);
   return res.statusCode;
 }
 
-Future<String> getMessagingToken(String username) async {
-  final uri = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessagingToken");
-  final res = await http.post(uri, body: username);
-  return res.body;
-}
-
-Future<bool> messageRequest(MessageRequest mr) async {
-  final uri = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest");
-  final res = await http.post(uri, body: jsonEncode(mr.toGoogle()));
-  if (res.statusCode == 200) {
-    return true;
-  }
-  return false;
+Future<List<Down4Message>?> getPosts(List<String> ids) async {
+  // TODO: getPosts
+  return null;
 }

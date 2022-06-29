@@ -8,12 +8,18 @@ import 'down4_utility.dart';
 
 class CameraConsole extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final void Function(String?, bool?) cameraCallBack;
+  final void Function(
+    String? filePath,
+    bool? isVideo,
+    bool? toReverse,
+  ) cameraCallBack;
   final void Function() cameraBack;
+  final bool enableVideo;
   const CameraConsole(
       {required this.cameras,
       required this.cameraBack,
       required this.cameraCallBack,
+      this.enableVideo = true,
       Key? key})
       : super(key: key);
 
@@ -25,7 +31,7 @@ class _CameraConsoleState extends State<CameraConsole> {
   CameraController? _cameraController;
   String? _filePath;
   Console? _console;
-  int _currentCameraIndex = 0;
+  int _cameraIndex = 0; // 0 = rear, 1 = front
   bool _audio = true;
   FlashMode _flashMode = FlashMode.off;
   ResolutionPreset _resolution = ResolutionPreset.low;
@@ -66,28 +72,17 @@ class _CameraConsoleState extends State<CameraConsole> {
     }
     _cameraController?.setFlashMode(_flashMode);
     _drawCapturingConsole();
-    print('''
-===============================================================================
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-                  FlashMode=${_flashMode.name}
-
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-================================================================================
-''');
   }
 
   Future<void> _initController() async {
     try {
       _cameraController = CameraController(
-          widget.cameras[_currentCameraIndex], _resolution,
+          widget.cameras[_cameraIndex], _resolution,
           enableAudio: _audio);
       await _cameraController?.initialize();
       await _cameraController?.setFlashMode(_flashMode);
     } catch (err) {
-      widget.cameraCallBack(null, null);
+      widget.cameraCallBack(null, null, null);
     }
     setState(() {});
   }
@@ -104,26 +99,31 @@ class _CameraConsoleState extends State<CameraConsole> {
         aspectRatio: _cameraController?.value.aspectRatio,
         topButtons: [
           ConsoleButton(
-              shouldBeDownButIsnt: _cameraController!.value.isRecordingVideo,
-              name: "Capture",
-              onPress: _takePicture,
-              onLongPress: _startRecording,
-              onLongPressUp: _stopRecording),
+            shouldBeDownButIsnt: _cameraController!.value.isRecordingVideo,
+            name: "Capture",
+            isSpecial: widget.enableVideo,
+            onPress: _takePicture,
+            onLongPress: widget.enableVideo ? _startRecording : null,
+            onLongPressUp: widget.enableVideo ? _stopRecording : null,
+          ),
           ConsoleButton(
-              isMode: true,
-              name: _resolution.name.capitalize(),
-              onPress: _nextResolution)
+            isMode: true,
+            name: _resolution.name.makeLowerCase(),
+            onPress: _nextResolution,
+          ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.cameraBack),
           ConsoleButton(
-              isMode: true,
-              name: _flashMode.name.capitalize(),
-              onPress: _nextFlashMode),
+            isMode: true,
+            name: _flashMode.name.makeLowerCase(),
+            onPress: _nextFlashMode,
+          ),
           ConsoleButton(
-              isMode: true,
-              name: _currentCameraIndex == 0 ? "Rear" : "Front",
-              onPress: _nextCam)
+            isMode: true,
+            name: _cameraIndex == 0 ? "Rear" : "Front",
+            onPress: _nextCam,
+          )
         ],
       );
     });
@@ -136,19 +136,19 @@ class _CameraConsoleState extends State<CameraConsole> {
       await _videoPlayerController?.setLooping(true);
       await _videoPlayerController?.play();
     } catch (err) {
-      widget.cameraCallBack(null, null);
+      widget.cameraCallBack(null, null, null);
     }
     setState(() {
       _console = Console(
         videoPlayerController: _videoPlayerController,
         aspectRatio: _cameraController?.value.aspectRatio,
-        toMirror: _currentCameraIndex == 1,
+        toMirror: _cameraIndex == 1,
         topButtons: [
           ConsoleButton(
-              name: "Accept",
-              onPress: () {
-                widget.cameraCallBack(_filePath, true);
-              }),
+            name: "Accept",
+            onPress: () =>
+                widget.cameraCallBack(_filePath, true, _cameraIndex == 1),
+          ),
         ],
         bottomButtons: [
           ConsoleButton(
@@ -157,7 +157,9 @@ class _CameraConsoleState extends State<CameraConsole> {
                 _setCapturingConsole();
               }),
           ConsoleButton(
-              name: "Cancel", onPress: () => widget.cameraCallBack(null, null))
+            name: "Cancel",
+            onPress: () => widget.cameraCallBack(null, null, null),
+          )
         ],
       );
     });
@@ -167,16 +169,20 @@ class _CameraConsoleState extends State<CameraConsole> {
     setState(() {
       _console = Console(
         imagePreviewPath: _filePath,
-        toMirror: _currentCameraIndex == 1,
+        toMirror: _cameraIndex == 1,
         topButtons: [
           ConsoleButton(
-              name: "Accept",
-              onPress: () => widget.cameraCallBack(_filePath, false))
+            name: "Accept",
+            onPress: () =>
+                widget.cameraCallBack(_filePath, false, _cameraIndex == 1),
+          ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: _setCapturingConsole),
           ConsoleButton(
-              name: "Cancel", onPress: () => widget.cameraCallBack(null, null))
+            name: "Cancel",
+            onPress: () => widget.cameraCallBack(null, null, null),
+          )
         ],
       );
     });
@@ -190,7 +196,7 @@ class _CameraConsoleState extends State<CameraConsole> {
   }
 
   void _nextCam() {
-    _currentCameraIndex = (_currentCameraIndex + 1) % widget.cameras.length;
+    _cameraIndex = (_cameraIndex + 1) % widget.cameras.length;
     _setCapturingConsole();
   }
 
@@ -198,18 +204,9 @@ class _CameraConsoleState extends State<CameraConsole> {
     try {
       final xfile = await _cameraController?.takePicture();
       final path = xfile?.path;
-      final bytes = await xfile?.readAsBytes();
-      print("""
-      --
-
-        file path = $path
-        file size = ${bytes?.length}
-
-      --
-      """);
       _filePath = path;
     } catch (e) {
-      widget.cameraCallBack(null, null);
+      widget.cameraCallBack(null, null, null);
     }
     _setImagePreviewConsole();
   }
@@ -219,7 +216,7 @@ class _CameraConsoleState extends State<CameraConsole> {
       await _cameraController?.startVideoRecording();
       _drawCapturingConsole();
     } catch (e) {
-      widget.cameraCallBack(null, null);
+      widget.cameraCallBack(null, null, null);
     }
   }
 
@@ -227,22 +224,9 @@ class _CameraConsoleState extends State<CameraConsole> {
     try {
       XFile? f = await _cameraController?.stopVideoRecording();
       final path = f?.path;
-      final bytes = await f?.readAsBytes();
-      print('''
-===============================================================================
-
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-                  Size of video=${bytes?.length}
-                  Path of video=$path
-
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-================================================================================
-''');
       _filePath = path;
     } catch (e) {
-      widget.cameraCallBack(null, null);
+      widget.cameraCallBack(null, null, null);
     }
     _setVideoPreviewConsole();
   }

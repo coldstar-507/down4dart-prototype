@@ -7,22 +7,22 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 // import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-
+import 'src/data_objects.dart';
 import 'firebase_options.dart';
 import 'src/kernel.dart';
 
-Future<void> _openAllBoxes() async {
-  Hive.openBox("Images");
-  await Hive.openBox("Friends");
+var docDirPath;
+
+Future<void> _initBox() async {
   await Hive.openBox("User");
-  Hive.openBox("Reactions");
-  Hive.openBox("Others");
-  await Hive.openBox("FriendRequests");
-  Hive.openBox("Messages");
   await Hive.openBox("MessageQueue");
-  Hive.openBox("Bills");
-  Hive.openBox("Payments");
-  await Hive.openBox("Hyperchats");
+  await Hive.openBox("Home");
+  await Hive.openBox("Images");
+  await Hive.openBox("Reactions");
+  await Hive.openBox("Messages");
+  await Hive.openBox("Bills");
+  await Hive.openBox("Payments");
+  await Hive.openBox("SavedMessages");
 }
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -71,9 +71,10 @@ Future<void> main() async {
     // TODO kIsWeb
   }
 
-  var dir = await getApplicationDocumentsDirectory();
-  Hive.init(dir.path);
-  await _openAllBoxes();
+  final dir = await getApplicationDocumentsDirectory();
+  docDirPath = dir.path;
+  Hive.init(docDirPath);
+  await _initBox();
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
