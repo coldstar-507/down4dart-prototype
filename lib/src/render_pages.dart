@@ -172,6 +172,12 @@ class _HyperchatPageState extends State<HyperchatPage> {
         lastName: wp.second,
         image: _hyperchatImage ?? widget.self.image,
         messages: [msg.messageID],
+        posts: [],
+        friends: [],
+        group: targets..add(widget.self.id),
+        parents: [],
+        childs: [],
+        admins: [],
       )..saveLocally();
       final success = await r.messageRequest(MessageRequest(
         msg: msg,
@@ -1029,6 +1035,7 @@ class _HomePageState extends State<HomePage> {
   Down4Media? _mediaInput;
   bool _camera = false;
   var tec = TextEditingController();
+  bool _extra = false;
 
   // ======================================================= INITIALIZATION ============================================================ //
 
@@ -1047,16 +1054,19 @@ class _HomePageState extends State<HomePage> {
     if (_messages[nodeID] == null) {
       _messages[nodeID] = {};
       final node = _palettes[nodeLocation]?[nodeID]?.node;
+      String prevSenderID = "";
       for (final msgID in node?.messages ?? <String>[]) {
         final d4msg = Down4Message.fromLocal(msgID);
         _messages[nodeID]?.addAll({
           msgID: ChatMessage(
+            hasHeader: prevSenderID != d4msg.senderID,
             at: nodeID,
             message: d4msg,
             myMessage: widget.self.id == d4msg.senderID,
             select: selectMessage,
           )
         });
+        prevSenderID = d4msg.senderID;
       }
     }
   }
@@ -1202,7 +1212,7 @@ class _HomePageState extends State<HomePage> {
           buttonsInfo: [
             ButtonsInfo(
               assetPath: "lib/src/assets/rightBlackArrow.png",
-              pressFunc: openNode,
+              pressFunc: openChat,
               rightMost: true,
             )
           ],
@@ -1261,12 +1271,14 @@ class _HomePageState extends State<HomePage> {
         {
           final msg = (await notif.toDown4Message())..saveLocally();
           final chatMessage = ChatMessage(
+            hasHeader: lastMessageSender(msg.root) != msg.senderID,
             message: msg,
             at: msg.root,
             select: selectMessage,
             myMessage: msg.senderID == widget.self.id ||
                 msg.forwarderID == widget.self.id,
           );
+          setMessage(chatMessage);
 
           if (getPalette(msg.root, "Home") != null) {
             setPalette(
@@ -1281,6 +1293,7 @@ class _HomePageState extends State<HomePage> {
             // save it locally with proper type and activity
             final node = nonFriend?.first
               ?..mutateType(Nodes.nonFriend)
+              ..messages.add(msg.messageID)
               ..updateActivity(DateTime.now().millisecondsSinceEpoch)
               ..saveLocally();
             if (node != null) {
@@ -1288,8 +1301,6 @@ class _HomePageState extends State<HomePage> {
               setPaletteIfAbsent(nodeToPalette("Home", node)!);
             }
           }
-          // cache the message
-          setMessage(chatMessage);
           setState(() {});
           break;
         }
@@ -1312,7 +1323,7 @@ class _HomePageState extends State<HomePage> {
       case Messages.group:
         {
           final msg = await notif.toDown4Message();
-          final node = await notif.nodeOfGroup()
+          var node = (await notif.nodeOfGroup())
             ?..messages.add(msg.messageID)
             ..updateActivity(DateTime.now().millisecondsSinceEpoch)
             ..saveLocally();
@@ -1392,6 +1403,7 @@ class _HomePageState extends State<HomePage> {
     mr.msg.saveLocally();
     r.messageRequest(mr);
     final cm = ChatMessage(
+      hasHeader: lastMessageSender(mr.msg.root) != mr.msg.senderID,
       message: mr.msg,
       myMessage: true,
       at: mr.msg.root,
@@ -1399,6 +1411,11 @@ class _HomePageState extends State<HomePage> {
     );
     setMessage(cm);
     updateActivity(mr.msg.root, mr.msg.timestamp);
+    setState(() {});
+  }
+
+  void toggleExtra() {
+    _extra = !_extra;
     setState(() {});
   }
 
@@ -1524,6 +1541,14 @@ class _HomePageState extends State<HomePage> {
         : _messages[m.message.root] = {m.message.messageID: m};
   }
 
+  String lastMessageSender(String at) {
+    try {
+      return getMessages(at)?.values.last.message.senderID ?? "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   Map<String, ChatMessage>? getMessages(String at) {
     return _messages[at];
   }
@@ -1572,6 +1597,7 @@ class _HomePageState extends State<HomePage> {
     }
     _messages[chatRoot] = {};
     final messageIDs = _node?.messages;
+    String lastMessageSender = "";
     for (final msgID in messageIDs ?? []) {
       final d4msg = Down4Message.fromLocal(msgID);
       if (d4msg.timestamp.isExpired()) {
@@ -1580,6 +1606,7 @@ class _HomePageState extends State<HomePage> {
       } else {
         _messages[chatRoot]?.addAll({
           msgID: ChatMessage(
+            hasHeader: lastMessageSender != d4msg.senderID,
             at: chatRoot,
             message: d4msg,
             myMessage: d4msg.senderID == widget.self.id ||
@@ -1587,6 +1614,7 @@ class _HomePageState extends State<HomePage> {
             select: selectMessage,
           )
         });
+        lastMessageSender = d4msg.senderID;
       }
     }
     _node?.saveLocally();
@@ -1647,36 +1675,65 @@ class _HomePageState extends State<HomePage> {
         return const LoadingPage();
 
       case HomePageRenderState.home:
-        return PalettePage(
-            palettes: formatedHomePalettes,
-            console: Console(
-              inputs: [
-                ConsoleInput(
-                  tec: tec,
-                  inputCallBack: (text) => _textInput = text,
-                  placeHolder: ":)",
-                )
-              ],
-              topButtons: [
-                ConsoleButton(
-                    name: "Hyperchat",
-                    onPress: () => putState(HomePageRenderState.hyperchat)),
-                ConsoleButton(
-                    name: "Money",
-                    onPress: () => putState(HomePageRenderState.money)),
-              ],
-              bottomButtons: [
-                ConsoleButton(name: "Delete", onPress: delete),
-                ConsoleButton(
-                    name: "Search",
-                    onPress: () {
-                      pushLocation("Search");
-                      putState(HomePageRenderState.addFriend);
-                    }),
-                ConsoleButton(
-                    isSpecial: true, name: "Ping", onPress: () => print("TODO"))
-              ],
-            ));
+        return Stack(
+          children: [
+            PalettePage(
+              palettes: formatedHomePalettes,
+              console: Console(
+                inputs: [
+                  ConsoleInput(
+                    tec: tec,
+                    inputCallBack: (text) => _textInput = text,
+                    placeHolder: ":)",
+                  )
+                ],
+                topButtons: [
+                  ConsoleButton(
+                      name: "Hyperchat",
+                      onPress: () => putState(HomePageRenderState.hyperchat)),
+                  ConsoleButton(
+                      name: "Money",
+                      onPress: () => putState(HomePageRenderState.money)),
+                ],
+                bottomButtons: [
+                  ConsoleButton(
+                    name: "Delete",
+                    onPress: delete,
+                    isSpecial: true,
+                    onLongPress: toggleExtra,
+                  ),
+                  ConsoleButton(
+                      name: "Search",
+                      onPress: () {
+                        pushLocation("Search");
+                        putState(HomePageRenderState.addFriend);
+                      }),
+                  ConsoleButton(
+                      isSpecial: true,
+                      name: "Ping",
+                      onPress: () => print("TODO"))
+                ],
+              ),
+            ),
+            _extra
+                ? Positioned(
+                    bottom: 16.0,
+                    left: 16.0,
+                    child: Container(
+                      height: ConsoleButton.height * 4,
+                      width: (MediaQuery.of(context).size.width - 29) / 3,
+                      decoration: BoxDecoration(border: Border.all(width: 0.5)),
+                      child: Column(children: [
+                        ConsoleButton(name: "Lol", onPress: toggleExtra),
+                        ConsoleButton(name: "Nigger", onPress: toggleExtra),
+                        ConsoleButton(name: "Shill", onPress: toggleExtra),
+                        ConsoleButton(name: "Wachko", onPress: toggleExtra),
+                      ]),
+                    ),
+                  )
+                : const SizedBox.shrink()
+          ],
+        );
 
       case HomePageRenderState.chat:
         return ChatPage(

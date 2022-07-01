@@ -127,7 +127,6 @@ class ProfileWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // width: imageWith,
       clipBehavior: Clip.hardEdge,
       decoration: const BoxDecoration(
         boxShadow: [
@@ -551,7 +550,7 @@ class _Down4InputState extends State<Down4Input> {
 }
 
 class Console extends StatelessWidget {
-  final List<ConsoleButton>? topButtons, extraButtons;
+  final List<ConsoleButton>? topButtons;
   final List<ConsoleButton> bottomButtons;
   final CameraPreview? cameraPreview;
   final double? aspectRatio;
@@ -574,7 +573,6 @@ class Console extends StatelessWidget {
     this.inputs,
     this.topInputs,
     this.topButtons,
-    this.extraButtons,
     Key? key,
   }) : super(key: key);
 
@@ -587,108 +585,111 @@ class Console extends StatelessWidget {
       margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
       decoration:
           BoxDecoration(border: Border.all(width: 0.5, color: Colors.black)),
-      child: Column(children: [
-        Row(textDirection: TextDirection.ltr, children: topInputs ?? []),
-        Row(textDirection: TextDirection.ltr, children: inputs ?? []),
-        images == true
-            ? Container(
-                width: camWidthAndHeight,
-                height: camWidthAndHeight,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black, width: 0.5),
-                  color: PinkTheme.buttonColor,
-                ),
-                child: (ListView.builder(
-                    itemCount: (medias?.length ?? 0 / 4.0).ceil(),
-                    itemBuilder: ((context, index) {
-                      Widget f(int i) {
-                        if ((medias?.length ?? 0) > i) {
-                          return medias?[i].metadata.isVideo == true
-                              ? SizedBox(
-                                  height: (camWidthAndHeight / 4) - 0.25,
-                                  width: (camWidthAndHeight / 4) - 0.25,
-                                  child: Down4VideoPlayer(
-                                    vid: medias![i].file!,
-                                  ),
-                                )
-                              : GestureDetector(
-                                  onTap: () => selectMedia?.call(medias![i]),
-                                  child: SizedBox(
-                                    height: (camWidthAndHeight / 5) - 0.2,
-                                    width: (camWidthAndHeight / 5) - 0.2,
-                                    child: Image.memory(
-                                      medias![i].data,
-                                      fit: BoxFit.cover,
+      child: Column(
+        children: [
+          Row(textDirection: TextDirection.ltr, children: topInputs ?? []),
+          Row(textDirection: TextDirection.ltr, children: inputs ?? []),
+          images == true
+              ? Container(
+                  width: camWidthAndHeight,
+                  height: camWidthAndHeight,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 0.5),
+                    color: PinkTheme.buttonColor,
+                  ),
+                  child: (ListView.builder(
+                      itemCount: (medias?.length ?? 0 / 4.0).ceil(),
+                      itemBuilder: ((context, index) {
+                        Widget f(int i) {
+                          if ((medias?.length ?? 0) > i) {
+                            return medias?[i].metadata.isVideo == true
+                                ? SizedBox(
+                                    height: (camWidthAndHeight / 4) - 0.25,
+                                    width: (camWidthAndHeight / 4) - 0.25,
+                                    child: Down4VideoPlayer(
+                                      vid: medias![i].file!,
                                     ),
-                                  ),
-                                );
-                        } else {
-                          return const SizedBox.shrink();
+                                  )
+                                : GestureDetector(
+                                    onTap: () => selectMedia?.call(medias![i]),
+                                    child: SizedBox(
+                                      height: (camWidthAndHeight / 5) - 0.2,
+                                      width: (camWidthAndHeight / 5) - 0.2,
+                                      child: Image.memory(
+                                        medias![i].data,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  );
+                          } else {
+                            return const SizedBox.shrink();
+                          }
                         }
-                      }
 
-                      return Row(
-                        children: [
-                          f((index * 5)),
-                          f((index * 5) + 1),
-                          f((index * 5) + 2),
-                          f((index * 5) + 3),
-                          f((index * 5) + 4)
-                        ],
-                      );
-                    }))),
-              )
-            : cameraPreview != null
-                ? Container(
-                    width: camWidthAndHeight,
-                    height: camWidthAndHeight,
-                    clipBehavior: Clip.hardEdge,
-                    decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black, width: .5)),
-                    child: Transform.scale(
-                        alignment: Alignment.center,
-                        scaleY: aspectRatio,
-                        child: AspectRatio(
-                            aspectRatio: aspectRatio!, child: cameraPreview!)))
-                : imagePreviewPath != null
-                    ? Container(
-                        width: camWidthAndHeight,
-                        height: camWidthAndHeight,
-                        decoration: BoxDecoration(
-                            border:
-                                Border.all(color: Colors.black, width: 0.5)),
-                        child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.rotationY(mirror),
-                            child: Image.file(
-                              io.File(imagePreviewPath!),
-                              fit: BoxFit.cover,
-                            )))
-                    : videoPlayerController != null
-                        ? Container(
-                            clipBehavior: Clip.hardEdge,
-                            width: camWidthAndHeight,
-                            height: camWidthAndHeight,
-                            decoration: BoxDecoration(
-                                border: Border.all(
-                                    color: Colors.black, width: 0.5)),
-                            child: Transform(
-                                alignment: Alignment.center,
-                                transform: Matrix4.rotationY(mirror),
-                                child: Transform.scale(
-                                    scaleY: aspectRatio,
-                                    child:
-                                        VideoPlayer(videoPlayerController!))))
-                        : const SizedBox.shrink(),
-        Row(
-          children: topButtons ?? [],
-          textDirection: TextDirection.ltr,
-        ),
-        Row(
-          children: bottomButtons,
-          textDirection: TextDirection.ltr,
-        )
-      ]),
+                        return Row(
+                          children: [
+                            f((index * 5)),
+                            f((index * 5) + 1),
+                            f((index * 5) + 2),
+                            f((index * 5) + 3),
+                            f((index * 5) + 4)
+                          ],
+                        );
+                      }))),
+                )
+              : cameraPreview != null
+                  ? Container(
+                      width: camWidthAndHeight,
+                      height: camWidthAndHeight,
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                          border: Border.all(color: Colors.black, width: .5)),
+                      child: Transform.scale(
+                          alignment: Alignment.center,
+                          scaleY: aspectRatio,
+                          child: AspectRatio(
+                              aspectRatio: aspectRatio!,
+                              child: cameraPreview!)))
+                  : imagePreviewPath != null
+                      ? Container(
+                          width: camWidthAndHeight,
+                          height: camWidthAndHeight,
+                          decoration: BoxDecoration(
+                              border:
+                                  Border.all(color: Colors.black, width: 0.5)),
+                          child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.rotationY(mirror),
+                              child: Image.file(
+                                io.File(imagePreviewPath!),
+                                fit: BoxFit.cover,
+                              )))
+                      : videoPlayerController != null
+                          ? Container(
+                              clipBehavior: Clip.hardEdge,
+                              width: camWidthAndHeight,
+                              height: camWidthAndHeight,
+                              decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Colors.black, width: 0.5)),
+                              child: Transform(
+                                  alignment: Alignment.center,
+                                  transform: Matrix4.rotationY(mirror),
+                                  child: Transform.scale(
+                                      scaleY: aspectRatio,
+                                      child:
+                                          VideoPlayer(videoPlayerController!))))
+                          : const SizedBox.shrink(),
+          Row(
+            children: topButtons ?? [],
+            textDirection: TextDirection.ltr,
+          ),
+          Row(
+            children: bottomButtons,
+            textDirection: TextDirection.ltr,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -697,12 +698,13 @@ class ChatMessage extends StatelessWidget {
   static const double headerHeight = 24.0;
   final String at;
   final Down4Message message;
-  final bool myMessage, selected;
+  final bool myMessage, selected, hasHeader;
   final void Function(Identifier, Identifier)? select;
   const ChatMessage({
     required this.message,
     required this.myMessage,
     required this.at,
+    required this.hasHeader,
     this.selected = false,
     this.select,
     Key? key,
@@ -710,6 +712,7 @@ class ChatMessage extends StatelessWidget {
 
   ChatMessage invertedSelection() {
     return ChatMessage(
+      hasHeader: hasHeader,
       message: message,
       myMessage: myMessage,
       at: at,
@@ -752,69 +755,80 @@ class ChatMessage extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                textDirection: TextDirection.ltr,
-                children: [
-                  GestureDetector(
-                    onTap: () => select?.call(message.messageID, at),
-                    child: Container(
-                      clipBehavior: Clip.hardEdge,
-                      decoration: const BoxDecoration(
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(4.0),
-                        ),
-                      ),
-                      height: ChatMessage.headerHeight,
-                      width: ChatMessage.headerHeight,
-                      child: Image.memory(
-                        message.senderThumbnail,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => select?.call(message.messageID, at),
-                      child: Container(
-                        clipBehavior: Clip.hardEdge,
-                        decoration: const BoxDecoration(
-                          color: PinkTheme.headerColor,
-                          borderRadius: BorderRadius.only(
-                            topRight: Radius.circular(4.0),
+              hasHeader
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      textDirection: TextDirection.ltr,
+                      children: [
+                        GestureDetector(
+                          onTap: () => select?.call(message.messageID, at),
+                          child: Container(
+                            clipBehavior: Clip.hardEdge,
+                            decoration: const BoxDecoration(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(4.0),
+                              ),
+                            ),
+                            height: ChatMessage.headerHeight,
+                            width: ChatMessage.headerHeight,
+                            child: Image.memory(
+                              message.senderThumbnail,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
-                        padding: const EdgeInsets.only(
-                            left: 2.0, top: 2.0, right: 2.0),
-                        height: ChatMessage.headerHeight,
-                        child: Text(
-                          message.senderName,
-                          textDirection: TextDirection.ltr,
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => select?.call(message.messageID, at),
+                            child: Container(
+                              clipBehavior: Clip.hardEdge,
+                              decoration: const BoxDecoration(
+                                color: PinkTheme.headerColor,
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(4.0),
+                                ),
+                              ),
+                              padding: const EdgeInsets.only(
+                                  left: 2.0, top: 2.0, right: 2.0),
+                              height: ChatMessage.headerHeight,
+                              child: Text(
+                                message.senderName,
+                                textDirection: TextDirection.ltr,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
               message.text == null || message.text == ""
                   ? const SizedBox.shrink()
                   : GestureDetector(
                       onTap: () => select?.call(message.messageID, at),
                       child: Container(
-                        padding: const EdgeInsets.all(2.0),
-                        color:
-                            message.media != null ? PinkTheme.bodyColor : null,
-                        clipBehavior:
-                            message.media == null ? Clip.hardEdge : Clip.none,
+                        padding: const EdgeInsets.all(6.0),
+                        clipBehavior: Clip.hardEdge,
                         decoration: message.media == null
-                            ? const BoxDecoration(
+                            ? BoxDecoration(
                                 color: PinkTheme.bodyColor,
-                                borderRadius: BorderRadius.only(
-                                  bottomLeft: Radius.circular(4.0),
-                                  bottomRight: Radius.circular(4.0),
-                                ),
+                                borderRadius: hasHeader
+                                    ? const BorderRadius.only(
+                                        bottomLeft: Radius.circular(4.0),
+                                        bottomRight: Radius.circular(4.0),
+                                      )
+                                    : const BorderRadius.all(
+                                        Radius.circular(4.0),
+                                      ),
                               )
-                            : null,
+                            : BoxDecoration(
+                                color: PinkTheme.bodyColor,
+                                borderRadius: hasHeader
+                                    ? null
+                                    : const BorderRadius.only(
+                                        topRight: Radius.circular(4.0),
+                                        topLeft: Radius.circular(4.0),
+                                      ),
+                              ),
                         child: Text(
                           message.text!,
                           textDirection: TextDirection.ltr,
@@ -1393,7 +1407,6 @@ class PaletteMakerList extends StatelessWidget {
 //     );
 //   }
 // }
-
 
 // class LocalPalette extends StatelessWidget {
 //   static const double height = 60.0;

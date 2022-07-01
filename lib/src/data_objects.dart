@@ -197,7 +197,7 @@ class Reaction {
 
 class MessageNotification {
   final Messages type;
-  final Identifier id, senderID, root; // if senderID == root -> chat is person
+  final Identifier msgID, senderID, root;
   final Identifier? mediaID, forwarderID;
   final int timestamp;
   final String senderThumbnail, senderName;
@@ -208,7 +208,7 @@ class MessageNotification {
   final bool isChat;
   MessageNotification({
     required this.type,
-    required this.id,
+    required this.msgID,
     required this.root,
     required this.isChat,
     required this.timestamp,
@@ -234,11 +234,10 @@ class MessageNotification {
   });
 
   factory MessageNotification.fromNotification(Map<String, String> ntf) {
-    print("Notification: $ntf");
     return MessageNotification(
       type: Messages.values.byName(ntf["t"]!),
       timestamp: int.tryParse(ntf["ts"]!)!,
-      id: ntf["msgid"]!,
+      msgID: ntf["msgid"]!,
       mediaID: ntf["mid"],
       root: ntf["rt"]!,
       senderID: ntf["sdrid"]!,
@@ -250,11 +249,11 @@ class MessageNotification {
       hyperchatID: ntf["hcid"],
       hyperchatName: ntf["hcnm"],
       hyperchatLastName: ntf["hcln"],
-      hyperchatMediaID: ntf["hcmid"],
+      hyperchatMediaID: ntf["hcim"],
       hyperchatFriends: ntf["hcfr"]?.split(" "),
       groupID: ntf["gid"],
       groupName: ntf["gnm"],
-      groupMediaID: ntf["gmid"],
+      groupMediaID: ntf["gim"],
       groupFriends: ntf["gfr"]?.split(" "),
       isChat: ntf["ischt"] == "true",
       text: ntf["txt"],
@@ -268,7 +267,7 @@ class MessageNotification {
         ? await r.getMessageMedia(mediaID!)
         : null;
     return Down4Message(
-      messageID: id,
+      messageID: msgID,
       senderThumbnail: base64Decode(senderThumbnail),
       senderID: senderID,
       root: root,
@@ -291,13 +290,22 @@ class MessageNotification {
     if (groupMediaID != null) {
       m = await r.getMessageMedia(groupMediaID!);
     }
-    if (m != null && groupName != null && groupFriends != null) {
+    if (m != null &&
+        groupName != null &&
+        groupFriends != null &&
+        groupID != null) {
       return Node(
         type: Nodes.group,
-        id: id,
+        id: groupID!,
         name: groupName!,
         image: m,
         group: groupFriends!,
+        posts: [],
+        messages: [],
+        admins: [],
+        childs: [],
+        friends: [],
+        parents: [],
       );
     }
     return null;
@@ -308,13 +316,22 @@ class MessageNotification {
     if (hyperchatMediaID != null) {
       m = await r.getMessageMedia(hyperchatMediaID!);
     }
-    if (m != null && hyperchatName != null && hyperchatFriends != null) {
+    if (m != null &&
+        hyperchatName != null &&
+        hyperchatFriends != null &&
+        hyperchatID != null) {
       return Node(
         type: Nodes.hyperchat,
-        id: id,
+        id: hyperchatID!,
         name: hyperchatName!,
         image: m,
         group: hyperchatFriends!,
+        friends: [],
+        admins: [],
+        messages: [],
+        posts: [],
+        childs: [],
+        parents: [],
       );
     }
     return null;
@@ -391,7 +408,9 @@ class Down4Message {
           Uint8List.fromList(List<int>.from(decodedJson["fdrtn"])),
       isChat: decodedJson["ischt"],
       text: decodedJson["txt"],
-      media: Down4Media.fromJson(decodedJson["m"]),
+      media: decodedJson["m"] != null
+          ? Down4Media.fromJson(decodedJson["m"])
+          : null,
       timestamp: decodedJson["ts"],
       reactions:
           decodedJson["r"] != null ? List<String>.from(decodedJson["r"]) : null,
@@ -464,8 +483,13 @@ class Node {
   String? description;
   Nodes type;
   int activity;
-  List<Identifier> admins, childs, parents, friends, group;
-  List<Identifier> messages, posts; // messages / either post or chat
+  List<Identifier> admins = [];
+  List<Identifier> childs = [];
+  List<Identifier> parents = [];
+  List<Identifier> friends = [];
+  List<Identifier> group = [];
+  List<Identifier> messages = [];
+  List<Identifier> posts = []; // messages / either post or chat
   Node({
     required this.type,
     required this.id,
@@ -474,13 +498,13 @@ class Node {
     this.description,
     this.activity = 0,
     this.lastName,
-    this.posts = const [],
-    this.messages = const [],
-    this.admins = const [],
-    this.childs = const [],
-    this.group = const [],
-    this.parents = const [],
-    this.friends = const [],
+    required this.posts,
+    required this.messages,
+    required this.admins,
+    required this.childs,
+    required this.group,
+    required this.parents,
+    required this.friends,
   });
 
   void mutateType(Nodes t) => type = t;
@@ -531,6 +555,7 @@ class Node {
       parents: List<String>.from(decodedJson["prt"] ?? []),
       posts: List<String>.from(decodedJson["pst"] ?? []),
       group: List<String>.from(decodedJson["grp"] ?? []),
+      friends: List<String>.from(decodedJson["frd"] ?? []),
     );
   }
 

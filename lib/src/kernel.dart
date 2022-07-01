@@ -170,6 +170,13 @@ class _Down4State extends State<Down4> {
       image: image,
       name: name,
       lastName: lastName,
+      parents: [],
+      childs: [],
+      admins: [],
+      friends: [],
+      group: [],
+      posts: [],
+      messages: [],
     );
 
     _moneyInfo = MoneyInfo(
