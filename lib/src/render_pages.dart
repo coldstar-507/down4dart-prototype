@@ -1048,29 +1048,6 @@ class _HomePageState extends State<HomePage> {
     putState(HomePageRenderState.home);
   }
 
-  void loadLocalMessages(String nodeID, String nodeLocation) {
-    // The sessions starts at null for every node mapping to their messages
-    // We local load them once, then they get added to memory and to disk with the _onMessage function
-    if (_messages[nodeID] == null) {
-      _messages[nodeID] = {};
-      final node = _palettes[nodeLocation]?[nodeID]?.node;
-      String prevSenderID = "";
-      for (final msgID in node?.messages ?? <String>[]) {
-        final d4msg = Down4Message.fromLocal(msgID);
-        _messages[nodeID]?.addAll({
-          msgID: ChatMessage(
-            hasHeader: prevSenderID != d4msg.senderID,
-            at: nodeID,
-            message: d4msg,
-            myMessage: widget.self.id == d4msg.senderID,
-            select: selectMessage,
-          )
-        });
-        prevSenderID = d4msg.senderID;
-      }
-    }
-  }
-
   void loadLocalHomePalettes() {
     final jsonEncodedHomeNodes = Boxes.instance.home.values;
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
@@ -1148,6 +1125,16 @@ class _HomePageState extends State<HomePage> {
       case Nodes.market:
         break;
       case Nodes.hyperchat:
+        if (node.messages.isEmpty) {
+          return null;
+        } else {
+          final lastMessageID = node.messages.last;
+          final msg = Down4Message.fromLocal(lastMessageID);
+          if (msg.timestamp.isExpired()) {
+            node.deleteLocally();
+            return null;
+          }
+        }
         return Palette(
           node: node,
           at: location,
@@ -1188,6 +1175,15 @@ class _HomePageState extends State<HomePage> {
         break;
 
       case Nodes.nonFriend:
+        if (node.messages.isEmpty) {
+          return null;
+        } else {
+          final msg = Down4Message.fromLocal(node.messages.last);
+          if (msg.timestamp.isExpired()) {
+            node.deleteLocally();
+            return null;
+          }
+        }
         return Palette(
           node: node,
           at: location,

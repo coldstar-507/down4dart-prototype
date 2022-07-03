@@ -843,11 +843,16 @@ class ChatMessage extends StatelessWidget {
                           onTap: () => select?.call(message.messageID, at),
                           child: Container(
                             clipBehavior: Clip.hardEdge,
-                            decoration: const BoxDecoration(
-                              borderRadius: BorderRadius.only(
-                                bottomLeft: Radius.circular(4.0),
-                                bottomRight: Radius.circular(4.0),
-                              ),
+                            decoration: BoxDecoration(
+                              borderRadius: hasHeader &&
+                                      (message.text != null ||
+                                          message.text != "")
+                                  ? const BorderRadius.only(
+                                      bottomLeft: Radius.circular(4.0),
+                                      bottomRight: Radius.circular(4.0),
+                                    )
+                                  : const BorderRadius.all(
+                                      Radius.circular(4.0)),
                             ),
                             child: Image.memory(
                               message.media!.data,
