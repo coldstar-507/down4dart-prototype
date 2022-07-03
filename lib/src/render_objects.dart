@@ -37,6 +37,99 @@ class PinkTheme {
   };
 }
 
+class RealButton {
+  final ConsoleButton mainButton;
+  final List<ConsoleButton>? extraButtons;
+  final bool showExtra;
+  RealButton(
+      {required this.mainButton, this.extraButtons, this.showExtra = false});
+}
+
+class Down4PalettePage extends StatelessWidget {
+  final List<Palette> palettes;
+  final List<RealButton> bottomButtons;
+  final List<RealButton>? topButtons;
+  final List<ConsoleInput>? bottomInputs, topInputs;
+  const Down4PalettePage({
+    required this.palettes,
+    required this.bottomButtons,
+    this.topButtons,
+    this.bottomInputs,
+    this.topInputs,
+    Key? key,
+  }) : super(key: key);
+
+  List<Widget> getExtraTopButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 32) / (topButtons?.length ?? 1);
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in topButtons ?? []) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+            bottom: 16.0 + ConsoleButton.height,
+            left: 16.0 + (buttonWidth * i),
+            child: Container(
+              height: ConsoleButton.height * b.getExtraBottomButtons!.length,
+              width: (screenWidth - 32) / topButtons!.length,
+              decoration: BoxDecoration(border: Border.all(width: 0.5)),
+              child: Column(children: b.getExtraBottomButtons!),
+            )));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  List<Widget> getExtraBottomButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 32) / bottomButtons.length;
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in bottomButtons) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+          bottom: 16.0,
+          left: 16.0 + (buttonWidth * i),
+          child: Container(
+            height: ConsoleButton.height * b.extraButtons!.length,
+            width: (screenWidth - 32) / bottomButtons.length,
+            decoration: BoxDecoration(border: Border.all(width: 0.5)),
+            child: Column(children: b.extraButtons!),
+          ),
+        ));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final extraBottomButtons = getExtraBottomButtons(screenWidth);
+    final extraTopButtons = getExtraTopButtons(screenWidth);
+    return Container(
+      color: PinkTheme.backGroundColor,
+      child: Stack(children: [
+        Column(children: [
+          PaletteList(palettes: palettes),
+          Console(
+            bottomButtons: bottomButtons.map((e) => e.mainButton).toList(),
+            topButtons: topButtons?.map((e) => e.mainButton).toList(),
+            topInputs: topInputs,
+            inputs: bottomInputs,
+          )
+        ]),
+        Stack(children: extraTopButtons),
+        Stack(children: extraBottomButtons),
+      ]),
+    );
+  }
+}
+
 class Down4ColumnBackground extends StatelessWidget {
   List<Widget> children;
   Down4ColumnBackground({required this.children, Key? key}) : super(key: key);

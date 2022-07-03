@@ -1671,6 +1671,61 @@ class _HomePageState extends State<HomePage> {
         return const LoadingPage();
 
       case HomePageRenderState.home:
+        return Down4PalettePage(
+          palettes: formatedHomePalettes,
+          bottomInputs: [
+            ConsoleInput(
+              tec: tec,
+              inputCallBack: (text) => _textInput = text,
+              placeHolder: ":)",
+            ),
+          ],
+          bottomButtons: [
+            RealButton(
+                showExtra: _extra,
+                mainButton: ConsoleButton(
+                  name: "Delete",
+                  onPress: _extra ? toggleExtra : delete,
+                  isSpecial: true,
+                  onLongPress: toggleExtra,
+                ),
+                extraButtons: [
+                  ConsoleButton(name: "Nigger", onPress: toggleExtra),
+                  ConsoleButton(name: "Shit", onPress: toggleExtra),
+                  ConsoleButton(name: "Wacko", onPress: toggleExtra),
+                ]),
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Search",
+                onPress: () {
+                  pushLocation("Search");
+                  putState(HomePageRenderState.addFriend);
+                },
+              ),
+            ),
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Ping",
+                onPress: ping,
+              ),
+            ),
+          ],
+          topButtons: [
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Hyperchat",
+                onPress: () => putState(HomePageRenderState.hyperchat),
+              ),
+            ),
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Money",
+                onPress: () => putState(HomePageRenderState.money),
+              ),
+            ),
+          ],
+        );
+
         return Stack(
           children: [
             PalettePage(
