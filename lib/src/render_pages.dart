@@ -1031,8 +1031,8 @@ class _HomePageState extends State<HomePage> {
   // when it's empty we should be on home view
   // if _currentLocation is not "Home", it should be _node.id
 
-  String _textInput = "";
-  Down4Media? _mediaInput;
+  String _pingInput = "";
+  Down4Media? _snipInput;
   bool _camera = false;
   var tec = TextEditingController();
   bool _extra = false;
@@ -1220,7 +1220,7 @@ class _HomePageState extends State<HomePage> {
   void handleSnipCameraCallback(String? path, bool? isVideo, bool? toReverse) {
     if (path != null) {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _mediaInput = Down4Media.fromCamera(
+      _snipInput = Down4Media.fromCamera(
         widget.self.id,
         path,
         MediaMetadata(
@@ -1239,12 +1239,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   void clearInputs() {
-    _textInput = "";
-    _mediaInput = null;
+    _pingInput = "";
+    _snipInput = null;
   }
 
   Down4Message? makeMsg() {
-    if (_mediaInput != null || _textInput != "") {
+    if (_snipInput != null || _pingInput != "") {
       final ts = DateTime.now().millisecondsSinceEpoch;
       final msgID = d4utils.generateMessageID(widget.self.id, ts);
       return Down4Message(
@@ -1254,8 +1254,8 @@ class _HomePageState extends State<HomePage> {
         senderID: widget.self.id,
         senderName: widget.self.name,
         senderThumbnail: widget.self.image.thumbnail!,
-        text: _textInput,
-        media: _mediaInput,
+        text: _pingInput,
+        media: _snipInput,
       );
     }
     return null;
@@ -1676,7 +1676,7 @@ class _HomePageState extends State<HomePage> {
           bottomInputs: [
             ConsoleInput(
               tec: tec,
-              inputCallBack: (text) => _textInput = text,
+              inputCallBack: (text) => _pingInput = text,
               placeHolder: ":)",
             ),
           ],
@@ -1723,66 +1723,6 @@ class _HomePageState extends State<HomePage> {
                 onPress: () => putState(HomePageRenderState.money),
               ),
             ),
-          ],
-        );
-
-        return Stack(
-          children: [
-            PalettePage(
-              palettes: formatedHomePalettes,
-              console: Console(
-                inputs: [
-                  ConsoleInput(
-                    tec: tec,
-                    inputCallBack: (text) => _textInput = text,
-                    placeHolder: ":)",
-                  )
-                ],
-                topButtons: [
-                  ConsoleButton(
-                      name: "Hyperchat",
-                      onPress: () => putState(HomePageRenderState.hyperchat)),
-                  ConsoleButton(
-                      name: "Money",
-                      onPress: () => putState(HomePageRenderState.money)),
-                ],
-                bottomButtons: [
-                  ConsoleButton(
-                    name: "Delete",
-                    onPress: delete,
-                    isSpecial: true,
-                    onLongPress: toggleExtra,
-                  ),
-                  ConsoleButton(
-                      name: "Search",
-                      onPress: () {
-                        pushLocation("Search");
-                        putState(HomePageRenderState.addFriend);
-                      }),
-                  ConsoleButton(
-                      isSpecial: true,
-                      name: "Ping",
-                      onPress: () => print("TODO"))
-                ],
-              ),
-            ),
-            _extra
-                ? Positioned(
-                    bottom: 16.0,
-                    left: 16.0,
-                    child: Container(
-                      height: ConsoleButton.height * 4,
-                      width: (MediaQuery.of(context).size.width - 29) / 3,
-                      decoration: BoxDecoration(border: Border.all(width: 0.5)),
-                      child: Column(children: [
-                        ConsoleButton(name: "Lol", onPress: toggleExtra),
-                        ConsoleButton(name: "Nigger", onPress: toggleExtra),
-                        ConsoleButton(name: "Shill", onPress: toggleExtra),
-                        ConsoleButton(name: "Wachko", onPress: toggleExtra),
-                      ]),
-                    ),
-                  )
-                : const SizedBox.shrink()
           ],
         );
 

@@ -63,16 +63,16 @@ class Down4PalettePage extends StatelessWidget {
     final buttonWidth = (screenWidth - 32) / (topButtons?.length ?? 1);
     List<Widget> extras = [];
     int i = 0;
-    for (final b in topButtons ?? []) {
+    for (final b in topButtons ?? <RealButton>[]) {
       if (b.showExtra) {
         extras.add(Positioned(
-            bottom: 16.0 + ConsoleButton.height,
+            bottom: 16.0 + (ConsoleButton.height * 2),
             left: 16.0 + (buttonWidth * i),
             child: Container(
-              height: ConsoleButton.height * b.getExtraBottomButtons!.length,
+              height: ConsoleButton.height * b.extraButtons!.length,
               width: (screenWidth - 32) / topButtons!.length,
               decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.getExtraBottomButtons!),
+              child: Column(children: b.extraButtons!),
             )));
       } else {
         extras.add(const SizedBox.shrink());
@@ -89,7 +89,7 @@ class Down4PalettePage extends StatelessWidget {
     for (final b in bottomButtons) {
       if (b.showExtra) {
         extras.add(Positioned(
-          bottom: 16.0,
+          bottom: 16.0 + ConsoleButton.height,
           left: 16.0 + (buttonWidth * i),
           child: Container(
             height: ConsoleButton.height * b.extraButtons!.length,
@@ -123,16 +123,17 @@ class Down4PalettePage extends StatelessWidget {
             inputs: bottomInputs,
           )
         ]),
-        Stack(children: extraTopButtons),
-        Stack(children: extraBottomButtons),
+        ...extraBottomButtons,
+        ...extraTopButtons,
       ]),
     );
   }
 }
 
 class Down4ColumnBackground extends StatelessWidget {
-  List<Widget> children;
-  Down4ColumnBackground({required this.children, Key? key}) : super(key: key);
+  final List<Widget> children;
+  const Down4ColumnBackground({required this.children, Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -147,8 +148,9 @@ class Down4ColumnBackground extends StatelessWidget {
 }
 
 class Down4StackBackground extends StatelessWidget {
-  List<Widget> children;
-  Down4StackBackground({required this.children, Key? key}) : super(key: key);
+  final List<Widget> children;
+  const Down4StackBackground({required this.children, Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
