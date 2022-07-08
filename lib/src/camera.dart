@@ -108,7 +108,7 @@ class _CameraConsoleState extends State<CameraConsole> {
           ),
           ConsoleButton(
             isMode: true,
-            name: _resolution.name.makeLowerCase(),
+            name: _resolution.name.capitalize(),
             onPress: _nextResolution,
           ),
         ],
@@ -116,7 +116,7 @@ class _CameraConsoleState extends State<CameraConsole> {
           ConsoleButton(name: "Back", onPress: widget.cameraBack),
           ConsoleButton(
             isMode: true,
-            name: _flashMode.name.makeLowerCase(),
+            name: _flashMode.name.capitalize(),
             onPress: _nextFlashMode,
           ),
           ConsoleButton(

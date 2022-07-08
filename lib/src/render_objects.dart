@@ -83,7 +83,7 @@ class Down4PalettePage extends StatelessWidget {
   }
 
   List<Widget> getExtraBottomButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 32) / bottomButtons.length;
+    final buttonWidth = (screenWidth - 30) / bottomButtons.length;
     List<Widget> extras = [];
     int i = 0;
     for (final b in bottomButtons) {
@@ -93,7 +93,7 @@ class Down4PalettePage extends StatelessWidget {
           left: 16.0 + (buttonWidth * i),
           child: Container(
             height: ConsoleButton.height * b.extraButtons!.length,
-            width: (screenWidth - 32) / bottomButtons.length,
+            width: buttonWidth,
             decoration: BoxDecoration(border: Border.all(width: 0.5)),
             child: Column(children: b.extraButtons!),
           ),
@@ -867,7 +867,7 @@ class ChatMessage extends StatelessWidget {
                             height: ChatMessage.headerHeight,
                             width: ChatMessage.headerHeight,
                             child: Image.memory(
-                              message.senderThumbnail,
+                              base64Decode(message.senderThumbnail),
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -939,8 +939,8 @@ class ChatMessage extends StatelessWidget {
                           child: Container(
                             clipBehavior: Clip.hardEdge,
                             decoration: BoxDecoration(
-                              borderRadius: hasHeader &&
-                                      (message.text != null ||
+                              borderRadius: hasHeader ||
+                                      (message.text != null &&
                                           message.text != "")
                                   ? const BorderRadius.only(
                                       bottomLeft: Radius.circular(4.0),

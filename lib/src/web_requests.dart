@@ -70,7 +70,7 @@ Future<Down4Media?> getMessageMedia(String id) async {
 
 Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
   final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/MessageRequest",
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
   );
   final res = await http.post(url, body: jsonEncode(req));
   if (res.statusCode == HttpStatus.noContent && retried == false) {

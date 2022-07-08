@@ -158,7 +158,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         root: root,
         senderName: widget.self.id,
         senderID: widget.self.id,
-        senderThumbnail: widget.self.image.thumbnail!,
+        senderThumbnail: base64Encode(widget.self.image.thumbnail!),
         forwarderName: widget.self.name,
         isChat: true,
         timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -838,13 +838,28 @@ class ChatPage extends StatefulWidget {
   _ChatPageState createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> {  
   String _textInput = "";
   Down4Media? _cameraInput, _mediaInput;
-  bool _camera = false;
-  bool _medias = false;
+  bool _showCameraConsole = false;
+  bool _showMediaConsole = false;
   ConsoleInput? _consoleInput;
   var tec = TextEditingController();
+  Map<Identifier, Down4Media> _medias = {};
+
+  List<Down4Media> get medias {
+    if (_medias.isEmpty && Boxes.instance.images.keys.isEmpty) {
+      return <Down4Media>[];
+    } else if (_medias.values.isEmpty &&
+        Boxes.instance.images.keys.isNotEmpty) {
+      for (final mediaID in Boxes.instance.images.keys) {
+        _medias[mediaID] = Down4Media.fromSave(mediaID);
+      }
+      return _medias.values.toList();
+    } else {
+      return _medias.values.toList();
+    }
+  }
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
         tec: tec,
@@ -855,9 +870,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Console get mediasConsole => Console(
         images: true,
-        medias: Boxes.instance.images.values
-            .map((e) => Down4Media.fromJson(jsonDecode(e)))
-            .toList(growable: false),
+        medias: medias,
         selectMedia: (media) {
           _mediaInput = media;
           send();
@@ -892,24 +905,23 @@ class _ChatPageState extends State<ChatPage> {
       withData: true,
       allowMultiple: true,
     );
-    if (r?.files.single.bytes != null) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final compressedData = await FlutterImageCompress.compressWithList(
-        r!.files.single.bytes!,
-        minHeight: 520,
-        minWidth: 0,
-      );
-      Down4Media(
-        id: d4utils.generateBetterMediaID(widget.self.id, compressedData),
-        data: compressedData,
-        metadata: MediaMetadata(
-          owner: widget.self.id,
-          timestamp: timestamp,
-          isVideo: false,
-        ),
-      ).save();
-      setState(() {});
+    final ts = d4utils.timeStamp();
+    for (final pf in r?.files ?? <PlatformFile>[]) {
+      if (pf.bytes != null) {
+        final compressedData = await FlutterImageCompress.compressWithList(
+          pf.bytes!,
+          minHeight: 520,
+          minWidth: 0,
+        );
+        final mediaID = d4utils.generateMediaID(widget.self.id, compressedData);
+        _medias[mediaID] = Down4Media(
+          id: mediaID,
+          data: compressedData,
+          metadata: MediaMetadata(owner: widget.self.id, timestamp: ts),
+        )..save();
+      }
     }
+    setState(() {});
   }
 
   void handleCameraCallback(String? path, bool? isVideo, bool? toReverse) {
@@ -926,16 +938,16 @@ class _ChatPageState extends State<ChatPage> {
         ),
       );
     }
-    _camera = false;
+    _showCameraConsole = false;
     setState(() {});
   }
 
   void toggleCamera() {
-    setState(() => _camera = !_camera);
+    setState(() => _showCameraConsole = !_showCameraConsole);
   }
 
   void toggleMedias() {
-    setState(() => _medias = !_medias);
+    setState(() => _showMediaConsole = !_showMediaConsole);
   }
 
   void saveSelectedMessages() {}
@@ -952,13 +964,13 @@ class _ChatPageState extends State<ChatPage> {
       final ts = DateTime.now().millisecondsSinceEpoch;
       final targets =
           widget.node.group.isEmpty ? [widget.node.id] : widget.node.group;
-      final msg = Down4Message(
+      var msg = Down4Message(
         messageID: d4utils.generateMessageID(widget.self.id, ts),
         root: widget.node.id,
         timestamp: ts,
         senderID: widget.self.id,
         senderName: widget.self.name,
-        senderThumbnail: widget.self.image.thumbnail!,
+        senderThumbnail: base64Encode(widget.self.image.thumbnail!),
         media: _cameraInput ?? _mediaInput,
         text: _textInput,
       );
@@ -974,13 +986,13 @@ class _ChatPageState extends State<ChatPage> {
       messageList: MessageList(
         messages: widget.messages,
       ),
-      console: _camera
+      console: _showCameraConsole
           ? CameraConsole(
               cameras: widget.cameras,
               cameraBack: toggleCamera,
               cameraCallBack: handleCameraCallback,
             )
-          : _medias
+          : _showMediaConsole
               ? mediasConsole
               : baseConsole,
     );
@@ -1130,7 +1142,7 @@ class _HomePageState extends State<HomePage> {
         } else {
           final lastMessageID = node.messages.last;
           final msg = Down4Message.fromLocal(lastMessageID);
-          if (msg.timestamp.isExpired()) {
+          if (msg.timestamp.isExpired) {
             node.deleteLocally();
             return null;
           }
@@ -1175,14 +1187,8 @@ class _HomePageState extends State<HomePage> {
         break;
 
       case Nodes.nonFriend:
-        if (node.messages.isEmpty) {
+        if (node.activity.isExpired) {
           return null;
-        } else {
-          final msg = Down4Message.fromLocal(node.messages.last);
-          if (msg.timestamp.isExpired()) {
-            node.deleteLocally();
-            return null;
-          }
         }
         return Palette(
           node: node,
@@ -1253,7 +1259,7 @@ class _HomePageState extends State<HomePage> {
         timestamp: ts,
         senderID: widget.self.id,
         senderName: widget.self.name,
-        senderThumbnail: widget.self.image.thumbnail!,
+        senderThumbnail: base64Encode(widget.self.image.thumbnail!),
         text: _pingInput,
         media: _snipInput,
       );
@@ -1385,29 +1391,33 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<bool> search(String id) async {
-    final node = (await r.getNodes([id]))?.first;
-    if (node == null) {
-      return false;
-    } else {
-      setPaletteIfAbsent(nodeToPalette("Search", node)!);
-      setState(() {});
-      return true;
+    final nodes = await r.getNodes([id]);
+    var node = nodes == null ? null : nodes.first;
+    if (node != null) {
+      node.updateActivity(d4utils.timeStamp());
+      final p = nodeToPalette("Search", node);
+      if (p != null) {
+        setPaletteIfAbsent(p);
+        setState(() {});
+        return true;
+      }
     }
+    return false;
   }
 
-  void send(MessageRequest mr) {
-    mr.msg.saveLocally();
-    r.messageRequest(mr);
-    final cm = ChatMessage(
-      hasHeader: lastMessageSender(mr.msg.root) != mr.msg.senderID,
-      message: mr.msg,
-      myMessage: true,
-      at: mr.msg.root,
-      select: selectMessage,
-    );
-    setMessage(cm);
-    updateActivity(mr.msg.root, mr.msg.timestamp);
-    setState(() {});
+  Future<void> send(MessageRequest mr) async {
+    if (await r.messageRequest(mr)) {
+      mr.msg.saveLocally();
+      final cm = ChatMessage(
+        hasHeader: lastMessageSender(mr.msg.root) != mr.msg.senderID,
+        message: mr.msg,
+        myMessage: true,
+        at: mr.msg.root,
+        select: selectMessage,
+      );
+      updateActivity(mr.msg.root, mr.msg.timestamp);
+      setState(() {});
+    }
   }
 
   void toggleExtra() {
@@ -1596,7 +1606,7 @@ class _HomePageState extends State<HomePage> {
     String lastMessageSender = "";
     for (final msgID in messageIDs ?? []) {
       final d4msg = Down4Message.fromLocal(msgID);
-      if (d4msg.timestamp.isExpired()) {
+      if (d4msg.timestamp.isExpired) {
         Boxes.instance.messages.delete(msgID);
         _node?.messages.removeWhere((element) => element == msgID);
       } else {
@@ -1671,6 +1681,13 @@ class _HomePageState extends State<HomePage> {
         return const LoadingPage();
 
       case HomePageRenderState.home:
+        var formattedPalettesInfo = formatedHomePalettes
+            .map((e) => <String, dynamic>{
+                  "name": e.node.name,
+                  "activity": e.node.activity
+                })
+            .toList();
+        print(formattedPalettesInfo);
         return Down4PalettePage(
           palettes: formatedHomePalettes,
           bottomInputs: [

@@ -3,7 +3,7 @@ import 'package:dartsv/dartsv.dart' as sv;
 import 'dart:typed_data';
 
 extension StringExtension on String {
-  String makeLowerCase() {
+  String capitalize() {
     return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
   }
 }
@@ -27,31 +27,35 @@ String generateMessageID(String senderID, num timeStamp) {
 }
 
 extension Down4TimestampExpiration on int {
-  bool isExpired() {
+  bool get isExpired {
     final now = DateTime.now();
     final expirationDate = DateTime.fromMillisecondsSinceEpoch(this).add(
       const Duration(days: 4),
     );
-    return expirationDate.isAfter(now);
+    return now.isAfter(expirationDate);
   }
 }
 
 extension Down4TimestampUnder16HoursLeft on int {
-  bool shouldBeUpdated() {
+  bool get shouldBeUpdated {
     final now = DateTime.now().millisecondsSinceEpoch;
     final diff = now - this;
     final duration = Duration(minutes: diff);
-    return duration.inHours > 80; // 4 days
+    return duration.inHours > 80;
   }
 }
 
-String generateBetterMediaID(String uid, Uint8List mediaData) {
+String generateMediaID(String uid, Uint8List mediaData) {
   final userCodeUnits = uid.codeUnits;
-  if (mediaData.length > 40) {
-    final mediaFootPrint = mediaData.getRange(0, 40).toList();
-    return HEX.encode(sv.sha1(userCodeUnits + mediaFootPrint));
+  if (mediaData.length > 100) {
+    final footPrint = mediaData.reversed.toList().getRange(0, 100).toList();
+    return HEX.encode(sv.sha1(userCodeUnits + footPrint));
   } else {
-    final mediaFootPrint = mediaData.toList();
-    return HEX.encode(sv.sha1(userCodeUnits + mediaFootPrint));
+    final footPrint = mediaData.reversed.toList();
+    return HEX.encode(sv.sha1(userCodeUnits + footPrint));
   }
+}
+
+int timeStamp() {
+  return DateTime.now().millisecondsSinceEpoch;
 }

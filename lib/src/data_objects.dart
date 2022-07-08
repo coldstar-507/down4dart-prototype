@@ -138,7 +138,7 @@ class Down4Media {
   factory Down4Media.fromCamera(String uid, String filePath, MediaMetadata md) {
     final data = File(filePath).readAsBytesSync();
     return Down4Media(
-      id: d4utils.generateBetterMediaID(uid, data),
+      id: d4utils.generateMediaID(uid, data),
       data: data,
       metadata: md,
       path: filePath,
@@ -268,7 +268,7 @@ class MessageNotification {
         : null;
     return Down4Message(
       messageID: msgID,
-      senderThumbnail: base64Decode(senderThumbnail),
+      senderThumbnail: senderThumbnail,
       senderID: senderID,
       root: root,
       senderName: senderName,
@@ -280,8 +280,7 @@ class MessageNotification {
       isChat: isChat,
       forwarderID: forwarderID,
       forwarderName: forwarderName,
-      forwarderThumbnail:
-          forwarderThumbnail != null ? base64Decode(forwarderThumbnail!) : null,
+      forwarderThumbnail: forwarderThumbnail,
     );
   }
 
@@ -339,7 +338,8 @@ class MessageNotification {
 }
 
 class Down4Message {
-  final Identifier messageID, root;
+  Identifier root;
+  final Identifier messageID;
   final String? text;
   final Down4Media? media;
   final bool isChat; // true is chat, false is post
@@ -349,11 +349,11 @@ class Down4Message {
   final Identifier senderID;
   final String senderName;
   final String? senderLastName;
-  final Uint8List senderThumbnail;
+  final String senderThumbnail;
 
   final Identifier? forwarderID;
   final String? forwarderName, forwarderLastName;
-  final Uint8List? forwarderThumbnail;
+  final String? forwarderThumbnail;
 
   Down4Message({
     required this.messageID,
@@ -385,7 +385,8 @@ class Down4Message {
       senderThumbnail: senderThumbnail,
       forwarderID: self.id != senderID ? self.id : null,
       forwarderName: self.id != senderID ? self.name : null,
-      forwarderThumbnail: self.id != senderID ? self.image.thumbnail : null,
+      forwarderThumbnail:
+          self.id != senderID ? base64Encode(self.image.thumbnail!) : null,
       media: media,
       nodes: nodes,
       reactions: reactions,
@@ -400,12 +401,11 @@ class Down4Message {
       senderID: decodedJson["sdrid"],
       senderName: decodedJson["sdrnm"],
       senderLastName: decodedJson["sdrln"],
-      senderThumbnail: Uint8List.fromList(List<int>.from(decodedJson["sdrtn"])),
+      senderThumbnail: decodedJson["sdrtn"],
       forwarderID: decodedJson["fdrid"],
       forwarderName: decodedJson["fdrnm"],
       forwarderLastName: decodedJson["fdrln"],
-      forwarderThumbnail:
-          Uint8List.fromList(List<int>.from(decodedJson["fdrtn"])),
+      forwarderThumbnail: decodedJson["fdrtn"],
       isChat: decodedJson["ischt"],
       text: decodedJson["txt"],
       media: decodedJson["m"] != null
@@ -429,7 +429,7 @@ class Down4Message {
         'msgid': messageID,
         if (text != null) 'txt': text,
         'sdrid': senderID,
-        'sdrtn': senderThumbnail.toList(growable: false),
+        'sdrtn': senderThumbnail,
         'sdrnm': senderName,
         if (senderLastName != null) 'sdrln': senderLastName!,
         'ts': timestamp,
@@ -547,6 +547,7 @@ class Node {
       id: decodedJson["id"],
       name: decodedJson["nm"],
       lastName: decodedJson["ln"],
+      activity: decodedJson["a"] ?? 0,
       image: Down4Media.fromJson(decodedJson["im"]),
       type: Nodes.values.byName(decodedJson["t"]),
       messages: List<String>.from(decodedJson["msg"] ?? []),
@@ -576,6 +577,7 @@ class Node {
   Map<String, dynamic> toLocal() => {
         "id": id,
         "t": type.name,
+        "a": activity,
         "nm": name,
         "ln": lastName,
         "im": image.toJson(),
@@ -607,13 +609,16 @@ class Node {
   //     return Node.fromJson(decodedJson);
   //   }
   // }
+  bool get isUser =>
+      const [Nodes.friend, Nodes.nonFriend, Nodes.user].contains(type);
+  bool get isGroupchat => const [Nodes.group, Nodes.hyperchat].contains(type);
 }
 
 class MessageRequest {
   bool withUpload;
+  Down4Message msg;
   final bool isGroup, isHyperchat;
   final Node? rootNode;
-  final Down4Message msg;
   final List<Identifier> targets;
   MessageRequest({
     required this.msg,
