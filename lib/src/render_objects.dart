@@ -818,6 +818,7 @@ class ChatMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxWidth = MediaQuery.of(context).size.width * 0.66;
     return Align(
       alignment: message.isChat == false
           ? Alignment.topCenter
@@ -826,8 +827,7 @@ class ChatMessage extends StatelessWidget {
               : Alignment.topLeft,
       child: Container(
         margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.66),
+        constraints: BoxConstraints(maxWidth: maxWidth),
         decoration: BoxDecoration(
             borderRadius: const BorderRadius.all(Radius.circular(6.0)),
             boxShadow: !selected
@@ -933,7 +933,20 @@ class ChatMessage extends StatelessWidget {
                     ),
               message.media != null
                   ? message.media!.metadata.isVideo
-                      ? Down4VideoPlayer(vid: message.media!.file!)
+                      ? Container(
+                          clipBehavior: Clip.hardEdge,
+                          height: maxWidth,
+                          width: maxWidth,
+                          decoration: BoxDecoration(
+                            borderRadius: hasHeader ||
+                                    (message.text != null && message.text != "")
+                                ? const BorderRadius.only(
+                                    bottomLeft: Radius.circular(4.0),
+                                    bottomRight: Radius.circular(4.0),
+                                  )
+                                : const BorderRadius.all(Radius.circular(4.0)),
+                          ),
+                          child: Down4VideoPlayer(vid: message.media!.file!))
                       : GestureDetector(
                           onTap: () => select?.call(message.messageID, at),
                           child: Container(
@@ -976,10 +989,15 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   VideoPlayerController? _videoController;
 
   @override
-  void initState() async {
+  void initState() {
     super.initState();
+    initController();
+  }
+
+  Future<void> initController() async {
     _videoController = VideoPlayerController.file(widget.vid);
     await _videoController?.initialize();
+    setState(() {});
   }
 
   void touch() {

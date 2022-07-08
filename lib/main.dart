@@ -18,6 +18,7 @@ Future<void> _initBox() async {
   await Hive.openBox("MessageQueue");
   await Hive.openBox("Home");
   await Hive.openBox("Images");
+  await Hive.openBox("Videos");
   await Hive.openBox("Reactions");
   await Hive.openBox("Messages");
   await Hive.openBox("Bills");

@@ -153,7 +153,9 @@ class Down4Media {
       };
 
   void save() {
-    Boxes.instance.images.put(id, jsonEncode(this));
+    metadata.isVideo
+        ? Boxes.instance.images.put(id, jsonEncode(this))
+        : Boxes.instance.videos.put(id, jsonEncode(this));
   }
 
   factory Down4Media.fromSave(String id) {
