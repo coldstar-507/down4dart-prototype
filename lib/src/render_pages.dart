@@ -32,7 +32,7 @@ class PalettePage extends StatelessWidget {
 }
 
 class MessagePage extends StatelessWidget {
-  final MessageList messageList;
+  final MessageList2 messageList;
   final dynamic console;
   const MessagePage(
       {required this.messageList, required this.console, Key? key})
@@ -128,7 +128,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
         if (filePath != null) {
           final timestamp = DateTime.now().millisecondsSinceEpoch;
           _mediaInput = Down4Media.fromCamera(
-            widget.self.id,
             filePath,
             MediaMetadata(
               owner: widget.self.id,
@@ -821,12 +820,14 @@ class _NodePageState extends State<NodePage> {
 class ChatPage extends StatefulWidget {
   final Node self, node;
   final List<CameraDescription> cameras;
+  final List<Down4Message> d4messages;
   final void Function() back, saveMessages;
   final void Function(MessageRequest) messageRequest;
   final List<ChatMessage> messages;
   const ChatPage({
     required this.messageRequest,
     required this.saveMessages,
+    required this.d4messages,
     required this.self,
     required this.node,
     required this.back,
@@ -838,7 +839,7 @@ class ChatPage extends StatefulWidget {
   _ChatPageState createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {  
+class _ChatPageState extends State<ChatPage> {
   String _textInput = "";
   Down4Media? _cameraInput, _mediaInput;
   bool _showCameraConsole = false;
@@ -913,7 +914,7 @@ class _ChatPageState extends State<ChatPage> {
           minHeight: 520,
           minWidth: 0,
         );
-        final mediaID = d4utils.generateMediaID(widget.self.id, compressedData);
+        final mediaID = d4utils.generateMediaID(compressedData);
         _medias[mediaID] = Down4Media(
           id: mediaID,
           data: compressedData,
@@ -928,7 +929,6 @@ class _ChatPageState extends State<ChatPage> {
     if (path != null && isVideo != null && toReverse != null) {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       _cameraInput = Down4Media.fromCamera(
-        widget.self.id,
         path,
         MediaMetadata(
           owner: widget.self.id,
@@ -983,8 +983,9 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return MessagePage(
-      messageList: MessageList(
-        messages: widget.messages,
+      messageList: MessageList2(
+        messages: widget.node.messages.reversed.toList(),
+        self: widget.self,
       ),
       console: _showCameraConsole
           ? CameraConsole(
@@ -1036,6 +1037,7 @@ class _HomePageState extends State<HomePage> {
     "Saved": {},
     "MyPosts": {},
   };
+  Map<String, ChatMessage> _chatMessages = {};
 
   Node? _node; // the node we are currently traversing, always null at start
   List<String> _locations = ["Home"]; // to keep an history of traversed nodes
@@ -1227,7 +1229,6 @@ class _HomePageState extends State<HomePage> {
     if (path != null) {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       _snipInput = Down4Media.fromCamera(
-        widget.self.id,
         path,
         MediaMetadata(
           owner: widget.self.id,
@@ -1271,17 +1272,11 @@ class _HomePageState extends State<HomePage> {
     switch (notif.type) {
       case Messages.chat:
         {
-          final msg = (await notif.toDown4Message())..saveLocally();
-          final chatMessage = ChatMessage(
-            hasHeader: lastMessageSender(msg.root) != msg.senderID,
-            message: msg,
-            at: msg.root,
-            select: selectMessage,
-            myMessage: msg.senderID == widget.self.id ||
-                msg.forwarderID == widget.self.id,
-          );
-          setMessage(chatMessage);
-
+          var msg = await notif.toDown4Message();
+          if (msg.root == widget.self.id) {
+            msg.root = msg.senderID;
+          }
+          msg.saveLocally();
           if (getPalette(msg.root, "Home") != null) {
             setPalette(
               getPalette(msg.root, "Home")!
@@ -1289,6 +1284,9 @@ class _HomePageState extends State<HomePage> {
                 ..node.updateActivity(DateTime.now().millisecondsSinceEpoch)
                 ..node.saveLocally(),
             );
+            if (_node?.id == msg.root) {
+              _node?.messages.add(msg.messageID);
+            }
           } else {
             // else fetch the node
             final nonFriend = await r.getNodes([msg.root]);
@@ -1489,6 +1487,10 @@ class _HomePageState extends State<HomePage> {
 
   // ======================================================== GETTERS AND SETTERS======================================================== //
 
+  void updateTheNode() {
+    _node = _palettes["Home"]?[_node?.id]?.node;
+  }
+
   void updateActivity(String id, int timestamp) {
     setPalette(
       getPalette(id, "Home")!
@@ -1627,6 +1629,31 @@ class _HomePageState extends State<HomePage> {
     return _messages[chatRoot]!.values.toList().reversed.toList();
   }
 
+  List<ChatMessage> get chatMessages {
+    if (node?.messages.length == _chatMessages.keys.length) {
+      return _chatMessages.values.toList().reversed.toList();
+    }
+    final messagesToGet =
+        node?.messages.takeWhile((msgID) => !_chatMessages.containsKey(msgID));
+
+    var lastSenderID =
+        _chatMessages.isEmpty ? "" : _chatMessages.values.last.message.senderID;
+
+    for (final msgID in messagesToGet ?? <String>[]) {
+      var d4msg = Down4Message.fromLocal(msgID);
+      _chatMessages.addAll({
+        d4msg.messageID: ChatMessage(
+          message: d4msg,
+          myMessage: widget.self.id == d4msg.senderID,
+          at: "at",
+          hasHeader: lastSenderID != d4msg.senderID,
+        )
+      });
+      lastSenderID = d4msg.senderID;
+    }
+    return _chatMessages.values.toList().reversed.toList();
+  }
+
   Node? get node {
     return _node;
   }
@@ -1645,6 +1672,14 @@ class _HomePageState extends State<HomePage> {
 
   List<Identifier> get selectedHomeUserIDs {
     return selectedHomeUserNodes.map((e) => e.id).toList();
+  }
+
+  List<Down4Message> get messages {
+    var l = <Down4Message>[];
+    for (final msgID in node?.messages.reversed ?? <String>[]) {
+      l.add(Down4Message.fromLocal(msgID));
+    }
+    return l;
   }
 
   String get currentLocation {
@@ -1745,15 +1780,19 @@ class _HomePageState extends State<HomePage> {
 
       case HomePageRenderState.chat:
         return ChatPage(
+            d4messages: messages,
             saveMessages: saveMessages, // messages are cached in home for now,
             self: widget.self,
             node: _node!,
             messageRequest: send,
             messages: currentMessages,
             cameras: widget.cameras,
-            back: () => currentLocation == "Home"
-                ? putState(HomePageRenderState.home)
-                : putState(HomePageRenderState.node));
+            back: () {
+              currentLocation == "Home"
+                  ? putState(HomePageRenderState.home)
+                  : putState(HomePageRenderState.node);
+              _chatMessages.clear();
+            });
 
       case HomePageRenderState.hyperchat:
         return HyperchatPage(

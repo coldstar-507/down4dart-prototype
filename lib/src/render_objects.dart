@@ -946,7 +946,10 @@ class ChatMessage extends StatelessWidget {
                                   )
                                 : const BorderRadius.all(Radius.circular(4.0)),
                           ),
-                          child: Down4VideoPlayer(vid: message.media!.file!))
+                          child: Down4VideoPlayer(
+                            vid: message.media!.file!,
+                            key: GlobalKey(),
+                          ))
                       : GestureDetector(
                           onTap: () => select?.call(message.messageID, at),
                           child: Container(
@@ -965,6 +968,7 @@ class ChatMessage extends StatelessWidget {
                             child: Image.memory(
                               message.media!.data,
                               fit: BoxFit.cover,
+                              gaplessPlayback: true,
                             ),
                           ),
                         )
@@ -1006,6 +1010,12 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
     } else {
       _videoController?.play();
     }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _videoController?.dispose();
   }
 
   @override
@@ -1061,6 +1071,55 @@ class MessageList extends StatelessWidget {
                   : messages[i - 1],
           separatorBuilder: (c, i) => Container(height: 16.0),
           itemCount: messages.length + 2,
+        ),
+      ),
+    );
+  }
+}
+
+class MessageList2 extends StatefulWidget {
+  final List<Identifier> messages;
+  final Node self;
+  const MessageList2({
+    required this.messages,
+    required this.self,
+    Key? key,
+  }) : super(key: key);
+  @override
+  _MessageList2State createState() => _MessageList2State();
+}
+
+class _MessageList2State extends State<MessageList2> {
+  Map<int, ChatMessage?> messages = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: ScrollConfiguration(
+        behavior: NoGlow(),
+        child: ListView.separated(
+          reverse: true,
+          itemBuilder: (c, i) {
+            if (i == 0 || i == messages.length + 2 - 1) {
+              return const SizedBox.shrink();
+            }
+            if (messages[i] != null) {
+              return messages[i]!;
+            } else {
+              Down4Message d4msg =
+                  Down4Message.fromLocal(widget.messages[i - 1]);
+              var chat = ChatMessage(
+                message: d4msg,
+                myMessage: d4msg.senderID == widget.self.id,
+                at: "",
+                hasHeader: true,
+              );
+              messages[i] = chat;
+              return chat;
+            }
+          },
+          separatorBuilder: (c, i) => Container(height: 4.0),
+          itemCount: widget.messages.length + 2,
         ),
       ),
     );

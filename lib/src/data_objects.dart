@@ -135,10 +135,10 @@ class Down4Media {
     }
   }
 
-  factory Down4Media.fromCamera(String uid, String filePath, MediaMetadata md) {
+  factory Down4Media.fromCamera(String filePath, MediaMetadata md) {
     final data = File(filePath).readAsBytesSync();
     return Down4Media(
-      id: d4utils.generateMediaID(uid, data),
+      id: d4utils.generateMediaID(data),
       data: data,
       metadata: md,
       path: filePath,
@@ -154,8 +154,8 @@ class Down4Media {
 
   void save() {
     metadata.isVideo
-        ? Boxes.instance.images.put(id, jsonEncode(this))
-        : Boxes.instance.videos.put(id, jsonEncode(this));
+        ? Boxes.instance.videos.put(id, jsonEncode(this))
+        : Boxes.instance.images.put(id, jsonEncode(this));
   }
 
   factory Down4Media.fromSave(String id) {

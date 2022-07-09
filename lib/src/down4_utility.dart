@@ -45,15 +45,14 @@ extension Down4TimestampUnder16HoursLeft on int {
   }
 }
 
-String generateMediaID(String uid, Uint8List mediaData) {
-  final userCodeUnits = uid.codeUnits;
-  if (mediaData.length > 100) {
-    final footPrint = mediaData.reversed.toList().getRange(0, 100).toList();
-    return HEX.encode(sv.sha1(userCodeUnits + footPrint));
-  } else {
-    final footPrint = mediaData.reversed.toList();
-    return HEX.encode(sv.sha1(userCodeUnits + footPrint));
+String generateMediaID(Uint8List mediaData) {
+  final n = mediaData.length;
+  List<int> bytes = [];
+  const prime = 97;
+  for (int i = 1; i < 101; i++) {
+    bytes.add(mediaData[(i * prime) % n]);
   }
+  return HEX.encode(sv.sha1(bytes));
 }
 
 int timeStamp() {
