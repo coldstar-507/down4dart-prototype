@@ -32,7 +32,7 @@ class PalettePage extends StatelessWidget {
 }
 
 class MessagePage extends StatelessWidget {
-  final MessageList2 messageList;
+  final MessageList4 messageList;
   final dynamic console;
   const MessagePage(
       {required this.messageList, required this.console, Key? key})
@@ -303,12 +303,14 @@ class _MoneyPageState extends State<MoneyPage> {
 class AddFriendPage extends StatefulWidget {
   final Node self;
   final List<Palette> palettes;
+  final List<CameraDescription> cameras;
   final Future<bool> Function(String) search;
   final void Function(List<Node>) addCallback;
   final void Function() backCallback;
   const AddFriendPage({
     required this.palettes,
     required this.search,
+    required this.cameras,
     required this.self,
     required this.addCallback,
     required this.backCallback,
@@ -323,11 +325,38 @@ class _AddFriendPageState extends State<AddFriendPage> {
   String _input = "";
   ConsoleInput? _consoleInputRef;
   TextEditingController tec = TextEditingController();
+  bool _scanning = false;
+  CameraController? _cameraController;
+
+  Future<void> initController() async {
+    try {
+      _cameraController =
+          CameraController(widget.cameras[0], ResolutionPreset.low);
+      await _cameraController?.initialize();
+      await _cameraController?.setFlashMode(FlashMode.off);
+    } catch (err) {
+      rethrow;
+    }
+    setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
     _consoleInputRef = consoleInput;
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _cameraController?.dispose();
+  }
+
+  Future<void> toggleScan() async {
+    await initController();
+
+    _scanning = !_scanning;
+    setState(() {});
   }
 
   ConsoleInput get consoleInput {
@@ -342,12 +371,10 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   Console get defaultConsole {
     return Console(
-      inputs: [_consoleInputRef ?? consoleInput],
+      cameraPreview: _scanning ? CameraPreview(_cameraController!) : null,
+      aspectRatio: _cameraController?.value.aspectRatio,
+      inputs: !_scanning ? [_consoleInputRef ?? consoleInput] : null,
       topButtons: [
-        ConsoleButton(
-          name: "Search",
-          onPress: () async => await widget.search(_input) ? tec.clear() : {},
-        ),
         ConsoleButton(
           name: "Add",
           onPress: () => widget.addCallback(
@@ -356,11 +383,15 @@ class _AddFriendPageState extends State<AddFriendPage> {
                 .map((e) => e.node)
                 .toList(),
           ),
-        )
+        ),
+        ConsoleButton(
+          name: "Search",
+          onPress: () async => await widget.search(_input) ? tec.clear() : null,
+        ),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.backCallback),
-        ConsoleButton(name: "Scan", onPress: () => print("SCAN")),
+        ConsoleButton(name: "Scan", onPress: toggleScan),
         ConsoleButton(name: "Forward", onPress: () => print("FORWARD")),
       ],
     );
@@ -638,10 +669,9 @@ class NodePage extends StatefulWidget {
   final Node self;
   final Palette? Function(String, Node) nodeToPalette;
   final void Function(String, String) openNode, openChat;
-  final void Function() back, saveMessages;
+  final void Function() back;
   const NodePage({
     required this.cameras,
-    required this.saveMessages,
     required this.openNode,
     required this.openChat,
     required this.palette,
@@ -820,18 +850,11 @@ class _NodePageState extends State<NodePage> {
 class ChatPage extends StatefulWidget {
   final Node self, node;
   final List<CameraDescription> cameras;
-  final List<Down4Message> d4messages;
-  final void Function() back, saveMessages;
-  final void Function(MessageRequest) messageRequest;
-  final List<ChatMessage> messages;
+  final void Function() back;
   const ChatPage({
-    required this.messageRequest,
-    required this.saveMessages,
-    required this.d4messages,
     required this.self,
     required this.node,
     required this.back,
-    required this.messages,
     required this.cameras,
     Key? key,
   }) : super(key: key);
@@ -847,6 +870,7 @@ class _ChatPageState extends State<ChatPage> {
   ConsoleInput? _consoleInput;
   var tec = TextEditingController();
   Map<Identifier, Down4Media> _medias = {};
+  Map<Identifier, ChatMessage> _messages = {};
 
   List<Down4Media> get medias {
     if (_medias.isEmpty && Boxes.instance.images.keys.isEmpty) {
@@ -886,7 +910,7 @@ class _ChatPageState extends State<ChatPage> {
   Console get baseConsole => Console(
         topInputs: [_consoleInput ?? consoleInput],
         topButtons: [
-          ConsoleButton(name: "Save", onPress: widget.saveMessages),
+          ConsoleButton(name: "Save", onPress: saveSelectedMessages),
           ConsoleButton(name: "Send", onPress: send),
         ],
         bottomButtons: [
@@ -950,7 +974,15 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _showMediaConsole = !_showMediaConsole);
   }
 
-  void saveSelectedMessages() {}
+  void saveSelectedMessages() {
+    for (final msg in _messages.values) {
+      if (msg.selected) {
+        msg.message.save();
+        _messages[msg.message.messageID] = msg.invertedSelection();
+      }
+    }
+    setState(() {});
+  }
 
   void clearInputs() {
     tec.clear();
@@ -974,16 +1006,32 @@ class _ChatPageState extends State<ChatPage> {
         media: _cameraInput ?? _mediaInput,
         text: _textInput,
       );
-      widget.messageRequest(MessageRequest(targets: targets, msg: msg));
+      r.messageRequest(MessageRequest(targets: targets, msg: msg));
       clearInputs();
       setState(() {});
     }
   }
 
+  // When dynamically loaded from MessageList2
+  // the Messages are cached in _messages
+  // There is not limit to this cache, which could be dangerous
+  void cacheMessage(ChatMessage msg) {
+    _messages[msg.message.messageID] = msg;
+    // setState(() {}); // should we reload MessageList2 like this?
+  }
+
+  void selectMessage(Identifier id, _) {
+    _messages[id] = _messages[id]!.invertedSelection();
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return MessagePage(
-      messageList: MessageList2(
+      messageList: MessageList4(
+        messageMap: _messages,
+        cache: cacheMessage,
+        select: selectMessage,
         messages: widget.node.messages.reversed.toList(),
         self: widget.self,
       ),
@@ -1010,20 +1058,8 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-enum HomePageRenderState {
-  loading,
-  home,
-  addFriend,
-  money,
-  hyperchat,
-  chat,
-  map,
-  feed,
-  node,
-}
-
 class _HomePageState extends State<HomePage> {
-  HomePageRenderState _state = HomePageRenderState.loading;
+  Widget? _view;
   // The base location is Home with the home palettes
   // You can traverse palettes which will be cached
   // Home -> home palettes
@@ -1037,10 +1073,12 @@ class _HomePageState extends State<HomePage> {
     "Saved": {},
     "MyPosts": {},
   };
-  Map<String, ChatMessage> _chatMessages = {};
 
   Node? _node; // the node we are currently traversing, always null at start
-  List<String> _locations = ["Home"]; // to keep an history of traversed nodes
+  // List<String> _locations = ["Home"]; // to keep an history of traversed nodes
+  List<Map<String, String>> _locations2 = [
+    {"place": "Home"}
+  ];
   // we pop it when backing in node views
   // when it's empty we should be on home view
   // if _currentLocation is not "Home", it should be _node.id
@@ -1059,7 +1097,7 @@ class _HomePageState extends State<HomePage> {
     loadLocalHomePalettes();
     processMessageQueue();
     initializeMessageListener();
-    putState(HomePageRenderState.home);
+    homePage();
   }
 
   void loadLocalHomePalettes() {
@@ -1094,10 +1132,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ======================================================= UTILS ============================================================ //
-
-  void putState(HomePageRenderState s) {
-    setState(() => _state = s);
-  }
 
   Palette? nodeToPalette(String location, Node node) {
     switch (node.type) {
@@ -1238,11 +1272,7 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     }
-    toggleCamera();
-  }
-
-  void toggleCamera() {
-    setState(() => _camera = !_camera);
+    homePage();
   }
 
   void clearInputs() {
@@ -1276,7 +1306,6 @@ class _HomePageState extends State<HomePage> {
           if (msg.root == widget.self.id) {
             msg.root = msg.senderID;
           }
-          msg.saveLocally();
           if (getPalette(msg.root, "Home") != null) {
             setPalette(
               getPalette(msg.root, "Home")!
@@ -1284,24 +1313,28 @@ class _HomePageState extends State<HomePage> {
                 ..node.updateActivity(DateTime.now().millisecondsSinceEpoch)
                 ..node.saveLocally(),
             );
-            if (_node?.id == msg.root) {
-              _node?.messages.add(msg.messageID);
-            }
+            msg.saveLocally();
           } else {
             // else fetch the node
             final nonFriend = await r.getNodes([msg.root]);
             // save it locally with proper type and activity
-            final node = nonFriend?.first
-              ?..mutateType(Nodes.nonFriend)
-              ..messages.add(msg.messageID)
-              ..updateActivity(DateTime.now().millisecondsSinceEpoch)
-              ..saveLocally();
-            if (node != null) {
+            if (nonFriend?.isNotEmpty ?? false) {
+              final node = nonFriend?.first
+                ?..mutateType(Nodes.nonFriend)
+                ..messages.add(msg.messageID)
+                ..updateActivity(DateTime.now().millisecondsSinceEpoch)
+                ..saveLocally();
               // add it to cached palettes
-              setPaletteIfAbsent(nodeToPalette("Home", node)!);
+              setPaletteIfAbsent(nodeToPalette("Home", node!)!);
+              msg.saveLocally();
             }
           }
-          setState(() {});
+          _view is Down4PalettePage
+              ? homePage()
+              : currentLocation["place"] == "Chat" &&
+                      currentLocation["id"] == msg.root
+                  ? chatPage()
+                  : null;
           break;
         }
 
@@ -1310,13 +1343,18 @@ class _HomePageState extends State<HomePage> {
           final msg = (await notif.toDown4Message());
           final node = (await notif.nodeOfHyperchat())
             ?..messages.add(msg.messageID)
-            ..updateActivity(DateTime.now().millisecondsSinceEpoch)
+            ..updateActivity(d4utils.timeStamp())
             ..saveLocally();
           if (node != null) {
             msg.saveLocally();
             setPaletteIfAbsent(nodeToPalette("Home", node)!);
           }
-          setState(() {});
+          _view is Down4PalettePage
+              ? homePage()
+              : currentLocation["place"] == "Chat" &&
+                      currentLocation["id"] == msg.root
+                  ? chatPage()
+                  : null;
           break;
         }
 
@@ -1325,13 +1363,18 @@ class _HomePageState extends State<HomePage> {
           final msg = await notif.toDown4Message();
           var node = (await notif.nodeOfGroup())
             ?..messages.add(msg.messageID)
-            ..updateActivity(DateTime.now().millisecondsSinceEpoch)
+            ..updateActivity(d4utils.timeStamp())
             ..saveLocally();
           if (node != null) {
             msg.saveLocally();
             setPaletteIfAbsent(nodeToPalette("Home", node)!);
           }
-          setState(() {});
+          _view is Down4PalettePage
+              ? homePage()
+              : currentLocation["place"] == "Chat" &&
+                      currentLocation["id"] == msg.root
+                  ? chatPage()
+                  : null;
           break;
         }
 
@@ -1359,7 +1402,7 @@ class _HomePageState extends State<HomePage> {
             ..updateActivity(DateTime.now().millisecondsSinceEpoch)
             ..saveLocally())!);
     }
-    setState(() {});
+    searchPage();
   }
 
   Future<bool> ping() async {
@@ -1371,21 +1414,12 @@ class _HomePageState extends State<HomePage> {
     return false;
   }
 
-  void saveMessages() {
-    for (final msg in currentMessages) {
-      if (msg.selected) {
-        msg.message.save();
-        selectMessage(msg.message.messageID, msg.at);
-      }
-    }
-  }
-
   void delete() {
     for (final p in selectedHomePalettes) {
       p.node.deleteLocally();
       removeHomePalette(p.node.id);
     }
-    setState(() {});
+    homePage();
   }
 
   Future<bool> search(String id) async {
@@ -1396,31 +1430,16 @@ class _HomePageState extends State<HomePage> {
       final p = nodeToPalette("Search", node);
       if (p != null) {
         setPaletteIfAbsent(p);
-        setState(() {});
+        searchPage();
         return true;
       }
     }
     return false;
   }
 
-  Future<void> send(MessageRequest mr) async {
-    if (await r.messageRequest(mr)) {
-      mr.msg.saveLocally();
-      final cm = ChatMessage(
-        hasHeader: lastMessageSender(mr.msg.root) != mr.msg.senderID,
-        message: mr.msg,
-        myMessage: true,
-        at: mr.msg.root,
-        select: selectMessage,
-      );
-      updateActivity(mr.msg.root, mr.msg.timestamp);
-      setState(() {});
-    }
-  }
-
   void toggleExtra() {
     _extra = !_extra;
-    setState(() {});
+    homePage();
   }
 
   // ======================================================== NODE ACTIONS ============================================================== //
@@ -1436,9 +1455,9 @@ class _HomePageState extends State<HomePage> {
             for (final node in childNodes) {
               setPaletteIfAbsent(nodeToPalette(id, node)!);
             }
-            setTheNode(nodeAt(id, at));
-            pushLocation(id);
-            putState(HomePageRenderState.node);
+            _node = nodeAt(id, at);
+            _locations2.add({"place": "Node", "id": id});
+            nodePage();
           }
         }
       } else {
@@ -1447,40 +1466,42 @@ class _HomePageState extends State<HomePage> {
           for (final node in childNodes) {
             setPaletteIfAbsent(nodeToPalette(id, node)!);
           }
-          setTheNode(nodeAt(id, at));
-          pushLocation(id);
-          putState(HomePageRenderState.node);
+          _node = nodeAt(id, at);
+          _locations2.add({"place": "Node", "id": id});
+          nodePage();
         }
       }
     } else {
-      setTheNode(nodeAt(id, at));
-      pushLocation(id);
-      putState(HomePageRenderState.node);
+      _node = nodeAt(id, at);
+      _locations2.add({"place": "Node", "id": id});
+      nodePage();
     }
   }
 
   void select(String id, String at) {
     _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
-    setState(() {});
-  }
-
-  void selectMessage(String id, String at) {
-    _messages[at]?[id] = _messages[at]![id]!.invertedSelection();
-    setState(() {});
+    currentLocation["place"] == "Home"
+        ? homePage()
+        : currentLocation["place"] == "Search"
+            ? searchPage()
+            : nodePage();
   }
 
   void openChat(String id, String at) {
     if (at == "Home") {
-      setTheNode(nodeAt(id, at));
-      putState(HomePageRenderState.chat);
+      _node = nodeAt(id, at);
+      _locations2.add({"place": "Chat", "id": id});
+      chatPage();
     } else {
       if (friendAndNonFriendIDs.contains(id)) {
-        setTheNode(nodeAt(id, at));
-        putState(HomePageRenderState.chat);
+        _node = nodeAt(id, at);
+        _locations2.add({"place": "Chat", "id": id});
+        chatPage();
       } else {
         setPaletteIfAbsent(nodeToPalette("Home", nodeAt(id, at))!);
-        setTheNode(nodeAt(id, at));
-        putState(HomePageRenderState.chat);
+        _node = nodeAt(id, at);
+        _locations2.add({"place": "Chat", "id": id});
+        chatPage();
       }
     }
   }
@@ -1499,20 +1520,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void pushLocation(Identifier id) {
-    _locations.add(id);
-  }
-
-  void popLocation() {
-    _locations.removeLast();
-  }
-
   Node nodeAt(String id, String at) {
     return _palettes[at]![id]!.node;
-  }
-
-  void setTheNode(Node node) {
-    _node = node;
   }
 
   void removeHomePalette(String id) {
@@ -1537,28 +1546,6 @@ class _HomePageState extends State<HomePage> {
     } else {
       _palettes[p.at]!.putIfAbsent(p.node.id, () => p);
     }
-  }
-
-  ChatMessage? getMessage(String id, String at) {
-    return _messages[at]?[id];
-  }
-
-  void setMessage(ChatMessage m) {
-    _messages[m.message.root] != null
-        ? _messages[m.message.root]!.addAll({m.message.messageID: m})
-        : _messages[m.message.root] = {m.message.messageID: m};
-  }
-
-  String lastMessageSender(String at) {
-    try {
-      return getMessages(at)?.values.last.message.senderID ?? "";
-    } catch (e) {
-      return "";
-    }
-  }
-
-  Map<String, ChatMessage>? getMessages(String at) {
-    return _messages[at];
   }
 
   List<Palette> get formatedHomePalettes {
@@ -1594,66 +1581,6 @@ class _HomePageState extends State<HomePage> {
     return palettes;
   }
 
-  List<ChatMessage> get currentMessages {
-    final chatRoot = node?.id;
-    if (chatRoot == null) {
-      return [];
-    }
-    // first, try the cache
-    if (_messages[chatRoot] != null) {
-      return _messages[chatRoot]!.values.toList().reversed.toList();
-    }
-    _messages[chatRoot] = {};
-    final messageIDs = _node?.messages;
-    String lastMessageSender = "";
-    for (final msgID in messageIDs ?? []) {
-      final d4msg = Down4Message.fromLocal(msgID);
-      if (d4msg.timestamp.isExpired) {
-        Boxes.instance.messages.delete(msgID);
-        _node?.messages.removeWhere((element) => element == msgID);
-      } else {
-        _messages[chatRoot]?.addAll({
-          msgID: ChatMessage(
-            hasHeader: lastMessageSender != d4msg.senderID,
-            at: chatRoot,
-            message: d4msg,
-            myMessage: d4msg.senderID == widget.self.id ||
-                d4msg.forwarderID == widget.self.id,
-            select: selectMessage,
-          )
-        });
-        lastMessageSender = d4msg.senderID;
-      }
-    }
-    _node?.saveLocally();
-    return _messages[chatRoot]!.values.toList().reversed.toList();
-  }
-
-  List<ChatMessage> get chatMessages {
-    if (node?.messages.length == _chatMessages.keys.length) {
-      return _chatMessages.values.toList().reversed.toList();
-    }
-    final messagesToGet =
-        node?.messages.takeWhile((msgID) => !_chatMessages.containsKey(msgID));
-
-    var lastSenderID =
-        _chatMessages.isEmpty ? "" : _chatMessages.values.last.message.senderID;
-
-    for (final msgID in messagesToGet ?? <String>[]) {
-      var d4msg = Down4Message.fromLocal(msgID);
-      _chatMessages.addAll({
-        d4msg.messageID: ChatMessage(
-          message: d4msg,
-          myMessage: widget.self.id == d4msg.senderID,
-          at: "at",
-          hasHeader: lastSenderID != d4msg.senderID,
-        )
-      });
-      lastSenderID = d4msg.senderID;
-    }
-    return _chatMessages.values.toList().reversed.toList();
-  }
-
   Node? get node {
     return _node;
   }
@@ -1682,8 +1609,8 @@ class _HomePageState extends State<HomePage> {
     return l;
   }
 
-  String get currentLocation {
-    return _locations.last;
+  Map<String, String> get currentLocation {
+    return _locations2.last;
   }
 
   List<Identifier> get friendIDs {
@@ -1701,165 +1628,333 @@ class _HomePageState extends State<HomePage> {
         .toList();
   }
 
-  String get previousLocation {
-    if (_locations.length > 2) {
-      return _locations[_locations.length - 2];
+  Map<String, String> get previousLocation {
+    if (_locations2.length > 2) {
+      return _locations2[_locations2.length - 2];
     }
     throw "Invalid previous location";
   }
   // ============================================================== BUILD ================================================================ //
 
+  void homePage() => setState(() => _view = Down4PalettePage(
+        palettes: formatedHomePalettes,
+        bottomInputs: [
+          ConsoleInput(
+            tec: tec,
+            inputCallBack: (text) => _pingInput = text,
+            placeHolder: ":)",
+          ),
+        ],
+        bottomButtons: [
+          RealButton(
+              showExtra: _extra,
+              mainButton: ConsoleButton(
+                name: "Delete",
+                onPress: _extra ? toggleExtra : delete,
+                isSpecial: true,
+                onLongPress: toggleExtra,
+              ),
+              extraButtons: [
+                ConsoleButton(name: "Nigger", onPress: toggleExtra),
+                ConsoleButton(name: "Shit", onPress: toggleExtra),
+                ConsoleButton(name: "Wacko", onPress: toggleExtra),
+              ]),
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Search",
+              onPress: () {
+                _locations2.add({"place": "Search"});
+                searchPage();
+              },
+            ),
+          ),
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Ping",
+              onPress: ping,
+              onLongPress: snipPage,
+              isSpecial: true,
+            ),
+          ),
+        ],
+        topButtons: [
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Chat",
+              onPress: hyperchatPage,
+            ),
+          ),
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Money",
+              onPress: moneyPage,
+            ),
+          ),
+        ],
+      ));
+
+  void moneyPage() => setState(() => _view = MoneyPage(
+        palettes: selectedFriendPalettesDeactivated,
+        back: () {
+          clearInputs();
+          homePage();
+        },
+      ));
+
+  void hyperchatPage() => setState(() => _view = HyperchatPage(
+        self: widget.self,
+        afterMessageCallback: (node) {
+          setPaletteIfAbsent(nodeToPalette("Home", node)!);
+          _node = node;
+          chatPage();
+        },
+        back: () {
+          clearInputs();
+          homePage();
+        },
+        palettes: selectedFriendPalettesDeactivated,
+        cameras: widget.cameras,
+      ));
+
+  void searchPage() => setState(() => _view = AddFriendPage(
+        cameras: widget.cameras,
+        self: widget.self,
+        search: search,
+        palettes:
+            getPalettes("Search")?.values.toList().reversed.toList() ?? [],
+        addCallback: addUsers,
+        backCallback: () {
+          _locations2.removeLast();
+          getPalettes("Search")?.clear();
+          homePage();
+        },
+      ));
+
+  void nodePage() => setState(() => _view = NodePage(
+        cameras: widget.cameras,
+        self: widget.self,
+        openChat: openChat,
+        palette: getPalette(node!.id, previousLocation["id"]!)!,
+        palettes: getPalettes(node!.id)?.values.toList() ?? <Palette>[],
+        openNode: openNode,
+        nodeToPalette: nodeToPalette,
+        back: () {
+          _locations2.removeLast();
+          if (currentLocation["place"] == "Home") {
+            homePage();
+          } else if (currentLocation["place"] == "Search") {
+            searchPage();
+          } else if (currentLocation["place"] == "Node") {
+            nodePage();
+          } else if (currentLocation["place"] == "Chat") {
+            chatPage();
+          }
+        },
+      ));
+
+  void snipPage({
+    CameraController? ctrl,
+    camera = 0,
+    res = ResolutionPreset.medium,
+    bool reload = false,
+  }) async {
+    ResolutionPreset nextRes() => res == ResolutionPreset.low
+        ? ResolutionPreset.medium
+        : res == ResolutionPreset.medium
+            ? ResolutionPreset.high
+            : ResolutionPreset.low;
+
+    int nextCam() => camera == 0 ? 1 : 0;
+
+    void snip() async {
+      _view = SnipCamera(
+        maxZoom: await ctrl!.getMaxZoomLevel(),
+        minZoom: await ctrl.getMinZoomLevel(),
+        camNum: camera,
+        ctrl: ctrl,
+        nextRes: () =>
+            snipPage(ctrl: ctrl, res: nextRes(), camera: camera, reload: true),
+        flip: () =>
+            snipPage(ctrl: ctrl, res: res, camera: nextCam(), reload: true),
+        cameraBack: homePage,
+        cameraCallBack: handleSnipCameraCallback,
+      );
+      setState(() {});
+    }
+
+    if (ctrl == null || reload) {
+      ctrl = CameraController(widget.cameras[camera], res);
+      await ctrl.initialize();
+      snip();
+    }
+  }
+
+  void chatPage() => setState(() => _view = ChatPage(
+      self: widget.self,
+      node: _node!,
+      cameras: widget.cameras,
+      back: () {
+        _locations2.removeLast();
+        if (currentLocation["place"] == "Home") {
+          homePage();
+        } else if (currentLocation["place"] == "Search") {
+          searchPage();
+        } else if (currentLocation["place"] == "Node") {
+          nodePage();
+        } else if (currentLocation["place"] == "Chat") {
+          chatPage();
+        }
+      }));
+
   @override
   Widget build(BuildContext context) {
-    switch (_state) {
-      case HomePageRenderState.loading:
-        return const LoadingPage();
+    return _view ?? const LoadingPage();
+    //   switch (_state) {
+    //     case HomePageRenderState.loading:
+    //       return const LoadingPage();
 
-      case HomePageRenderState.home:
-        var formattedPalettesInfo = formatedHomePalettes
-            .map((e) => <String, dynamic>{
-                  "name": e.node.name,
-                  "activity": e.node.activity
-                })
-            .toList();
-        print(formattedPalettesInfo);
-        return Down4PalettePage(
-          palettes: formatedHomePalettes,
-          bottomInputs: [
-            ConsoleInput(
-              tec: tec,
-              inputCallBack: (text) => _pingInput = text,
-              placeHolder: ":)",
-            ),
-          ],
-          bottomButtons: [
-            RealButton(
-                showExtra: _extra,
-                mainButton: ConsoleButton(
-                  name: "Delete",
-                  onPress: _extra ? toggleExtra : delete,
-                  isSpecial: true,
-                  onLongPress: toggleExtra,
-                ),
-                extraButtons: [
-                  ConsoleButton(name: "Nigger", onPress: toggleExtra),
-                  ConsoleButton(name: "Shit", onPress: toggleExtra),
-                  ConsoleButton(name: "Wacko", onPress: toggleExtra),
-                ]),
-            RealButton(
-              mainButton: ConsoleButton(
-                name: "Search",
-                onPress: () {
-                  pushLocation("Search");
-                  putState(HomePageRenderState.addFriend);
-                },
-              ),
-            ),
-            RealButton(
-              mainButton: ConsoleButton(
-                name: "Ping",
-                onPress: ping,
-              ),
-            ),
-          ],
-          topButtons: [
-            RealButton(
-              mainButton: ConsoleButton(
-                name: "Hyperchat",
-                onPress: () => putState(HomePageRenderState.hyperchat),
-              ),
-            ),
-            RealButton(
-              mainButton: ConsoleButton(
-                name: "Money",
-                onPress: () => putState(HomePageRenderState.money),
-              ),
-            ),
-          ],
-        );
+    //     case HomePageRenderState.home:
+    //       return Down4PalettePage(
+    //         palettes: formatedHomePalettes,
+    //         bottomInputs: [
+    //           ConsoleInput(
+    //             tec: tec,
+    //             inputCallBack: (text) => _pingInput = text,
+    //             placeHolder: ":)",
+    //           ),
+    //         ],
+    //         bottomButtons: [
+    //           RealButton(
+    //               showExtra: _extra,
+    //               mainButton: ConsoleButton(
+    //                 name: "Delete",
+    //                 onPress: _extra ? toggleExtra : delete,
+    //                 isSpecial: true,
+    //                 onLongPress: toggleExtra,
+    //               ),
+    //               extraButtons: [
+    //                 ConsoleButton(name: "Nigger", onPress: toggleExtra),
+    //                 ConsoleButton(name: "Shit", onPress: toggleExtra),
+    //                 ConsoleButton(name: "Wacko", onPress: toggleExtra),
+    //               ]),
+    //           RealButton(
+    //             mainButton: ConsoleButton(
+    //               name: "Search",
+    //               onPress: () {
+    //                 pushLocation("Search");
+    //                 putState(HomePageRenderState.addFriend);
+    //               },
+    //             ),
+    //           ),
+    //           RealButton(
+    //             mainButton: ConsoleButton(
+    //               name: "Ping",
+    //               onPress: ping,
+    //               onLongPress: () => putState(HomePageRenderState.snip),
+    //               isSpecial: true,
+    //             ),
+    //           ),
+    //         ],
+    //         topButtons: [
+    //           RealButton(
+    //             mainButton: ConsoleButton(
+    //               name: "Chat",
+    //               onPress: () => putState(HomePageRenderState.hyperchat),
+    //             ),
+    //           ),
+    //           RealButton(
+    //             mainButton: ConsoleButton(
+    //               name: "Money",
+    //               onPress: () => putState(HomePageRenderState.money),
+    //             ),
+    //           ),
+    //         ],
+    //       );
 
-      case HomePageRenderState.chat:
-        return ChatPage(
-            d4messages: messages,
-            saveMessages: saveMessages, // messages are cached in home for now,
-            self: widget.self,
-            node: _node!,
-            messageRequest: send,
-            messages: currentMessages,
-            cameras: widget.cameras,
-            back: () {
-              currentLocation == "Home"
-                  ? putState(HomePageRenderState.home)
-                  : putState(HomePageRenderState.node);
-              _chatMessages.clear();
-            });
+    //     case HomePageRenderState.snip:
+    //       return SnipCamera(
+    //         cameras: widget.cameras,
+    //         cameraBack: () => putState(HomePageRenderState.home),
+    //         cameraCallBack: handleSnipCameraCallback,
+    //       );
 
-      case HomePageRenderState.hyperchat:
-        return HyperchatPage(
-          self: widget.self,
-          afterMessageCallback: (node) {
-            setPaletteIfAbsent(nodeToPalette("Home", node)!);
-            setTheNode(node);
-            putState(HomePageRenderState.chat);
-          },
-          back: () {
-            clearInputs();
-            putState(HomePageRenderState.home);
-          },
-          palettes: selectedFriendPalettesDeactivated,
-          cameras: widget.cameras,
-        );
+    //     case HomePageRenderState.chat:
+    //       return ChatPage(
+    //           self: widget.self,
+    //           node: _node!,
+    //           cameras: widget.cameras,
+    //           back: () => currentLocation == "Home"
+    //               ? putState(HomePageRenderState.home)
+    //               : putState(HomePageRenderState.node));
 
-      case HomePageRenderState.node:
-        return NodePage(
-          cameras: widget.cameras,
-          self: widget.self,
-          openChat: openChat,
-          palette: getPalette(node!.id, previousLocation)!,
-          palettes: getPalettes(node!.id)?.values.toList() ?? <Palette>[],
-          saveMessages: saveMessages,
-          openNode: openNode,
-          nodeToPalette: nodeToPalette,
-          back: () {
-            popLocation();
-            if (currentLocation == "Home") {
-              putState(HomePageRenderState.home);
-            } else if (currentLocation == "Search") {
-              putState(HomePageRenderState.addFriend);
-            } else {
-              putState(HomePageRenderState.node);
-            }
-          },
-        );
+    //     case HomePageRenderState.hyperchat:
+    //       return HyperchatPage(
+    //         self: widget.self,
+    //         afterMessageCallback: (node) {
+    //           setPaletteIfAbsent(nodeToPalette("Home", node)!);
+    //           setTheNode(node);
+    //           putState(HomePageRenderState.chat);
+    //         },
+    //         back: () {
+    //           clearInputs();
+    //           putState(HomePageRenderState.home);
+    //         },
+    //         palettes: selectedFriendPalettesDeactivated,
+    //         cameras: widget.cameras,
+    //       );
 
-      case HomePageRenderState.addFriend:
-        return AddFriendPage(
-          self: widget.self,
-          addCallback: addUsers,
-          search: search,
-          palettes: getPalettes("Search")!.values.toList(),
-          backCallback: () {
-            popLocation();
-            getPalettes("Search")?.clear();
-            putState(HomePageRenderState.home);
-          },
-        );
+    //     case HomePageRenderState.node:
+    //       return NodePage(
+    //         cameras: widget.cameras,
+    //         self: widget.self,
+    //         openChat: openChat,
+    //         palette: getPalette(node!.id, previousLocation)!,
+    //         palettes: getPalettes(node!.id)?.values.toList() ?? <Palette>[],
+    //         openNode: openNode,
+    //         nodeToPalette: nodeToPalette,
+    //         back: () {
+    //           popLocation();
+    //           if (currentLocation == "Home") {
+    //             putState(HomePageRenderState.home);
+    //           } else if (currentLocation == "Search") {
+    //             putState(HomePageRenderState.addFriend);
+    //           } else {
+    //             putState(HomePageRenderState.node);
+    //           }
+    //         },
+    //       );
 
-      case HomePageRenderState.money:
-        return MoneyPage(
-          palettes: selectedFriendPalettesDeactivated,
-          back: () {
-            clearInputs();
-            putState(HomePageRenderState.home);
-          },
-        );
+    //     case HomePageRenderState.addFriend:
+    //       return AddFriendPage(
+    //         cameras: widget.cameras,
+    //         self: widget.self,
+    //         search: search,
+    //         palettes:
+    //             getPalettes("Search")?.values.toList().reversed.toList() ?? [],
+    //         addCallback: addUsers,
+    //         backCallback: () {
+    //           popLocation();
+    //           getPalettes("Search")?.clear();
+    //           putState(HomePageRenderState.home);
+    //         },
+    //       );
 
-      case HomePageRenderState.feed:
-        return Container();
+    //     case HomePageRenderState.money:
+    //       return MoneyPage(
+    //         palettes: selectedFriendPalettesDeactivated,
+    //         back: () {
+    //           clearInputs();
+    //           putState(HomePageRenderState.home);
+    //         },
+    //       );
 
-      case HomePageRenderState.map:
-        return Container();
-    }
+    //     case HomePageRenderState.feed:
+    //       return Container();
+
+    //     case HomePageRenderState.map:
+    //       return Container();
+    //   }
+    // }
   }
 }
 
@@ -1957,3 +2052,4 @@ class _HomePageState extends State<HomePage> {
 //     );
 //   }
 // }
+

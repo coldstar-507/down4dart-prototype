@@ -544,6 +544,11 @@ class Node {
     lastName = mergeNode.lastName;
   }
 
+  factory Node.fromLocal(Identifier id) {
+    final decodedJson = jsonDecode(Boxes.instance.home.get(id));
+    return Node.fromJson(decodedJson);
+  }
+
   factory Node.fromJson(Map<String, dynamic> decodedJson) {
     return Node(
       id: decodedJson["id"],
