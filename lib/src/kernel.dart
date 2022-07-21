@@ -177,6 +177,7 @@ class _Down4State extends State<Down4> {
       group: [],
       posts: [],
       messages: [],
+      snips: [],
     );
 
     _moneyInfo = MoneyInfo(

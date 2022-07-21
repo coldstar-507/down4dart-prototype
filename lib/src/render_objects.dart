@@ -486,6 +486,7 @@ class Palette extends StatelessWidget {
                       .map((e) => BasicActionButton(
                             color: PinkTheme.nodeColors[node.type],
                             goPress: e.pressFunc,
+                            goLongPress: e.longPressFunc,
                             location: at,
                             id: node.id,
                             rightMost: e.rightMost,
