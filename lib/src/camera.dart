@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import 'dart:async';
 import 'dart:io';
 import 'down4_utility.dart';
+import 'render_utility.dart';
 
 class CameraConsole extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -365,7 +366,7 @@ class _SnipCameraState extends State<SnipCamera> {
             }
           },
           child: ClipRect(
-            clipper: _MediaSizeClipper(mediaSize),
+            clipper: MediaSizeClipper(mediaSize),
             child: Transform.scale(
               scale: scale,
               alignment: Alignment.topCenter,
@@ -425,7 +426,7 @@ class _SnipCameraState extends State<SnipCamera> {
     _preview = Down4StackBackground2(
       children: [
         ClipRect(
-          clipper: _MediaSizeClipper(mediaSize),
+          clipper: MediaSizeClipper(mediaSize),
           child: Transform.scale(
             scale: scale,
             alignment: Alignment.topCenter,
@@ -474,7 +475,7 @@ class _SnipCameraState extends State<SnipCamera> {
     _preview = Down4StackBackground2(
       children: [
         ClipRect(
-          clipper: _MediaSizeClipper(mediaSize),
+          clipper: MediaSizeClipper(mediaSize),
           child: Transform.scale(
             scale: scale,
             alignment: Alignment.topCenter,
@@ -522,16 +523,4 @@ class _SnipCameraState extends State<SnipCamera> {
   }
 }
 
-class _MediaSizeClipper extends CustomClipper<Rect> {
-  final Size mediaSize;
-  const _MediaSizeClipper(this.mediaSize);
-  @override
-  Rect getClip(Size size) {
-    return Rect.fromLTWH(0, 0, mediaSize.width, mediaSize.height);
-  }
 
-  @override
-  bool shouldReclip(CustomClipper<Rect> oldClipper) {
-    return true;
-  }
-}
