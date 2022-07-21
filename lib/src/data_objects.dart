@@ -18,6 +18,8 @@ enum Messages {
   group,
   bill,
   payment,
+  snip,
+  ping,
 }
 
 enum Nodes {
@@ -307,6 +309,7 @@ class MessageNotification {
         childs: [],
         friends: [],
         parents: [],
+        snips: [],
       );
     }
     return null;
@@ -333,6 +336,7 @@ class MessageNotification {
         posts: [],
         childs: [],
         parents: [],
+        snips: [],
       );
     }
     return null;
@@ -489,6 +493,7 @@ class Node {
   List<Identifier> childs = [];
   List<Identifier> parents = [];
   List<Identifier> friends = [];
+  List<Identifier> snips = [];
   List<Identifier> group = [];
   List<Identifier> messages = [];
   List<Identifier> posts = []; // messages / either post or chat
@@ -507,6 +512,7 @@ class Node {
     required this.group,
     required this.parents,
     required this.friends,
+    required this.snips,
   });
 
   void mutateType(Nodes t) => type = t;
@@ -527,6 +533,7 @@ class Node {
       group: group,
       messages: messages,
       posts: posts,
+      snips: snips,
     );
   }
 
@@ -564,6 +571,7 @@ class Node {
       posts: List<String>.from(decodedJson["pst"] ?? []),
       group: List<String>.from(decodedJson["grp"] ?? []),
       friends: List<String>.from(decodedJson["frd"] ?? []),
+      snips: List<String>.from(decodedJson["snp"] ?? []),
     );
   }
 
@@ -654,6 +662,8 @@ class MessageRequest {
 class MediaMetadata {
   final bool toReverse, shareable, payToView, isVideo, payToOwn;
   final Identifier owner;
+  final double? aspectRatio;
+  final String? text;
   int timestamp;
   MediaMetadata({
     required this.owner,
@@ -663,6 +673,8 @@ class MediaMetadata {
     this.payToView = false,
     this.toReverse = false,
     this.payToOwn = false,
+    this.aspectRatio,
+    this.text,
   });
 
   factory MediaMetadata.fromJson(Map<String, dynamic> decodedJson) {
@@ -674,6 +686,10 @@ class MediaMetadata {
       shareable: decodedJson["shr"] == "true",
       payToView: decodedJson["ptv"] == "true",
       payToOwn: decodedJson["pto"] == "true",
+      text: decodedJson["txt"],
+      aspectRatio: decodedJson["ar"] != "null" && decodedJson["ar"] != null
+          ? double.parse(decodedJson["ar"])
+          : null,
     );
   }
 
@@ -686,6 +702,8 @@ class MediaMetadata {
       "shr": shareable.toString(),
       "ptv": payToView.toString(),
       "pto": payToOwn.toString(),
+      "ar": aspectRatio.toString(),
+      if (text != null) "txt": text!,
     };
   }
 }
