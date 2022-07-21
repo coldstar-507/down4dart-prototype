@@ -1,11 +1,10 @@
-import 'dart:io';
-import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:video_player/video_player.dart';
 import 'render_objects.dart';
 import 'dart:convert';
 import 'boxes.dart';
@@ -17,6 +16,7 @@ import 'web_requests.dart' as r;
 import 'package:hex/hex.dart';
 import 'down4_utility.dart' as d4utils;
 import 'package:random_words/random_words.dart' as rw;
+import 'render_utility.dart';
 
 class PalettePage extends StatelessWidget {
   final List<Palette> palettes;
@@ -177,6 +177,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         parents: [],
         childs: [],
         admins: [],
+        snips: [],
       )..saveLocally();
       final success = await r.messageRequest(MessageRequest(
         msg: msg,
@@ -232,7 +233,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
 class MoneyPage extends StatefulWidget {
   final List<Palette> palettes;
-  final VoidCallback back;
+  final void Function() back;
   const MoneyPage({
     required this.palettes,
     required this.back,
@@ -602,13 +603,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
 }
 
 class WelcomePage extends StatelessWidget {
-  final VoidCallback _understood;
+  final void Function() _understood;
   final String _mnemonic;
   final Node _userInfo;
   const WelcomePage({
     required String mnemonic,
     required Node userInfo,
-    required VoidCallback understood,
+    required void Function() understood,
     Key? key,
   })  : _mnemonic = mnemonic,
         _userInfo = userInfo,
@@ -1074,10 +1075,10 @@ class _HomePageState extends State<HomePage> {
     "MyPosts": {},
   };
 
-  Node? _node; // the node we are currently traversing, always null at start
+  // Node? _node; // the node we are currently traversing, always null at start
   // List<String> _locations = ["Home"]; // to keep an history of traversed nodes
   List<Map<String, String>> _locations2 = [
-    {"place": "Home"}
+    {"at": "Home"}
   ];
   // we pop it when backing in node views
   // when it's empty we should be on home view
@@ -1133,17 +1134,17 @@ class _HomePageState extends State<HomePage> {
 
   // ======================================================= UTILS ============================================================ //
 
-  Palette? nodeToPalette(String location, Node node) {
+  Palette? nodeToPalette(String at, Node node) {
     switch (node.type) {
       case Nodes.user:
         return friendIDs.contains(node.id)
-            ? nodeToPalette(location, node.mutatedType(Nodes.friend))
-            : nodeToPalette(location, node.mutatedType(Nodes.nonFriend));
+            ? nodeToPalette(at, node.mutatedType(Nodes.friend))
+            : nodeToPalette(at, node.mutatedType(Nodes.nonFriend));
 
       case Nodes.root:
         return Palette(
           node: node,
-          at: location, // todo
+          at: at, // todo
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
@@ -1158,13 +1159,19 @@ class _HomePageState extends State<HomePage> {
       case Nodes.friend:
         return Palette(
           node: node,
-          at: location,
+          at: at,
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
-              assetPath: "lib/src/assets/rightBlackArrow.png",
-              pressFunc: location == "Home" ? openChat : openNode,
+              assetPath: at == "Home" && node.snips.isNotEmpty
+                  ? "lib/src/assets/rightRedArrow.png"
+                  : "lib/src/assets/rightBlackArrow.png",
+              pressFunc: at == "Home"
+                  ? node.snips.isNotEmpty
+                      ? checkSnips
+                      : openChat
+                  : openNode,
               longPressFunc: openNode,
               rightMost: true,
             )
@@ -1185,14 +1192,16 @@ class _HomePageState extends State<HomePage> {
         }
         return Palette(
           node: node,
-          at: location,
+          at: at,
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
-              assetPath: "lib/src/assets/rightBlackArrow.png",
-              pressFunc: openChat,
               rightMost: true,
+              pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
+              assetPath: node.snips.isNotEmpty
+                  ? "lib/src/assets/rightRedArrow.png"
+                  : "lib/src/assets/rightBlackArrow.png",
             )
           ],
         );
@@ -1201,7 +1210,7 @@ class _HomePageState extends State<HomePage> {
       case Nodes.checkpoint:
         return Palette(
           node: node,
-          at: location,
+          at: at,
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
@@ -1228,13 +1237,19 @@ class _HomePageState extends State<HomePage> {
         }
         return Palette(
           node: node,
-          at: location,
+          at: at,
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
-              assetPath: "lib/src/assets/rightBlackArrow.png",
-              pressFunc: location == "Home" ? openChat : openNode,
+              assetPath: at == "Home" && node.snips.isNotEmpty
+                  ? "lib/src/assets/rightRedArrow.png"
+                  : "lib/src/assets/rightBlackArrow.png",
+              pressFunc: at == "Home"
+                  ? node.snips.isNotEmpty
+                      ? checkSnips
+                      : openChat
+                  : openNode,
               longPressFunc: openNode,
               rightMost: true,
             )
@@ -1244,14 +1259,16 @@ class _HomePageState extends State<HomePage> {
       case Nodes.group:
         return Palette(
           node: node,
-          at: location,
+          at: at,
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
-              assetPath: "lib/src/assets/rightBlackArrow.png",
-              pressFunc: openChat,
               rightMost: true,
+              pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
+              assetPath: node.snips.isNotEmpty
+                  ? "lib/src/assets/rightRedArrow.png"
+                  : "lib/src/assets/rightBlackArrow.png",
             )
           ],
         );
@@ -1278,24 +1295,6 @@ class _HomePageState extends State<HomePage> {
   void clearInputs() {
     _pingInput = "";
     _snipInput = null;
-  }
-
-  Down4Message? makeMsg() {
-    if (_snipInput != null || _pingInput != "") {
-      final ts = DateTime.now().millisecondsSinceEpoch;
-      final msgID = d4utils.generateMessageID(widget.self.id, ts);
-      return Down4Message(
-        messageID: msgID,
-        root: _node!.id,
-        timestamp: ts,
-        senderID: widget.self.id,
-        senderName: widget.self.name,
-        senderThumbnail: base64Encode(widget.self.image.thumbnail!),
-        text: _pingInput,
-        media: _snipInput,
-      );
-    }
-    return null;
   }
 
   Future<void> parseMessageNotification(MessageNotification notif) async {
@@ -1333,7 +1332,7 @@ class _HomePageState extends State<HomePage> {
               ? homePage()
               : currentLocation["place"] == "Chat" &&
                       currentLocation["id"] == msg.root
-                  ? chatPage()
+                  ? chatPage(nodeAt(msg.root, "Home"))
                   : null;
           break;
         }
@@ -1353,7 +1352,7 @@ class _HomePageState extends State<HomePage> {
               ? homePage()
               : currentLocation["place"] == "Chat" &&
                       currentLocation["id"] == msg.root
-                  ? chatPage()
+                  ? chatPage(nodeAt(msg.root, "Home"))
                   : null;
           break;
         }
@@ -1373,8 +1372,23 @@ class _HomePageState extends State<HomePage> {
               ? homePage()
               : currentLocation["place"] == "Chat" &&
                       currentLocation["id"] == msg.root
-                  ? chatPage()
+                  ? chatPage(nodeAt(msg.root, "Home"))
                   : null;
+          break;
+        }
+
+      case Messages.snip:
+        {
+          var updatedNode = nodeAt(notif.root, "Home")
+            ..updateActivity(d4utils.timeStamp())
+            ..snips.add(notif.mediaID!);
+          setPalette(nodeToPalette("Home", updatedNode)!);
+          _view is Down4PalettePage ? homePage() : null;
+          break;
+        }
+
+      case Messages.ping:
+        {
           break;
         }
 
@@ -1406,12 +1420,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<bool> ping() async {
-    final List<String> targets = selectedHomeUserIDs;
-    final msg = makeMsg();
-    if (msg != null && targets.isNotEmpty) {
-      return await r.messageRequest(MessageRequest(msg: msg, targets: targets));
-    }
-    return false;
+    // TODO
+    return true;
   }
 
   void delete() {
@@ -1446,71 +1456,46 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> openNode(String id, String at) async {
     if (getPalettes(id) == null) {
+      Node node;
       if (at == "Home") {
-        // fetch the local node first to be sure it's up to date TODO: sadly
-        final theNode = (await r.getNodes([id]))?.first;
-        if (theNode != null) {
-          final childNodes = await r.getNodes(theNode.childs);
-          if (childNodes != null) {
-            for (final node in childNodes) {
-              setPaletteIfAbsent(nodeToPalette(id, node)!);
-            }
-            _node = nodeAt(id, at);
-            _locations2.add({"place": "Node", "id": id});
-            nodePage();
-          }
+        final nodes = await r.getNodes([id]);
+        if (nodes == null) {
+          return;
         }
+        node = nodes.first;
       } else {
-        final childNodes = await r.getNodes(nodeAt(id, at).childs);
-        if (childNodes != null) {
-          for (final node in childNodes) {
-            setPaletteIfAbsent(nodeToPalette(id, node)!);
-          }
-          _node = nodeAt(id, at);
-          _locations2.add({"place": "Node", "id": id});
-          nodePage();
+        node = nodeAt(id, at);
+      }
+      final childNodes = await r.getNodes(node.childs);
+      if (childNodes != null) {
+        for (final node in childNodes) {
+          setPaletteIfAbsent(nodeToPalette(id, node)!);
         }
       }
-    } else {
-      _node = nodeAt(id, at);
-      _locations2.add({"place": "Node", "id": id});
-      nodePage();
     }
+    _locations2.add({"type": "Node", "id": id, "at": at});
+    nodePage(nodeAt(id, at));
   }
 
   void select(String id, String at) {
     _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
-    currentLocation["place"] == "Home"
+    currentLocation["at"] == "Home"
         ? homePage()
-        : currentLocation["place"] == "Search"
+        : currentLocation["at"] == "Search"
             ? searchPage()
-            : nodePage();
+            : nodePage(nodeAt(at, previousLocation["id"]!));
   }
 
   void openChat(String id, String at) {
-    if (at == "Home") {
-      _node = nodeAt(id, at);
-      _locations2.add({"place": "Chat", "id": id});
-      chatPage();
-    } else {
-      if (friendAndNonFriendIDs.contains(id)) {
-        _node = nodeAt(id, at);
-        _locations2.add({"place": "Chat", "id": id});
-        chatPage();
-      } else {
-        setPaletteIfAbsent(nodeToPalette("Home", nodeAt(id, at))!);
-        _node = nodeAt(id, at);
-        _locations2.add({"place": "Chat", "id": id});
-        chatPage();
-      }
-    }
+    _locations2.add({"at": at, "id": id, "type": "Chat"});
+    chatPage(nodeAt(id, at));
+  }
+
+  void checkSnips(String id, String at) {
+    snipView(nodeAt(id, at));
   }
 
   // ======================================================== GETTERS AND SETTERS======================================================== //
-
-  void updateTheNode() {
-    _node = _palettes["Home"]?[_node?.id]?.node;
-  }
 
   void updateActivity(String id, int timestamp) {
     setPalette(
@@ -1581,10 +1566,6 @@ class _HomePageState extends State<HomePage> {
     return palettes;
   }
 
-  Node? get node {
-    return _node;
-  }
-
   List<Palette> get selectedHomePalettes {
     return homePalettes.where((element) => element.selected).toList();
   }
@@ -1599,14 +1580,6 @@ class _HomePageState extends State<HomePage> {
 
   List<Identifier> get selectedHomeUserIDs {
     return selectedHomeUserNodes.map((e) => e.id).toList();
-  }
-
-  List<Down4Message> get messages {
-    var l = <Down4Message>[];
-    for (final msgID in node?.messages.reversed ?? <String>[]) {
-      l.add(Down4Message.fromLocal(msgID));
-    }
-    return l;
   }
 
   Map<String, String> get currentLocation {
@@ -1636,123 +1609,134 @@ class _HomePageState extends State<HomePage> {
   }
   // ============================================================== BUILD ================================================================ //
 
-  void homePage() => setState(() => _view = Down4PalettePage(
-        palettes: formatedHomePalettes,
-        bottomInputs: [
-          ConsoleInput(
-            tec: tec,
-            inputCallBack: (text) => _pingInput = text,
-            placeHolder: ":)",
-          ),
-        ],
-        bottomButtons: [
-          RealButton(
-              showExtra: _extra,
-              mainButton: ConsoleButton(
-                name: "Delete",
-                onPress: _extra ? toggleExtra : delete,
-                isSpecial: true,
-                onLongPress: toggleExtra,
-              ),
-              extraButtons: [
-                ConsoleButton(name: "Nigger", onPress: toggleExtra),
-                ConsoleButton(name: "Shit", onPress: toggleExtra),
-                ConsoleButton(name: "Wacko", onPress: toggleExtra),
-              ]),
-          RealButton(
+  void homePage() {
+    _view = Down4PalettePage(
+      palettes: formatedHomePalettes,
+      bottomInputs: [
+        ConsoleInput(
+          tec: tec,
+          inputCallBack: (text) => _pingInput = text,
+          placeHolder: ":)",
+        ),
+      ],
+      bottomButtons: [
+        RealButton(
+            showExtra: _extra,
             mainButton: ConsoleButton(
-              name: "Search",
-              onPress: () {
-                _locations2.add({"place": "Search"});
-                searchPage();
-              },
-            ),
-          ),
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Ping",
-              onPress: ping,
-              onLongPress: snipPage,
+              name: "Delete",
+              onPress: _extra ? toggleExtra : delete,
               isSpecial: true,
+              onLongPress: toggleExtra,
             ),
+            extraButtons: [
+              ConsoleButton(name: "Nigger", onPress: toggleExtra),
+              ConsoleButton(name: "Shit", onPress: toggleExtra),
+              ConsoleButton(name: "Wacko", onPress: toggleExtra),
+            ]),
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Search",
+            onPress: searchPage,
           ),
-        ],
-        topButtons: [
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Chat",
-              onPress: hyperchatPage,
-            ),
+        ),
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Ping",
+            onPress: ping,
+            onLongPress: snipPage,
+            isSpecial: true,
           ),
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Money",
-              onPress: moneyPage,
-            ),
+        ),
+      ],
+      topButtons: [
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Chat",
+            onPress: hyperchatPage,
           ),
-        ],
-      ));
+        ),
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Money",
+            onPress: moneyPage,
+          ),
+        ),
+      ],
+    );
+    setState(() {});
+  }
 
-  void moneyPage() => setState(() => _view = MoneyPage(
-        palettes: selectedFriendPalettesDeactivated,
-        back: () {
-          clearInputs();
+  void moneyPage() {
+    _view = MoneyPage(
+      palettes: selectedFriendPalettesDeactivated,
+      back: () {
+        clearInputs();
+        homePage();
+      },
+    );
+    setState(() {});
+  }
+
+  void hyperchatPage() {
+    _view = HyperchatPage(
+      self: widget.self,
+      afterMessageCallback: (node) {
+        setPaletteIfAbsent(nodeToPalette("Home", node)!);
+        chatPage(node);
+      },
+      back: () {
+        clearInputs();
+        homePage();
+      },
+      palettes: selectedFriendPalettesDeactivated,
+      cameras: widget.cameras,
+    );
+    setState(() {});
+  }
+
+  void searchPage() {
+    _locations2.add({"at": "Search"});
+    _view = AddFriendPage(
+      cameras: widget.cameras,
+      self: widget.self,
+      search: search,
+      palettes: getPalettes("Search")?.values.toList().reversed.toList() ?? [],
+      addCallback: addUsers,
+      backCallback: () {
+        _locations2.removeLast();
+        getPalettes("Search")?.clear();
+        homePage();
+      },
+    );
+    setState(() {});
+  }
+
+  void nodePage(Node node) {
+    _view = NodePage(
+      cameras: widget.cameras,
+      self: widget.self,
+      openChat: openChat,
+      palette: getPalette(node.id, currentLocation["at"]!)!,
+      palettes: getPalettes(node.id)?.values.toList() ?? <Palette>[],
+      openNode: openNode,
+      nodeToPalette: nodeToPalette,
+      back: () {
+        _locations2.removeLast();
+        if (currentLocation["at"] == "Home") {
           homePage();
-        },
-      ));
+        } else if (currentLocation["at"] == "Search") {
+          searchPage();
+        } else if (currentLocation["type"] == "Node") {
+          nodePage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
+        } else if (currentLocation["type"] == "Chat") {
+          chatPage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
+        }
+      },
+    );
+    setState(() {});
+  }
 
-  void hyperchatPage() => setState(() => _view = HyperchatPage(
-        self: widget.self,
-        afterMessageCallback: (node) {
-          setPaletteIfAbsent(nodeToPalette("Home", node)!);
-          _node = node;
-          chatPage();
-        },
-        back: () {
-          clearInputs();
-          homePage();
-        },
-        palettes: selectedFriendPalettesDeactivated,
-        cameras: widget.cameras,
-      ));
-
-  void searchPage() => setState(() => _view = AddFriendPage(
-        cameras: widget.cameras,
-        self: widget.self,
-        search: search,
-        palettes:
-            getPalettes("Search")?.values.toList().reversed.toList() ?? [],
-        addCallback: addUsers,
-        backCallback: () {
-          _locations2.removeLast();
-          getPalettes("Search")?.clear();
-          homePage();
-        },
-      ));
-
-  void nodePage() => setState(() => _view = NodePage(
-        cameras: widget.cameras,
-        self: widget.self,
-        openChat: openChat,
-        palette: getPalette(node!.id, previousLocation["id"]!)!,
-        palettes: getPalettes(node!.id)?.values.toList() ?? <Palette>[],
-        openNode: openNode,
-        nodeToPalette: nodeToPalette,
-        back: () {
-          _locations2.removeLast();
-          if (currentLocation["place"] == "Home") {
-            homePage();
-          } else if (currentLocation["place"] == "Search") {
-            searchPage();
-          } else if (currentLocation["place"] == "Node") {
-            nodePage();
-          } else if (currentLocation["place"] == "Chat") {
-            chatPage();
-          }
-        },
-      ));
-
-  void snipPage({
+  Future<void> snipPage({
     CameraController? ctrl,
     camera = 0,
     res = ResolutionPreset.medium,
@@ -1789,22 +1773,110 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void chatPage() => setState(() => _view = ChatPage(
-      self: widget.self,
-      node: _node!,
-      cameras: widget.cameras,
-      back: () {
-        _locations2.removeLast();
-        if (currentLocation["place"] == "Home") {
-          homePage();
-        } else if (currentLocation["place"] == "Search") {
-          searchPage();
-        } else if (currentLocation["place"] == "Node") {
-          nodePage();
-        } else if (currentLocation["place"] == "Chat") {
-          chatPage();
-        }
-      }));
+  void chatPage(Node node) {
+    _view = ChatPage(
+        self: widget.self,
+        node: node,
+        cameras: widget.cameras,
+        back: () {
+          _locations2.removeLast();
+          if (currentLocation["at"] == "Home") {
+            homePage();
+          } else if (currentLocation["at"] == "Search") {
+            searchPage();
+          } else if (currentLocation["type"] == "Node") {
+            nodePage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
+          } else if (currentLocation["type"] == "Chat") {
+            chatPage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
+          }
+        });
+    setState(() {});
+  }
+
+  Future<void> snipView(Node node) async {
+    final mediaSize = MediaQuery.of(context).size; // full screen
+    node.snips.isEmpty ? homePage() : null;
+    final snip = node.snips.first;
+    node.snips.remove(snip); // consume it
+    final media = await r.getMessageMedia(snip);
+    media == null ? homePage() : null;
+    final scale =
+        1 / (media!.metadata.aspectRatio ?? 1.0 * mediaSize.aspectRatio);
+    if (media.metadata.isVideo) {
+      var ctrl = VideoPlayerController.network(media.networkUrl!);
+      await ctrl.initialize();
+      await ctrl.setLooping(true);
+      await ctrl.play();
+      _view = Down4StackBackground2(
+        children: [
+          ClipRect(
+            clipper: MediaSizeClipper(mediaSize),
+            child: Transform.scale(
+              scale: scale,
+              alignment: Alignment.topCenter,
+              child: AspectRatio(
+                aspectRatio: 1 / (media.metadata.aspectRatio ?? 1.0),
+                child: VideoPlayer(ctrl),
+              ),
+            ),
+          ),
+        ],
+        bottomButtons: [
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Back",
+              onPress: () async {
+                await ctrl.dispose();
+                homePage();
+              },
+            ),
+          ),
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Next",
+              onPress: () async {
+                if (node.snips.isEmpty) {
+                  await ctrl.dispose();
+                  homePage();
+                } else {
+                  await ctrl.dispose();
+                  snipView(node);
+                }
+              },
+            ),
+          ),
+        ],
+      );
+    } else {
+      _view = Down4StackBackground2(
+        children: [
+          ClipRect(
+            clipper: MediaSizeClipper(mediaSize),
+            child: Transform.scale(
+              scale: scale,
+              alignment: Alignment.topCenter,
+              child: Image.memory(media.data),
+            ),
+          ),
+        ],
+        bottomButtons: [
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Back",
+              onPress: homePage,
+            ),
+          ),
+          RealButton(
+            mainButton: ConsoleButton(
+              name: "Next",
+              onPress: () => node.snips.isEmpty ? homePage() : snipView(node),
+            ),
+          ),
+        ],
+      );
+    }
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
