@@ -3,12 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:dartsv/dartsv.dart' as sv;
-// import 'package:firebase_storage/firebase_storage.dart';
 import 'boxes.dart';
 import 'web_requests.dart' as r;
-import 'package:random_words/random_words.dart' as rw;
 import 'down4_utility.dart' as d4utils;
-import 'boxes.dart';
 
 typedef Identifier = String;
 
@@ -160,6 +157,16 @@ class Down4Media {
         : Boxes.instance.images.put(id, jsonEncode(this));
   }
 
+  void writeToFile() {
+    path = Boxes.instance.dirPath + "/" + id;
+    file = File(path!);
+    file!.writeAsBytesSync(data);
+  }
+
+  void deleteFile() {
+    file?.delete();
+  }
+
   factory Down4Media.fromSave(String id) {
     return Down4Media.fromJson(jsonDecode(Boxes.instance.images.get(id)));
   }
@@ -240,10 +247,10 @@ class MessageNotification {
   factory MessageNotification.fromNotification(Map<String, String> ntf) {
     return MessageNotification(
       type: Messages.values.byName(ntf["t"]!),
-      timestamp: int.tryParse(ntf["ts"]!)!,
-      msgID: ntf["msgid"]!,
+      timestamp: int.parse(ntf["ts"] ?? "0"),
+      msgID: ntf["msgid"] ?? "",
       mediaID: ntf["mid"],
-      root: ntf["rt"]!,
+      root: ntf["rt"] ?? "",
       senderID: ntf["sdrid"]!,
       senderThumbnail: ntf["sdrtn"]!,
       senderName: ntf["sdrnm"]!,
@@ -537,7 +544,7 @@ class Node {
     );
   }
 
-  void updateActivity(int newActivity) => activity = newActivity;
+  void updateActivity() => activity = d4utils.timeStamp();
 
   void merge(Node mergeNode) {
     childs = mergeNode.childs;
@@ -630,23 +637,18 @@ class Node {
 }
 
 class MessageRequest {
-  bool withUpload;
   Down4Message msg;
-  final bool isGroup, isHyperchat;
-  final Node? rootNode;
   final List<Identifier> targets;
+  bool? withUpload;
+  final Node? rootNode;
   MessageRequest({
     required this.msg,
     required this.targets,
     this.rootNode,
-    this.isGroup = false,
-    this.isHyperchat = false,
     this.withUpload = false,
   });
   Map<String, dynamic> toJson() => {
-        "wu": withUpload,
-        "ig": isGroup,
-        "ihc": isHyperchat,
+        if (withUpload != null) "wu": withUpload,
         if (rootNode != null)
           "g": {
             "id": rootNode!.id,
@@ -654,7 +656,7 @@ class MessageRequest {
             "nm": rootNode!.name,
             if (rootNode!.lastName != null) "ln": rootNode!.lastName,
           },
-        "msg": msg.toJson(withUpload),
+        "msg": msg.toJson(withUpload == true),
         "trgts": targets,
       };
 }
