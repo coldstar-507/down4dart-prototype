@@ -24,6 +24,7 @@ Future<void> _initBox() async {
   await Hive.openBox("Bills");
   await Hive.openBox("Payments");
   await Hive.openBox("SavedMessages");
+  await Hive.openBox("Snips");
 }
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -90,11 +91,9 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       theme: ThemeData(fontFamily: "Alice"),
-      home: Scaffold(
-        body: SafeArea(
-          child: Down4(
-            cameras: cameras,
-          ),
+      home: Material(
+        child: Down4(
+          cameras: cameras,
         ),
       ),
     ),
