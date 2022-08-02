@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/src/boxes.dart';
 import 'data_objects.dart';
 import 'render_utility.dart';
 import 'package:file_picker/file_picker.dart';
@@ -21,6 +22,7 @@ class PinkTheme {
   static const borderColor = Colors.black;
   static const qrColor = Color.fromARGB(255, 56, 3, 17);
   static const black = Colors.black;
+  static const snipRibbon = Color.fromARGB(153, 255, 241, 242);
   static const Map<Nodes, Color> nodeColors = {
     Nodes.root: Color.fromARGB(255, 53, 3, 20),
     Nodes.hyperchat: Color.fromARGB(255, 212, 168, 182),
@@ -111,21 +113,23 @@ class Down4PalettePage extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final extraBottomButtons = getExtraBottomButtons(screenWidth);
     final extraTopButtons = getExtraTopButtons(screenWidth);
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: Stack(children: [
-        Column(children: [
-          PaletteList(palettes: palettes),
-          Console(
-            bottomButtons: bottomButtons.map((e) => e.mainButton).toList(),
-            topButtons: topButtons?.map((e) => e.mainButton).toList(),
-            topInputs: topInputs,
-            inputs: bottomInputs,
-          )
+    return Scaffold(
+      body: Container(
+        color: PinkTheme.backGroundColor,
+        child: Stack(children: [
+          Column(children: [
+            PaletteList(palettes: palettes),
+            Console(
+              bottomButtons: bottomButtons.map((e) => e.mainButton).toList(),
+              topButtons: topButtons?.map((e) => e.mainButton).toList(),
+              topInputs: topInputs,
+              inputs: bottomInputs,
+            )
+          ]),
+          ...extraBottomButtons,
+          ...extraTopButtons,
         ]),
-        ...extraBottomButtons,
-        ...extraTopButtons,
-      ]),
+      ),
     );
   }
 }
@@ -279,7 +283,11 @@ class BasicActionButton extends StatelessWidget {
                 )
               : null,
         ),
-        child: Image.asset(assetPathFromLib, fit: BoxFit.cover),
+        child: Image.asset(
+          assetPathFromLib,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+        ),
       ),
     );
   }
@@ -307,8 +315,11 @@ class ProfileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final squareImageSize = size.width - 88;
     return Container(
       clipBehavior: Clip.hardEdge,
+      width: squareImageSize,
       decoration: const BoxDecoration(
         boxShadow: [
           BoxShadow(
@@ -325,7 +336,12 @@ class ProfileWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Image.memory(node.image.data, fit: BoxFit.cover),
+          Image.memory(
+            node.image.data,
+            fit: BoxFit.cover,
+            width: squareImageSize,
+            height: squareImageSize,
+          ),
           const SizedBox(height: 8.0),
           Text(
             node.name + (node.lastName != null ? " " + node.lastName! : ""),
@@ -391,8 +407,9 @@ class Palette extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final paletteHeight = Sizes.h * 0.08575;
     return Container(
-      height: Palette.height,
+      height: paletteHeight,
       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
       decoration: BoxDecoration(
         boxShadow: !selected
@@ -427,7 +444,7 @@ class Palette extends StatelessWidget {
                   bottomLeft: Radius.circular(4.0),
                 ),
               ),
-              width: Palette.height - 2.0, // borderWidth x2
+              width: paletteHeight - 2.0, // borderWidth x2
               child: Image.memory(
                 node.image.data,
                 fit: BoxFit.cover,
@@ -474,7 +491,18 @@ class Palette extends StatelessWidget {
                                   : FontWeight.normal,
                             ),
                           )
-                        : const SizedBox.shrink(),
+                        : const [Nodes.hyperchat, Nodes.group]
+                                .contains(node.type)
+                            ? Text(
+                                node.group.map((id) => "@" + id).join(" "),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: selected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              )
+                            : const SizedBox.shrink(),
                   ],
                 ),
               ),
@@ -493,169 +521,6 @@ class Palette extends StatelessWidget {
                             assetPathFromLib: e.assetPath,
                           ))
                       .toList())
-              : Container(
-                  padding: const EdgeInsets.all(2.0),
-                  decoration: BoxDecoration(
-                    color: PinkTheme.nodeColors[node.type],
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(4.0),
-                      bottomRight: Radius.circular(4.0),
-                    ),
-                  ),
-                ),
-        ],
-      ),
-    );
-  }
-}
-
-class NewPalette extends StatelessWidget {
-  static const double height = 60.0;
-  final Node node;
-  final void Function(String)? imPress,
-      bodyPress,
-      imLongPress,
-      bodyLongPress,
-      goPress,
-      goLongPress;
-  final bool selected;
-
-  const NewPalette({
-    required this.node,
-    this.imPress,
-    this.bodyPress,
-    this.imLongPress,
-    this.bodyLongPress,
-    this.goPress,
-    this.goLongPress,
-    this.selected = false,
-    Key? key,
-  }) : super(key: key);
-
-  NewPalette invertedSelection() {
-    return NewPalette(
-      node: node,
-      selected: !selected,
-      imPress: imPress,
-      imLongPress: imLongPress,
-      bodyPress: bodyPress,
-      bodyLongPress: bodyLongPress,
-      goPress: goPress,
-      goLongPress: goLongPress,
-    );
-  }
-
-  NewPalette deactivated() {
-    return NewPalette(node: node);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: Palette.height,
-      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-      decoration: BoxDecoration(
-        boxShadow: !selected
-            ? [
-                const BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 6.0,
-                  spreadRadius: -6.0,
-                  offset: Offset(8.0, 8.0),
-                  blurStyle: BlurStyle.normal,
-                )
-              ]
-            : null,
-        borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-        border: Border.all(
-          width: 2.0,
-          color: selected ? PinkTheme.black : Colors.transparent,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        textDirection: TextDirection.ltr,
-        children: [
-          GestureDetector(
-            onTap: () => imPress?.call(node.id),
-            onLongPress: () => imLongPress?.call(node.id),
-            child: Container(
-              clipBehavior: Clip.hardEdge,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4.0),
-                  bottomLeft: Radius.circular(4.0),
-                ),
-              ),
-              width: Palette.height - 2.0, // borderWidth x2
-              child: Image.memory(
-                node.image.data,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => bodyPress?.call(node.id),
-              onLongPress: () => bodyLongPress?.call(node.id),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: PinkTheme.nodeColors[node.type],
-                  border: Border(
-                    left: BorderSide(
-                      color: selected
-                          ? PinkTheme.black
-                          : PinkTheme.nodeColors[node.type]!,
-                      width: 1.0,
-                    ),
-                  ),
-                ),
-                padding: const EdgeInsets.only(left: 6.0, top: 5.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      node.name + " " + (node.lastName ?? ""),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    const [Nodes.user, Nodes.friend, Nodes.nonFriend]
-                            .contains(node.type)
-                        ? Text(
-                            "@" + node.id,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: selected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          goPress != null
-              ? GestureDetector(
-                  onTap: () => goPress?.call(node.id),
-                  onLongPress: () => goPress?.call(node.id),
-                  child: Container(
-                    padding: const EdgeInsets.all(2.0),
-                    decoration: BoxDecoration(
-                      color: PinkTheme.nodeColors[node.type],
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(4.0),
-                        bottomRight: Radius.circular(4.0),
-                      ),
-                    ),
-                    child: Image.asset("lib/src/assets/rightBlackArrow.png"),
-                  ),
-                )
               : Container(
                   padding: const EdgeInsets.all(2.0),
                   decoration: BoxDecoration(
@@ -694,9 +559,10 @@ class ConsoleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final buttonHeight = Sizes.h * 0.038; // 3.8%
     return Expanded(
       child: Container(
-        height: height,
+        height: buttonHeight,
         decoration: BoxDecoration(
             shape: BoxShape.rectangle,
             color: PinkTheme.black,
@@ -775,11 +641,12 @@ class _ConsoleInputState extends State<ConsoleInput> {
 
   @override
   Widget build(BuildContext context) {
+    final buttonHeight = Sizes.h * 0.038; // 3.8%
     return Expanded(
       child: Container(
-        constraints: const BoxConstraints(
-          minHeight: ConsoleButton.height,
-          maxHeight: ConsoleButton.height * 4,
+        constraints: BoxConstraints(
+          minHeight: buttonHeight,
+          maxHeight: buttonHeight * 4,
         ),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -787,12 +654,12 @@ class _ConsoleInputState extends State<ConsoleInput> {
         ),
         child: TextField(
           controller: widget.tec,
+          cursorColor: PinkTheme.black,
           key: widget.k,
           maxLines: null,
           keyboardType: widget.type,
           textAlignVertical: TextAlignVertical.center,
           textAlign: TextAlign.center,
-          style: TextStyle(),
           decoration: InputDecoration(
             isDense: true,
             isCollapsed: true,
@@ -925,19 +792,24 @@ class Console extends StatelessWidget {
   Widget build(BuildContext context) {
     // both margin (16+16=32) + 1 = 0.5x1 for the Main container border
     final double mirror = toMirror == true ? math.pi : 0;
-    var camWidthAndHeight = MediaQuery.of(context).size.width - 33.0;
+    var camWidthAndHeight = Sizes.w - (Sizes.h * 0.04);
     return Container(
-      margin: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
-      decoration:
-          BoxDecoration(border: Border.all(width: 0.5, color: Colors.black)),
+      margin: EdgeInsets.only(
+        left: Sizes.h * 0.02,
+        right: Sizes.h * 0.02,
+        bottom: Sizes.h * 0.02,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(width: 0.5, color: Colors.black),
+      ),
       child: Column(
         children: [
           Row(textDirection: TextDirection.ltr, children: topInputs ?? []),
           Row(textDirection: TextDirection.ltr, children: inputs ?? []),
           images == true
               ? Container(
-                  width: camWidthAndHeight,
-                  height: camWidthAndHeight,
+                  width: camWidthAndHeight - 1,
+                  height: camWidthAndHeight - 1,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black, width: 0.5),
                     color: PinkTheme.buttonColor,
@@ -958,8 +830,8 @@ class Console extends StatelessWidget {
                                 : GestureDetector(
                                     onTap: () => selectMedia?.call(medias![i]),
                                     child: SizedBox(
-                                      height: (camWidthAndHeight / 5) - 0.2,
-                                      width: (camWidthAndHeight / 5) - 0.2,
+                                      height: ((camWidthAndHeight - 2) / 5),
+                                      width: ((camWidthAndHeight - 2) / 5),
                                       child: Image.memory(
                                         medias![i].data,
                                         fit: BoxFit.cover,
@@ -1068,7 +940,7 @@ class ChatMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxWidth = MediaQuery.of(context).size.width * 0.76;
+    final maxWidth = Sizes.w * 0.76;
     return Align(
       alignment: message.isChat == false
           ? Alignment.topCenter
@@ -1084,9 +956,9 @@ class ChatMessage extends StatelessWidget {
                 ? [
                     const BoxShadow(
                       color: Colors.black54,
-                      blurRadius: 6.0,
+                      blurRadius: 4.0,
                       spreadRadius: -6.0,
-                      offset: Offset(8.0, 8.0),
+                      offset: Offset(5.0, 5.0),
                       blurStyle: BlurStyle.normal,
                     )
                   ]
@@ -1179,6 +1051,7 @@ class ChatMessage extends StatelessWidget {
                           message.text!,
                           textDirection: TextDirection.ltr,
                           style: const TextStyle(color: Colors.black),
+                          textAlign: TextAlign.left,
                         ),
                       ),
                     ),
@@ -1285,6 +1158,7 @@ class PaletteList extends StatelessWidget {
   const PaletteList({required this.palettes, Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
+    final gapSize = Sizes.h * 0.02; // 2%
     return Expanded(
       child: ScrollConfiguration(
         behavior: NoGlow(),
@@ -1296,31 +1170,7 @@ class PaletteList extends StatelessWidget {
               : i == palettes.length + 2 - 1
                   ? const SizedBox.shrink()
                   : palettes[i - 1],
-          separatorBuilder: (c, i) => Container(height: 16.0),
-          itemCount: palettes.length + 2,
-        ),
-      ),
-    );
-  }
-}
-
-class NewPaletteList extends StatelessWidget {
-  final List<NewPalette> palettes;
-  const NewPaletteList({required this.palettes, Key? key}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: ScrollConfiguration(
-        behavior: NoGlow(),
-        child: ListView.separated(
-          padding: const EdgeInsets.only(top: 0),
-          reverse: true,
-          itemBuilder: (c, i) => i == 0
-              ? const SizedBox.shrink()
-              : i == palettes.length + 2 - 1
-                  ? const SizedBox.shrink()
-                  : palettes[i - 1],
-          separatorBuilder: (c, i) => Container(height: 16.0),
+          separatorBuilder: (c, i) => Container(height: gapSize),
           itemCount: palettes.length + 2,
         ),
       ),
