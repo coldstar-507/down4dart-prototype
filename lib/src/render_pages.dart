@@ -17,6 +17,7 @@ import 'package:hex/hex.dart';
 import 'down4_utility.dart' as d4utils;
 import 'package:random_words/random_words.dart' as rw;
 import 'render_utility.dart';
+import 'dart:math' as math;
 
 class PalettePage extends StatelessWidget {
   final List<Palette> palettes;
@@ -45,13 +46,15 @@ class MessagePage extends StatelessWidget {
   }
 }
 
-class HyperchatPage extends StatefulWidget {
+class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
+  final bool isHyperchat;
   final Node self;
   final List<Palette> palettes;
   final void Function(Node) afterMessageCallback;
   final void Function() back;
-  const HyperchatPage({
+  const GroupPage({
+    required this.isHyperchat,
     required this.self,
     required this.afterMessageCallback,
     required this.back,
@@ -61,10 +64,10 @@ class HyperchatPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _HyperchatPageState createState() => _HyperchatPageState();
+  _GroupPageState createState() => _GroupPageState();
 }
 
-class _HyperchatPageState extends State<HyperchatPage> {
+class _GroupPageState extends State<GroupPage> {
   dynamic _console;
   dynamic singleInput;
   List<dynamic> _items = [];
@@ -72,6 +75,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   String _input = "";
   Down4Media? _mediaInput;
+  Down4Media? _cameraInput;
 
   String _hyperchatName = "";
   Down4Media? _hyperchatImage;
@@ -81,18 +85,18 @@ class _HyperchatPageState extends State<HyperchatPage> {
   @override
   void initState() {
     super.initState();
-    _loadTextInput();
-    _loadHyperchatConsole();
-    _loadPalettes();
+    loadTextInput();
+    loadChatConsole();
+    loadPalettes();
   }
 
-  PaletteMaker _hyperchatMaker() {
+  PaletteMaker hyperchatMaker() {
     return PaletteMaker(
       id: "", // will calculate the ID on hyperchat creation for hyperchats
       name: _hyperchatName,
       hintText: "(Name)",
       nameCallBack: (name) => setState(() => _hyperchatName = name),
-      type: Nodes.hyperchat,
+      type: widget.isHyperchat ? Nodes.hyperchat : Nodes.group,
       imageCallBack: (data) {
         final dataForID = widget.self.id.codeUnits + data.toList();
         final imageID = HEX.encode(sv.sha1(dataForID));
@@ -104,30 +108,30 @@ class _HyperchatPageState extends State<HyperchatPage> {
             timestamp: DateTime.now().millisecondsSinceEpoch,
           ),
         );
-        _loadPalettes();
+        loadPalettes();
       },
       image: _hyperchatImage?.data ?? Uint8List(0),
     );
   }
 
-  void _loadPalettes() {
+  void loadPalettes() {
     _items.clear();
-    _items.add(_hyperchatMaker());
+    _items.add(hyperchatMaker());
     _items.addAll(widget.palettes);
     setState(() {});
   }
 
-  void _loadCameraConsole() {
+  void loadCameraConsole() {
     _console = CameraConsole(
       cameras: widget.cameras,
       cameraBack: () {
-        _loadTextInput();
-        _loadHyperchatConsole();
+        loadTextInput();
+        loadChatConsole();
       },
       cameraCallBack: (filePath, isVideo, toReverse) {
         if (filePath != null) {
           final timestamp = DateTime.now().millisecondsSinceEpoch;
-          _mediaInput = Down4Media.fromCamera(
+          _cameraInput = Down4Media.fromCamera(
             filePath,
             MediaMetadata(
               owner: widget.self.id,
@@ -137,34 +141,33 @@ class _HyperchatPageState extends State<HyperchatPage> {
             ),
           );
         }
-        _loadHyperchatConsole();
+        loadChatConsole();
       },
     );
   }
 
-  Future<void> _send() async {
-    if (_input != "" && _mediaInput != null) {
-      final targets = widget.palettes.map((e) => e.node.id).toList();
+  Future<void> send() async {
+    if (_input != "" || _mediaInput != null || _cameraInput != null) {
+      final ts = d4utils.timeStamp();
+      var targets = widget.palettes.map((e) => e.node.id).toList()
+        ..remove(widget.self.id);
       final wp = rw.WordPair.random(safeOnly: false);
       final root =
-          d4utils.deterministicHyperchatRoot(targets..add(widget.self.id));
+          d4utils.deterministicHyperchatRoot(targets + [widget.self.id]);
       final msg = Down4Message(
-        messageID: d4utils.generateMessageID(
-          widget.self.id,
-          DateTime.now().millisecondsSinceEpoch,
-        ),
-        media: _mediaInput,
+        messageID: d4utils.generateMessageID(widget.self.id, ts),
+        media: _cameraInput ?? _mediaInput,
         root: root,
         senderName: widget.self.id,
         senderID: widget.self.id,
         senderThumbnail: base64Encode(widget.self.image.thumbnail!),
         forwarderName: widget.self.name,
         isChat: true,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
+        timestamp: ts,
         text: _input,
         nodes: _forwardingNodes,
       )..saveLocally();
-      final hyperchatNode = Node(
+      var hyperchatNode = Node(
         type: Nodes.hyperchat,
         id: root,
         name: wp.first,
@@ -173,18 +176,20 @@ class _HyperchatPageState extends State<HyperchatPage> {
         messages: [msg.messageID],
         posts: [],
         friends: [],
-        group: targets..add(widget.self.id),
+        group: targets + [widget.self.id],
         parents: [],
         childs: [],
         admins: [],
         snips: [],
-      )..saveLocally();
-      final success = await r.messageRequest(MessageRequest(
+      )
+        ..updateActivity()
+        ..saveLocally();
+      final f = widget.isHyperchat ? r.hyperchatRequest : r.groupRequest;
+      final success = await f(MessageRequest(
         msg: msg,
         targets: targets,
-        isHyperchat: true,
         rootNode: hyperchatNode,
-        withUpload: msg.media != null,
+        withUpload: _cameraInput != null,
       ));
       if (success) {
         widget.afterMessageCallback(hyperchatNode);
@@ -192,7 +197,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
     }
   }
 
-  void _loadHyperchatConsole() {
+  void loadChatConsole() {
     _console = Console(
       inputs: [singleInput],
       topButtons: [
@@ -200,20 +205,20 @@ class _HyperchatPageState extends State<HyperchatPage> {
           name: "Images",
           onPress: () => print("TODO"),
         ),
-        ConsoleButton(name: "Send", onPress: _send),
+        ConsoleButton(name: "Send", onPress: send),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
           name: _mediaInput == null ? "Camera" : "&Camera",
-          onPress: _loadCameraConsole,
+          onPress: loadCameraConsole,
         ),
         ConsoleButton(name: "Ping", onPress: () => print("TODO"))
       ],
     );
   }
 
-  void _loadTextInput() {
+  void loadTextInput() {
     singleInput = ConsoleInput(
       tec: tec,
       inputCallBack: (text) => _input = text,
@@ -224,10 +229,12 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Down4ColumnBackground(children: [
-      DynamicList(palettes: _items),
-      _console ?? const SizedBox.shrink()
-    ]);
+    return Scaffold(
+      body: Down4ColumnBackground(children: [
+        DynamicList(palettes: _items),
+        _console ?? const SizedBox.shrink()
+      ]),
+    );
   }
 }
 
@@ -260,42 +267,44 @@ class _MoneyPageState extends State<MoneyPage> {
   Widget build(BuildContext context) {
     final currency = _currencies["l"][_currencies["i"]] as String;
     final paymentMethod = _paymentMethod["l"][_paymentMethod["i"]] as String;
-    return PalettePage(
-      palettes: widget.palettes,
-      console: Console(
-        inputs: [
-          ConsoleInput(
-            tec: tec,
-            inputCallBack: (text) => _moneyInput = text,
-            placeHolder: "\$",
-            type: TextInputType.number,
-          )
-        ],
-        topButtons: [
-          ConsoleButton(name: "Pay", onPress: () => print("TODO")),
-          ConsoleButton(name: "Bill", onPress: () => print("TODO"))
-        ],
-        bottomButtons: [
-          ConsoleButton(name: "Back", onPress: widget.back),
-          ConsoleButton(
-              name: currency,
-              isMode: true,
-              onPress: () {
-                setState(() {
-                  _currencies["i"] = (_currencies["i"] + 1) %
-                      (_currencies["l"] as List<String>).length;
-                });
-              }),
-          ConsoleButton(
-              name: paymentMethod,
-              isMode: true,
-              onPress: () {
-                setState(() {
-                  _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
-                      (_paymentMethod["l"] as List<String>).length;
-                });
-              })
-        ],
+    return Scaffold(
+      body: PalettePage(
+        palettes: widget.palettes,
+        console: Console(
+          inputs: [
+            ConsoleInput(
+              tec: tec,
+              inputCallBack: (text) => _moneyInput = text,
+              placeHolder: "\$",
+              type: TextInputType.number,
+            )
+          ],
+          topButtons: [
+            ConsoleButton(name: "Pay", onPress: () => print("TODO")),
+            ConsoleButton(name: "Bill", onPress: () => print("TODO"))
+          ],
+          bottomButtons: [
+            ConsoleButton(name: "Back", onPress: widget.back),
+            ConsoleButton(
+                name: currency,
+                isMode: true,
+                onPress: () {
+                  setState(() {
+                    _currencies["i"] = (_currencies["i"] + 1) %
+                        (_currencies["l"] as List<String>).length;
+                  });
+                }),
+            ConsoleButton(
+                name: paymentMethod,
+                isMode: true,
+                onPress: () {
+                  setState(() {
+                    _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
+                        (_paymentMethod["l"] as List<String>).length;
+                  });
+                })
+          ],
+        ),
       ),
     );
   }
@@ -400,24 +409,26 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Down4StackBackground(
-      children: [
-        Container(
-          padding: const EdgeInsets.only(top: 44, right: 44, left: 44),
-          child: Align(
-            alignment: AlignmentDirectional.topCenter,
-            child: QrImage(
-              foregroundColor: PinkTheme.qrColor,
-              data: [widget.self.id, widget.self.name, widget.self.lastName]
-                  .join(" "),
+    return Scaffold(
+      body: Down4StackBackground(
+        children: [
+          Container(
+            padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
+            child: Align(
+              alignment: AlignmentDirectional.topCenter,
+              child: QrImage(
+                foregroundColor: PinkTheme.qrColor,
+                data: [widget.self.id, widget.self.name, widget.self.lastName]
+                    .join(" "),
+              ),
             ),
           ),
-        ),
-        Column(children: [
-          PaletteList(palettes: widget.palettes),
-          defaultConsole,
-        ]),
-      ],
+          Column(children: [
+            PaletteList(palettes: widget.palettes),
+            defaultConsole,
+          ]),
+        ],
+      ),
     );
   }
 }
@@ -804,7 +815,7 @@ class _NodePageState extends State<NodePage> {
             ? Down4ColumnBackground(
                 children: [
                   Container(
-                    margin: const EdgeInsets.only(left: 44, right: 44, top: 27),
+                    margin: const EdgeInsets.only(top: 27),
                     child: ProfileWidget(
                       node: widget.palette.node
                         ..description =
@@ -851,8 +862,10 @@ class _NodePageState extends State<NodePage> {
 class ChatPage extends StatefulWidget {
   final Node self, node;
   final List<CameraDescription> cameras;
+  final Future<bool> Function(MessageRequest req) send;
   final void Function() back;
   const ChatPage({
+    required this.send,
     required this.self,
     required this.node,
     required this.back,
@@ -995,8 +1008,10 @@ class _ChatPageState extends State<ChatPage> {
   void send() {
     if (_textInput != "" || _cameraInput != null || _mediaInput != null) {
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final targets =
-          widget.node.group.isEmpty ? [widget.node.id] : widget.node.group;
+      final targets = widget.node.group.isEmpty
+          ? [widget.node.id]
+          : List<String>.from(widget.node.group)
+        ..remove(widget.self.id);
       var msg = Down4Message(
         messageID: d4utils.generateMessageID(widget.self.id, ts),
         root: widget.node.id,
@@ -1006,8 +1021,8 @@ class _ChatPageState extends State<ChatPage> {
         senderThumbnail: base64Encode(widget.self.image.thumbnail!),
         media: _cameraInput ?? _mediaInput,
         text: _textInput,
-      );
-      r.messageRequest(MessageRequest(targets: targets, msg: msg));
+      )..saveLocally();
+      widget.send(MessageRequest(targets: targets, msg: msg));
       clearInputs();
       setState(() {});
     }
@@ -1028,23 +1043,25 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MessagePage(
-      messageList: MessageList4(
-        messageMap: _messages,
-        cache: cacheMessage,
-        select: selectMessage,
-        messages: widget.node.messages.reversed.toList(),
-        self: widget.self,
+    return Scaffold(
+      body: MessagePage(
+        messageList: MessageList4(
+          messageMap: _messages,
+          cache: cacheMessage,
+          select: selectMessage,
+          messages: widget.node.messages.reversed.toList(),
+          self: widget.self,
+        ),
+        console: _showCameraConsole
+            ? CameraConsole(
+                cameras: widget.cameras,
+                cameraBack: toggleCamera,
+                cameraCallBack: handleCameraCallback,
+              )
+            : _showMediaConsole
+                ? mediasConsole
+                : baseConsole,
       ),
-      console: _showCameraConsole
-          ? CameraConsole(
-              cameras: widget.cameras,
-              cameraBack: toggleCamera,
-              cameraCallBack: handleCameraCallback,
-            )
-          : _showMediaConsole
-              ? mediasConsole
-              : baseConsole,
     );
   }
 }
@@ -1077,17 +1094,15 @@ class _HomePageState extends State<HomePage> {
 
   // Node? _node; // the node we are currently traversing, always null at start
   // List<String> _locations = ["Home"]; // to keep an history of traversed nodes
-  List<Map<String, String>> _locations2 = [
+  List<Map<String, String>> _loc = [
     {"at": "Home"}
   ];
   // we pop it when backing in node views
   // when it's empty we should be on home view
   // if _currentLocation is not "Home", it should be _node.id
 
+  var _tec = TextEditingController();
   String _pingInput = "";
-  Down4Media? _snipInput;
-  bool _camera = false;
-  var tec = TextEditingController();
   bool _extra = false;
 
   // ======================================================= INITIALIZATION ============================================================ //
@@ -1107,17 +1122,19 @@ class _HomePageState extends State<HomePage> {
       final node = Node.fromJson(jsonDecode(jsonEncodedHomeNode));
       final p = nodeToPalette("Home", node);
       if (p != null) {
-        setPaletteIfAbsent(p);
+        _palettes["Home"]!.putIfAbsent(node.id, () => p);
       }
     }
   }
 
   void initializeMessageListener() {
     FirebaseMessaging.onMessage.listen((event) async {
-      print("Received message: ${event.data}");
       final notif = MessageNotification.fromNotification(
         Map<String, String>.from(event.data),
       );
+      event.data["sdrtn"] = "";
+      event.data["fdrtn"] = "";
+      print("Received message: ${event.data}");
       parseMessageNotification(notif);
     });
   }
@@ -1134,9 +1151,32 @@ class _HomePageState extends State<HomePage> {
 
   // ======================================================= UTILS ============================================================ //
 
+  void unselectSelectedHomePalettes([bool updateActivity = false]) {
+    if (updateActivity) {
+      for (final p in homePalettes) {
+        if (p.selected) {
+          _palettes[p.at]
+              ?[p.node.id] = _palettes[p.at]![p.node.id]!.invertedSelection()
+            ..node.updateActivity();
+        }
+      }
+    } else {
+      for (final p in homePalettes) {
+        if (p.selected) {
+          _palettes[p.at]?[p.node.id] =
+              _palettes[p.at]![p.node.id]!.invertedSelection();
+        }
+      }
+    }
+  }
+
   Palette? nodeToPalette(String at, Node node) {
     switch (node.type) {
       case Nodes.user:
+        final friendIDs = homePalettes
+            .where((p) => p.node.type == Nodes.friend)
+            .map((e) => e.node.id)
+            .toList();
         return friendIDs.contains(node.id)
             ? nodeToPalette(at, node.mutatedType(Nodes.friend))
             : nodeToPalette(at, node.mutatedType(Nodes.nonFriend));
@@ -1276,25 +1316,51 @@ class _HomePageState extends State<HomePage> {
     return null;
   }
 
-  void handleSnipCameraCallback(String? path, bool? isVideo, bool? toReverse) {
+  void handleSnipCameraCallback(
+    String? path,
+    bool? isVideo,
+    bool? toReverse,
+    String? text,
+    double aspectRatio,
+  ) async {
     if (path != null) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      _snipInput = Down4Media.fromCamera(
+      final timestamp = d4utils.timeStamp();
+      var media = Down4Media.fromCamera(
         path,
         MediaMetadata(
           owner: widget.self.id,
           timestamp: timestamp,
           toReverse: toReverse ?? false,
           isVideo: isVideo ?? false,
+          text: text,
+          aspectRatio: aspectRatio,
         ),
       );
+      var success = r.snipRequest(MessageRequest(
+        withUpload: true,
+        msg: Down4Message(
+            messageID: "", // can be ommited
+            root: homePalettes
+                .where((p) => p.selected)
+                .map((e) => e.node.id)
+                .toList()
+                .join(" "), // can be omited
+            timestamp: timestamp,
+            media: media,
+            senderID: widget.self.id,
+            senderName: widget.self.name,
+            senderLastName: widget.self.lastName,
+            senderThumbnail: base64Encode(widget.self.image.thumbnail!)),
+        targets: selectedHomeUserIDs,
+      ));
+      homePage();
+      if (await success) {
+        unselectSelectedHomePalettes(true);
+        homePage();
+      }
+    } else {
+      homePage();
     }
-    homePage();
-  }
-
-  void clearInputs() {
-    _pingInput = "";
-    _snipInput = null;
   }
 
   Future<void> parseMessageNotification(MessageNotification notif) async {
@@ -1305,54 +1371,49 @@ class _HomePageState extends State<HomePage> {
           if (msg.root == widget.self.id) {
             msg.root = msg.senderID;
           }
-          if (getPalette(msg.root, "Home") != null) {
-            setPalette(
-              getPalette(msg.root, "Home")!
-                ..node.messages.add(msg.messageID)
-                ..node.updateActivity(DateTime.now().millisecondsSinceEpoch)
-                ..node.saveLocally(),
-            );
+          if (nodeAt(msg.root) != null) {
+            nodeAt(msg.root)!
+              ..messages.add(msg.messageID)
+              ..updateActivity()
+              ..saveLocally();
+            print(nodeAt(msg.root)?.messages);
             msg.saveLocally();
           } else {
-            // else fetch the node
+            // not in home -> fetch the node
             final nonFriend = await r.getNodes([msg.root]);
             // save it locally with proper type and activity
             if (nonFriend?.isNotEmpty ?? false) {
-              final node = nonFriend?.first
-                ?..mutateType(Nodes.nonFriend)
+              writePalette(nonFriend!.first
+                ..mutateType(Nodes.nonFriend)
                 ..messages.add(msg.messageID)
-                ..updateActivity(DateTime.now().millisecondsSinceEpoch)
-                ..saveLocally();
-              // add it to cached palettes
-              setPaletteIfAbsent(nodeToPalette("Home", node!)!);
+                ..updateActivity()
+                ..saveLocally());
               msg.saveLocally();
             }
           }
           _view is Down4PalettePage
               ? homePage()
-              : currentLocation["place"] == "Chat" &&
-                      currentLocation["id"] == msg.root
-                  ? chatPage(nodeAt(msg.root, "Home"))
+              : _loc.last["type"] == "Chat" && _loc.last["id"] == msg.root
+                  ? chatPage(nodeAt(msg.root)!)
                   : null;
           break;
         }
 
       case Messages.hyperchat:
         {
-          final msg = (await notif.toDown4Message());
+          final msg = await notif.toDown4Message();
           final node = (await notif.nodeOfHyperchat())
             ?..messages.add(msg.messageID)
-            ..updateActivity(d4utils.timeStamp())
+            ..updateActivity()
             ..saveLocally();
           if (node != null) {
             msg.saveLocally();
-            setPaletteIfAbsent(nodeToPalette("Home", node)!);
+            writePalette(node);
           }
           _view is Down4PalettePage
               ? homePage()
-              : currentLocation["place"] == "Chat" &&
-                      currentLocation["id"] == msg.root
-                  ? chatPage(nodeAt(msg.root, "Home"))
+              : _loc.last["type"] == "Chat" && _loc.last["id"] == msg.root
+                  ? chatPage(nodeAt(msg.root)!)
                   : null;
           break;
         }
@@ -1362,27 +1423,58 @@ class _HomePageState extends State<HomePage> {
           final msg = await notif.toDown4Message();
           var node = (await notif.nodeOfGroup())
             ?..messages.add(msg.messageID)
-            ..updateActivity(d4utils.timeStamp())
+            ..updateActivity()
             ..saveLocally();
           if (node != null) {
             msg.saveLocally();
-            setPaletteIfAbsent(nodeToPalette("Home", node)!);
+            writePalette(node);
           }
           _view is Down4PalettePage
               ? homePage()
-              : currentLocation["place"] == "Chat" &&
-                      currentLocation["id"] == msg.root
-                  ? chatPage(nodeAt(msg.root, "Home"))
+              : _loc.last["type"] == "Chat" && _loc.last["id"] == msg.root
+                  ? chatPage(nodeAt(msg.root)!)
                   : null;
           break;
         }
 
       case Messages.snip:
         {
-          var updatedNode = nodeAt(notif.root, "Home")
-            ..updateActivity(d4utils.timeStamp())
-            ..snips.add(notif.mediaID!);
-          setPalette(nodeToPalette("Home", updatedNode)!);
+          Future<void> fetchAndSaveSnip() async {
+            final media = await r.getMessageMedia(notif.mediaID!);
+            if (media != null) {
+              Boxes.instance.snip.put(media.id, jsonEncode(media));
+            }
+          }
+
+          void updateNode(Node node) {
+            writePalette(node
+              ..updateActivity()
+              ..snips.add(notif.mediaID!)
+              ..saveLocally());
+          }
+
+          final roots = notif.root.split(" ");
+          for (final root in roots) {
+            if (root == widget.self.id) {
+              Node? node;
+              if ((node = nodeAt(notif.senderID)) != null) {
+                if (node!.type == Nodes.friend) {
+                  fetchAndSaveSnip();
+                }
+                updateNode(node);
+              } else {
+                var nodes = await r.getNodes([notif.senderID]);
+                node = nodes == null ? null : nodes.first;
+                if (node != null) {
+                  updateNode(node);
+                }
+              }
+            } else if (groupRoots.contains(root)) {
+              fetchAndSaveSnip();
+              updateNode(nodeAt(root)!);
+            }
+          }
+
           _view is Down4PalettePage ? homePage() : null;
           break;
         }
@@ -1407,14 +1499,18 @@ class _HomePageState extends State<HomePage> {
 
   void addUsers(List<Node> friends) {
     for (final friend in friends) {
-      setPalette(getPalette(friend.id, "Search")!.invertedSelection()
-        ..node.mutateType(Nodes.friend));
+      _palettes["Search"]![friend.id] = _palettes["Search"]![friend.id]!
+          .invertedSelection()
+        ..node.mutateType(Nodes.friend);
 
-      setPaletteIfAbsent(nodeToPalette(
-          "Home",
-          friend.mutatedType(Nodes.friend)
-            ..updateActivity(DateTime.now().millisecondsSinceEpoch)
-            ..saveLocally())!);
+      _palettes["Home"]!.putIfAbsent(
+          friend.id,
+          () => nodeToPalette(
+              "Home",
+              friend
+                ..mutateType(Nodes.friend)
+                ..updateActivity()
+                ..saveLocally())!);
     }
     searchPage();
   }
@@ -1425,9 +1521,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   void delete() {
-    for (final p in selectedHomePalettes) {
+    for (final p in homePalettes.toList().where((e) => e.selected)) {
       p.node.deleteLocally();
-      removeHomePalette(p.node.id);
+      _palettes["Home"]?.remove(p.node.id);
     }
     homePage();
   }
@@ -1436,10 +1532,10 @@ class _HomePageState extends State<HomePage> {
     final nodes = await r.getNodes([id]);
     var node = nodes == null ? null : nodes.first;
     if (node != null) {
-      node.updateActivity(d4utils.timeStamp());
+      node.updateActivity();
       final p = nodeToPalette("Search", node);
       if (p != null) {
-        setPaletteIfAbsent(p);
+        _palettes["Search"]?.putIfAbsent(node.id, () => p);
         searchPage();
         return true;
       }
@@ -1452,10 +1548,19 @@ class _HomePageState extends State<HomePage> {
     homePage();
   }
 
+  Future<bool> chatRequest(MessageRequest req) async {
+    final success = r.chatRequest(req);
+    chatPage(nodeAt(req.msg.root)!
+      ..messages.add(req.msg.messageID)
+      ..updateActivity()
+      ..saveLocally());
+    return await success;
+  }
+
   // ======================================================== NODE ACTIONS ============================================================== //
 
   Future<void> openNode(String id, String at) async {
-    if (getPalettes(id) == null) {
+    if (_palettes[id] == null) {
       Node node;
       if (at == "Home") {
         final nodes = await r.getNodes([id]);
@@ -1464,78 +1569,49 @@ class _HomePageState extends State<HomePage> {
         }
         node = nodes.first;
       } else {
-        node = nodeAt(id, at);
+        node = nodeAt(id, at)!;
       }
       final childNodes = await r.getNodes(node.childs);
       if (childNodes != null) {
         for (final node in childNodes) {
-          setPaletteIfAbsent(nodeToPalette(id, node)!);
+          _palettes[id]!.putIfAbsent(node.id, () => nodeToPalette(id, node)!);
         }
       }
     }
-    _locations2.add({"type": "Node", "id": id, "at": at});
-    nodePage(nodeAt(id, at));
+    _loc.add({"type": "Node", "id": id, "at": at});
+    nodePage(nodeAt(id, at)!);
   }
 
   void select(String id, String at) {
     _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
-    currentLocation["at"] == "Home"
+    _loc.last["at"] == "Home"
         ? homePage()
-        : currentLocation["at"] == "Search"
+        : _loc.last["at"] == "Search"
             ? searchPage()
-            : nodePage(nodeAt(at, previousLocation["id"]!));
+            : nodePage(nodeAt(at, previousLocation["id"]!)!);
   }
 
   void openChat(String id, String at) {
-    _locations2.add({"at": at, "id": id, "type": "Chat"});
-    chatPage(nodeAt(id, at));
+    _loc.add({"at": at, "id": id, "type": "Chat"});
+    chatPage(nodeAt(id, at)!);
   }
 
   void checkSnips(String id, String at) {
-    snipView(nodeAt(id, at));
+    snipView(nodeAt(id, at)!);
   }
 
-  // ======================================================== GETTERS AND SETTERS======================================================== //
+  // ======================================================== COMPLEXITY REDUCING GETTERS ? =============================================== //
 
-  void updateActivity(String id, int timestamp) {
-    setPalette(
-      getPalette(id, "Home")!
-        ..node.updateActivity(timestamp)
-        ..node.saveLocally(),
-    );
-  }
-
-  Node nodeAt(String id, String at) {
-    return _palettes[at]![id]!.node;
-  }
-
-  void removeHomePalette(String id) {
-    _palettes["Home"]?.remove(id);
-  }
-
-  Palette? getPalette(String id, String at) {
+  Palette? paletteAt(String id, [String at = "Home"]) {
     return _palettes[at]?[id];
   }
 
-  Map<String, Palette>? getPalettes(String at) {
-    return _palettes[at];
+  Node? nodeAt(String id, [String at = "Home"]) {
+    return _palettes[at]?[id]?.node;
   }
 
-  void setPalette(Palette p) {
-    _palettes[p.at]![p.node.id] = p;
-  }
-
-  void setPaletteIfAbsent(Palette p) {
-    if (_palettes[p.at] == null) {
-      _palettes[p.at] = {p.node.id: p};
-    } else {
-      _palettes[p.at]!.putIfAbsent(p.node.id, () => p);
-    }
-  }
-
-  List<Palette> get formatedHomePalettes {
-    return _palettes["Home"]?.values.toList() ?? <Palette>[]
-      ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+  void writePalette(Node node, [String at = "Home"]) {
+    _palettes[at]?[node.id] = nodeToPalette(at, node)!;
   }
 
   List<Palette> get selectedFriendPalettesDeactivated {
@@ -1554,7 +1630,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     var palettes = <Palette>[];
-    final selectedNonGroups = homePalettes.where(
+    final selectedNonGroups = formatedHomePalettes.where(
       (p) => (p.node.type == Nodes.friend) && p.selected,
     );
     for (final pal in selectedNonGroups) {
@@ -1566,47 +1642,70 @@ class _HomePageState extends State<HomePage> {
     return palettes;
   }
 
-  List<Palette> get selectedHomePalettes {
-    return homePalettes.where((element) => element.selected).toList();
-  }
+  List<Palette> get selectedHomeUserPaletteDeactivated {
+    var selectedGroups = formatedHomePalettes.where(
+      (p) =>
+          (p.node.type == Nodes.hyperchat || p.node.type == Nodes.group) &&
+          p.selected,
+    );
+    var idsInSelGroups = <Identifier>[];
+    for (final shc in selectedGroups) {
+      for (final uid in shc.node.group) {
+        if (!idsInSelGroups.contains(uid)) {
+          idsInSelGroups.add(uid);
+        }
+      }
+    }
 
-  List<Palette> get homePalettes {
-    return _palettes["Home"]?.values.toList() ?? <Palette>[];
-  }
+    var palettes = <Palette>[];
+    for (final id in idsInSelGroups) {
+      if (paletteAt(id) != null) {
+        palettes.add(paletteAt(id)!.deactivated());
+      }
+    }
 
-  List<Node> get selectedHomeUserNodes {
-    return selectedFriendPalettesDeactivated.map((e) => e.node).toList();
+    final selectedNonGroups = formatedHomePalettes.where(
+      (p) =>
+          (p.node.type == Nodes.friend || p.node.type == Nodes.nonFriend) &&
+          p.selected,
+    );
+    for (final pal in selectedNonGroups) {
+      if (!idsInSelGroups.contains(pal.node.id)) {
+        palettes.add(pal.deactivated());
+      }
+    }
+
+    return palettes;
   }
 
   List<Identifier> get selectedHomeUserIDs {
-    return selectedHomeUserNodes.map((e) => e.id).toList();
+    return selectedHomeUserPaletteDeactivated.map((e) => e.node.id).toList();
   }
 
-  Map<String, String> get currentLocation {
-    return _locations2.last;
+  List<Palette> get homePalettes {
+    return _palettes["Home"]!.values.toList();
   }
 
-  List<Identifier> get friendIDs {
+  List<Palette> get formatedHomePalettes {
     return homePalettes
-        .where((p) => p.node.type == Nodes.friend)
-        .map((e) => e.node.id)
-        .toList();
-  }
-
-  List<Identifier> get friendAndNonFriendIDs {
-    return homePalettes
-        .where((p) =>
-            p.node.type == Nodes.friend || p.node.type == Nodes.nonFriend)
-        .map((e) => e.node.id)
-        .toList();
+      ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
   }
 
   Map<String, String> get previousLocation {
-    if (_locations2.length > 2) {
-      return _locations2[_locations2.length - 2];
+    if (_loc.length > 2) {
+      return _loc[_loc.length - 2];
     }
     throw "Invalid previous location";
   }
+
+  List<Identifier> get groupRoots {
+    return homePalettes
+        .where(
+            (e) => const [Nodes.group, Nodes.hyperchat].contains(e.node.type))
+        .map((e) => e.node.id)
+        .toList();
+  }
+
   // ============================================================== BUILD ================================================================ //
 
   void homePage() {
@@ -1614,7 +1713,7 @@ class _HomePageState extends State<HomePage> {
       palettes: formatedHomePalettes,
       bottomInputs: [
         ConsoleInput(
-          tec: tec,
+          tec: _tec,
           inputCallBack: (text) => _pingInput = text,
           placeHolder: ":)",
         ),
@@ -1636,7 +1735,10 @@ class _HomePageState extends State<HomePage> {
         RealButton(
           mainButton: ConsoleButton(
             name: "Search",
-            onPress: searchPage,
+            onPress: () {
+              _loc.add({"at": "Search"});
+              searchPage();
+            },
           ),
         ),
         RealButton(
@@ -1668,43 +1770,39 @@ class _HomePageState extends State<HomePage> {
 
   void moneyPage() {
     _view = MoneyPage(
-      palettes: selectedFriendPalettesDeactivated,
-      back: () {
-        clearInputs();
-        homePage();
-      },
+      palettes: selectedHomeUserPaletteDeactivated,
+      back: homePage,
     );
     setState(() {});
   }
 
   void hyperchatPage() {
-    _view = HyperchatPage(
+    _view = GroupPage(
+      isHyperchat: true,
       self: widget.self,
       afterMessageCallback: (node) {
-        setPaletteIfAbsent(nodeToPalette("Home", node)!);
+        _palettes["Home"]!
+            .putIfAbsent(node.id, () => nodeToPalette("Home", node)!);
+        _loc.add({"at": "Home", "id": node.id, "type": "Chat"});
         chatPage(node);
       },
-      back: () {
-        clearInputs();
-        homePage();
-      },
-      palettes: selectedFriendPalettesDeactivated,
+      back: homePage,
+      palettes: selectedHomeUserPaletteDeactivated,
       cameras: widget.cameras,
     );
     setState(() {});
   }
 
   void searchPage() {
-    _locations2.add({"at": "Search"});
     _view = AddFriendPage(
       cameras: widget.cameras,
       self: widget.self,
       search: search,
-      palettes: getPalettes("Search")?.values.toList().reversed.toList() ?? [],
+      palettes: _palettes["Search"]?.values.toList().reversed.toList() ?? [],
       addCallback: addUsers,
       backCallback: () {
-        _locations2.removeLast();
-        getPalettes("Search")?.clear();
+        _loc.removeLast();
+        _palettes["Search"]?.clear();
         homePage();
       },
     );
@@ -1716,20 +1814,20 @@ class _HomePageState extends State<HomePage> {
       cameras: widget.cameras,
       self: widget.self,
       openChat: openChat,
-      palette: getPalette(node.id, currentLocation["at"]!)!,
-      palettes: getPalettes(node.id)?.values.toList() ?? <Palette>[],
+      palette: _palettes[_loc.last["at"]!]![node.id]!,
+      palettes: _palettes[node.id]?.values.toList() ?? <Palette>[],
       openNode: openNode,
       nodeToPalette: nodeToPalette,
       back: () {
-        _locations2.removeLast();
-        if (currentLocation["at"] == "Home") {
+        _loc.removeLast();
+        if (_loc.last["at"] == "Home" && _loc.last["type"] == null) {
           homePage();
-        } else if (currentLocation["at"] == "Search") {
+        } else if (_loc.last["at"] == "Search" && _loc.last["type"] == null) {
           searchPage();
-        } else if (currentLocation["type"] == "Node") {
-          nodePage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
-        } else if (currentLocation["type"] == "Chat") {
-          chatPage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
+        } else if (_loc.last["type"] == "Node") {
+          nodePage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
+        } else if (_loc.last["type"] == "Chat") {
+          chatPage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
         }
       },
     );
@@ -1775,19 +1873,20 @@ class _HomePageState extends State<HomePage> {
 
   void chatPage(Node node) {
     _view = ChatPage(
+        send: chatRequest,
         self: widget.self,
         node: node,
         cameras: widget.cameras,
         back: () {
-          _locations2.removeLast();
-          if (currentLocation["at"] == "Home") {
+          _loc.removeLast();
+          if (_loc.last["at"] == "Home" && _loc.last["type"] == null) {
             homePage();
-          } else if (currentLocation["at"] == "Search") {
+          } else if (_loc.last["at"] == "Search" && _loc.last["type"] == null) {
             searchPage();
-          } else if (currentLocation["type"] == "Node") {
-            nodePage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
-          } else if (currentLocation["type"] == "Chat") {
-            chatPage(nodeAt(currentLocation["id"]!, currentLocation["at"]!));
+          } else if (_loc.last["type"] == "Node") {
+            nodePage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
+          } else if (_loc.last["type"] == "Chat") {
+            chatPage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
           }
         });
     setState(() {});
@@ -1795,238 +1894,165 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> snipView(Node node) async {
     final mediaSize = MediaQuery.of(context).size; // full screen
-    node.snips.isEmpty ? homePage() : null;
-    final snip = node.snips.first;
-    node.snips.remove(snip); // consume it
-    final media = await r.getMessageMedia(snip);
-    media == null ? homePage() : null;
-    final scale =
-        1 / (media!.metadata.aspectRatio ?? 1.0 * mediaSize.aspectRatio);
-    if (media.metadata.isVideo) {
-      var ctrl = VideoPlayerController.network(media.networkUrl!);
-      await ctrl.initialize();
-      await ctrl.setLooping(true);
-      await ctrl.play();
-      _view = Down4StackBackground2(
-        children: [
-          ClipRect(
-            clipper: MediaSizeClipper(mediaSize),
-            child: Transform.scale(
-              scale: scale,
-              alignment: Alignment.topCenter,
-              child: AspectRatio(
-                aspectRatio: 1 / (media.metadata.aspectRatio ?? 1.0),
-                child: VideoPlayer(ctrl),
+    if (node.snips.isEmpty) {
+      writePalette(node);
+      homePage();
+    } else {
+      final snip = node.snips.first;
+      node
+        ..snips.remove(snip) // consume it
+        ..saveLocally();
+      Down4Media? media;
+      dynamic jsonEncodedMedia;
+      if ((jsonEncodedMedia = Boxes.instance.snip.get(snip)) == null) {
+        media = await r.getMessageMedia(snip);
+      } else {
+        media = Down4Media.fromJson(jsonDecode(jsonEncodedMedia));
+        Boxes.instance.snip.delete(snip); // consume it
+      }
+      if (media == null) {
+        writePalette(node);
+        homePage();
+      }
+      final scale =
+          1 / (media!.metadata.aspectRatio ?? 1.0 * mediaSize.aspectRatio);
+      if (media.metadata.isVideo) {
+        media.writeToFile();
+        var ctrl = VideoPlayerController.file(media.file!);
+        await ctrl.initialize();
+        await ctrl.setLooping(true);
+        await ctrl.play();
+        _view = Down4StackBackground2(
+          children: [
+            SizedBox(
+              height: mediaSize.height,
+              width: mediaSize.width,
+              child: Transform.scale(
+                scaleX: 1 / scale,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform:
+                      Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+                  child: VideoPlayer(ctrl),
+                ),
               ),
             ),
-          ),
-        ],
-        bottomButtons: [
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Back",
-              onPress: () async {
-                await ctrl.dispose();
-                homePage();
-              },
-            ),
-          ),
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Next",
-              onPress: () async {
-                if (node.snips.isEmpty) {
+            media.metadata.text != "" && media.metadata.text != null
+                ? Center(
+                    child: Container(
+                      width: mediaSize.width,
+                      decoration: const BoxDecoration(
+                        // border: Border.symmetric(
+                        //   horizontal: BorderSide(color: Colors.black38),
+                        // ),
+                        color: Colors.black38,
+                        // color: PinkTheme.snipRibbon,
+                      ),
+                      constraints: BoxConstraints(
+                        minHeight: 16,
+                        maxHeight: mediaSize.height,
+                      ),
+                      child: Text(
+                        media.metadata.text!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink()
+          ],
+          bottomButtons: [
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Back",
+                onPress: () async {
                   await ctrl.dispose();
+                  media!.deleteFile();
+                  writePalette(node);
                   homePage();
-                } else {
+                },
+              ),
+            ),
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Next",
+                onPress: () async {
                   await ctrl.dispose();
+                  media!.deleteFile();
                   snipView(node);
-                }
-              },
+                },
+              ),
             ),
-          ),
-        ],
-      );
-    } else {
-      _view = Down4StackBackground2(
-        children: [
-          ClipRect(
-            clipper: MediaSizeClipper(mediaSize),
-            child: Transform.scale(
-              scale: scale,
-              alignment: Alignment.topCenter,
-              child: Image.memory(media.data),
+          ],
+        );
+      } else {
+        await precacheImage(MemoryImage(media.data), context);
+        _view = Down4StackBackground2(
+          children: [
+            SizedBox(
+              height: mediaSize.height,
+              width: mediaSize.width,
+              child: Transform(
+                alignment: Alignment.center,
+                transform:
+                    Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+                child: Image.memory(
+                  media.data,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                ),
+              ),
             ),
-          ),
-        ],
-        bottomButtons: [
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Back",
-              onPress: homePage,
+            media.metadata.text != "" && media.metadata.text != null
+                ? Center(
+                    child: Container(
+                      width: mediaSize.width,
+                      decoration: const BoxDecoration(
+                        // border: Border.symmetric(
+                        //   horizontal: BorderSide(color: Colors.black38),
+                        // ),
+                        color: Colors.black38,
+                        // color: PinkTheme.snipRibbon,
+                      ),
+                      constraints: BoxConstraints(
+                        minHeight: 16,
+                        maxHeight: mediaSize.height,
+                      ),
+                      child: Text(
+                        media.metadata.text!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink()
+          ],
+          bottomButtons: [
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Back",
+                onPress: () {
+                  writePalette(node);
+                  homePage();
+                },
+              ),
             ),
-          ),
-          RealButton(
-            mainButton: ConsoleButton(
-              name: "Next",
-              onPress: () => node.snips.isEmpty ? homePage() : snipView(node),
+            RealButton(
+              mainButton: ConsoleButton(
+                name: "Next",
+                onPress: () => snipView(node),
+              ),
             ),
-          ),
-        ],
-      );
+          ],
+        );
+      }
+      setState(() {});
     }
-    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return _view ?? const LoadingPage();
-    //   switch (_state) {
-    //     case HomePageRenderState.loading:
-    //       return const LoadingPage();
-
-    //     case HomePageRenderState.home:
-    //       return Down4PalettePage(
-    //         palettes: formatedHomePalettes,
-    //         bottomInputs: [
-    //           ConsoleInput(
-    //             tec: tec,
-    //             inputCallBack: (text) => _pingInput = text,
-    //             placeHolder: ":)",
-    //           ),
-    //         ],
-    //         bottomButtons: [
-    //           RealButton(
-    //               showExtra: _extra,
-    //               mainButton: ConsoleButton(
-    //                 name: "Delete",
-    //                 onPress: _extra ? toggleExtra : delete,
-    //                 isSpecial: true,
-    //                 onLongPress: toggleExtra,
-    //               ),
-    //               extraButtons: [
-    //                 ConsoleButton(name: "Nigger", onPress: toggleExtra),
-    //                 ConsoleButton(name: "Shit", onPress: toggleExtra),
-    //                 ConsoleButton(name: "Wacko", onPress: toggleExtra),
-    //               ]),
-    //           RealButton(
-    //             mainButton: ConsoleButton(
-    //               name: "Search",
-    //               onPress: () {
-    //                 pushLocation("Search");
-    //                 putState(HomePageRenderState.addFriend);
-    //               },
-    //             ),
-    //           ),
-    //           RealButton(
-    //             mainButton: ConsoleButton(
-    //               name: "Ping",
-    //               onPress: ping,
-    //               onLongPress: () => putState(HomePageRenderState.snip),
-    //               isSpecial: true,
-    //             ),
-    //           ),
-    //         ],
-    //         topButtons: [
-    //           RealButton(
-    //             mainButton: ConsoleButton(
-    //               name: "Chat",
-    //               onPress: () => putState(HomePageRenderState.hyperchat),
-    //             ),
-    //           ),
-    //           RealButton(
-    //             mainButton: ConsoleButton(
-    //               name: "Money",
-    //               onPress: () => putState(HomePageRenderState.money),
-    //             ),
-    //           ),
-    //         ],
-    //       );
-
-    //     case HomePageRenderState.snip:
-    //       return SnipCamera(
-    //         cameras: widget.cameras,
-    //         cameraBack: () => putState(HomePageRenderState.home),
-    //         cameraCallBack: handleSnipCameraCallback,
-    //       );
-
-    //     case HomePageRenderState.chat:
-    //       return ChatPage(
-    //           self: widget.self,
-    //           node: _node!,
-    //           cameras: widget.cameras,
-    //           back: () => currentLocation == "Home"
-    //               ? putState(HomePageRenderState.home)
-    //               : putState(HomePageRenderState.node));
-
-    //     case HomePageRenderState.hyperchat:
-    //       return HyperchatPage(
-    //         self: widget.self,
-    //         afterMessageCallback: (node) {
-    //           setPaletteIfAbsent(nodeToPalette("Home", node)!);
-    //           setTheNode(node);
-    //           putState(HomePageRenderState.chat);
-    //         },
-    //         back: () {
-    //           clearInputs();
-    //           putState(HomePageRenderState.home);
-    //         },
-    //         palettes: selectedFriendPalettesDeactivated,
-    //         cameras: widget.cameras,
-    //       );
-
-    //     case HomePageRenderState.node:
-    //       return NodePage(
-    //         cameras: widget.cameras,
-    //         self: widget.self,
-    //         openChat: openChat,
-    //         palette: getPalette(node!.id, previousLocation)!,
-    //         palettes: getPalettes(node!.id)?.values.toList() ?? <Palette>[],
-    //         openNode: openNode,
-    //         nodeToPalette: nodeToPalette,
-    //         back: () {
-    //           popLocation();
-    //           if (currentLocation == "Home") {
-    //             putState(HomePageRenderState.home);
-    //           } else if (currentLocation == "Search") {
-    //             putState(HomePageRenderState.addFriend);
-    //           } else {
-    //             putState(HomePageRenderState.node);
-    //           }
-    //         },
-    //       );
-
-    //     case HomePageRenderState.addFriend:
-    //       return AddFriendPage(
-    //         cameras: widget.cameras,
-    //         self: widget.self,
-    //         search: search,
-    //         palettes:
-    //             getPalettes("Search")?.values.toList().reversed.toList() ?? [],
-    //         addCallback: addUsers,
-    //         backCallback: () {
-    //           popLocation();
-    //           getPalettes("Search")?.clear();
-    //           putState(HomePageRenderState.home);
-    //         },
-    //       );
-
-    //     case HomePageRenderState.money:
-    //       return MoneyPage(
-    //         palettes: selectedFriendPalettesDeactivated,
-    //         back: () {
-    //           clearInputs();
-    //           putState(HomePageRenderState.home);
-    //         },
-    //       );
-
-    //     case HomePageRenderState.feed:
-    //       return Container();
-
-    //     case HomePageRenderState.map:
-    //       return Container();
-    //   }
-    // }
   }
 }
 
