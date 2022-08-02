@@ -17,7 +17,6 @@ import 'package:pointycastle/digests/sha256.dart' as pc256;
 import 'package:hex/hex.dart';
 
 import 'render_pages.dart';
-import 'render_objects.dart';
 import 'data_objects.dart';
 
 class Down4 extends StatefulWidget {
@@ -31,49 +30,42 @@ class Down4 extends StatefulWidget {
   State<Down4> createState() => _Down4State();
 }
 
-enum InitializationStates { loading, createUser, welcome, home }
-
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
   Node? _user;
   MoneyInfo? _moneyInfo;
-  InitializationStates _state = InitializationStates.loading;
+  Widget? _view;
 
   // ============================================================ KERNEL ============================================================ //
 
   @override
   void initState() {
     super.initState();
-    // _anonymousLogin();
-    _loadTokenChangeListener();
-    _loadUser();
+    loadTokenChangeListener();
+    loadUser();
   }
 
-  void _putState(InitializationStates s) {
-    setState(() => _state = s);
-  }
-
-  void _loadTokenChangeListener() {
+  void loadTokenChangeListener() {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       final res = await r.refreshTokenRequest(newToken);
     });
   }
 
-  Future<void> _loadUser() async {
+  Future<void> loadUser() async {
     final userData = Boxes.instance.user.get('user');
     if (userData != null) {
       _user = Node.fromJson(jsonDecode(userData));
       final moneyData = Boxes.instance.user.get('money');
       _moneyInfo =
           MoneyInfo.fromJson(jsonDecode(moneyData)); // if this crashes gg
-      _putState(InitializationStates.home);
+      homePage();
     } else {
       // returns false if user hasn't been initialized
-      _putState(InitializationStates.createUser);
+      createUser();
     }
   }
 
-  Future<bool> _initUser(
+  Future<bool> initUser(
     String id,
     String name,
     String lastName,
@@ -199,28 +191,38 @@ class _Down4State extends State<Down4> {
 
   // ============================================================ RENDER ============================================================ //
 
+  void homePage() {
+    _view = HomePage(
+      cameras: widget.cameras,
+      self: _user!,
+    );
+    setState(() {});
+  }
+
+  void createUser() {
+    _view = UserMakerPage(
+      cameras: widget.cameras,
+      initUser: initUser,
+      success: welcomePage,
+    );
+    setState(() {});
+  }
+
+  void welcomePage() {
+    _view = WelcomePage(
+      mnemonic: _moneyInfo!.mnemonic,
+      userInfo: _user!,
+      understood: homePage,
+    );
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    switch (_state) {
-      case InitializationStates.loading:
-        return const LoadingPage();
-      case InitializationStates.home:
-        return HomePage(
-          cameras: widget.cameras,
-          self: _user!,
-        );
-      case InitializationStates.createUser:
-        return UserMakerPage(
-          cameras: widget.cameras,
-          initUser: _initUser,
-          success: () => _putState(InitializationStates.welcome),
-        );
-      case InitializationStates.welcome:
-        return WelcomePage(
-          mnemonic: _moneyInfo!.mnemonic,
-          userInfo: _user!,
-          understood: () => _putState(InitializationStates.home),
-        );
-    }
+    final size = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+    Sizes.h = size.height - padding.top - padding.bottom;
+    Sizes.w = size.width - padding.left - padding.right;
+    return SafeArea(child: _view ?? const LoadingPage());
   }
 }
