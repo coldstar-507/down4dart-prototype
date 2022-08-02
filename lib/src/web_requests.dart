@@ -68,13 +68,77 @@ Future<Down4Media?> getMessageMedia(String id) async {
   return null;
 }
 
-Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
+// Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req));
+//   if (res.statusCode == HttpStatus.noContent && retried == false) {
+//     return messageRequest(
+//       req
+//         ..withUpload = true
+//         ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+//       true,
+//     );
+//   }
+//   return res.statusCode == 200;
+// }
+
+Future<bool> pingRequest(MessageRequest req) async {
   final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
+  );
+  final res = await http.post(url, body: jsonEncode(req));
+  return res.statusCode == 200;
+}
+
+Future<bool> snipRequest(MessageRequest req) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
+  );
+  final res = await http.post(url, body: jsonEncode(req));
+  return res.statusCode == 200;
+}
+
+Future<bool> groupRequest(MessageRequest req, [retried = false]) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
   );
   final res = await http.post(url, body: jsonEncode(req));
   if (res.statusCode == HttpStatus.noContent && retried == false) {
-    return messageRequest(
+    return groupRequest(
+      req
+        ..withUpload = true
+        ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+      true,
+    );
+  }
+  return res.statusCode == 200;
+}
+
+Future<bool> hyperchatRequest(MessageRequest req, [retried = false]) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
+  );
+  final res = await http.post(url, body: jsonEncode(req));
+  if (res.statusCode == HttpStatus.noContent && retried == false) {
+    return hyperchatRequest(
+      req
+        ..withUpload = true
+        ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+      true,
+    );
+  }
+  return res.statusCode == 200;
+}
+
+Future<bool> chatRequest(MessageRequest req, [retried = false]) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
+  );
+  final res = await http.post(url, body: jsonEncode(req));
+  if (res.statusCode == HttpStatus.noContent && retried == false) {
+    return chatRequest(
       req
         ..withUpload = true
         ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
