@@ -10,7 +10,10 @@ class Jeff {
 }
 
 void main() {
-  final jeff = Jeff(a: 2, b: false, c: 83);
-  print(jeff.c);
-  print((jeff..c = 5).c);
+  var jeff = Jeff(a: 2, b: true, c: 98);
+  jeff
+    ..b = false
+    ..c = 1;
+
+  print("jeff.b: ${jeff.b}, jeff.c = ${jeff.c}");
 }
