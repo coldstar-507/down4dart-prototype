@@ -13,7 +13,8 @@ class Boxes {
       messageQueue,
       bills,
       payments,
-      savedMessages;
+      savedMessages,
+      snip;
   Boxes()
       : dirPath = main.docDirPath,
         user = Hive.box("User"),
@@ -25,9 +26,22 @@ class Boxes {
         messageQueue = Hive.box("MessageQueue"),
         bills = Hive.box("Bills"),
         payments = Hive.box("Payments"),
-        savedMessages = Hive.box("SavedMessages");
+        savedMessages = Hive.box("SavedMessages"),
+        snip = Hive.box("Snips");
 
-  //static Boxes get instance => _instance ?? _instance = Boxes();
-  static Boxes get instance =>
-      _instance == null ? _instance = Boxes() : _instance!;
+  static Boxes get instance => _instance ??= Boxes();
+}
+
+class Sizes {
+  static double h = 0;
+  static double w = 0;
+}
+
+class Sizes2 {
+  Sizes2._()
+      : w = 0,
+        h = 0;
+  double w, h;
+  static Sizes2? _instance;
+  static Sizes2 get instance => _instance ??= Sizes2._();
 }
