@@ -1,14 +1,12 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:flutter_testproject/src/render_pages.dart';
 import 'render_objects.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:async';
 import 'dart:io';
 import 'down4_utility.dart';
 import 'render_utility.dart';
+import 'dart:math' as math;
 
 class CameraConsole extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -249,6 +247,8 @@ class SnipCamera extends StatefulWidget {
     String? filePath,
     bool? isVideo,
     bool? toReverse,
+    String? text,
+    double aspectRatio,
   ) cameraCallBack;
   final void Function() cameraBack, nextRes, flip;
   final bool enableVideo;
@@ -270,49 +270,41 @@ class SnipCamera extends StatefulWidget {
 }
 
 class _SnipCameraState extends State<SnipCamera> {
-  String? _filePath;
-  bool? _toReverse, _isVideo;
   bool extra = false;
   Widget? _preview;
-  FlashMode _flashMode = FlashMode.off;
-  VideoPlayerController? _videoPlayerController;
   double _scale = 1.0;
   double _baseScale = 1.0;
+  var tec = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    widget.ctrl.setFlashMode(_flashMode);
+    widget.ctrl.setFlashMode(FlashMode.off);
   }
 
   void _nextFlashMode() {
-    if (_flashMode == FlashMode.off) {
-      _flashMode = FlashMode.torch;
+    if (widget.ctrl.value.flashMode == FlashMode.off) {
+      widget.ctrl.setFlashMode(FlashMode.torch);
     } else {
-      _flashMode = FlashMode.off;
+      widget.ctrl.setFlashMode(FlashMode.off);
     }
-    widget.ctrl.setFlashMode(_flashMode);
-    setState(() {});
   }
 
   Future<void> _takePicture() async {
     try {
       final xfile = await widget.ctrl.takePicture();
       final path = xfile.path;
-      _filePath = path;
-      _toReverse = widget.ctrl.cameraId == 1;
-      _isVideo = false;
+      imagePreview(path, false, widget.camNum == 1);
     } catch (e) {
-      widget.cameraCallBack(null, null, null);
+      widget.cameraCallBack(null, null, null, null, -1);
     }
-    imagePreview();
   }
 
   Future<void> _startRecording() async {
     try {
       await widget.ctrl.startVideoRecording();
     } catch (e) {
-      widget.cameraCallBack(null, null, null);
+      widget.cameraCallBack(null, null, null, null, -1);
     }
   }
 
@@ -320,24 +312,23 @@ class _SnipCameraState extends State<SnipCamera> {
     try {
       XFile? f = await widget.ctrl.stopVideoRecording();
       final path = f.path;
-      _filePath = path;
+      final vpc = await initVPC(path);
+      videoPreview(vpc, path, true, widget.camNum == 1);
     } catch (e) {
-      widget.cameraCallBack(null, null, null);
+      widget.cameraCallBack(null, null, null, null, -1);
     }
-    await initVideoPlayerController();
-    videoPreview();
   }
 
-  Future<void> initVideoPlayerController() async {
-    _videoPlayerController = VideoPlayerController.file(File(_filePath!));
+  Future<VideoPlayerController> initVPC(String filePath) async {
+    var vpc = VideoPlayerController.file(File(filePath));
     try {
-      await _videoPlayerController?.initialize();
-      await _videoPlayerController?.setLooping(true);
-      await _videoPlayerController?.play();
+      await vpc.initialize();
+      await vpc.setLooping(true);
+      await vpc.play();
     } catch (err) {
-      widget.cameraCallBack(null, null, null);
+      widget.cameraCallBack(null, null, null, null, -1);
     }
-    return;
+    return vpc;
   }
 
   void toggleExtra() {
@@ -365,11 +356,12 @@ class _SnipCameraState extends State<SnipCamera> {
               widget.ctrl.setZoomLevel(_scale);
             }
           },
-          child: ClipRect(
-            clipper: MediaSizeClipper(mediaSize),
+          child: SizedBox(
+            height: mediaSize.height,
+            width: mediaSize.width,
             child: Transform.scale(
-              scale: scale,
-              alignment: Alignment.topCenter,
+              scaleX: scale,
+              alignment: Alignment.center,
               child: CameraPreview(widget.ctrl),
             ),
           ),
@@ -403,7 +395,7 @@ class _SnipCameraState extends State<SnipCamera> {
             ),
             ConsoleButton(
               isMode: true,
-              name: _flashMode.name.capitalize(),
+              name: widget.ctrl.value.flashMode.name.capitalize(),
               onPress: _nextFlashMode,
             ),
           ],
@@ -420,93 +412,258 @@ class _SnipCameraState extends State<SnipCamera> {
     );
   }
 
-  void videoPreview() {
+  void videoPreview(
+    VideoPlayerController vpc,
+    String filePath,
+    bool isVideo,
+    bool toReverse, [
+    String? text,
+    bool input = false,
+  ]) {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
-    _preview = Down4StackBackground2(
+    _preview = Stack(
       children: [
-        ClipRect(
-          clipper: MediaSizeClipper(mediaSize),
+        SizedBox(
+          height: mediaSize.height,
+          width: mediaSize.width,
           child: Transform.scale(
-            scale: scale,
-            alignment: Alignment.topCenter,
-            child: AspectRatio(
-              aspectRatio: 1 / widget.ctrl.value.aspectRatio,
-              child: VideoPlayer(_videoPlayerController!),
+            scaleX: scale,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+              child: VideoPlayer(vpc),
             ),
           ),
         ),
-      ],
-      topButtons: [
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Accept",
-            onPress: () =>
-                widget.cameraCallBack(_filePath, _isVideo, _toReverse),
-          ),
-        ),
-      ],
-      bottomButtons: [
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Back",
-            onPress: () async {
-              _preview = null;
-              await _videoPlayerController?.dispose();
-              _videoPlayerController = null;
-              setState(() {});
-            },
-          ),
-        ),
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Cancel",
-            onPress: widget.cameraBack,
-          ),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(children: [
+            input
+                ? Center(
+                    child: Container(
+                      width: mediaSize.width,
+                      decoration: const BoxDecoration(
+                        // border: Border.symmetric(
+                        //   horizontal: BorderSide(color: Colors.black38),
+                        // ),
+                        color: Colors.black38,
+                        // color: PinkTheme.snipRibbon,
+                      ),
+                      constraints: BoxConstraints(
+                        minHeight: 16,
+                        maxHeight: mediaSize.height,
+                      ),
+                      child: TextField(
+                        autofocus: input,
+                        textInputAction: TextInputAction.done,
+                        cursorColor: Colors.white,
+                        controller: tec,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          isCollapsed: true,
+                        ),
+                        maxLines: 15,
+                        minLines: 1,
+                        style: const TextStyle(color: Colors.white),
+                        // style: const TextStyle(color: PinkTheme.black),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+            Column(
+              children: [
+                const Spacer(),
+                Console(topButtons: [
+                  ConsoleButton(
+                    name: "Accept",
+                    onPress: () async {
+                      await vpc.dispose();
+                      widget.cameraCallBack(
+                        filePath,
+                        isVideo,
+                        toReverse,
+                        tec.value.text,
+                        widget.ctrl.value.aspectRatio,
+                      );
+                    },
+                  ),
+                ], bottomButtons: [
+                  ConsoleButton(
+                    name: "Back",
+                    onPress: () {
+                      _preview = null;
+                      vpc.dispose();
+                      setState(() {});
+                    },
+                  ),
+                  ConsoleButton(
+                    name: "Text",
+                    onPress: () => videoPreview(
+                      vpc,
+                      filePath,
+                      isVideo,
+                      toReverse,
+                      text,
+                      !input,
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ]),
         )
       ],
     );
+
+    // _preview = Down4StackBackground2(
+    //   children: [
+    //     SizedBox(
+    //       height: mediaSize.height,
+    //       width: mediaSize.width,
+    //       child: Transform.scale(
+    //         scaleX: scale,
+    //         child: Transform(
+    //           alignment: Alignment.center,
+    //           transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+    //           child: VideoPlayer(vpc),
+    //         ),
+    //       ),
+    //     ),
+    //   ],
+    //   topButtons: [
+    //     RealButton(
+    //       mainButton: ConsoleButton(
+    //         name: "Accept",
+    //         onPress: () => widget.cameraCallBack(
+    //           filePath,
+    //           isVideo,
+    //           toReverse,
+    //           tec.value.text,
+    //           widget.ctrl.value.aspectRatio,
+    //         ),
+    //       ),
+    //     ),
+    //   ],
+    //   bottomButtons: [
+    //     RealButton(
+    //       mainButton: ConsoleButton(
+    //         name: "Back",
+    //         onPress: () async {
+    //           _preview = null;
+    //           await vpc.dispose();
+    //           setState(() {});
+    //         },
+    //       ),
+    //     ),
+    //     RealButton(
+    //       mainButton: ConsoleButton(
+    //         name: "Cancel",
+    //         onPress: widget.cameraBack,
+    //       ),
+    //     )
+    //   ],
+    // );
     setState(() {});
   }
 
-  void imagePreview() {
+  void imagePreview(
+    String filePath,
+    bool isVideo,
+    bool toReverse, [
+    String? text,
+    bool input = false,
+  ]) {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
-    _preview = Down4StackBackground2(
+    _preview = Stack(
       children: [
-        ClipRect(
-          clipper: MediaSizeClipper(mediaSize),
-          child: Transform.scale(
-            scale: scale,
-            alignment: Alignment.topCenter,
-            child: Image.file(File(_filePath!)),
+        SizedBox(
+          height: mediaSize.height,
+          width: mediaSize.width,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+            child: Image.file(File(filePath), fit: BoxFit.cover),
           ),
         ),
-      ],
-      topButtons: [
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Accept",
-            onPress: () =>
-                widget.cameraCallBack(_filePath, _isVideo, _toReverse),
-          ),
-        ),
-      ],
-      bottomButtons: [
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Back",
-            onPress: () => setState(() => _preview = null),
-          ),
-        ),
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Cancel",
-            onPress: widget.cameraBack,
-          ),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(children: [
+            input
+                ? Center(
+                    child: Container(
+                      width: mediaSize.width,
+                      decoration: const BoxDecoration(
+                        // border: Border.symmetric(
+                        //   horizontal: BorderSide(color: Colors.black38),
+                        // ),
+                        color: Colors.black38,
+                        // color: PinkTheme.snipRibbon,
+                      ),
+                      constraints: BoxConstraints(
+                        minHeight: 16,
+                        maxHeight: mediaSize.height,
+                      ),
+                      child: TextField(
+                        autofocus: input,
+                        textInputAction: TextInputAction.done,
+                        cursorColor: Colors.white,
+                        controller: tec,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          isCollapsed: true,
+                        ),
+                        maxLines: 15,
+                        minLines: 1,
+                        style: const TextStyle(color: Colors.white),
+                        // style: const TextStyle(color: PinkTheme.black),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+            Column(
+              children: [
+                const Spacer(),
+                Console(topButtons: [
+                  ConsoleButton(
+                    name: "Accept",
+                    onPress: () => widget.cameraCallBack(
+                      filePath,
+                      isVideo,
+                      toReverse,
+                      tec.value.text,
+                      widget.ctrl.value.aspectRatio,
+                    ),
+                  ),
+                ], bottomButtons: [
+                  ConsoleButton(
+                    name: "Back",
+                    onPress: () => setState(() => _preview = null),
+                  ),
+                  ConsoleButton(
+                    name: "Text",
+                    isMode: false,
+                    onPress: () => imagePreview(
+                      filePath,
+                      isVideo,
+                      toReverse,
+                      text,
+                      !input,
+                    ),
+                  ),
+                ]),
+              ],
+            ),
+          ]),
         )
       ],
     );
+
     setState(() {});
   }
 
@@ -514,7 +671,6 @@ class _SnipCameraState extends State<SnipCamera> {
   Future<void> dispose() async {
     super.dispose();
     await widget.ctrl.dispose();
-    await _videoPlayerController?.dispose();
   }
 
   @override
@@ -522,5 +678,3 @@ class _SnipCameraState extends State<SnipCamera> {
     return _preview ?? capturingPage(extra);
   }
 }
-
-
