@@ -429,109 +429,134 @@ class Palette extends StatelessWidget {
           color: selected ? PinkTheme.black : Colors.transparent,
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        textDirection: TextDirection.ltr,
-        children: [
-          GestureDetector(
-            onTap: () => imPress?.call(node.id, at),
-            onLongPress: () => imLongPress?.call(node.id, at),
-            child: Container(
-              clipBehavior: Clip.hardEdge,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4.0),
-                  bottomLeft: Radius.circular(4.0),
+      child: Container(
+        // color: PinkTheme.nodeColors[node.type],
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: PinkTheme.nodeColors[node.type],
+          borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          textDirection: TextDirection.ltr,
+          children: [
+            GestureDetector(
+              onTap: () => imPress?.call(node.id, at),
+              onLongPress: () => imLongPress?.call(node.id, at),
+              child: SizedBox(
+                width: paletteHeight - 2.0, // borderWidth x2
+                child: Image.memory(
+                  node.image.data,
+                  fit: BoxFit.cover,
                 ),
-              ),
-              width: paletteHeight - 2.0, // borderWidth x2
-              child: Image.memory(
-                node.image.data,
-                fit: BoxFit.cover,
               ),
             ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => bodyPress?.call(node.id, at),
-              onLongPress: () => bodyLongPress?.call(node.id, at),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: PinkTheme.nodeColors[node.type],
-                  border: Border(
-                    left: BorderSide(
-                      color: selected
-                          ? PinkTheme.black
-                          : PinkTheme.nodeColors[node.type]!,
-                      width: 1.0,
-                    ),
-                  ),
-                ),
-                padding: const EdgeInsets.only(left: 6.0, top: 5.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      node.name + " " + (node.lastName ?? ""),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal,
+            Expanded(
+              child: GestureDetector(
+                onTap: () => bodyPress?.call(node.id, at),
+                onLongPress: () => bodyLongPress?.call(node.id, at),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: selected
+                            ? PinkTheme.black
+                            : PinkTheme.nodeColors[node.type]!,
+                        width: 1.0,
                       ),
                     ),
-                    const [Nodes.user, Nodes.friend, Nodes.nonFriend]
-                            .contains(node.type)
-                        ? Text(
-                            "@" + node.id,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: selected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          )
-                        : const [Nodes.hyperchat, Nodes.group]
-                                .contains(node.type)
-                            ? Text(
-                                node.group.map((id) => "@" + id).join(" "),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: selected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                  ],
+                  ),
+                  padding: const EdgeInsets.only(left: 6.0, top: 5.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        node.name + " " + (node.lastName ?? ""),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight:
+                              selected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      const [Nodes.user, Nodes.friend, Nodes.nonFriend]
+                              .contains(node.type)
+                          ? Text(
+                              "@" + node.id,
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontStyle: FontStyle.italic,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            )
+                          : const [Nodes.hyperchat, Nodes.group]
+                                  .contains(node.type)
+                              ? Text(
+                                  node.group.map((id) => "@" + id).join(" "),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 8,
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: selected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                      const SizedBox(height: 5),
+                      const [
+                                Nodes.user,
+                                Nodes.friend,
+                                Nodes.nonFriend,
+                                Nodes.hyperchat,
+                                Nodes.group,
+                              ].contains(node.type) &&
+                              node.messages.isNotEmpty
+                          ? Text(
+                              (Down4Message.fromLocal(node.messages.last)
+                                              .text
+                                              ?.length ??
+                                          0) >
+                                      0
+                                  ? '"' +
+                                      Down4Message.fromLocal(node.messages.last)
+                                          .text! +
+                                      '"'
+                                  : "&attachment",
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 12,
+                                // fontStyle: FontStyle.italic,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            )
+                          : const SizedBox.shrink()
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          buttonsInfo.isNotEmpty
-              ? Row(
-                  children: buttonsInfo
-                      .map((e) => BasicActionButton(
-                            color: PinkTheme.nodeColors[node.type],
-                            goPress: e.pressFunc,
-                            goLongPress: e.longPressFunc,
-                            location: at,
-                            id: node.id,
-                            rightMost: e.rightMost,
-                            assetPathFromLib: e.assetPath,
-                          ))
-                      .toList())
-              : Container(
-                  padding: const EdgeInsets.all(2.0),
-                  decoration: BoxDecoration(
-                    color: PinkTheme.nodeColors[node.type],
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(4.0),
-                      bottomRight: Radius.circular(4.0),
-                    ),
-                  ),
-                ),
-        ],
+            Row(
+                children: buttonsInfo
+                    .map((e) => BasicActionButton(
+                          color: PinkTheme.nodeColors[node.type],
+                          goPress: e.pressFunc,
+                          goLongPress: e.longPressFunc,
+                          location: at,
+                          id: node.id,
+                          rightMost: e.rightMost,
+                          assetPathFromLib: e.assetPath,
+                        ))
+                    .toList())
+          ],
+        ),
       ),
     );
   }
@@ -795,10 +820,9 @@ class Console extends StatelessWidget {
     var camWidthAndHeight = Sizes.w - (Sizes.h * 0.04);
     return Container(
       margin: EdgeInsets.only(
-        left: Sizes.h * 0.02,
-        right: Sizes.h * 0.02,
-        bottom: Sizes.h * 0.02,
-      ),
+          left: Sizes.h * 0.023,
+          right: Sizes.h * 0.023,
+          bottom: Sizes.h * 0.021),
       decoration: BoxDecoration(
         border: Border.all(width: 0.5, color: Colors.black),
       ),
