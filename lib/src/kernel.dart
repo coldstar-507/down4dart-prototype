@@ -6,6 +6,7 @@ import 'package:dartsv/dartsv.dart' as sv;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter_testproject/src/wallet.dart';
 import 'web_requests.dart' as r;
 import 'boxes.dart';
 // import 'package:crypto/crypto.dart' as crypto;
@@ -33,7 +34,7 @@ class Down4 extends StatefulWidget {
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
   Node? _user;
-  MoneyInfo? _moneyInfo;
+  Wallet? _wallet;
   Widget? _view;
 
   // ============================================================ KERNEL ============================================================ //
@@ -56,8 +57,7 @@ class _Down4State extends State<Down4> {
     if (userData != null) {
       _user = Node.fromJson(jsonDecode(userData));
       final moneyData = Boxes.instance.user.get('money');
-      _moneyInfo =
-          MoneyInfo.fromJson(jsonDecode(moneyData)); // if this crashes gg
+      _wallet = Wallet.fromJson(jsonDecode(moneyData)); // if this crashes gg
       homePage();
     } else {
       // returns false if user hasn't been initialized
@@ -172,7 +172,7 @@ class _Down4State extends State<Down4> {
       snips: [],
     );
 
-    _moneyInfo = MoneyInfo(
+    _wallet = Wallet(
       mnemonic: mnemonic,
       master: master,
       down4priv: down4priv,
@@ -184,7 +184,7 @@ class _Down4State extends State<Down4> {
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user!.toLocal()));
-    Boxes.instance.user.put('money', jsonEncode(_moneyInfo));
+    Boxes.instance.user.put('money', jsonEncode(_wallet));
 
     return true;
   }
@@ -210,7 +210,7 @@ class _Down4State extends State<Down4> {
 
   void welcomePage() {
     _view = WelcomePage(
-      mnemonic: _moneyInfo!.mnemonic,
+      mnemonic: _wallet!.mnemonic,
       userInfo: _user!,
       understood: homePage,
     );

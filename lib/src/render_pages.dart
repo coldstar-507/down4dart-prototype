@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
+import 'package:flutter_testproject/src/wallet.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'render_objects.dart';
@@ -239,9 +240,13 @@ class _GroupPageState extends State<GroupPage> {
 }
 
 class MoneyPage extends StatefulWidget {
+  final double exchangeRate;
+  final Wallet wallet;
   final List<Palette> palettes;
   final void Function() back;
   const MoneyPage({
+    required this.wallet,
+    required this.exchangeRate,
     required this.palettes,
     required this.back,
     Key? key,
@@ -252,16 +257,40 @@ class MoneyPage extends StatefulWidget {
 }
 
 class _MoneyPageState extends State<MoneyPage> {
-  String _moneyInput = "";
   var tec = TextEditingController();
   final Map<String, dynamic> _currencies = {
-    "l": ["CAD", "Satoshis"],
+    "l": ["USD", "Satoshis"],
     "i": 0
   };
   final Map<String, dynamic> _paymentMethod = {
     "l": ["Each", "Split"],
     "i": 0
   };
+
+  bool pay(String currency, bool split) {
+    final walletIndex = math.Random().nextInt(1 << 32);
+    final txInfos = widget.palettes.asMap().entries.map((e) {
+      final pubKey =
+          e.value.node.neuter!.deriveChildNumber(walletIndex).keyBuffer;
+      return {
+        "idx": e.key,
+        "username": e.value.node.id,
+        "address": sv.Address.fromCompressedPubKey(pubKey, sv.NetworkType.MAIN),
+        "pubKey": pubKey,
+      };
+    });
+  final inputs = widget.wallet.
+  }
+
+  BigInt usdToSatoshis(double usds) =>
+      BigInt.from((usds / widget.exchangeRate) * 100000000);
+
+  double satoshisToUSD(BigInt satoshis) =>
+      (satoshis.toInt() / 100000000) * widget.exchangeRate;
+
+  String get satoshis => widget.wallet.balance.toString();
+
+  String get usds => satoshisToUSD(widget.wallet.balance).toString();
 
   @override
   Widget build(BuildContext context) {
@@ -274,8 +303,8 @@ class _MoneyPageState extends State<MoneyPage> {
           inputs: [
             ConsoleInput(
               tec: tec,
-              inputCallBack: (text) => _moneyInput = text,
-              placeHolder: "\$",
+              inputCallBack: (text) => null,
+              placeHolder: currency == "USD" ? usds + "\$" : satoshis,
               type: TextInputType.number,
             )
           ],
@@ -903,8 +932,13 @@ class _ChatPageState extends State<ChatPage> {
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
         tec: tec,
         inputCallBack: (t) => _textInput = t,
-        placeHolder: ":)",
         value: _textInput,
+        placeHolder: ":)",
+        // placeHolder: widget.node.name,
+        // placeHolder: widget.node.name +
+        //     ((widget.node.lastName != null && widget.node.lastName != "")
+        //         ? " " + widget.node.lastName!
+        //         : ""),
       );
 
   Console get mediasConsole => Console(

@@ -34,46 +34,6 @@ enum Nodes {
   ticket,
 }
 
-class MoneyInfo {
-  String mnemonic;
-  sv.HDPrivateKey down4priv, master;
-  int upperIndex, upperChange, lowerIndex, lowerChange;
-
-  MoneyInfo({
-    required this.mnemonic,
-    required this.master,
-    required this.down4priv,
-    required this.lowerIndex,
-    required this.upperIndex,
-    required this.lowerChange,
-    required this.upperChange,
-  });
-
-  factory MoneyInfo.fromJson(Map<String, dynamic> decodedJson) {
-    return MoneyInfo(
-      mnemonic: decodedJson["mnemonic"],
-      master: sv.HDPrivateKey.fromXpriv(decodedJson["master"]),
-      down4priv: sv.HDPrivateKey.fromXpriv(decodedJson["down4priv"]),
-      lowerIndex: decodedJson["lowerindex"],
-      upperIndex: decodedJson["upperindex"],
-      lowerChange: decodedJson["lowerchange"],
-      upperChange: decodedJson["upperchange"],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      "mnemonic": mnemonic,
-      "master": master.toString(),
-      "down4priv": down4priv.toString(),
-      "lowerindex": lowerIndex,
-      "upperindex": upperIndex,
-      "lowerchange": lowerChange,
-      "upperchange": upperChange,
-    };
-  }
-}
-
 class Down4Media {
   Identifier id;
   MediaMetadata metadata;
@@ -490,6 +450,7 @@ class Down4Message {
 
 class Node {
   final Identifier id;
+  final sv.HDPublicKey? neuter;
   String name;
   String? lastName;
   Down4Media image;
@@ -509,6 +470,7 @@ class Node {
     required this.id,
     required this.image,
     required this.name,
+    this.neuter,
     this.description,
     this.activity = 0,
     this.lastName,

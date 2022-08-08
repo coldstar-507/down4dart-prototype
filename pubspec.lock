@@ -22,6 +22,20 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.1.0"
+  bs58check:
+    dependency: transitive
+    description:
+      name: bs58check
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.2"
+  bsv:
+    dependency: "direct main"
+    description:
+      name: bsv
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.11"
   buffer:
     dependency: transitive
     description:

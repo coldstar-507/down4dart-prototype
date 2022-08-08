@@ -84,6 +84,15 @@ Future<Down4Media?> getMessageMedia(String id) async {
 //   return res.statusCode == 200;
 // }
 
+Future<double?> getExchangeRate() async {
+  final url = Uri.parse(
+    "https://api.whatsonchain.com/v1/bsv/main/exchangerate",
+  );
+  final res = await http.get(url);
+  if (res.statusCode != 200) return null;
+  return double.parse(jsonDecode(res.body)["rate"]);
+}
+
 Future<bool> pingRequest(MessageRequest req) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
