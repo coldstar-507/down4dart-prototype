@@ -20,6 +20,10 @@ import 'package:hex/hex.dart';
 import 'render_pages.dart';
 import 'data_objects.dart';
 
+import 'down4_utility.dart' as d4utils;
+
+import 'package:bsv/bsv.dart' as bsv;
+
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
   const Down4({
@@ -91,22 +95,18 @@ class _Down4State extends State<Down4> {
     final idCodeUnits = id.codeUnits;
     final secretData = concatMnemonicCodes + idCodeUnits;
 
-    final seed = sv.Mnemonic().toSeedHex(mnemonic);
-    final master = sv.HDPrivateKey.fromSeed(seed, sv.NetworkType.MAIN);
-    final down4priv = master.deriveChildKey("m/4'/0'/0'");
-    final neuter = down4priv.hdPublicKey;
-    print("seedHex: $seed");
-    print("masterString: ${master.toString()}");
-    print("down4priv: ${down4priv.toString()}");
-    print("neuter: ${neuter.toString()}");
+    final bip39 = bsv.Bip39.fromString(mnemonic);
+    final master = bsv.Bip32.fromSeed(bip39.seed!.toList());
+    final down4priv = master.derive("m/4'/0'/0'");
+    final neuter = down4priv.bip32PubKey;
+
+    final bsvDoubleHash = bsv.Hash.sha256Sha256(secretData.asUint8List());
+    final bsvDoubleHashHex = bsvDoubleHash.toHex();
 
     final singleHash =
         pc256.SHA256Digest().process(Uint8List.fromList(secretData));
     final doubleHash = pc256.SHA256Digest().process(singleHash);
     final pcDoubleHashHex = HEX.encode(doubleHash);
-
-    final doublesv = sv.sha256Twice(secretData);
-    final doublesvHex = HEX.encode(doublesv);
 
     print("concatMnemonicCodeUnits: $concatMnemonicCodes");
     print("idCodeUnits: $idCodeUnits");
@@ -115,18 +115,18 @@ class _Down4State extends State<Down4> {
     print("pcDoubleHash: $doubleHash");
     print("pcDoubleHEX: $pcDoubleHashHex");
 
-    print("doublesv: $doublesv");
-    print("doublesvHEX: $doublesvHex");
+    print("doublesv: $bsvDoubleHash");
+    print("doublesvHEX: $bsvDoubleHashHex");
 
-    final secret = doublesvHex;
-    final isValid = doublesvHex == pcDoubleHashHex;
+    final secret = bsvDoubleHashHex;
+    final isValid = bsvDoubleHashHex == pcDoubleHashHex;
 
-    print("VALID SECRET IS ${doublesvHex == pcDoubleHashHex}\n");
+    print("VALID SECRET IS $isValid\n");
     if (!isValid) {
       return false;
     }
 
-    final imageID = HEX.encode(sv.sha1(id.codeUnits + imData.toList()));
+    final imageID = d4utils.generateMediaID(imData);
     Down4Media image = Down4Media(
       id: imageID,
       data: imData,
@@ -193,6 +193,7 @@ class _Down4State extends State<Down4> {
 
   void homePage() {
     _view = HomePage(
+      wallet: _wallet!,
       cameras: widget.cameras,
       self: _user!,
     );

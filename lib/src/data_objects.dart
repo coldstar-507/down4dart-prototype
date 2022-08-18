@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:dartsv/dartsv.dart' as sv;
+import 'package:bsv/bsv.dart' as bsv;
 import 'boxes.dart';
 import 'web_requests.dart' as r;
 import 'down4_utility.dart' as d4utils;
@@ -450,7 +451,9 @@ class Down4Message {
 
 class Node {
   final Identifier id;
-  final sv.HDPublicKey? neuter;
+  final bsv.Bip32? neuter;
+  // final sv.HDPublicKey? neuter;
+
   String name;
   String? lastName;
   Down4Media image;

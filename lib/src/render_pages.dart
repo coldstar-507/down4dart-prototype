@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:bsv/bsv.dart' as bsv;
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -268,24 +269,14 @@ class _MoneyPageState extends State<MoneyPage> {
   };
 
   bool pay(String currency, bool split) {
-    final walletIndex = math.Random().nextInt(1 << 32);
-    final txInfos = widget.palettes.asMap().entries.map((e) {
-      final pubKey =
-          e.value.node.neuter!.deriveChildNumber(walletIndex).keyBuffer;
-      return {
-        "idx": e.key,
-        "username": e.value.node.id,
-        "address": sv.Address.fromCompressedPubKey(pubKey, sv.NetworkType.MAIN),
-        "pubKey": pubKey,
-      };
-    });
-  final inputs = widget.wallet.
+    // TODO
+    return false;
   }
 
-  BigInt usdToSatoshis(double usds) =>
-      BigInt.from((usds / widget.exchangeRate) * 100000000);
+  bsv.BigIntX usdToSatoshis(double usds) =>
+      bsv.BigIntX.fromNum((usds / widget.exchangeRate) * 100000000);
 
-  double satoshisToUSD(BigInt satoshis) =>
+  double satoshisToUSD(bsv.BigIntX satoshis) =>
       (satoshis.toInt() / 100000000) * widget.exchangeRate;
 
   String get satoshis => widget.wallet.balance.toString();
@@ -1103,8 +1094,13 @@ class _ChatPageState extends State<ChatPage> {
 class HomePage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final Node self;
-  const HomePage({required this.cameras, required this.self, Key? key})
-      : super(key: key);
+  final Wallet wallet;
+  const HomePage({
+    required this.cameras,
+    required this.self,
+    required this.wallet,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -1112,6 +1108,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   Widget? _view;
+  Wallet? _wallet;
   // The base location is Home with the home palettes
   // You can traverse palettes which will be cached
   // Home -> home palettes
@@ -1350,7 +1347,7 @@ class _HomePageState extends State<HomePage> {
     return null;
   }
 
-  void handleSnipCameraCallback(
+  Future<void> handleSnipCameraCallback(
     String? path,
     bool? isVideo,
     bool? toReverse,
@@ -1802,8 +1799,11 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
-  void moneyPage() {
+  Future<void> moneyPage() async {
+    final exchangeRate = await r.getExchangeRate();
     _view = MoneyPage(
+      wallet: widget.wallet,
+      exchangeRate: exchangeRate ?? 0.0,
       palettes: selectedHomeUserPaletteDeactivated,
       back: homePage,
     );
