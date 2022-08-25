@@ -1,10 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:dartsv/dartsv.dart' as sv;
-import 'package:bsv/bsv.dart' as bsv;
-import 'boxes.dart';
+import 'package:bip32/bip32.dart';
 import 'web_requests.dart' as r;
 import 'down4_utility.dart' as d4utils;
 
@@ -54,45 +51,33 @@ class Down4Media {
     this.file,
   });
 
-  Future<Uint8List?> generateThumbnail() async {
-    if (!metadata.isVideo) {
-      return thumbnail = await FlutterImageCompress.compressWithList(
-        data,
-        minWidth: 10,
-        minHeight: 10,
-        quality: 50,
-      );
-    }
-    return null;
-  }
-
   factory Down4Media.fromJson(Map<String, dynamic> decodedJson) {
     final metadata = MediaMetadata.fromJson(decodedJson["md"]);
-    if (metadata.isVideo) {
-      final path = Boxes.instance.dirPath + "/" + decodedJson["id"];
-      var file = File(path);
-      final data = base64Decode(decodedJson["d"]);
-      file.writeAsBytesSync(data);
-      return Down4Media(
-        id: decodedJson["id"],
-        file: file,
-        path: path,
-        metadata: MediaMetadata.fromJson(decodedJson["md"]),
-        data: data,
-        thumbnail: decodedJson["tn"] != null && decodedJson["tn"] != ""
-            ? base64Decode(decodedJson["tn"])
-            : null,
-      );
-    } else {
-      return Down4Media(
-        id: decodedJson["id"],
-        metadata: metadata,
-        data: base64Decode(decodedJson["d"]),
-        thumbnail: decodedJson["tn"] != null && decodedJson["tn"] != ""
-            ? base64Decode(decodedJson["tn"])
-            : null,
-      );
-    }
+    // if (metadata.isVideo) {
+    //   final path = Boxes.instance.dirPath + "/" + decodedJson["id"];
+    //   var file = File(path);
+    //   final data = base64Decode(decodedJson["d"]);
+    //   file.writeAsBytesSync(data);
+    //   return Down4Media(
+    //     id: decodedJson["id"],
+    //     file: file,
+    //     path: path,
+    //     metadata: MediaMetadata.fromJson(decodedJson["md"]),
+    //     data: data,
+    //     thumbnail: decodedJson["tn"] != null && decodedJson["tn"] != ""
+    //         ? base64Decode(decodedJson["tn"])
+    //         : null,
+    //   );
+    // } else {
+    return Down4Media(
+      id: decodedJson["id"],
+      metadata: metadata,
+      data: base64Decode(decodedJson["d"]),
+      thumbnail: decodedJson["tn"] != null && decodedJson["tn"] != ""
+          ? base64Decode(decodedJson["tn"])
+          : null,
+    );
+    // }
   }
 
   factory Down4Media.fromCamera(String filePath, MediaMetadata md) {
@@ -112,25 +97,25 @@ class Down4Media {
         if (thumbnail != null) "tn": base64Encode(thumbnail!),
       };
 
-  void save() {
-    metadata.isVideo
-        ? Boxes.instance.videos.put(id, jsonEncode(this))
-        : Boxes.instance.images.put(id, jsonEncode(this));
-  }
+  // void save() {
+  //   metadata.isVideo
+  //       ? Boxes.instance.videos.put(id, jsonEncode(this))
+  //       : Boxes.instance.images.put(id, jsonEncode(this));
+  // }
 
-  void writeToFile() {
-    path = Boxes.instance.dirPath + "/" + id;
-    file = File(path!);
-    file!.writeAsBytesSync(data);
-  }
+  // void writeToFile() {
+  //   path = Boxes.instance.dirPath + "/" + id;
+  //   file = File(path!);
+  //   file!.writeAsBytesSync(data);
+  // }
 
-  void deleteFile() {
-    file?.delete();
-  }
+  // void deleteFile() {
+  //   file?.delete();
+  // }
 
-  factory Down4Media.fromSave(String id) {
-    return Down4Media.fromJson(jsonDecode(Boxes.instance.images.get(id)));
-  }
+  // factory Down4Media.fromSave(String id) {
+  //   return Down4Media.fromJson(jsonDecode(Boxes.instance.images.get(id)));
+  // }
 }
 
 class Reaction {
@@ -154,10 +139,10 @@ class Reaction {
     );
   }
 
-  factory Reaction.fromLocal(String id) {
-    final decodedJson = jsonDecode(Boxes.instance.reactions.get(id));
-    return Reaction.fromJson(decodedJson);
-  }
+  // factory Reaction.fromLocal(String id) {
+  //   final decodedJson = jsonDecode(Boxes.instance.reactions.get(id));
+  //   return Reaction.fromJson(decodedJson);
+  // }
 
   Map<String, dynamic> toLocal() => {
         'id': id,
@@ -393,10 +378,10 @@ class Down4Message {
     );
   }
 
-  factory Down4Message.fromLocal(String id) {
-    final decodedJson = jsonDecode(Boxes.instance.messages.get(id));
-    return Down4Message.fromJson(decodedJson);
-  }
+  // factory Down4Message.fromLocal(String id) {
+  //   final decodedJson = jsonDecode(Boxes.instance.messages.get(id));
+  //   return Down4Message.fromJson(decodedJson);
+  // }
 
   Map<String, dynamic> toJson([bool withMediaData = true]) => {
         'rt': root,
@@ -422,37 +407,36 @@ class Down4Message {
                 },
       };
 
-  factory Down4Message.fromSave(String id) {
-    Map<String, dynamic> saved = Boxes.instance.savedMessages.get(id);
-    Down4Media? m;
-    if (saved["m"]?["id"] != null) {
-      m = Down4Media.fromSave(saved["m"]!["id"]);
-    }
-    saved["m"] = m;
-    return Down4Message.fromJson(saved);
-  }
+  // factory Down4Message.fromSave(String id) {
+  //   Map<String, dynamic> saved = Boxes.instance.savedMessages.get(id);
+  //   Down4Media? m;
+  //   if (saved["m"]?["id"] != null) {
+  //     m = Down4Media.fromSave(saved["m"]!["id"]);
+  //   }
+  //   saved["m"] = m;
+  //   return Down4Message.fromJson(saved);
+  // }
 
-  void save() {
-    Boxes.instance.savedMessages.put(
-      messageID,
-      jsonEncode(toJson(false)),
-    );
-    media?.save();
-  }
+  // void save() {
+  //   Boxes.instance.savedMessages.put(
+  //     messageID,
+  //     jsonEncode(toJson(false)),
+  //   );
+  //   media?.save();
+  // }
 
-  void saveLocally() {
-    Boxes.instance.messages.put(messageID, jsonEncode(this));
-  }
+  // void saveLocally() {
+  //   Boxes.instance.messages.put(messageID, jsonEncode(this));
+  // }
 
-  void deleteLocally() {
-    Boxes.instance.messages.delete(messageID);
-  }
+  // void deleteLocally() {
+  //   Boxes.instance.messages.delete(messageID);
+  // }
 }
 
 class Node {
   final Identifier id;
-  final bsv.Bip32? neuter;
-  // final sv.HDPublicKey? neuter;
+  final BIP32? neuter;
 
   String name;
   String? lastName;
@@ -523,10 +507,10 @@ class Node {
     lastName = mergeNode.lastName;
   }
 
-  factory Node.fromLocal(Identifier id) {
-    final decodedJson = jsonDecode(Boxes.instance.home.get(id));
-    return Node.fromJson(decodedJson);
-  }
+  // factory Node.fromLocal(Identifier id) {
+  //   final decodedJson = jsonDecode(Boxes.instance.home.get(id));
+  //   return Node.fromJson(decodedJson);
+  // }
 
   factory Node.fromJson(Map<String, dynamic> decodedJson) {
     return Node(
@@ -547,45 +531,63 @@ class Node {
     );
   }
 
-  Map<String, dynamic> toFirebase() => {
-        "id": id,
-        "t": type.name,
-        "nm": name,
-        "ln": lastName,
-        "im": image.id,
-        "msg": messages,
-        "adm": admins,
-        "chl": childs,
-        "prt": parents,
-        "pst": posts,
-        "grp": group,
-      };
+  // Map<String, dynamic> toFirebase() => {
+  //       "id": id,
+  //       "t": type.name,
+  //       "nm": name,
+  //       "ln": lastName,
+  //       "im": image.id,
+  //       "msg": messages,
+  //       "adm": admins,
+  //       "chl": childs,
+  //       "prt": parents,
+  //       "pst": posts,
+  //       "grp": group,
+  //       "snp": snips,
+  //     };
 
-  Map<String, dynamic> toLocal() => {
+  // Map<String, dynamic> toLocal() => {
+  //       "id": id,
+  //       "t": type.name,
+  //       "a": activity,
+  //       "nm": name,
+  //       "ln": lastName,
+  //       "im": image.toJson(),
+  //       "msg": messages,
+  //       "adm": admins,
+  //       "chl": childs,
+  //       "prt": parents,
+  //       "pst": posts,
+  //       "grp": group,
+  //       "snp": snips,
+  //     };
+
+  Map<String, dynamic> toJson([bool withMedia = true]) => {
         "id": id,
         "t": type.name,
         "a": activity,
         "nm": name,
         "ln": lastName,
-        "im": image.toJson(),
+        "im": withMedia ? image.toJson() : image.id,
         "msg": messages,
         "adm": admins,
         "chl": childs,
         "prt": parents,
         "pst": posts,
         "grp": group,
+        "snp": snips,
       };
 
-  void saveLocally() {
-    Boxes.instance.home.put(id, jsonEncode(toLocal()));
-  }
+  // void saveLocally() {
+  //   Boxes.instance.home.put(id, jsonEncode(toLocal()));
+  // }
 
-  void deleteLocally() {
-    Boxes.instance.home.delete(id);
-    for (final msgID in messages) {
-      Boxes.instance.messages.delete(msgID);
-    }
-  }
+  // void deleteLocally() {
+  //   Boxes.instance.home.delete(id);
+  //   for (final msgID in messages) {
+  //     Boxes.instance.messages.delete(msgID);
+  //   }
+  // }
 
   // factory Node.fromLocal(String id, Box<dynamic> box) {
   //   if (isFriend) {
