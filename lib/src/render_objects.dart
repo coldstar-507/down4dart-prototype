@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io' as io;
 import 'dart:math' as math;
 import 'package:video_player/video_player.dart';
+import 'boxes.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
@@ -517,13 +518,15 @@ class Palette extends StatelessWidget {
                               ].contains(node.type) &&
                               node.messages.isNotEmpty
                           ? Text(
-                              (Down4Message.fromLocal(node.messages.last)
+                              (Boxes.instance
+                                              .loadMessage(node.messages.last)
                                               .text
                                               ?.length ??
                                           0) >
                                       0
                                   ? '"' +
-                                      Down4Message.fromLocal(node.messages.last)
+                                      Boxes.instance
+                                          .loadMessage(node.messages.last)
                                           .text! +
                                       '"'
                                   : "&attachment",
@@ -1235,10 +1238,10 @@ class MessageList4 extends StatelessWidget {
               Down4Message? prevMsg;
               if (i < messages.length) {
                 prevMsg = messageMap[messages[i]]?.message ??
-                    Down4Message.fromLocal(messages[i]);
+                    Boxes.instance.loadMessage(messages[i]);
               }
               final msg =
-                  prevMsgCache ?? Down4Message.fromLocal(messages[i - 1]);
+                  prevMsgCache ?? Boxes.instance.loadMessage(messages[i - 1]);
               final chat = ChatMessage(
                 message: msg,
                 myMessage: msg.senderID == self.id,

@@ -1,5 +1,5 @@
+import 'dart:io';
 import 'dart:typed_data';
-import 'package:bsv/bsv.dart' as bsv;
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -13,13 +13,13 @@ import 'boxes.dart';
 import 'camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:dartsv/dartsv.dart' as sv;
 import 'web_requests.dart' as r;
 import 'package:hex/hex.dart';
 import 'down4_utility.dart' as d4utils;
 import 'package:random_words/random_words.dart' as rw;
 import 'render_utility.dart';
 import 'dart:math' as math;
+import 'simple_bsv.dart';
 
 class PalettePage extends StatelessWidget {
   final List<Palette> palettes;
@@ -101,7 +101,7 @@ class _GroupPageState extends State<GroupPage> {
       type: widget.isHyperchat ? Nodes.hyperchat : Nodes.group,
       imageCallBack: (data) {
         final dataForID = widget.self.id.codeUnits + data.toList();
-        final imageID = HEX.encode(sv.sha1(dataForID));
+        final imageID = d4utils.generateMediaID(dataForID.asUint8List());
         _hyperchatImage = Down4Media(
           data: data,
           id: imageID,
@@ -168,7 +168,8 @@ class _GroupPageState extends State<GroupPage> {
         timestamp: ts,
         text: _input,
         nodes: _forwardingNodes,
-      )..saveLocally();
+      );
+      Boxes.instance.saveMessage(msg);
       var hyperchatNode = Node(
         type: Nodes.hyperchat,
         id: root,
@@ -183,9 +184,8 @@ class _GroupPageState extends State<GroupPage> {
         childs: [],
         admins: [],
         snips: [],
-      )
-        ..updateActivity()
-        ..saveLocally();
+      )..updateActivity();
+      Boxes.instance.saveNode(hyperchatNode);
       final f = widget.isHyperchat ? r.hyperchatRequest : r.groupRequest;
       final success = await f(MessageRequest(
         msg: msg,
@@ -273,11 +273,11 @@ class _MoneyPageState extends State<MoneyPage> {
     return false;
   }
 
-  bsv.BigIntX usdToSatoshis(double usds) =>
-      bsv.BigIntX.fromNum((usds / widget.exchangeRate) * 100000000);
+  int usdToSatoshis(double usds) =>
+      ((usds / widget.exchangeRate) * 100000000).floor();
 
-  double satoshisToUSD(bsv.BigIntX satoshis) =>
-      (satoshis.toInt() / 100000000) * widget.exchangeRate;
+  double satoshisToUSD(int satoshis) =>
+      (satoshis / 100000000) * widget.exchangeRate;
 
   String get satoshis => widget.wallet.balance.toString();
 
@@ -903,20 +903,20 @@ class _ChatPageState extends State<ChatPage> {
   bool _showMediaConsole = false;
   ConsoleInput? _consoleInput;
   var tec = TextEditingController();
-  Map<Identifier, Down4Media> _medias = {};
+  Map<Identifier, Down4Media> _images = {};
   Map<Identifier, ChatMessage> _messages = {};
 
-  List<Down4Media> get medias {
-    if (_medias.isEmpty && Boxes.instance.images.keys.isEmpty) {
+  List<Down4Media> get images {
+    if (_images.isEmpty && Boxes.instance.images.keys.isEmpty) {
       return <Down4Media>[];
-    } else if (_medias.values.isEmpty &&
+    } else if (_images.values.isEmpty &&
         Boxes.instance.images.keys.isNotEmpty) {
       for (final mediaID in Boxes.instance.images.keys) {
-        _medias[mediaID] = Down4Media.fromSave(mediaID);
+        _images[mediaID] = Boxes.instance.loadImage(mediaID);
       }
-      return _medias.values.toList();
+      return _images.values.toList();
     } else {
-      return _medias.values.toList();
+      return _images.values.toList();
     }
   }
 
@@ -934,7 +934,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Console get mediasConsole => Console(
         images: true,
-        medias: medias,
+        medias: images,
         selectMedia: (media) {
           _mediaInput = media;
           send();
@@ -978,11 +978,12 @@ class _ChatPageState extends State<ChatPage> {
           minWidth: 0,
         );
         final mediaID = d4utils.generateMediaID(compressedData);
-        _medias[mediaID] = Down4Media(
+        _images[mediaID] = Down4Media(
           id: mediaID,
           data: compressedData,
           metadata: MediaMetadata(owner: widget.self.id, timestamp: ts),
-        )..save();
+        );
+        Boxes.instance.saveImage(_images[mediaID]!);
       }
     }
     setState(() {});
@@ -1016,7 +1017,13 @@ class _ChatPageState extends State<ChatPage> {
   void saveSelectedMessages() {
     for (final msg in _messages.values) {
       if (msg.selected) {
-        msg.message.save();
+        if (msg.message.media != null) {
+          if (msg.message.media!.metadata.isVideo) {
+            Boxes.instance.saveVideo(msg.message.media!);
+          } else {
+            Boxes.instance.saveImage(msg.message.media!);
+          }
+        }
         _messages[msg.message.messageID] = msg.invertedSelection();
       }
     }
@@ -1046,7 +1053,8 @@ class _ChatPageState extends State<ChatPage> {
         senderThumbnail: base64Encode(widget.self.image.thumbnail!),
         media: _cameraInput ?? _mediaInput,
         text: _textInput,
-      )..saveLocally();
+      );
+      Boxes.instance.saveMessage(msg);
       widget.send(MessageRequest(targets: targets, msg: msg));
       clearInputs();
       setState(() {});
@@ -1255,9 +1263,9 @@ class _HomePageState extends State<HomePage> {
           return null;
         } else {
           final lastMessageID = node.messages.last;
-          final msg = Down4Message.fromLocal(lastMessageID);
+          final msg = Boxes.instance.loadMessage(lastMessageID);
           if (msg.timestamp.isExpired) {
-            node.deleteLocally();
+            Boxes.instance.deleteNode(node.id);
             return null;
           }
         }
@@ -1405,21 +1413,22 @@ class _HomePageState extends State<HomePage> {
           if (nodeAt(msg.root) != null) {
             nodeAt(msg.root)!
               ..messages.add(msg.messageID)
-              ..updateActivity()
-              ..saveLocally();
-            print(nodeAt(msg.root)?.messages);
-            msg.saveLocally();
+              ..updateActivity();
+            Boxes.instance.saveNode(nodeAt(msg.root)!);
+            Boxes.instance.saveMessage(msg);
           } else {
             // not in home -> fetch the node
             final nonFriend = await r.getNodes([msg.root]);
             // save it locally with proper type and activity
             if (nonFriend?.isNotEmpty ?? false) {
-              writePalette(nonFriend!.first
-                ..mutateType(Nodes.nonFriend)
-                ..messages.add(msg.messageID)
-                ..updateActivity()
-                ..saveLocally());
-              msg.saveLocally();
+              writePalette(
+                nonFriend!.first
+                  ..mutateType(Nodes.nonFriend)
+                  ..messages.add(msg.messageID)
+                  ..updateActivity(),
+              );
+              Boxes.instance.saveNode(nonFriend.first);
+              Boxes.instance.saveMessage(msg);
             }
           }
           _view is Down4PalettePage
@@ -1435,10 +1444,10 @@ class _HomePageState extends State<HomePage> {
           final msg = await notif.toDown4Message();
           final node = (await notif.nodeOfHyperchat())
             ?..messages.add(msg.messageID)
-            ..updateActivity()
-            ..saveLocally();
+            ..updateActivity();
           if (node != null) {
-            msg.saveLocally();
+            Boxes.instance.saveNode(node);
+            Boxes.instance.saveMessage(msg);
             writePalette(node);
           }
           _view is Down4PalettePage
@@ -1454,10 +1463,10 @@ class _HomePageState extends State<HomePage> {
           final msg = await notif.toDown4Message();
           var node = (await notif.nodeOfGroup())
             ?..messages.add(msg.messageID)
-            ..updateActivity()
-            ..saveLocally();
+            ..updateActivity();
           if (node != null) {
-            msg.saveLocally();
+            Boxes.instance.saveNode(node);
+            Boxes.instance.saveMessage(msg);
             writePalette(node);
           }
           _view is Down4PalettePage
@@ -1478,10 +1487,12 @@ class _HomePageState extends State<HomePage> {
           }
 
           void updateNode(Node node) {
-            writePalette(node
-              ..updateActivity()
-              ..snips.add(notif.mediaID!)
-              ..saveLocally());
+            writePalette(
+              node
+                ..updateActivity()
+                ..snips.add(notif.mediaID!),
+            );
+            Boxes.instance.saveNode(node);
           }
 
           final roots = notif.root.split(" ");
@@ -1535,13 +1546,15 @@ class _HomePageState extends State<HomePage> {
         ..node.mutateType(Nodes.friend);
 
       _palettes["Home"]!.putIfAbsent(
-          friend.id,
-          () => nodeToPalette(
-              "Home",
-              friend
-                ..mutateType(Nodes.friend)
-                ..updateActivity()
-                ..saveLocally())!);
+        friend.id,
+        () => nodeToPalette(
+          "Home",
+          friend
+            ..mutateType(Nodes.friend)
+            ..updateActivity(),
+        )!,
+      );
+      Boxes.instance.saveNode(friend);
     }
     searchPage();
   }
@@ -1553,7 +1566,7 @@ class _HomePageState extends State<HomePage> {
 
   void delete() {
     for (final p in homePalettes.toList().where((e) => e.selected)) {
-      p.node.deleteLocally();
+      Boxes.instance.deleteNode(p.node.id);
       _palettes["Home"]?.remove(p.node.id);
     }
     homePage();
@@ -1581,10 +1594,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<bool> chatRequest(MessageRequest req) async {
     final success = r.chatRequest(req);
-    chatPage(nodeAt(req.msg.root)!
+    final node = nodeAt(req.msg.root)!;
+    chatPage(node
       ..messages.add(req.msg.messageID)
-      ..updateActivity()
-      ..saveLocally());
+      ..updateActivity());
+    Boxes.instance.saveNode(node);
     return await success;
   }
 
@@ -1887,13 +1901,21 @@ class _HomePageState extends State<HomePage> {
         maxZoom: await ctrl!.getMaxZoomLevel(),
         minZoom: await ctrl.getMinZoomLevel(),
         camNum: camera,
-        ctrl: ctrl,
-        nextRes: () =>
-            snipPage(ctrl: ctrl, res: nextRes(), camera: camera, reload: true),
-        flip: () =>
-            snipPage(ctrl: ctrl, res: res, camera: nextCam(), reload: true),
         cameraBack: homePage,
         cameraCallBack: handleSnipCameraCallback,
+        ctrl: ctrl,
+        nextRes: () => snipPage(
+          ctrl: ctrl,
+          res: nextRes(),
+          camera: camera,
+          reload: true,
+        ),
+        flip: () => snipPage(
+          ctrl: ctrl,
+          res: res,
+          camera: nextCam(),
+          reload: true,
+        ),
       );
       setState(() {});
     }
@@ -1933,9 +1955,8 @@ class _HomePageState extends State<HomePage> {
       homePage();
     } else {
       final snip = node.snips.first;
-      node
-        ..snips.remove(snip) // consume it
-        ..saveLocally();
+      node.snips.remove(snip); // consume it
+      Boxes.instance.saveNode(node);
       Down4Media? media;
       dynamic jsonEncodedMedia;
       if ((jsonEncodedMedia = Boxes.instance.snip.get(snip)) == null) {
@@ -1951,8 +1972,8 @@ class _HomePageState extends State<HomePage> {
       final scale =
           1 / (media!.metadata.aspectRatio ?? 1.0 * mediaSize.aspectRatio);
       if (media.metadata.isVideo) {
-        media.writeToFile();
-        var ctrl = VideoPlayerController.file(media.file!);
+        var f = Boxes.instance.writeMediaToFile(media);
+        var ctrl = VideoPlayerController.file(f);
         await ctrl.initialize();
         await ctrl.setLooping(true);
         await ctrl.play();
@@ -2001,7 +2022,7 @@ class _HomePageState extends State<HomePage> {
                 name: "Back",
                 onPress: () async {
                   await ctrl.dispose();
-                  media!.deleteFile();
+                  f.delete();
                   writePalette(node);
                   homePage();
                 },
@@ -2012,7 +2033,7 @@ class _HomePageState extends State<HomePage> {
                 name: "Next",
                 onPress: () async {
                   await ctrl.dispose();
-                  media!.deleteFile();
+                  f.delete();
                   snipView(node);
                 },
               ),

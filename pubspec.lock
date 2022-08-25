@@ -15,6 +15,20 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.8.2"
+  bip32:
+    dependency: "direct main"
+    description:
+      name: bip32
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.0.0"
+  bip39:
+    dependency: "direct main"
+    description:
+      name: bip39
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.6"
   boolean_selector:
     dependency: transitive
     description:
@@ -29,20 +43,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.2"
-  bsv:
-    dependency: "direct main"
-    description:
-      name: bsv
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "1.0.11"
-  buffer:
-    dependency: transitive
-    description:
-      name: buffer
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "1.1.1"
   camera:
     dependency: "direct main"
     description:
@@ -127,13 +127,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.4"
-  dartsv:
-    dependency: "direct main"
-    description:
-      name: dartsv
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "1.0.1"
   dbus:
     dependency: transitive
     description:
@@ -457,13 +450,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.2"
-  resource_portable:
-    dependency: transitive
-    description:
-      name: resource_portable
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "3.0.0"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -476,13 +462,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.8.2"
-  sprintf:
-    dependency: transitive
-    description:
-      name: sprintf
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "6.0.0"
   stack_trace:
     dependency: transitive
     description:
@@ -546,13 +525,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.3.0"
-  unorm_dart:
-    dependency: transitive
-    description:
-      name: unorm_dart
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.2.0"
   vector_math:
     dependency: transitive
     description:

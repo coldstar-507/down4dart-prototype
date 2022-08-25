@@ -1,6 +1,14 @@
-import 'package:hex/hex.dart';
-import 'package:dartsv/dartsv.dart' as sv;
+import 'package:convert/convert.dart';
 import 'dart:typed_data';
+import 'package:pointycastle/digests/sha1.dart' as sha1;
+
+extension AsUint8List on List<int> {
+  Uint8List asUint8List() => Uint8List.fromList(this);
+}
+
+extension ToHex on List<int> {
+  String toHex() => hex.encode(this);
+}
 
 extension StringExtension on String {
   String capitalize() {
@@ -11,19 +19,24 @@ extension StringExtension on String {
 String deterministicHyperchatRoot(List<String> ids) {
   final sortedList = ids..sort();
   final asString = sortedList.join("");
-  return HEX.encode(sv.sha1(asString.codeUnits));
+
+  final hash = sha1.SHA1Digest().process(asString.codeUnits.asUint8List());
+  return hex.encode(hash);
 }
 
 String deterministicGroupRoot(List<String> ids) {
   final sortedList = ids..sort();
   final asString = sortedList.reversed.join("");
-  return HEX.encode(sv.sha1(asString.codeUnits));
+  final hash = sha1.SHA1Digest().process(asString.codeUnits.asUint8List());
+  return hex.encode(hash);
 }
 
 String generateMessageID(String senderID, num timeStamp) {
   final senderCodeUnits = senderID.codeUnits;
   final tsCodeUnits = timeStamp.toString().codeUnits;
-  return HEX.encode(sv.sha1(senderCodeUnits + tsCodeUnits));
+  final data = (senderCodeUnits + tsCodeUnits).asUint8List();
+  final hash = sha1.SHA1Digest().process(data);
+  return hex.encode(hash);
 }
 
 extension Down4TimestampExpiration on int {
@@ -52,7 +65,7 @@ String generateMediaID(Uint8List mediaData) {
   for (int i = 1; i < 101; i++) {
     bytes.add(mediaData[(i * prime) % n]);
   }
-  return HEX.encode(sv.sha1(bytes));
+  return hex.encode(sha1.SHA1Digest().process(bytes.asUint8List()));
 }
 
 int timeStamp() {

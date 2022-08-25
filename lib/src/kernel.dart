@@ -2,27 +2,25 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:dartsv/dartsv.dart' as sv;
+import 'package:bip32/bip32.dart' as b32;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:flutter_testproject/src/wallet.dart';
 import 'web_requests.dart' as r;
 import 'boxes.dart';
-// import 'package:crypto/crypto.dart' as crypto;
-// import 'package:pointycastle/digests/sha1.dart';
 import 'package:pointycastle/digests/sha256.dart' as pc256;
-// import 'package:firebase_storage/firebase_storage.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:convert/convert.dart';
 import 'package:hex/hex.dart';
 
 import 'render_pages.dart';
 import 'data_objects.dart';
 
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+
 import 'down4_utility.dart' as d4utils;
 
-import 'package:bsv/bsv.dart' as bsv;
+import 'simple_bsv.dart';
+
+import 'package:bip39/bip39.dart' as b39;
 
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -95,36 +93,12 @@ class _Down4State extends State<Down4> {
     final idCodeUnits = id.codeUnits;
     final secretData = concatMnemonicCodes + idCodeUnits;
 
-    final bip39 = bsv.Bip39.fromString(mnemonic);
-    final master = bsv.Bip32.fromSeed(bip39.seed!.toList());
-    final down4priv = master.derive("m/4'/0'/0'");
-    final neuter = down4priv.bip32PubKey;
+    final seed = b39.mnemonicToSeed(mnemonic);
+    final master = b32.BIP32.fromSeed(seed);
+    final down4priv = master.derivePath("m/4'/0'/0'");
+    final neuter = down4priv.neutered();
 
-    final bsvDoubleHash = bsv.Hash.sha256Sha256(secretData.asUint8List());
-    final bsvDoubleHashHex = bsvDoubleHash.toHex();
-
-    final singleHash =
-        pc256.SHA256Digest().process(Uint8List.fromList(secretData));
-    final doubleHash = pc256.SHA256Digest().process(singleHash);
-    final pcDoubleHashHex = HEX.encode(doubleHash);
-
-    print("concatMnemonicCodeUnits: $concatMnemonicCodes");
-    print("idCodeUnits: $idCodeUnits");
-    print("secretData: $secretData");
-
-    print("pcDoubleHash: $doubleHash");
-    print("pcDoubleHEX: $pcDoubleHashHex");
-
-    print("doublesv: $bsvDoubleHash");
-    print("doublesvHEX: $bsvDoubleHashHex");
-
-    final secret = bsvDoubleHashHex;
-    final isValid = bsvDoubleHashHex == pcDoubleHashHex;
-
-    print("VALID SECRET IS $isValid\n");
-    if (!isValid) {
-      return false;
-    }
+    final secret = sha256sha256(secretData.asUint8List());
 
     final imageID = d4utils.generateMediaID(imData);
     Down4Media image = Down4Media(
@@ -141,9 +115,9 @@ class _Down4State extends State<Down4> {
       'id': id,
       'nm': name,
       'ln': lastName,
-      'sh': secret,
+      'sh': secret.toHex(),
       'tkn': token,
-      'nt': neuter.toString(),
+      'nt': neuter.toBase58(),
       'im': image,
     };
 
@@ -154,7 +128,14 @@ class _Down4State extends State<Down4> {
       return false;
     }
 
-    await image.generateThumbnail();
+    final thumbnail = await FlutterImageCompress.compressWithList(
+      image.data,
+      minWidth: 20,
+      minHeight: 20,
+      quality: 50,
+    );
+
+    image.thumbnail = thumbnail;
 
     _user = Node(
       type: Nodes.user,
@@ -172,18 +153,10 @@ class _Down4State extends State<Down4> {
       snips: [],
     );
 
-    _wallet = Wallet(
-      mnemonic: mnemonic,
-      master: master,
-      down4priv: down4priv,
-      lowerIndex: 0,
-      upperIndex: 0,
-      lowerChange: 1,
-      upperChange: 1,
-    );
+    _wallet = Wallet([], down4priv, [], mnemonic);
 
     Boxes.instance.user.put('token', token);
-    Boxes.instance.user.put('user', jsonEncode(_user!.toLocal()));
+    Boxes.instance.user.put('user', jsonEncode(_user));
     Boxes.instance.user.put('money', jsonEncode(_wallet));
 
     return true;
