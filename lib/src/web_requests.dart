@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
+import 'simple_bsv.dart' as w;
 // import 'package:firebase_database/firebase_database.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -13,7 +14,8 @@ Future<bool> usernameIsValid(String username) async {
     return false;
   }
   final uri = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/IsValidUsername");
+    "https://us-east1-down4-26ee1.cloudfunctions.net/IsValidUsername",
+  );
   final res = await http.post(uri, body: username);
   return res.statusCode == 200;
 }
@@ -68,21 +70,26 @@ Future<Down4Media?> getMessageMedia(String id) async {
   return null;
 }
 
-// Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req));
-//   if (res.statusCode == HttpStatus.noContent && retried == false) {
-//     return messageRequest(
-//       req
-//         ..withUpload = true
-//         ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
-//       true,
-//     );
-//   }
-//   return res.statusCode == 200;
-// }
+Future<w.BatchResponse?> broadCastTxs(List<w.Down4TX> txs) async {
+  final uri = Uri.parse("https://api.taal.com/api/v1/batchBroadcast");
+  var rawTxs = [];
+  for (final tx in txs) {
+    rawTxs.add({"rawTx": tx.asRawHex});
+  }
+  final res = await http.post(
+    uri,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "mainnet_ea21eb661e59bc5733cbbfe945de3a7b",
+    },
+    body: jsonEncode(rawTxs),
+  );
+  if (res.statusCode == 200) {
+    final decodedJson = jsonDecode(res.body);
+    return w.BatchResponse.fromJson(decodedJson);
+  }
+  return null;
+}
 
 Future<double?> getExchangeRate() async {
   final url = Uri.parse(
@@ -169,3 +176,20 @@ Future<List<Down4Message>?> getPosts(List<String> ids) async {
   // TODO: getPosts
   return null;
 }
+
+
+// Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req));
+//   if (res.statusCode == HttpStatus.noContent && retried == false) {
+//     return messageRequest(
+//       req
+//         ..withUpload = true
+//         ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+//       true,
+//     );
+//   }
+//   return res.statusCode == 200;
+// }

@@ -7,6 +7,8 @@ import 'package:pointycastle/digests/ripemd160.dart' as r160;
 import 'package:bip32/bip32.dart';
 import 'down4_utility.dart';
 
+const TAAL_BATCH_BROADCAST = "https://api.taal.com/api/v1/batchBroadcast";
+
 // request.post({
 //   url: 'https://api.taal.com/api/v1/batchBroadcast',
 //   headers: {
@@ -165,7 +167,7 @@ class Wallet {
 
     // here we should have all the tx data necessary for signing
     var tx = Down4TX(txsIn: txsIn, maker: self.id, txsOut: outs);
-    final txdata = tx.asData.asUint8List();
+    final txdata = tx.asRawData.asUint8List();
     for (var txin in tx.txsIn) {
       final derived = down4priv.derive(txin.walletIndex!);
       final Uint8List sig = derived.sign(txdata);
@@ -398,7 +400,7 @@ class Down4TX {
             .toList(),
       );
 
-  List<int> get asData => [
+  List<int> get asRawData => [
         ...versionNo.data,
         ...inCounter.data,
         ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
@@ -415,9 +417,10 @@ class Down4TX {
         }
       });
 
-  TXID txid() => txID = TXID.fromBigEndian(sha256sha256(asData.asUint8List()));
+  TXID txid() =>
+      txID = TXID.fromBigEndian(sha256sha256(asRawData.asUint8List()));
 
-  String get asHex => hex.encode(asData);
+  String get asRawHex => hex.encode(asRawData);
 
   Map<String, dynamic> toJson() => {
         "mk": maker,
@@ -428,13 +431,46 @@ class Down4TX {
         "to": txsOut.map((txout) => txout.toJson()).toList(),
       };
 
-  String get asJsonString => jsonEncode(toJson());
+  String get asQrData => jsonEncode(toJson());
 
   @override
   int get hashCode => BigInt.parse(txID!.asHex, radix: 16).hashCode;
 
   @override
   bool operator ==(other) => other is Down4TX && other.txID == txID;
+}
+
+class TxResponse {
+  final TXID id;
+  final bool success;
+  final String description;
+  TxResponse({
+    required String pID,
+    required String pSuccess,
+    required this.description,
+  })  : id = TXID.fromBigEndianHex(pID),
+        success = pSuccess == "success";
+  factory TxResponse.fromJson(dynamic json) {
+    return TxResponse(
+      pID: json["txid"],
+      pSuccess: json["returnResult"],
+      description: json["resultDescription"],
+    );
+  }
+}
+
+class BatchResponse {
+  List<TxResponse> responses;
+  num failureCount;
+  BatchResponse({required this.responses, required this.failureCount});
+  factory BatchResponse.fromJson(dynamic json) {
+    return BatchResponse(
+      failureCount: json["failureCount"],
+      responses: List<dynamic>.from(json["txs"])
+          .map((txr) => TxResponse.fromJson(txr))
+          .toList(),
+    );
+  }
 }
 
 void main() {
@@ -476,12 +512,12 @@ void main() {
   );
 
   var txid = tx.txid();
-  print("Tx ID: ${txid.asHex}\nSerialized Tx: ${tx.asHex}");
+  print("Tx ID: ${txid.asHex}\nSerialized Tx: ${tx.asRawHex}");
 
   const full =
       "0100000001a8ff0305e43645cf7bcfb6ae8df6e121cb9fc43a55206ae22823b987aa28edb8000000006b4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8feffffff0208070000000000001976a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac905f0100000000001976a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac09230900";
 
-  print(tx.asHex == full);
+  print(tx.asRawHex == full);
 
   const txid_ =
       "d8c5c42cbd1df7e48acab76fe05f2c9e612a20996fd37f4ffd4dc251385b6ba3";
