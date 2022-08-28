@@ -6,6 +6,9 @@ import 'package:pointycastle/digests/sha256.dart' as s256;
 import 'package:pointycastle/digests/ripemd160.dart' as r160;
 import 'package:bip32/bip32.dart';
 import 'down4_utility.dart';
+import 'web_requests.dart' as r;
+import 'package:bip39/bip39.dart' as bip39;
+import 'dart:io' as io;
 
 const TAAL_BATCH_BROADCAST = "https://api.taal.com/api/v1/batchBroadcast";
 
@@ -36,56 +39,66 @@ int _deterministicWalletIndex() =>
 class Wallet {
   static const SATS_PER_BYTE = 0.05;
   static const DOWN4_SATS_PER_BYTE = 0.025;
-  static final DOWN4_NEUTER = BIP32.fromSeed(Uint8List.fromList(
-    [1, 2], // TODO
-  ));
+  static final DOWN4_NEUTER = BIP32.fromBase58(
+    "xpub6DTufsTvxdAJaPhAMcowwgNWghwUXw8fexqjY5rEdBdBiVAJiKCY7SQzVwBb7JXgMLFcoNqAxwJZUEEVnGFjj8ngbu2HGwTDBhPfVvHcGYs",
+  );
 
   final String _mnemonic;
-  BIP32 down4priv;
+  BIP32 bip;
   List<Down4TXOUT> utxos;
   List<Down4TX> unsettledTxs;
-  Wallet(this.utxos, this.down4priv, this.unsettledTxs, String mnemonic)
-      : _mnemonic = mnemonic;
 
   String get mnemonic => _mnemonic;
-
+  int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
   List<TXID> get uTXID => unsettledTxs.map((e) => e.txID!).toList();
 
-  int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
+  Future<BatchResponse?> trySettlement([List<Down4TX>? txs]) async {
+    return await r.broadcastTxs(
+      (txs ?? unsettledTxs)
+        ..sort((tx1, tx2) => tx1.down4ts.compareTo(tx2.down4ts)),
+    );
+  }
 
-  List<Down4TX> recDeps(List<Down4TX> deps) {
+  Wallet({
+    required this.utxos,
+    required this.bip,
+    required this.unsettledTxs,
+    required String mnemonic,
+  }) : _mnemonic = mnemonic;
+
+  factory Wallet.fromJson(dynamic decodedJson) {
+    return Wallet(
+      mnemonic: decodedJson["m"],
+      bip: BIP32.fromBase58(decodedJson["bip"]),
+      utxos: List<dynamic>.from(decodedJson["utxos"])
+          .map((jsonUtxo) => Down4TXOUT.fromJson(jsonUtxo))
+          .toList(),
+      unsettledTxs: List<dynamic>.from(decodedJson["txs"])
+          .map((jsonTx) => Down4TX.fromJson(jsonTx))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        "m": mnemonic,
+        "bip": bip.toBase58(),
+        "utxos": utxos.map((e) => e.toJson()),
+        "txs": unsettledTxs.map((e) => e.toJson()),
+      };
+
+  List<Down4TX> _chainedTxs(List<Down4TX> deps) {
     var newDeps = deps
-        .map((tx) => tx.txidDeps)
+        .map((tx) => tx.txidDeps..add(tx.txID!))
         .expand((txid) => txid)
         .toSet()
         .map((txid) => unsettledTxs.singleWhere((tx) => tx.txID == txid))
         .toList();
 
     if (newDeps.length == deps.length) return deps;
-    return recDeps(newDeps);
+    return _chainedTxs(newDeps);
   }
 
-  Map<String, dynamic> toJson() => {
-        "m": mnemonic,
-        "bip": down4priv.toBase58(),
-        "utxos": utxos.map((e) => e.toJson()),
-        "txs": unsettledTxs.map((e) => e.toJson()),
-      };
-
-  factory Wallet.fromJson(dynamic decodedJson) {
-    return Wallet(
-      List<dynamic>.from(decodedJson["utxos"])
-          .map((e) => Down4TXOUT.fromJson(jsonDecode(e)))
-          .toList(),
-      BIP32.fromBase58(decodedJson["bip"]),
-      List<dynamic>.from(decodedJson["txs"])
-          .map((e) => Down4TX.fromJson(jsonDecode(e)))
-          .toList(),
-      decodedJson["m"],
-    );
-  }
-
-  void sortUtxos() {
+  void _sortUtxos() {
     return utxos.sort(((a, b) => b.sats.asInt.compareTo(a.sats.asInt)));
   }
 
@@ -133,7 +146,7 @@ class Wallet {
   }
 
   List<Down4TX>? pay(List<Node> targets, Node self, Sats amount) {
-    sortUtxos();
+    _sortUtxos();
     final walletIndex = _deterministicWalletIndex();
     var outs = _reqOuts(targets, self, amount, walletIndex);
     var inInfo = _unsignedIns(self, amount, targets.length + 2);
@@ -169,7 +182,7 @@ class Wallet {
     var tx = Down4TX(txsIn: txsIn, maker: self.id, txsOut: outs);
     final txdata = tx.asRawData.asUint8List();
     for (var txin in tx.txsIn) {
-      final derived = down4priv.derive(txin.walletIndex!);
+      final derived = bip.derive(txin.walletIndex!);
       final Uint8List sig = derived.sign(txdata);
       final r = sig.sublist(0, 32);
       final s = sig.sublist(32, 64);
@@ -185,14 +198,14 @@ class Wallet {
       if (txout.receiver == self.id) utxos.add(txout);
     }
     unsettledTxs.add(tx);
-    var deps = recDeps([tx]);
-    return [...deps, tx];
+    return _chainedTxs([tx])..sort((a, b) => a.down4ts.compareTo(b.down4ts));
   }
 }
 
 class VarInt {
   final List<int> data;
   final int asInt;
+
   const VarInt._(this.data, this.asInt);
 
   factory VarInt.fromInt(int n) {
@@ -221,6 +234,7 @@ class VarInt {
 class FourByteInt {
   final List<int> data;
   final int asInt;
+
   FourByteInt(int n)
       : data = Uint8List(4)..buffer.asByteData().setUint32(0, n, Endian.little),
         asInt = n;
@@ -228,13 +242,20 @@ class FourByteInt {
 
 class TXID {
   final List<int> data;
+
   TXID(this.data);
+
   factory TXID.fromHex(String h) => TXID(hex.decode(h));
+
   factory TXID.fromBigEndian(List<int> be) => TXID(be.reversed.toList());
+
   factory TXID.fromBigEndianHex(String beh) =>
       TXID(hex.decode(beh).reversed.toList());
+
   List<int> get asBigEndian => data.reversed.toList();
+
   String get asHex => data.toHex();
+
   String get asHexBigEndian => data.reversed.toList().toHex();
 
   bool equals(TXID other) => data == other.data;
@@ -249,18 +270,26 @@ class TXID {
 class Sats {
   final List<int> data;
   final int asInt;
+
   Sats(int sats)
       : data = Uint8List(8)
           ..buffer.asByteData().setInt64(0, sats, Endian.little),
         asInt = sats;
 
   Sats operator +(Sats s) => Sats(asInt + s.asInt);
+
   Sats operator -(Sats s) => Sats(asInt - s.asInt);
+
   Sats operator *(Sats s) => Sats(asInt * s.asInt);
+
   Sats operator /(Sats s) => Sats((asInt / s.asInt).floor());
+
   bool operator >(Sats s) => asInt > s.asInt;
+
   bool operator >=(Sats s) => asInt >= s.asInt;
+
   bool operator <(Sats s) => asInt < s.asInt;
+
   bool operator <=(Sats s) => asInt <= s.asInt;
 }
 
@@ -369,6 +398,7 @@ class Down4TXOUT {
 
 class Down4TX {
   Identifier? maker;
+  int down4ts;
   FourByteInt versionNo, nLockTime;
   List<Down4TXIN> txsIn;
   List<Down4TXOUT> txsOut;
@@ -385,7 +415,8 @@ class Down4TX {
   })  : versionNo = FourByteInt(versionNo ?? 2),
         nLockTime = FourByteInt(nLockTime ?? 0),
         inCounter = VarInt.fromInt(txsIn.length),
-        outCounter = VarInt.fromInt(txsOut.length);
+        outCounter = VarInt.fromInt(txsOut.length),
+        down4ts = timeStamp();
 
   factory Down4TX.fromJson(dynamic decodedJson) => Down4TX(
         maker: decodedJson["mk"],
@@ -444,12 +475,14 @@ class TxResponse {
   final TXID id;
   final bool success;
   final String description;
+
   TxResponse({
     required String pID,
     required String pSuccess,
     required this.description,
   })  : id = TXID.fromBigEndianHex(pID),
         success = pSuccess == "success";
+
   factory TxResponse.fromJson(dynamic json) {
     return TxResponse(
       pID: json["txid"],
@@ -462,7 +495,9 @@ class TxResponse {
 class BatchResponse {
   List<TxResponse> responses;
   num failureCount;
+
   BatchResponse({required this.responses, required this.failureCount});
+
   factory BatchResponse.fromJson(dynamic json) {
     return BatchResponse(
       failureCount: json["failureCount"],
@@ -474,55 +509,64 @@ class BatchResponse {
 }
 
 void main() {
-  var scriptSig = hex.decode(
-    "4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8",
-  );
+  // final String mnemonic = bip39.generateMnemonic();
+  // final seed = bip39.mnemonicToSeed(mnemonic);
 
-  var tx = Down4TX(
-    maker: "scott",
-    nLockTime: 598793,
-    versionNo: 1,
-    txsIn: [
-      Down4TXIN(
-        spentFrom: TXID.fromBigEndianHex(
-          "b8ed28aa87b92328e26a20553ac49fcb21e1f68daeb6cf7bcf4536e40503ffa8",
-        ),
-        sats: Sats(100),
-        spender: "scott",
-        outIndex: FourByteInt(0),
-        sequenceNo: FourByteInt(4294967294),
-        scriptSig: scriptSig,
-        scriptSigLen: VarInt.fromInt(scriptSig.length),
-      ),
-    ],
-    txsOut: [
-      Down4TXOUT(
-        sats: Sats(1800),
-        scriptPubKey: hex.decode(
-          "76a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac",
-        ),
-      ),
-      Down4TXOUT(
-        sats: Sats(90000),
-        scriptPubKey: hex.decode(
-          "76a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac",
-        ),
-      ),
-    ],
-  );
+  // BIP32 down4neuter = BIP32.fromSeed(seed).derivePath("m/4'/0'/0'").neutered();
 
-  var txid = tx.txid();
-  print("Tx ID: ${txid.asHex}\nSerialized Tx: ${tx.asRawHex}");
+  // var f = io.File("/home/scott/Desktop/jeff.txt");
 
-  const full =
-      "0100000001a8ff0305e43645cf7bcfb6ae8df6e121cb9fc43a55206ae22823b987aa28edb8000000006b4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8feffffff0208070000000000001976a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac905f0100000000001976a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac09230900";
+  // f.writeAsStringSync(mnemonic + "\n" + down4neuter.toBase58());
 
-  print(tx.asRawHex == full);
+  // var scriptSig = hex.decode(
+  //   "4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8",
+  // );
 
-  const txid_ =
-      "d8c5c42cbd1df7e48acab76fe05f2c9e612a20996fd37f4ffd4dc251385b6ba3";
+  // var tx = Down4TX(
+  //   maker: "scott",
+  //   nLockTime: 598793,
+  //   versionNo: 1,
+  //   txsIn: [
+  //     Down4TXIN(
+  //       spentFrom: TXID.fromBigEndianHex(
+  //         "b8ed28aa87b92328e26a20553ac49fcb21e1f68daeb6cf7bcf4536e40503ffa8",
+  //       ),
+  //       sats: Sats(100),
+  //       spender: "scott",
+  //       outIndex: FourByteInt(0),
+  //       sequenceNo: FourByteInt(4294967294),
+  //       scriptSig: scriptSig,
+  //       scriptSigLen: VarInt.fromInt(scriptSig.length),
+  //     ),
+  //   ],
+  //   txsOut: [
+  //     Down4TXOUT(
+  //       sats: Sats(1800),
+  //       scriptPubKey: hex.decode(
+  //         "76a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac",
+  //       ),
+  //     ),
+  //     Down4TXOUT(
+  //       sats: Sats(90000),
+  //       scriptPubKey: hex.decode(
+  //         "76a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac",
+  //       ),
+  //     ),
+  //   ],
+  // );
 
-  print(txid.asHex == txid_);
+  // var txid = tx.txid();
+  // print("Tx ID: ${txid.asHex}\nSerialized Tx: ${tx.asRawHex}");
+
+  // const full =
+  //     "0100000001a8ff0305e43645cf7bcfb6ae8df6e121cb9fc43a55206ae22823b987aa28edb8000000006b4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8feffffff0208070000000000001976a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac905f0100000000001976a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac09230900";
+
+  // print(tx.asRawHex == full);
+
+  // const txid_ =
+  //     "d8c5c42cbd1df7e48acab76fe05f2c9e612a20996fd37f4ffd4dc251385b6ba3";
+
+  // print(txid.asHex == txid_);
 
   // print(tx.asJsonString.length); // throws error because no txid in outputs
 

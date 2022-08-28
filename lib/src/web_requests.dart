@@ -70,7 +70,7 @@ Future<Down4Media?> getMessageMedia(String id) async {
   return null;
 }
 
-Future<w.BatchResponse?> broadCastTxs(List<w.Down4TX> txs) async {
+Future<w.BatchResponse?> broadcastTxs(List<w.Down4TX> txs) async {
   final uri = Uri.parse("https://api.taal.com/api/v1/batchBroadcast");
   var rawTxs = [];
   for (final tx in txs) {
