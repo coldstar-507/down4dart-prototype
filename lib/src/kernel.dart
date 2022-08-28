@@ -153,7 +153,12 @@ class _Down4State extends State<Down4> {
       snips: [],
     );
 
-    _wallet = Wallet([], down4priv, [], mnemonic);
+    _wallet = Wallet(
+      mnemonic: mnemonic,
+      bip: down4priv,
+      utxos: [],
+      unsettledTxs: [],
+    );
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user));

@@ -638,21 +638,23 @@ class ConsoleButton extends StatelessWidget {
 // Could refactor to use Down4Input
 class ConsoleInput extends StatefulWidget {
   final TextInputType type;
+  final bool activated;
   final String placeHolder;
   final String value;
   final String prefix;
   final void Function(String) inputCallBack;
   final Key k = GlobalKey();
   TextEditingController tec;
-  ConsoleInput(
-      {this.type = TextInputType.text,
-      required this.inputCallBack,
-      required this.placeHolder,
-      required this.tec,
-      this.prefix = "",
-      this.value = "",
-      Key? key})
-      : super(key: key);
+  ConsoleInput({
+    this.type = TextInputType.text,
+    required this.inputCallBack,
+    required this.placeHolder,
+    required this.tec,
+    this.prefix = "",
+    this.value = "",
+    this.activated = true,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _ConsoleInputState createState() => _ConsoleInputState();
@@ -677,44 +679,50 @@ class _ConsoleInputState extends State<ConsoleInput> {
           maxHeight: buttonHeight * 4,
         ),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: widget.activated
+              ? Colors.white
+              : const Color.fromARGB(255, 216, 212, 212),
           border: Border.all(color: Colors.black, width: 0.5),
         ),
-        child: TextField(
-          controller: widget.tec,
-          cursorColor: PinkTheme.black,
-          key: widget.k,
-          maxLines: null,
-          keyboardType: widget.type,
-          textAlignVertical: TextAlignVertical.center,
-          textAlign: TextAlign.center,
-          decoration: InputDecoration(
-            isDense: true,
-            isCollapsed: true,
-            contentPadding: const EdgeInsets.all(2.0),
-            hintText: widget.placeHolder,
-            border: InputBorder.none,
-          ),
-          textDirection: TextDirection.ltr,
-          onChanged: (value) {
-            if (value.isNotEmpty) {
-              String output;
-              if (value.substring(0, widget.prefix.length) != widget.prefix) {
-                output = widget.prefix + value;
-              } else {
-                output = value;
-              }
-              setState(() {
-                widget.tec.text = output;
-                widget.tec.selection =
-                    TextSelection.collapsed(offset: output.length);
-              });
-              widget.inputCallBack(output.substring(widget.prefix.length));
-            } else {
-              widget.inputCallBack(value);
-            }
-          },
-        ),
+        child: widget.activated
+            ? TextField(
+                controller: widget.tec,
+                cursorColor: PinkTheme.black,
+                key: widget.k,
+                maxLines: null,
+                keyboardType: widget.type,
+                textAlignVertical: TextAlignVertical.center,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  isDense: true,
+                  isCollapsed: true,
+                  contentPadding: const EdgeInsets.all(2.0),
+                  hintText: widget.placeHolder,
+                  border: InputBorder.none,
+                ),
+                textDirection: TextDirection.ltr,
+                onChanged: (value) {
+                  if (value.isNotEmpty) {
+                    String output;
+                    if (value.substring(0, widget.prefix.length) !=
+                        widget.prefix) {
+                      output = widget.prefix + value;
+                    } else {
+                      output = value;
+                    }
+                    setState(() {
+                      widget.tec.text = output;
+                      widget.tec.selection =
+                          TextSelection.collapsed(offset: output.length);
+                    });
+                    widget
+                        .inputCallBack(output.substring(widget.prefix.length));
+                  } else {
+                    widget.inputCallBack(value);
+                  }
+                },
+              )
+            : Center(child: Text(widget.placeHolder)),
       ),
     );
   }
