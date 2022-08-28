@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
@@ -14,12 +15,109 @@ import 'camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:file_picker/file_picker.dart';
 import 'web_requests.dart' as r;
-import 'package:hex/hex.dart';
-import 'down4_utility.dart' as d4utils;
+import 'down4_utility.dart' as u;
 import 'package:random_words/random_words.dart' as rw;
 import 'render_utility.dart';
 import 'dart:math' as math;
 import 'simple_bsv.dart';
+
+class Down4Page extends StatelessWidget {
+  final List<Widget>? widgets;
+  final List<Palette>? palettes;
+  final List<ChatMessage>? messages;
+  final List<RealButton> bottomButtons;
+  final List<RealButton>? topButtons;
+  final List<ConsoleInput>? bottomInputs, topInputs;
+
+  const Down4Page({
+    required this.bottomButtons,
+    this.palettes,
+    this.widgets,
+    this.messages,
+    this.topButtons,
+    this.bottomInputs,
+    this.topInputs,
+    Key? key,
+  }) : super(key: key);
+
+  List<Widget> getExtraTopButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 31) / (topButtons?.length ?? 1);
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in topButtons ?? <RealButton>[]) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+            bottom: 16.0 + (ConsoleButton.height * 2),
+            left: 16.0 + (buttonWidth * i),
+            child: Container(
+              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
+              width: (screenWidth - 32) / topButtons!.length,
+              decoration: BoxDecoration(border: Border.all(width: 0.5)),
+              child: Column(children: b.extraButtons!),
+            )));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  List<Widget> getExtraBottomButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 30) / bottomButtons.length;
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in bottomButtons) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+          bottom: 16.0 + ConsoleButton.height,
+          left: 16.0 + (buttonWidth * i),
+          child: Container(
+            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
+            width: buttonWidth,
+            decoration: BoxDecoration(border: Border.all(width: 0.5)),
+            child: Column(children: b.extraButtons!),
+          ),
+        ));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final extraBottomButtons = getExtraBottomButtons(screenWidth);
+    final extraTopButtons = getExtraTopButtons(screenWidth);
+    return Scaffold(
+      body: Container(
+        color: PinkTheme.backGroundColor,
+        child: Stack(
+          children: [
+            ...widgets ?? [const SizedBox.shrink()],
+            Column(
+              children: [
+                ...palettes ?? messages ?? [const Spacer()],
+                Console(
+                  bottomButtons:
+                      bottomButtons.map((e) => e.mainButton).toList(),
+                  topButtons: topButtons?.map((e) => e.mainButton).toList(),
+                  topInputs: topInputs,
+                  inputs: bottomInputs,
+                ),
+              ],
+            ),
+            ...extraTopButtons,
+            ...extraBottomButtons,
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class PalettePage extends StatelessWidget {
   final List<Palette> palettes;
@@ -101,7 +199,7 @@ class _GroupPageState extends State<GroupPage> {
       type: widget.isHyperchat ? Nodes.hyperchat : Nodes.group,
       imageCallBack: (data) {
         final dataForID = widget.self.id.codeUnits + data.toList();
-        final imageID = d4utils.generateMediaID(dataForID.asUint8List());
+        final imageID = u.generateMediaID(dataForID.asUint8List());
         _hyperchatImage = Down4Media(
           data: data,
           id: imageID,
@@ -150,14 +248,13 @@ class _GroupPageState extends State<GroupPage> {
 
   Future<void> send() async {
     if (_input != "" || _mediaInput != null || _cameraInput != null) {
-      final ts = d4utils.timeStamp();
+      final ts = u.timeStamp();
       var targets = widget.palettes.map((e) => e.node.id).toList()
         ..remove(widget.self.id);
       final wp = rw.WordPair.random(safeOnly: false);
-      final root =
-          d4utils.deterministicHyperchatRoot(targets + [widget.self.id]);
+      final root = u.deterministicHyperchatRoot(targets + [widget.self.id]);
       final msg = Down4Message(
-        messageID: d4utils.generateMessageID(widget.self.id, ts),
+        messageID: u.generateMessageID(widget.self.id, ts),
         media: _cameraInput ?? _mediaInput,
         root: root,
         senderName: widget.self.id,
@@ -244,12 +341,14 @@ class MoneyPage extends StatefulWidget {
   final double exchangeRate;
   final Wallet wallet;
   final List<Palette> palettes;
+  final Node self;
   final void Function() back;
   const MoneyPage({
     required this.wallet,
     required this.exchangeRate,
     required this.palettes,
     required this.back,
+    required this.self,
     Key? key,
   }) : super(key: key);
 
@@ -259,19 +358,15 @@ class MoneyPage extends StatefulWidget {
 
 class _MoneyPageState extends State<MoneyPage> {
   var tec = TextEditingController();
+  Widget? _view;
   final Map<String, dynamic> _currencies = {
     "l": ["USD", "Satoshis"],
-    "i": 0
+    "i": 0,
   };
   final Map<String, dynamic> _paymentMethod = {
     "l": ["Each", "Split"],
-    "i": 0
+    "i": 0,
   };
-
-  bool pay(String currency, bool split) {
-    // TODO
-    return false;
-  }
 
   int usdToSatoshis(double usds) =>
       ((usds / widget.exchangeRate) * 100000000).floor();
@@ -283,50 +378,143 @@ class _MoneyPageState extends State<MoneyPage> {
 
   String get usds => satoshisToUSD(widget.wallet.balance).toString();
 
+  String get currency => _currencies["l"][_currencies["i"]] as String;
+
+  String get method => _paymentMethod["l"][_paymentMethod["i"]] as String;
+
+  int get inputAsSatoshis {
+    var amount;
+    final numInput = num.parse(tec.value.text);
+    if (currency == "Satoshis") {
+      amount = method == "Split"
+          ? numInput.round()
+          : (numInput * widget.palettes.length).round();
+    } else {
+      amount = method == "Split"
+          ? usdToSatoshis(numInput.toDouble())
+          : usdToSatoshis(numInput.toDouble() * widget.palettes.length);
+    }
+    return amount;
+  }
+
+  void mainView([bool reload = true]) {
+    _view = Down4Page(
+      palettes: widget.palettes,
+      bottomButtons: [
+        RealButton(
+          mainButton: ConsoleButton(name: "Back", onPress: widget.back),
+        ),
+        RealButton(
+          mainButton: ConsoleButton(
+              name: currency,
+              isMode: true,
+              onPress: () {
+                setState(() {
+                  _currencies["i"] = (_currencies["i"] + 1) %
+                      (_currencies["l"] as List<String>).length;
+                });
+                mainView();
+              }),
+        ),
+        RealButton(
+          mainButton: ConsoleButton(
+              name: method,
+              isMode: true,
+              onPress: () {
+                setState(() {
+                  _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
+                      (_paymentMethod["l"] as List<String>).length;
+                });
+                mainView();
+              }),
+        ),
+      ],
+      topButtons: [
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Pay",
+            onPress: confirmationView,
+          ),
+        ),
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Bill",
+            onPress: () => print("TODO"),
+          ),
+        )
+      ],
+    );
+    if (reload) setState(() {});
+  }
+
+  void confirmationView([bool reload = true]) {
+    _view = Down4Page(
+      palettes: widget.palettes,
+      topButtons: [
+        RealButton(
+          mainButton: ConsoleButton(
+              name: "Confirm",
+              onPress: () {
+                final txs = widget.wallet.pay(
+                  widget.palettes.map((p) => p.node).toList(),
+                  widget.self,
+                  Sats(inputAsSatoshis),
+                );
+                if (txs != null) {
+                  widget.wallet.trySettlement();
+                  transactedView(txs);
+                }
+              }),
+        ),
+      ],
+      bottomButtons: [
+        RealButton(mainButton: ConsoleButton(name: "Back", onPress: mainView)),
+        RealButton(
+          mainButton: ConsoleButton(
+            name: "Cancel",
+            onPress: widget.back,
+          ),
+        ),
+      ],
+    );
+    if (reload) setState(() {});
+  }
+
+  void transactedView(List<Down4TX> txs, [int i = 0, bool reload = true]) {
+    Timer.periodic(
+      const Duration(milliseconds: 800),
+      (_) => transactedView(txs, (i + 1) % txs.length),
+    );
+
+    _view = Down4Page(
+      widgets: [
+        Positioned(
+          top: 0,
+          left: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: QrImage(
+              data: txs[i].asQrData,
+              foregroundColor: PinkTheme.qrColor,
+              backgroundColor: Colors.transparent,
+            ),
+          ),
+        ),
+      ],
+      bottomButtons: [
+        RealButton(
+          mainButton: ConsoleButton(name: "Done", onPress: widget.back),
+        ),
+      ],
+    );
+
+    if (reload) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    final currency = _currencies["l"][_currencies["i"]] as String;
-    final paymentMethod = _paymentMethod["l"][_paymentMethod["i"]] as String;
-    return Scaffold(
-      body: PalettePage(
-        palettes: widget.palettes,
-        console: Console(
-          inputs: [
-            ConsoleInput(
-              tec: tec,
-              inputCallBack: (text) => null,
-              placeHolder: currency == "USD" ? usds + "\$" : satoshis,
-              type: TextInputType.number,
-            )
-          ],
-          topButtons: [
-            ConsoleButton(name: "Pay", onPress: () => print("TODO")),
-            ConsoleButton(name: "Bill", onPress: () => print("TODO"))
-          ],
-          bottomButtons: [
-            ConsoleButton(name: "Back", onPress: widget.back),
-            ConsoleButton(
-                name: currency,
-                isMode: true,
-                onPress: () {
-                  setState(() {
-                    _currencies["i"] = (_currencies["i"] + 1) %
-                        (_currencies["l"] as List<String>).length;
-                  });
-                }),
-            ConsoleButton(
-                name: paymentMethod,
-                isMode: true,
-                onPress: () {
-                  setState(() {
-                    _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
-                        (_paymentMethod["l"] as List<String>).length;
-                  });
-                })
-          ],
-        ),
-      ),
-    );
+    if (_view == null) mainView();
+    return _view!;
   }
 }
 
@@ -360,8 +548,10 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   Future<void> initController() async {
     try {
-      _cameraController =
-          CameraController(widget.cameras[0], ResolutionPreset.low);
+      _cameraController = CameraController(
+        widget.cameras[0],
+        ResolutionPreset.low,
+      );
       await _cameraController?.initialize();
       await _cameraController?.setFlashMode(FlashMode.off);
     } catch (err) {
@@ -969,7 +1159,7 @@ class _ChatPageState extends State<ChatPage> {
       withData: true,
       allowMultiple: true,
     );
-    final ts = d4utils.timeStamp();
+    final ts = u.timeStamp();
     for (final pf in r?.files ?? <PlatformFile>[]) {
       if (pf.bytes != null) {
         final compressedData = await FlutterImageCompress.compressWithList(
@@ -977,7 +1167,7 @@ class _ChatPageState extends State<ChatPage> {
           minHeight: 520,
           minWidth: 0,
         );
-        final mediaID = d4utils.generateMediaID(compressedData);
+        final mediaID = u.generateMediaID(compressedData);
         _images[mediaID] = Down4Media(
           id: mediaID,
           data: compressedData,
@@ -1045,7 +1235,7 @@ class _ChatPageState extends State<ChatPage> {
           : List<String>.from(widget.node.group)
         ..remove(widget.self.id);
       var msg = Down4Message(
-        messageID: d4utils.generateMessageID(widget.self.id, ts),
+        messageID: u.generateMessageID(widget.self.id, ts),
         root: widget.node.id,
         timestamp: ts,
         senderID: widget.self.id,
@@ -1363,7 +1553,7 @@ class _HomePageState extends State<HomePage> {
     double aspectRatio,
   ) async {
     if (path != null) {
-      final timestamp = d4utils.timeStamp();
+      final timestamp = u.timeStamp();
       var media = Down4Media.fromCamera(
         path,
         MediaMetadata(
@@ -1816,6 +2006,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> moneyPage() async {
     final exchangeRate = await r.getExchangeRate();
     _view = MoneyPage(
+      self: widget.self,
       wallet: widget.wallet,
       exchangeRate: exchangeRate ?? 0.0,
       palettes: selectedHomeUserPaletteDeactivated,
