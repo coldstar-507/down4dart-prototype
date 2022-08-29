@@ -676,7 +676,7 @@ class _ConsoleInputState extends State<ConsoleInput> {
       child: Container(
         constraints: BoxConstraints(
           minHeight: buttonHeight,
-          maxHeight: buttonHeight * 4,
+          maxHeight: widget.activated ? buttonHeight * 4 : buttonHeight,
         ),
         decoration: BoxDecoration(
           color: widget.activated
@@ -1275,6 +1275,7 @@ class DynamicList extends StatelessWidget {
   const DynamicList({required this.palettes, Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
+    final gapSize = Sizes.h * 0.02;
     return Expanded(
         child: ScrollConfiguration(
             behavior: NoGlow(),
@@ -1286,7 +1287,7 @@ class DynamicList extends StatelessWidget {
                     : i == palettes.length + 2 - 1
                         ? const SizedBox.shrink()
                         : palettes[i - 1],
-                separatorBuilder: (c, i) => Container(height: 16.0),
+                separatorBuilder: (c, i) => Container(height: gapSize),
                 itemCount: palettes.length + 2)));
   }
 }

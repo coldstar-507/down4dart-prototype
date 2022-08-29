@@ -25,12 +25,14 @@ class Down4Page extends StatelessWidget {
   final List<Widget>? widgets;
   final List<Palette>? palettes;
   final List<ChatMessage>? messages;
+  final List<Widget>? columnWidgets;
   final List<RealButton> bottomButtons;
   final List<RealButton>? topButtons;
   final List<ConsoleInput>? bottomInputs, topInputs;
 
   const Down4Page({
     required this.bottomButtons,
+    this.columnWidgets,
     this.palettes,
     this.widgets,
     this.messages,
@@ -100,7 +102,12 @@ class Down4Page extends StatelessWidget {
             ...widgets ?? [const SizedBox.shrink()],
             Column(
               children: [
-                ...palettes ?? messages ?? [const Spacer()],
+                DynamicList(
+                    palettes: palettes ??
+                        messages ??
+                        columnWidgets ??
+                        [const Spacer()]),
+                // ...palettes ?? messages ?? columnWidgets ?? [const Spacer()],
                 Console(
                   bottomButtons:
                       bottomButtons.map((e) => e.mainButton).toList(),
@@ -397,34 +404,46 @@ class _MoneyPageState extends State<MoneyPage> {
     return amount;
   }
 
+  void rotateMethod() {
+    _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
+        (_paymentMethod["l"] as List<String>).length;
+  }
+
+  void rotateCurrency() {
+    _currencies["i"] =
+        (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
+  }
+
   void mainView([bool reload = true]) {
     _view = Down4Page(
       palettes: widget.palettes,
+      bottomInputs: [
+        ConsoleInput(
+          type: TextInputType.number,
+          inputCallBack: (txt) => null,
+          placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
+          tec: tec,
+        )
+      ],
       bottomButtons: [
         RealButton(
           mainButton: ConsoleButton(name: "Back", onPress: widget.back),
         ),
         RealButton(
           mainButton: ConsoleButton(
-              name: currency,
+              name: method,
               isMode: true,
               onPress: () {
-                setState(() {
-                  _currencies["i"] = (_currencies["i"] + 1) %
-                      (_currencies["l"] as List<String>).length;
-                });
+                rotateMethod();
                 mainView();
               }),
         ),
         RealButton(
           mainButton: ConsoleButton(
-              name: method,
+              name: currency,
               isMode: true,
               onPress: () {
-                setState(() {
-                  _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
-                      (_paymentMethod["l"] as List<String>).length;
-                });
+                rotateCurrency();
                 mainView();
               }),
         ),
@@ -432,24 +451,45 @@ class _MoneyPageState extends State<MoneyPage> {
       topButtons: [
         RealButton(
           mainButton: ConsoleButton(
-            name: "Pay",
-            onPress: confirmationView,
+            name: "Bill",
+            onPress: () => print("TODO"),
           ),
         ),
         RealButton(
           mainButton: ConsoleButton(
-            name: "Bill",
-            onPress: () => print("TODO"),
+            name: "Pay",
+            onPress: () => confirmationView(currency),
           ),
-        )
+        ),
       ],
     );
     if (reload) setState(() {});
   }
 
-  void confirmationView([bool reload = true]) {
+  void confirmationView(String inputCurrency, [bool reload = true]) {
+    double asUSD;
+    int asSats;
+    if (inputCurrency == "USD") {
+      asUSD = num.parse(tec.value.text).toDouble() *
+          (method == "Split" ? 1.0 : widget.palettes.length);
+      asSats = usdToSatoshis(asUSD);
+    } else {
+      asSats = num.parse(tec.value.text).toInt() *
+          (method == "Split" ? 1 : widget.palettes.length);
+      asUSD = satoshisToUSD(asSats);
+    }
     _view = Down4Page(
       palettes: widget.palettes,
+      bottomInputs: [
+        ConsoleInput(
+          inputCallBack: (txt) => null,
+          placeHolder: currency == "USD"
+              ? asUSD.toStringAsFixed(4) + " \$"
+              : asSats.toString() + " sat",
+          tec: tec,
+          activated: false,
+        ),
+      ],
       topButtons: [
         RealButton(
           mainButton: ConsoleButton(
@@ -471,8 +511,12 @@ class _MoneyPageState extends State<MoneyPage> {
         RealButton(mainButton: ConsoleButton(name: "Back", onPress: mainView)),
         RealButton(
           mainButton: ConsoleButton(
-            name: "Cancel",
-            onPress: widget.back,
+            name: currency,
+            isMode: true,
+            onPress: () {
+              rotateCurrency();
+              confirmationView(inputCurrency);
+            },
           ),
         ),
       ],
@@ -783,42 +827,45 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Down4ColumnBackground(
-      children: [
-        _errorTryAgain
-            ? Container(
-                margin: const EdgeInsets.symmetric(horizontal: 22.0),
-                child: const Text(
-                  "Rare error, someone might have just taken that username, please try again",
-                  textAlign: TextAlign.center,
-                ))
-            : const SizedBox.shrink(),
-        UserMakerPalette(
-          selectFile: () async {
-            FilePickerResult? r = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['jpg', 'png', 'jpeg'],
-                withData: true);
-            if (r?.files.single.bytes != null) {
-              final compressedBytes =
-                  await FlutterImageCompress.compressWithList(
-                r!.files.single.bytes!,
-                minHeight: 520,
-                minWidth: 520,
-                quality: 40,
-              );
-              setState(() => _image = compressedBytes);
-            }
-          },
-          name: _name,
-          id: _id,
-          lastName: _lastName,
-          image: _image,
-        ),
-        const SizedBox(height: 16.0),
-        _console,
-        // console ?? Container()
-      ],
+    return Scaffold(
+      body: Down4ColumnBackground(
+        children: [
+          _errorTryAgain
+              ? Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 22.0),
+                  child: const Text(
+                    "Rare error, someone might have just taken that username, please try again",
+                    textAlign: TextAlign.center,
+                  ))
+              : const SizedBox.shrink(),
+          UserMakerPalette(
+            selectFile: () async {
+              FilePickerResult? r = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['jpg', 'png', 'jpeg'],
+                  withData: true);
+              if (r?.files.single.bytes != null) {
+                final compressedBytes =
+                    await FlutterImageCompress.compressWithList(
+                  r!.files.single.bytes!,
+                  minHeight: 520,
+                  minWidth: 520,
+                  quality: 40,
+                );
+                setState(() => _image = compressedBytes);
+                _loadInitConsole();
+              }
+            },
+            name: _name,
+            id: _id,
+            lastName: _lastName,
+            image: _image,
+          ),
+          const SizedBox(height: 16.0),
+          _console,
+          // console ?? Container()
+        ],
+      ),
     );
   }
 }
