@@ -82,8 +82,8 @@ class Wallet {
   Map<String, dynamic> toJson() => {
         "m": mnemonic,
         "bip": bip.toBase58(),
-        "utxos": utxos.map((e) => e.toJson()),
-        "txs": unsettledTxs.map((e) => e.toJson()),
+        "utxos": utxos.map((e) => e.toJson()).toList(),
+        "txs": unsettledTxs.map((e) => e.toJson()).toList(),
       };
 
   List<Down4TX> _chainedTxs(List<Down4TX> deps) {
