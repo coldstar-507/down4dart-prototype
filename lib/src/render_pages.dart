@@ -478,6 +478,19 @@ class _MoneyPageState extends State<MoneyPage> {
           (method == "Split" ? 1 : widget.palettes.length);
       asUSD = satoshisToUSD(asSats);
     }
+    // puts commas for every power of 1000 for the sats amount
+    var satsString = String.fromCharCodes(asSats
+        .toString()
+        .codeUnits
+        .reversed
+        .toList()
+        .asMap()
+        .map((key, value) => key % 3 == 0 && key != 0
+            ? MapEntry(key, [value, 0x002C])
+            : MapEntry(key, [value]))
+        .values
+        .reduce((value, element) => [...element, ...value]));
+
     _view = Down4Page(
       palettes: widget.palettes,
       bottomInputs: [
@@ -485,7 +498,7 @@ class _MoneyPageState extends State<MoneyPage> {
           inputCallBack: (txt) => null,
           placeHolder: currency == "USD"
               ? asUSD.toStringAsFixed(4) + " \$"
-              : asSats.toString() + " sat",
+              : satsString + " sat",
           tec: tec,
           activated: false,
         ),
