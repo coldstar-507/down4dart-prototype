@@ -366,6 +366,7 @@ class MoneyPage extends StatefulWidget {
 class _MoneyPageState extends State<MoneyPage> {
   var tec = TextEditingController();
   Widget? _view;
+  ConsoleInput? _cachedMainViewInput;
   final Map<String, dynamic> _currencies = {
     "l": ["USD", "Satoshis"],
     "i": 0,
@@ -404,6 +405,13 @@ class _MoneyPageState extends State<MoneyPage> {
     return amount;
   }
 
+  ConsoleInput get mainViewInput => _cachedMainViewInput = ConsoleInput(
+        type: TextInputType.number,
+        inputCallBack: (txt) => null,
+        placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
+        tec: tec,
+      );
+
   void rotateMethod() {
     _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
         (_paymentMethod["l"] as List<String>).length;
@@ -418,12 +426,7 @@ class _MoneyPageState extends State<MoneyPage> {
     _view = Down4Page(
       palettes: widget.palettes,
       bottomInputs: [
-        ConsoleInput(
-          type: TextInputType.number,
-          inputCallBack: (txt) => null,
-          placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
-          tec: tec,
-        )
+        _cachedMainViewInput ?? mainViewInput,
       ],
       bottomButtons: [
         RealButton(
@@ -508,7 +511,7 @@ class _MoneyPageState extends State<MoneyPage> {
           mainButton: ConsoleButton(
               name: "Confirm",
               onPress: () {
-                final txs = widget.wallet.pay(
+                final txs = widget.wallet.payUsers(
                   widget.palettes.map((p) => p.node).toList(),
                   widget.self,
                   Sats(inputAsSatoshis),
