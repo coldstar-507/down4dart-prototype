@@ -62,6 +62,16 @@ class Boxes {
     return t.Down4Media.fromJson(jsonDecode(videos.get(id)));
   }
 
+  Map<String, dynamic>? loadExchangeRate() {
+    final rate = user.get("exchangeRate");
+    if (rate == null) return null;
+    return jsonDecode(rate);
+  }
+
+  void saveExchangeRate(Map<String, dynamic> exchangeRate) {
+    user.put("exchangeRate", jsonEncode(exchangeRate));
+  }
+
   void deleteVideo(t.Identifier id) {
     videos.delete(id);
   }
