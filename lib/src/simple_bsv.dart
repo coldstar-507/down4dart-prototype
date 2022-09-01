@@ -23,6 +23,18 @@ Uint8List _makeAddress(Uint8List pubKey) => ripemd160(sha256(pubKey));
 int _deterministicWalletIndex() =>
     (DateTime.now().millisecondsSinceEpoch / 86400000).floor();
 
+class Down4Payment {
+  List<Down4TX> txs;
+  bool safe;
+  Down4Payment(this.txs, this.safe);
+
+  Map<String, dynamic> toJsoni(int i) => {
+        "tx": txs[i].toJson(),
+        "len": txs.length,
+        "safe": safe,
+      };
+}
+
 class Wallet {
   static const SATS_PER_BYTE = 0.05;
   static const DOWN4_SATS_PER_BYTE = 0.025;
@@ -70,6 +82,21 @@ class Wallet {
         "txs": unsettledTxs.map((e) => e.toJson()).toList(),
       };
 
+  void parsePayment(Node self, Down4Payment pay) {
+    var sortedTxs = _topologicalSort(pay.txs);
+    // if I'm right, we only care about utxos of the last TX
+    var lastTx = sortedTxs.last;
+    if (pay.safe) {
+      for (final utxo in lastTx.txsOut) {
+        if (utxo.receiver == self.id && !utxos.contains(utxo)) {
+          utxos.add(utxo);
+        }
+      }
+    } else {
+      // TODO
+    }
+  }
+
   List<Down4TX> _chainedTxs(List<Down4TX> deps) {
     var newDeps = deps
         .map((tx) => tx.txidDeps..add(tx.txID!))
@@ -80,10 +107,6 @@ class Wallet {
 
     if (newDeps.length == deps.length) return deps;
     return _chainedTxs(newDeps);
-  }
-
-  void _sortUtxos() {
-    return utxos.sort(((a, b) => b.sats.asInt.compareTo(a.sats.asInt)));
   }
 
   List<Down4TXOUT> _reqOuts(List<Node> tgrts, Node self, Sats sats, int wIdx) {
@@ -105,7 +128,8 @@ class Wallet {
 
   List<dynamic>? _unsignedIns(Node self, Sats pay, int nOuts) {
     List<Down4TXIN> ins = [];
-    var minerFees = Sats(((nOuts * 34) * SATS_PER_BYTE).ceil() + 4 + 4 + 9 + 9);
+    var minerFees =
+        Sats((((nOuts * 34) + 4 + 4 + 9 + 9) * SATS_PER_BYTE).ceil());
     var down4Fees = Sats((minerFees.asInt / 2).ceil());
     var sats = Sats(0);
     for (int i = 0; i < utxos.length; i++) {
@@ -129,8 +153,7 @@ class Wallet {
     return null;
   }
 
-  List<Down4TX>? payUsers(List<Node> targets, Node self, Sats amount) {
-    _sortUtxos();
+  Down4Payment? payUsers(List<Node> targets, Node self, Sats amount) {
     final walletIndex = _deterministicWalletIndex();
     var outs = _reqOuts(targets, self, amount, walletIndex);
     var inInfo = _unsignedIns(self, amount, targets.length + 2);
@@ -184,22 +207,28 @@ class Wallet {
       if (txout.receiver == self.id) utxos.add(txout);
     }
     unsettledTxs.add(tx);
-    return _chainedTxs([tx]);
+    final chain = _chainedTxs([tx]);
+    return Down4Payment(chain, true);
   }
 
-  // List<Down4TX> topologicalSort(List<Down4TX> txs) {
-  //   var sorted = <Down4TX>[];
-  //   sorted.add(txs.singleWhere((tx) => tx.txidDeps.isEmpty));
-  //   txs.removeWhere((tx) => tx.txidDeps.isEmpty);
-  //   do {
-  //     final prev = sorted.last.txID;
-  //     sorted.addAll(txs.where((tx) => tx.txidDeps.contains(prev)));
-  //     txs.removeWhere((tx) => tx.txidDeps.contains(prev));
-  //   } while (txs.isNotEmpty);
-  //   return sorted;
-  // }
+  List<Down4TX> _topologicalSort(List<Down4TX> txs) {
+    var sorted = <Down4TX>[];
+    var prevSortIDs = <TXID>[];
+    sorted.addAll(txs.where((tx) => tx.txidDeps.isEmpty));
+    do {
+      prevSortIDs = sorted.map((e) => e.txID!).toList();
+      final unSorted = txs.where((tx) => !prevSortIDs.contains(tx.txID));
+      for (final unsortedTx in unSorted) {
+        final deps = unsortedTx.txidDeps;
+        if (deps.every((dep) => prevSortIDs.contains(dep))) {
+          sorted.add(unsortedTx);
+        }
+      }
+    } while (sorted.length != prevSortIDs.length);
+    return sorted;
+  }
 
-  List<Down4TX>? payToAnyone(Node self, Sats amount) {
+  Down4Payment? payToAnyone(Node self, Sats amount) {
     if (amount.asInt > balance) return null;
     // for payToAnyone, we need a perfect input Amount for the tx we are giving
     // because we can't use change, since we can't know what the transaction ID will be.
@@ -358,7 +387,7 @@ class Wallet {
     unsettledTxs.add(firstTx);
 
     final chain = _chainedTxs([firstTx]);
-    return [...chain, lastTx];
+    return Down4Payment([...chain, lastTx], false);
   }
 }
 
@@ -555,6 +584,16 @@ class Down4TXOUT {
       );
 
   set scriptLen(int n) => scriptPubKeyLen = VarInt.fromInt(n);
+
+  @override
+  int get hashCode {
+    final uniqueData = txid!.data + FourByteInt(outIndex!).data;
+    return BigInt.parse(hex.encode(uniqueData), radix: 16).hashCode;
+  }
+
+  @override
+  bool operator ==(other) =>
+      other is Down4TXOUT && other.txid == txid && other.outIndex == outIndex;
 
   List<int> get asData => [
         ...sats.data,

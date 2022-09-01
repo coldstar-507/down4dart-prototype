@@ -12,6 +12,7 @@ import 'dart:io' as io;
 import 'dart:math' as math;
 import 'package:video_player/video_player.dart';
 import 'boxes.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
@@ -808,6 +809,8 @@ class Console extends StatelessWidget {
   final String? imagePreviewPath;
   final VideoPlayerController? videoPlayerController;
   final List<ConsoleInput>? inputs, topInputs;
+  final MobileScannerController? scanController;
+  final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
   const Console({
     required this.bottomButtons,
     this.selectMedia,
@@ -821,6 +824,8 @@ class Console extends StatelessWidget {
     this.inputs,
     this.topInputs,
     this.topButtons,
+    this.scanCallBack,
+    this.scanController,
     Key? key,
   }) : super(key: key);
 
@@ -931,7 +936,22 @@ class Console extends StatelessWidget {
                                       scaleY: aspectRatio,
                                       child:
                                           VideoPlayer(videoPlayerController!))))
-                          : const SizedBox.shrink(),
+                          : scanController != null
+                              ? Container(
+                                  width: camWidthAndHeight - 1,
+                                  height: camWidthAndHeight - 1,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Colors.black, width: 0.5),
+                                    color: PinkTheme.buttonColor,
+                                  ),
+                                  child: MobileScanner(
+                                    controller: scanController,
+                                    onDetect: scanCallBack!,
+                                    allowDuplicates: false,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
           Row(
             children: topButtons ?? [],
             textDirection: TextDirection.ltr,
@@ -1271,8 +1291,8 @@ class MessageList4 extends StatelessWidget {
 }
 
 class DynamicList extends StatelessWidget {
-  final List<dynamic> palettes;
-  const DynamicList({required this.palettes, Key? key}) : super(key: key);
+  final List<dynamic> list;
+  const DynamicList({required this.list, Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
     final gapSize = Sizes.h * 0.02;
@@ -1284,11 +1304,11 @@ class DynamicList extends StatelessWidget {
                 reverse: true,
                 itemBuilder: (c, i) => i == 0
                     ? const SizedBox.shrink()
-                    : i == palettes.length + 2 - 1
+                    : i == list.length + 2 - 1
                         ? const SizedBox.shrink()
-                        : palettes[i - 1],
+                        : list[i - 1],
                 separatorBuilder: (c, i) => Container(height: gapSize),
-                itemCount: palettes.length + 2)));
+                itemCount: list.length + 2)));
   }
 }
 

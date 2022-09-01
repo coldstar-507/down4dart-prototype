@@ -20,6 +20,7 @@ import 'package:random_words/random_words.dart' as rw;
 import 'render_utility.dart';
 import 'dart:math' as math;
 import 'simple_bsv.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class Down4Page extends StatelessWidget {
   final List<Widget>? widgets;
@@ -29,6 +30,8 @@ class Down4Page extends StatelessWidget {
   final List<RealButton> bottomButtons;
   final List<RealButton>? topButtons;
   final List<ConsoleInput>? bottomInputs, topInputs;
+  final MobileScannerController? scanController;
+  final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
 
   const Down4Page({
     required this.bottomButtons,
@@ -39,6 +42,8 @@ class Down4Page extends StatelessWidget {
     this.topButtons,
     this.bottomInputs,
     this.topInputs,
+    this.scanController,
+    this.scanCallBack,
     Key? key,
   }) : super(key: key);
 
@@ -99,16 +104,14 @@ class Down4Page extends StatelessWidget {
         color: PinkTheme.backGroundColor,
         child: Stack(
           children: [
-            ...widgets ?? [const SizedBox.shrink()],
+            ...widgets ?? [],
             Column(
               children: [
-                DynamicList(
-                    palettes: palettes ??
-                        messages ??
-                        columnWidgets ??
-                        [const Spacer()]),
+                DynamicList(list: palettes ?? messages ?? columnWidgets ?? []),
                 // ...palettes ?? messages ?? columnWidgets ?? [const Spacer()],
                 Console(
+                  scanCallBack: scanCallBack,
+                  scanController: scanController,
                   bottomButtons:
                       bottomButtons.map((e) => e.mainButton).toList(),
                   topButtons: topButtons?.map((e) => e.mainButton).toList(),
@@ -337,7 +340,7 @@ class _GroupPageState extends State<GroupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Down4ColumnBackground(children: [
-        DynamicList(palettes: _items),
+        DynamicList(list: _items),
         _console ?? const SizedBox.shrink()
       ]),
     );
@@ -422,11 +425,67 @@ class _MoneyPageState extends State<MoneyPage> {
         (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
   }
 
-  void mainView([bool reload = true]) {
+  void emptyMainView([bool scanning = false, bool reloadInput = false]) {
+    var len = 0;
+    var safe = false;
+    var txBuf = <Down4TX>[];
+    MobileScannerController? ctrl;
+    if (scanning) ctrl = MobileScannerController();
+    dynamic onScan(Barcode bc, MobileScannerArguments? args) {
+      final raw = bc.rawValue;
+      if (raw != null) {
+        final decodedJsoni = jsonDecode(raw);
+        if (decodedJsoni["len"] != null && decodedJsoni["safe"] != null) {
+          len = decodedJsoni["len"];
+          safe = decodedJsoni["safe"];
+          var tx = Down4TX.fromJson(decodedJsoni["tx"]);
+          if (!txBuf.contains(tx)) txBuf.add(tx);
+          if (txBuf.length == len) {
+            widget.wallet.parsePayment(widget.self, Down4Payment(txBuf, safe));
+            emptyMainView(false, true);
+          }
+        }
+      }
+    }
+
+    _view = Down4Page(
+      scanCallBack: onScan,
+      scanController: ctrl,
+      bottomInputs: scanning
+          ? null
+          : [
+              reloadInput
+                  ? mainViewInput
+                  : _cachedMainViewInput ?? mainViewInput,
+            ],
+      topButtons: [
+        RealButton(
+            mainButton: ConsoleButton(
+                name: "Scan", onPress: () => emptyMainView(!scanning)))
+      ],
+      bottomButtons: [
+        RealButton(
+            mainButton: ConsoleButton(name: "Back", onPress: widget.back)),
+        RealButton(
+          mainButton: ConsoleButton(
+            isMode: true,
+            name: currency,
+            onPress: () {
+              rotateCurrency();
+              emptyMainView(scanning, true);
+            },
+          ),
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  void mainView([bool reloadInput = false]) {
     _view = Down4Page(
       palettes: widget.palettes,
       bottomInputs: [
-        _cachedMainViewInput ?? mainViewInput,
+        reloadInput ? mainViewInput : _cachedMainViewInput ?? mainViewInput,
       ],
       bottomButtons: [
         RealButton(
@@ -447,7 +506,7 @@ class _MoneyPageState extends State<MoneyPage> {
               isMode: true,
               onPress: () {
                 rotateCurrency();
-                mainView();
+                mainView(tec.value.text.isEmpty ? true : false);
               }),
         ),
       ],
@@ -466,7 +525,7 @@ class _MoneyPageState extends State<MoneyPage> {
         ),
       ],
     );
-    if (reload) setState(() {});
+    setState(() {});
   }
 
   void confirmationView(String inputCurrency, [bool reload = true]) {
@@ -511,14 +570,14 @@ class _MoneyPageState extends State<MoneyPage> {
           mainButton: ConsoleButton(
               name: "Confirm",
               onPress: () {
-                final txs = widget.wallet.payUsers(
+                final pay = widget.wallet.payUsers(
                   widget.palettes.map((p) => p.node).toList(),
                   widget.self,
                   Sats(inputAsSatoshis),
                 );
-                if (txs != null) {
+                if (pay != null) {
                   widget.wallet.trySettlement();
-                  transactedView(txs);
+                  transactedView(pay);
                 }
               }),
         ),
@@ -540,10 +599,10 @@ class _MoneyPageState extends State<MoneyPage> {
     if (reload) setState(() {});
   }
 
-  void transactedView(List<Down4TX> txs, [int i = 0, bool reload = true]) {
+  void transactedView(Down4Payment pay, [int i = 0, bool reload = true]) {
     Timer.periodic(
       const Duration(milliseconds: 800),
-      (_) => transactedView(txs, (i + 1) % txs.length),
+      (_) => transactedView(pay, (i + 1) % pay.txs.length),
     );
 
     _view = Down4Page(
@@ -554,7 +613,7 @@ class _MoneyPageState extends State<MoneyPage> {
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: QrImage(
-              data: txs[i].asQrData,
+              data: jsonEncode(pay.toJsoni(i)),
               foregroundColor: PinkTheme.qrColor,
               backgroundColor: Colors.transparent,
             ),
@@ -573,7 +632,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_view == null) mainView();
+    if (_view == null) widget.palettes.isEmpty ? emptyMainView() : mainView();
     return _view!;
   }
 }
@@ -1368,8 +1427,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  var box = Boxes.instance;
   Widget? _view;
   Wallet? _wallet;
+  Map<String, dynamic> exchangeRate = {};
   // The base location is Home with the home palettes
   // You can traverse palettes which will be cached
   // Home -> home palettes
@@ -1402,14 +1463,30 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    exchangeRate = box.loadExchangeRate() ?? {"rate": 0.0, "update": 0};
+    updateExchangeRate();
     loadLocalHomePalettes();
     processMessageQueue();
     initializeMessageListener();
     homePage();
   }
 
+  Future<void> updateExchangeRate() async {
+    final lastUpdate = exchangeRate["update"] as int;
+    final rightNow = u.timeStamp();
+    if (rightNow - lastUpdate > const Duration(minutes: 10).inMilliseconds) {
+      final rate = await r.getExchangeRate();
+      if (rate != null) {
+        exchangeRate["rate"] = rate;
+        exchangeRate["update"] = rightNow;
+        box.saveExchangeRate(exchangeRate);
+        if (_view is MoneyPage) moneyPage();
+      }
+    }
+  }
+
   void loadLocalHomePalettes() {
-    final jsonEncodedHomeNodes = Boxes.instance.home.values;
+    final jsonEncodedHomeNodes = box.home.values;
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = Node.fromJson(jsonDecode(jsonEncodedHomeNode));
       final p = nodeToPalette("Home", node);
@@ -1432,13 +1509,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> processMessageQueue() async {
-    for (final messageData in Boxes.instance.messageQueue.values) {
+    for (final messageData in box.messageQueue.values) {
       final notif = MessageNotification.fromNotification(
           Map<String, String>.from(messageData));
       await parseMessageNotification(notif);
     }
-    await Boxes.instance.messageQueue.clear();
-    Boxes.instance.messageQueue.close();
+    await box.messageQueue.clear();
+    box.messageQueue.close();
   }
 
   // ======================================================= UTILS ============================================================ //
@@ -1516,9 +1593,9 @@ class _HomePageState extends State<HomePage> {
           return null;
         } else {
           final lastMessageID = node.messages.last;
-          final msg = Boxes.instance.loadMessage(lastMessageID);
+          final msg = box.loadMessage(lastMessageID);
           if (msg.timestamp.isExpired) {
-            Boxes.instance.deleteNode(node.id);
+            box.deleteNode(node.id);
             return null;
           }
         }
@@ -1667,8 +1744,8 @@ class _HomePageState extends State<HomePage> {
             nodeAt(msg.root)!
               ..messages.add(msg.messageID)
               ..updateActivity();
-            Boxes.instance.saveNode(nodeAt(msg.root)!);
-            Boxes.instance.saveMessage(msg);
+            box.saveNode(nodeAt(msg.root)!);
+            box.saveMessage(msg);
           } else {
             // not in home -> fetch the node
             final nonFriend = await r.getNodes([msg.root]);
@@ -1680,8 +1757,8 @@ class _HomePageState extends State<HomePage> {
                   ..messages.add(msg.messageID)
                   ..updateActivity(),
               );
-              Boxes.instance.saveNode(nonFriend.first);
-              Boxes.instance.saveMessage(msg);
+              box.saveNode(nonFriend.first);
+              box.saveMessage(msg);
             }
           }
           _view is Down4PalettePage
@@ -1699,8 +1776,8 @@ class _HomePageState extends State<HomePage> {
             ?..messages.add(msg.messageID)
             ..updateActivity();
           if (node != null) {
-            Boxes.instance.saveNode(node);
-            Boxes.instance.saveMessage(msg);
+            box.saveNode(node);
+            box.saveMessage(msg);
             writePalette(node);
           }
           _view is Down4PalettePage
@@ -1718,8 +1795,8 @@ class _HomePageState extends State<HomePage> {
             ?..messages.add(msg.messageID)
             ..updateActivity();
           if (node != null) {
-            Boxes.instance.saveNode(node);
-            Boxes.instance.saveMessage(msg);
+            box.saveNode(node);
+            box.saveMessage(msg);
             writePalette(node);
           }
           _view is Down4PalettePage
@@ -1735,7 +1812,7 @@ class _HomePageState extends State<HomePage> {
           Future<void> fetchAndSaveSnip() async {
             final media = await r.getMessageMedia(notif.mediaID!);
             if (media != null) {
-              Boxes.instance.snip.put(media.id, jsonEncode(media));
+              box.snip.put(media.id, jsonEncode(media));
             }
           }
 
@@ -1745,7 +1822,7 @@ class _HomePageState extends State<HomePage> {
                 ..updateActivity()
                 ..snips.add(notif.mediaID!),
             );
-            Boxes.instance.saveNode(node);
+            box.saveNode(node);
           }
 
           final roots = notif.root.split(" ");
@@ -1807,7 +1884,7 @@ class _HomePageState extends State<HomePage> {
             ..updateActivity(),
         )!,
       );
-      Boxes.instance.saveNode(friend);
+      box.saveNode(friend);
     }
     searchPage();
   }
@@ -1819,7 +1896,7 @@ class _HomePageState extends State<HomePage> {
 
   void delete() {
     for (final p in homePalettes.toList().where((e) => e.selected)) {
-      Boxes.instance.deleteNode(p.node.id);
+      box.deleteNode(p.node.id);
       _palettes["Home"]?.remove(p.node.id);
     }
     homePage();
@@ -1851,7 +1928,7 @@ class _HomePageState extends State<HomePage> {
     chatPage(node
       ..messages.add(req.msg.messageID)
       ..updateActivity());
-    Boxes.instance.saveNode(node);
+    box.saveNode(node);
     return await success;
   }
 
@@ -2066,12 +2143,13 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
-  Future<void> moneyPage() async {
-    final exchangeRate = await r.getExchangeRate();
+  void moneyPage() {
+    updateExchangeRate();
+    print(exchangeRate);
     _view = MoneyPage(
       self: widget.self,
       wallet: widget.wallet,
-      exchangeRate: exchangeRate ?? 0.0,
+      exchangeRate: exchangeRate["rate"],
       palettes: selectedHomeUserPaletteDeactivated,
       back: homePage,
     );
@@ -2210,14 +2288,14 @@ class _HomePageState extends State<HomePage> {
     } else {
       final snip = node.snips.first;
       node.snips.remove(snip); // consume it
-      Boxes.instance.saveNode(node);
+      box.saveNode(node);
       Down4Media? media;
       dynamic jsonEncodedMedia;
-      if ((jsonEncodedMedia = Boxes.instance.snip.get(snip)) == null) {
+      if ((jsonEncodedMedia = box.snip.get(snip)) == null) {
         media = await r.getMessageMedia(snip);
       } else {
         media = Down4Media.fromJson(jsonDecode(jsonEncodedMedia));
-        Boxes.instance.snip.delete(snip); // consume it
+        box.snip.delete(snip); // consume it
       }
       if (media == null) {
         writePalette(node);
@@ -2226,7 +2304,7 @@ class _HomePageState extends State<HomePage> {
       final scale =
           1 / (media!.metadata.aspectRatio ?? 1.0 * mediaSize.aspectRatio);
       if (media.metadata.isVideo) {
-        var f = Boxes.instance.writeMediaToFile(media);
+        var f = box.writeMediaToFile(media);
         var ctrl = VideoPlayerController.file(f);
         await ctrl.initialize();
         await ctrl.setLooping(true);
@@ -2459,4 +2537,3 @@ class _HomePageState extends State<HomePage> {
 //     );
 //   }
 // }
-
