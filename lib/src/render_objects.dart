@@ -41,18 +41,18 @@ class PinkTheme {
   };
 }
 
-class RealButton {
-  final ConsoleButton mainButton;
-  final List<ConsoleButton>? extraButtons;
-  final bool showExtra;
-  RealButton(
-      {required this.mainButton, this.extraButtons, this.showExtra = false});
-}
+// class RealButton {
+//   final ConsoleButton mainButton;
+//   final List<ConsoleButton>? extraButtons;
+//   final bool showExtra;
+//   RealButton(
+//       {required this.mainButton, this.extraButtons, this.showExtra = false});
+// }
 
 class Down4PalettePage extends StatelessWidget {
   final List<Palette> palettes;
-  final List<RealButton> bottomButtons;
-  final List<RealButton>? topButtons;
+  final List<ConsoleButton> bottomButtons;
+  final List<ConsoleButton>? topButtons;
   final List<ConsoleInput>? bottomInputs, topInputs;
   const Down4PalettePage({
     required this.palettes,
@@ -67,7 +67,7 @@ class Down4PalettePage extends StatelessWidget {
     final buttonWidth = (screenWidth - 31) / (topButtons?.length ?? 1);
     List<Widget> extras = [];
     int i = 0;
-    for (final b in topButtons ?? <RealButton>[]) {
+    for (final b in topButtons ?? <ConsoleButton>[]) {
       if (b.showExtra) {
         extras.add(Positioned(
             bottom: 16.0 + (ConsoleButton.height * 2),
@@ -122,8 +122,8 @@ class Down4PalettePage extends StatelessWidget {
           Column(children: [
             PaletteList(palettes: palettes),
             Console(
-              bottomButtons: bottomButtons.map((e) => e.mainButton).toList(),
-              topButtons: topButtons?.map((e) => e.mainButton).toList(),
+              bottomButtons: bottomButtons,
+              topButtons: topButtons,
               topInputs: topInputs,
               inputs: bottomInputs,
             )
@@ -169,8 +169,8 @@ class Down4StackBackground extends StatelessWidget {
 
 class Down4StackBackground2 extends StatelessWidget {
   final List<Widget> children;
-  final List<RealButton> bottomButtons;
-  final List<RealButton>? topButtons;
+  final List<ConsoleButton> bottomButtons;
+  final List<ConsoleButton>? topButtons;
   final List<ConsoleInput>? bottomInputs, topInputs;
   const Down4StackBackground2({
     required this.children,
@@ -185,7 +185,7 @@ class Down4StackBackground2 extends StatelessWidget {
     final buttonWidth = (screenWidth - 31) / (topButtons?.length ?? 1);
     List<Widget> extras = [];
     int i = 0;
-    for (final b in topButtons ?? <RealButton>[]) {
+    for (final b in topButtons ?? <ConsoleButton>[]) {
       if (b.showExtra) {
         extras.add(Positioned(
             bottom: 16.0 + (ConsoleButton.height * 2),
@@ -240,8 +240,8 @@ class Down4StackBackground2 extends StatelessWidget {
         Column(children: [
           const Spacer(),
           Console(
-            bottomButtons: bottomButtons.map((e) => e.mainButton).toList(),
-            topButtons: topButtons?.map((e) => e.mainButton).toList(),
+            bottomButtons: bottomButtons,
+            topButtons: topButtons,
             topInputs: topInputs,
             inputs: bottomInputs,
           )
@@ -569,7 +569,8 @@ class Palette extends StatelessWidget {
 class ConsoleButton extends StatelessWidget {
   static const double height = 26.0;
   final String name;
-  final bool isSpecial, isMode, shouldBeDownButIsnt, isActivated;
+  final List<ConsoleButton>? extraButtons;
+  final bool isSpecial, isMode, shouldBeDownButIsnt, isActivated, showExtra;
   final void Function() onPress;
   final void Function()? onLongPress;
   final void Function()? onLongPressUp;
@@ -577,6 +578,8 @@ class ConsoleButton extends StatelessWidget {
   const ConsoleButton({
     required this.name,
     required this.onPress,
+    this.extraButtons,
+    this.showExtra = false,
     this.shouldBeDownButIsnt = false,
     this.isMode = false,
     this.isSpecial = false,
@@ -801,7 +804,7 @@ class _Down4InputState extends State<Down4Input> {
 class Console extends StatelessWidget {
   final List<ConsoleButton>? topButtons;
   final List<ConsoleButton> bottomButtons;
-  final CameraPreview? cameraPreview;
+  final CameraController? cameraController;
   final double? aspectRatio;
   final bool? toMirror, images;
   final List<Down4Media>? medias;
@@ -820,7 +823,7 @@ class Console extends StatelessWidget {
     this.videoPlayerController,
     this.toMirror,
     this.aspectRatio,
-    this.cameraPreview,
+    this.cameraController,
     this.inputs,
     this.topInputs,
     this.topButtons,
@@ -894,26 +897,30 @@ class Console extends StatelessWidget {
                         );
                       }))),
                 )
-              : cameraPreview != null
+              : cameraController != null
                   ? Container(
                       width: camWidthAndHeight,
                       height: camWidthAndHeight,
                       clipBehavior: Clip.hardEdge,
                       decoration: BoxDecoration(
-                          border: Border.all(color: Colors.black, width: .5)),
+                        border: Border.all(color: Colors.black, width: .5),
+                      ),
                       child: Transform.scale(
-                          alignment: Alignment.center,
-                          scaleY: aspectRatio,
-                          child: AspectRatio(
-                              aspectRatio: aspectRatio!,
-                              child: cameraPreview!)))
+                        alignment: Alignment.center,
+                        scaleY: aspectRatio,
+                        child: AspectRatio(
+                          aspectRatio: aspectRatio!,
+                          child: CameraPreview(cameraController!),
+                        ),
+                      ),
+                    )
                   : imagePreviewPath != null
                       ? Container(
                           width: camWidthAndHeight,
                           height: camWidthAndHeight,
                           decoration: BoxDecoration(
-                              border:
-                                  Border.all(color: Colors.black, width: 0.5)),
+                            border: Border.all(color: Colors.black, width: 0.5),
+                          ),
                           child: Transform(
                               alignment: Alignment.center,
                               transform: Matrix4.rotationY(mirror),
@@ -927,22 +934,29 @@ class Console extends StatelessWidget {
                               width: camWidthAndHeight,
                               height: camWidthAndHeight,
                               decoration: BoxDecoration(
-                                  border: Border.all(
-                                      color: Colors.black, width: 0.5)),
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 0.5,
+                                ),
+                              ),
                               child: Transform(
-                                  alignment: Alignment.center,
-                                  transform: Matrix4.rotationY(mirror),
-                                  child: Transform.scale(
-                                      scaleY: aspectRatio,
-                                      child:
-                                          VideoPlayer(videoPlayerController!))))
+                                alignment: Alignment.center,
+                                transform: Matrix4.rotationY(mirror),
+                                child: Transform.scale(
+                                  scaleY: aspectRatio,
+                                  child: VideoPlayer(videoPlayerController!),
+                                ),
+                              ),
+                            )
                           : scanController != null
                               ? Container(
                                   width: camWidthAndHeight - 1,
                                   height: camWidthAndHeight - 1,
                                   decoration: BoxDecoration(
                                     border: Border.all(
-                                        color: Colors.black, width: 0.5),
+                                      color: Colors.black,
+                                      width: 0.5,
+                                    ),
                                     color: PinkTheme.buttonColor,
                                   ),
                                   child: MobileScanner(

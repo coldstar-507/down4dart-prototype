@@ -97,7 +97,7 @@ class _CameraConsoleState extends State<CameraConsole> {
   void _drawCapturingConsole() {
     setState(() {
       _console = Console(
-        cameraPreview: CameraPreview(_cameraController!),
+        cameraController: _cameraController!,
         aspectRatio: _cameraController?.value.aspectRatio,
         topButtons: [
           ConsoleButton(
@@ -368,25 +368,21 @@ class _SnipCameraState extends State<SnipCamera> {
         ),
       ],
       topButtons: [
-        RealButton(
-          mainButton: ConsoleButton(
-            shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
-            name: "Capture",
-            isSpecial: widget.enableVideo,
-            onPress: _takePicture,
-            onLongPress: widget.enableVideo ? _startRecording : null,
-            onLongPressUp: widget.enableVideo ? _stopRecording : null,
-          ),
+        ConsoleButton(
+          shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
+          name: "Capture",
+          isSpecial: widget.enableVideo,
+          onPress: _takePicture,
+          onLongPress: widget.enableVideo ? _startRecording : null,
+          onLongPressUp: widget.enableVideo ? _stopRecording : null,
         ),
       ],
       bottomButtons: [
-        RealButton(
-          mainButton: ConsoleButton(
-            name: "Back",
-            onPress: () => !extra ? widget.cameraBack() : toggleExtra(),
-            onLongPress: toggleExtra,
-            isSpecial: true,
-          ),
+        ConsoleButton(
+          name: "Back",
+          onPress: () => !extra ? widget.cameraBack() : toggleExtra(),
+          onLongPress: toggleExtra,
+          isSpecial: true,
           extraButtons: [
             ConsoleButton(
               isMode: true,
@@ -401,13 +397,11 @@ class _SnipCameraState extends State<SnipCamera> {
           ],
           showExtra: extra,
         ),
-        RealButton(
-          mainButton: ConsoleButton(
-            isMode: true,
-            name: widget.camNum == 0 ? "Rear" : "Front",
-            onPress: widget.flip,
-          ),
-        )
+        ConsoleButton(
+          isMode: true,
+          name: widget.camNum == 0 ? "Rear" : "Front",
+          onPress: widget.flip,
+        ),
       ],
     );
   }

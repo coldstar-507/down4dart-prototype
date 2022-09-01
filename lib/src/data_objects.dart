@@ -81,12 +81,14 @@ class Down4Media {
   }
 
   factory Down4Media.fromCamera(String filePath, MediaMetadata md) {
-    final data = File(filePath).readAsBytesSync();
+    final file = File(filePath);
+    final data = file.readAsBytesSync();
     return Down4Media(
       id: d4utils.generateMediaID(data),
       data: data,
       metadata: md,
       path: filePath,
+      file: file,
     );
   }
 
