@@ -10,6 +10,11 @@ import 'web_requests.dart' as r;
 // import 'package:bip39/bip39.dart' as bip39;
 // import 'dart:io' as io;
 
+const SATS_PER_BYTE = 0.05;
+final DOWN4_NEUTER = BIP32.fromBase58(
+  "xpub6DTufsTvxdAJaPhAMcowwgNWghwUXw8fexqjY5rEdBdBiVAJiKCY7SQzVwBb7JXgMLFcoNqAxwJZUEEVnGFjj8ngbu2HGwTDBhPfVvHcGYs",
+);
+
 List<int> _p2pkh(List<int> address) => [0x76, 0xa9, ...address, 0x88, 0xac];
 
 Uint8List sha256(Uint8List data) => s256.SHA256Digest().process(data);
@@ -36,12 +41,6 @@ class Down4Payment {
 }
 
 class Wallet {
-  static const SATS_PER_BYTE = 0.05;
-  static const DOWN4_SATS_PER_BYTE = 0.025;
-  static final DOWN4_NEUTER = BIP32.fromBase58(
-    "xpub6DTufsTvxdAJaPhAMcowwgNWghwUXw8fexqjY5rEdBdBiVAJiKCY7SQzVwBb7JXgMLFcoNqAxwJZUEEVnGFjj8ngbu2HGwTDBhPfVvHcGYs",
-  );
-
   final String _mnemonic;
   BIP32 bip;
   List<Down4TXOUT> utxos;
