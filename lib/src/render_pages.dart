@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:bip32/bip32.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +42,7 @@ class Down4Page extends StatelessWidget {
   final void Function(Down4Media)? selectMedia;
   final String? imagePreviewPath;
   final VideoPlayerController? videoPlayerController;
+
   const Down4Page({
     required this.bottomButtons,
     this.columnWidgets,
@@ -160,6 +162,7 @@ class Down4Page2 extends StatelessWidget {
   final MessageList4? messageList;
   final List<Widget>? columnWidgets;
   final Console console;
+
   const Down4Page2({
     required this.console,
     this.columnWidgets,
@@ -248,6 +251,7 @@ class Down4Page2 extends StatelessWidget {
 class PalettePage extends StatelessWidget {
   final List<Palette> palettes;
   final Console console;
+
   const PalettePage({required this.palettes, required this.console, Key? key})
       : super(key: key);
 
@@ -261,9 +265,11 @@ class PalettePage extends StatelessWidget {
 class MessagePage extends StatelessWidget {
   final MessageList4 messageList;
   final dynamic console;
+
   const MessagePage(
       {required this.messageList, required this.console, Key? key})
       : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Down4ColumnBackground(
@@ -279,6 +285,7 @@ class GroupPage extends StatefulWidget {
   final List<Palette> palettes;
   final void Function(Node) afterMessageCallback;
   final void Function() back;
+
   const GroupPage({
     required this.isHyperchat,
     required this.self,
@@ -318,7 +325,8 @@ class _GroupPageState extends State<GroupPage> {
 
   PaletteMaker hyperchatMaker() {
     return PaletteMaker(
-      id: "", // will calculate the ID on hyperchat creation for hyperchats
+      id: "",
+      // will calculate the ID on hyperchat creation for hyperchats
       name: _hyperchatName,
       hintText: "(Name)",
       nameCallBack: (name) => setState(() => _hyperchatName = name),
@@ -385,7 +393,7 @@ class _GroupPageState extends State<GroupPage> {
         root: root,
         senderName: widget.self.id,
         senderID: widget.self.id,
-        senderThumbnail: base64Encode(widget.self.image.thumbnail!),
+        senderThumbnail: base64Encode(widget.self.image!.thumbnail!),
         forwarderName: widget.self.name,
         isChat: true,
         timestamp: ts,
@@ -469,6 +477,7 @@ class MoneyPage extends StatefulWidget {
   final List<Palette> palettes;
   final Node self;
   final void Function() back;
+
   const MoneyPage({
     required this.wallet,
     required this.exchangeRate,
@@ -731,13 +740,16 @@ class AddFriendPage extends StatefulWidget {
   final List<Palette> palettes;
   final List<CameraDescription> cameras;
   final Future<bool> Function(String) search;
+  final void Function(Node node) putNodeOffline;
   final void Function(List<Node>) addCallback;
   final void Function() backCallback;
+
   const AddFriendPage({
     required this.palettes,
     required this.search,
     required this.cameras,
     required this.self,
+    required this.putNodeOffline,
     required this.addCallback,
     required this.backCallback,
     Key? key,
@@ -748,29 +760,16 @@ class AddFriendPage extends StatefulWidget {
 }
 
 class _AddFriendPageState extends State<AddFriendPage> {
+  Console? _console;
   String _input = "";
   ConsoleInput? _consoleInputRef;
   TextEditingController tec = TextEditingController();
-  bool _scanning = false;
   CameraController? _cameraController;
-
-  Future<void> initController() async {
-    try {
-      _cameraController = CameraController(
-        widget.cameras[0],
-        ResolutionPreset.low,
-      );
-      await _cameraController?.initialize();
-      await _cameraController?.setFlashMode(FlashMode.off);
-    } catch (err) {
-      rethrow;
-    }
-    setState(() {});
-  }
 
   @override
   void initState() {
     super.initState();
+    defaultConsole();
     _consoleInputRef = consoleInput;
   }
 
@@ -778,13 +777,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
   void dispose() {
     super.dispose();
     _cameraController?.dispose();
-  }
-
-  Future<void> toggleScan() async {
-    await initController();
-
-    _scanning = !_scanning;
-    setState(() {});
   }
 
   ConsoleInput get consoleInput {
@@ -797,11 +789,28 @@ class _AddFriendPageState extends State<AddFriendPage> {
     );
   }
 
-  Console get defaultConsole {
-    return Console(
-      cameraController: _scanning ? _cameraController! : null,
-      aspectRatio: _cameraController?.value.aspectRatio,
-      inputs: !_scanning ? [_consoleInputRef ?? consoleInput] : null,
+  scanCallBack(Barcode bc, MobileScannerArguments? args) {
+    if (bc.rawValue != null) {
+      final data = bc.rawValue!.split("~");
+      if (data.length != 4) return;
+      var node = Node(
+        type: Nodes.user,
+        id: data[0],
+        name: data[1],
+        lastName: data[2],
+        neuter: data[3] != null ? BIP32.fromBase58(data[3]) : null,
+      );
+      widget.putNodeOffline(node);
+    }
+  }
+
+  void defaultConsole([scanning = false]) {
+    MobileScannerController? scannerController;
+    if (scanning) scannerController = MobileScannerController();
+    _console = Console(
+      scanController: scannerController,
+      scanCallBack: scanCallBack,
+      inputs: !scanning ? [_consoleInputRef ?? consoleInput] : null,
       topButtons: [
         ConsoleButton(
           name: "Add",
@@ -819,35 +828,61 @@ class _AddFriendPageState extends State<AddFriendPage> {
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.backCallback),
-        ConsoleButton(name: "Scan", onPress: toggleScan),
+        ConsoleButton(name: "Scan", onPress: () => defaultConsole(!scanning)),
         ConsoleButton(name: "Forward", onPress: () => print("FORWARD")),
       ],
     );
   }
 
+  Widget get qr => Container(
+        padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
+        child: Align(
+          alignment: AlignmentDirectional.topCenter,
+          child: QrImage(
+            foregroundColor: PinkTheme.qrColor,
+            data: [
+              widget.self.id,
+              widget.self.name,
+              widget.self.lastName,
+              widget.self.neuter?.toBase58() ?? "",
+            ].join("~"),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Down4StackBackground(
-        children: [
-          Container(
-            padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
-            child: Align(
-              alignment: AlignmentDirectional.topCenter,
-              child: QrImage(
-                foregroundColor: PinkTheme.qrColor,
-                data: [widget.self.id, widget.self.name, widget.self.lastName]
-                    .join(" "),
-              ),
-            ),
-          ),
-          Column(children: [
-            PaletteList(palettes: widget.palettes),
-            defaultConsole,
-          ]),
-        ],
-      ),
+    return Down4Page2(
+      stackWidgets: [qr],
+      columnWidgets: widget.palettes,
+      console: _console!,
     );
+
+    // return Scaffold(
+    //   body: Down4StackBackground(
+    //     children: [
+    //       Container(
+    //         padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
+    //         child: Align(
+    //           alignment: AlignmentDirectional.topCenter,
+    //           child: QrImage(
+    //             foregroundColor: PinkTheme.qrColor,
+    //             data: [
+    //               widget.self.id,
+    //               widget.self.name,
+    //               widget.self.lastName,
+    //               widget.self.neuter?.toBase58() ?? "",
+    //             ].join(" "),
+    //           ),
+    //         ),
+    //       ),
+    //       Column(children: [
+    //         PaletteList(palettes: widget.palettes),
+    //         defaultConsole,
+    //       ]),
+    //     ],
+    //   ),
+    // );
   }
 }
 
@@ -867,6 +902,7 @@ class UserMakerPage extends StatefulWidget {
   final Future<bool> Function(String, String, String, Uint8List, bool) initUser;
   final void Function() success;
   final List<CameraDescription> cameras;
+
   const UserMakerPage({
     required this.initUser,
     required this.success,
@@ -900,9 +936,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
     _loadInitConsole();
   }
 
-  bool _isReady() {
-    return _isValidUsername && _image.isNotEmpty && _name.isNotEmpty;
-  }
+  bool get isReady => _isValidUsername && _image.isNotEmpty && _name.isNotEmpty;
 
   void _loadInputs() {
     _inputs = [
@@ -946,7 +980,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),
         ConsoleButton(
             key: buttonKey,
-            isActivated: _isReady(),
+            isActivated: isReady,
             name: "Proceed",
             onPress: () async {
               _errorTryAgain = !await widget.initUser(
@@ -991,7 +1025,44 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Down4Page2(
+      console: _console,
+      columnWidgets: [
+        _errorTryAgain
+            ? Container(
+                margin: const EdgeInsets.symmetric(horizontal: 22.0),
+                child: const Text(
+                  "Rare error, someone might have just taken that username, please try again",
+                  textAlign: TextAlign.center,
+                ))
+            : const SizedBox.shrink(),
+        UserMakerPalette(
+          selectFile: () async {
+            FilePickerResult? r = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['jpg', 'png', 'jpeg'],
+                withData: true);
+            if (r?.files.single.bytes != null) {
+              final compressedBytes =
+                  await FlutterImageCompress.compressWithList(
+                r!.files.single.bytes!,
+                minHeight: 520,
+                minWidth: 520,
+                quality: 40,
+              );
+              setState(() => _image = compressedBytes);
+              _loadInitConsole();
+            }
+          },
+          name: _name,
+          id: _id,
+          lastName: _lastName,
+          image: _image,
+        ),
+      ],
+    );
+
+    Scaffold(
       body: Down4ColumnBackground(
         children: [
           _errorTryAgain
@@ -1038,6 +1109,7 @@ class WelcomePage extends StatelessWidget {
   final void Function() _understood;
   final String _mnemonic;
   final Node _userInfo;
+
   const WelcomePage({
     required String mnemonic,
     required Node userInfo,
@@ -1103,6 +1175,7 @@ class NodePage extends StatefulWidget {
   final Palette? Function(String, Node) nodeToPalette;
   final void Function(String, String) openNode, openChat;
   final void Function() back;
+
   const NodePage({
     required this.cameras,
     required this.openNode,
@@ -1127,13 +1200,9 @@ class _NodePageState extends State<NodePage> {
     "Parents": {},
   };
 
-  // Map<String, ChatMessage> _posts = {};
-
   Map<String, List<String>> _stupidMap = {};
   List<String> _modes = ["Childs"];
   int _i = 0;
-
-  // double _profileImageWidth = 200;
 
   @override
   void initState() {
@@ -1144,27 +1213,19 @@ class _NodePageState extends State<NodePage> {
     //   _modes.add("Posts");
     //   _stupidMap["Posts"] = node.posts;
     // }
-    if (node.parents.isNotEmpty) {
+    if ((node.parents ?? []).isNotEmpty) {
       _modes.add("Parents");
-      _stupidMap["Parents"] = node.parents;
+      _stupidMap["Parents"] = node.parents!;
     }
-    if (node.admins.isNotEmpty) {
+    if ((node.admins ?? []).isNotEmpty) {
       _modes.add("Admins");
-      _stupidMap["Admins"] = node.admins;
+      _stupidMap["Admins"] = node.admins!;
     }
-    if (node.friends.isNotEmpty) {
+    if ((node.friends ?? []).isNotEmpty) {
       _modes.add("Friends");
-      _stupidMap["Friends"] = node.friends;
+      _stupidMap["Friends"] = node.friends!;
     }
   }
-
-  // Future<void> setUpProfileImage() async {
-  //   final buffer =
-  //       await ui.ImmutableBuffer.fromUint8List(widget.palette.node.image.data);
-  //   final descriptor = await ui.ImageDescriptor.encoded(buffer);
-  //   _profileImageWidth = descriptor.width.toDouble();
-  //   setState(() {});
-  // }
 
   String get currentMode => _modes[_i];
 
@@ -1285,6 +1346,7 @@ class ChatPage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final Future<bool> Function(MessageRequest req) send;
   final void Function() back;
+
   const ChatPage({
     required this.send,
     required this.self,
@@ -1293,6 +1355,7 @@ class ChatPage extends StatefulWidget {
     required this.cameras,
     Key? key,
   }) : super(key: key);
+
   @override
   _ChatPageState createState() => _ChatPageState();
 }
@@ -1322,11 +1385,6 @@ class _ChatPageState extends State<ChatPage> {
         tec: tec,
         inputCallBack: (t) => null,
         placeHolder: ":)",
-        // placeHolder: widget.node.name,
-        // placeHolder: widget.node.name +
-        //     ((widget.node.lastName != null && widget.node.lastName != "")
-        //         ? " " + widget.node.lastName!
-        //         : ""),
       );
 
   Future<void> handleImport() async {
@@ -1375,9 +1433,9 @@ class _ChatPageState extends State<ChatPage> {
   void send2(String textInput, Down4Media? mediaInput) {
     if (textInput != "" || mediaInput != null) {
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final targets = widget.node.group.isEmpty
+      final targets = widget.node.group!.isEmpty
           ? [widget.node.id]
-          : List<String>.from(widget.node.group)
+          : List<String>.from(widget.node.group!)
         ..remove(widget.self.id);
       var msg = Down4Message(
         messageID: u.generateMessageID(widget.self.id, ts),
@@ -1385,7 +1443,7 @@ class _ChatPageState extends State<ChatPage> {
         timestamp: ts,
         senderID: widget.self.id,
         senderName: widget.self.name,
-        senderThumbnail: base64Encode(widget.self.image.thumbnail!),
+        senderThumbnail: base64Encode(widget.self.image!.thumbnail!),
         media: mediaInput,
         text: textInput,
       );
@@ -1398,22 +1456,16 @@ class _ChatPageState extends State<ChatPage> {
   // When dynamically loaded from MessageList2
   // the Messages are cached in _messages
   // There is not limit to this cache, which could be dangerous
-  void cacheMessage(ChatMessage msg) {
-    _chachedMessages[msg.message.messageID] = msg;
-    // setState(() {}); // should we reload MessageList2 like this?
-  }
-
-  void selectMessage(Identifier id, _) {
-    _chachedMessages[id] = _chachedMessages[id]!.invertedSelection();
-    setState(() {});
-  }
 
   MessageList4 get messageList => MessageList4(
-        messages: widget.node.messages.reversed.toList(),
+        messages: widget.node.messages!.reversed.toList(),
         self: widget.self,
         messageMap: _chachedMessages,
-        select: selectMessage,
-        cache: cacheMessage,
+        cache: (msg) => _chachedMessages[msg.message.messageID] = msg,
+        select: (id, _) {
+          _chachedMessages[id] = _chachedMessages[id]!.invertedSelection();
+          setState(() {});
+        },
       );
 
   void camConsole([
@@ -1645,6 +1697,7 @@ class HomePage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final Node self;
   final Wallet wallet;
+
   const HomePage({
     required this.cameras,
     required this.self,
@@ -1659,8 +1712,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   var box = Boxes.instance;
   Widget? _view;
-  Wallet? _wallet;
   Map<String, dynamic> exchangeRate = {};
+
   // The base location is Home with the home palettes
   // You can traverse palettes which will be cached
   // Home -> home palettes
@@ -1669,6 +1722,7 @@ class _HomePageState extends State<HomePage> {
     "Home": {},
     "Search": {},
   };
+
   // similar to the palettes, used for local data and caching messages
   Map<String, Map<String, ChatMessage>> _messages = {
     "Saved": {},
@@ -1680,13 +1734,12 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, String>> _loc = [
     {"at": "Home"}
   ];
+
   // we pop it when backing in node views
   // when it's empty we should be on home view
   // if _currentLocation is not "Home", it should be _node.id
 
   var _tec = TextEditingController();
-  String _pingInput = "";
-  bool _extra = false;
 
   // ======================================================= INITIALIZATION ============================================================ //
 
@@ -1783,7 +1836,8 @@ class _HomePageState extends State<HomePage> {
       case Nodes.root:
         return Palette(
           node: node,
-          at: at, // todo
+          at: at,
+          // todo
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
@@ -1803,11 +1857,11 @@ class _HomePageState extends State<HomePage> {
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
-              assetPath: at == "Home" && node.snips.isNotEmpty
+              assetPath: at == "Home" && node.snips!.isNotEmpty
                   ? "lib/src/assets/rightRedArrow.png"
                   : "lib/src/assets/rightBlackArrow.png",
               pressFunc: at == "Home"
-                  ? node.snips.isNotEmpty
+                  ? node.snips!.isNotEmpty
                       ? checkSnips
                       : openChat
                   : openNode,
@@ -1819,10 +1873,10 @@ class _HomePageState extends State<HomePage> {
       case Nodes.market:
         break;
       case Nodes.hyperchat:
-        if (node.messages.isEmpty) {
+        if (node.messages!.isEmpty) {
           return null;
         } else {
-          final lastMessageID = node.messages.last;
+          final lastMessageID = node.messages!.last;
           final msg = box.loadMessage(lastMessageID);
           if (msg.timestamp.isExpired) {
             box.deleteNode(node.id);
@@ -1837,8 +1891,8 @@ class _HomePageState extends State<HomePage> {
           buttonsInfo: [
             ButtonsInfo(
               rightMost: true,
-              pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
-              assetPath: node.snips.isNotEmpty
+              pressFunc: node.snips!.isNotEmpty ? checkSnips : openChat,
+              assetPath: node.snips!.isNotEmpty
                   ? "lib/src/assets/rightRedArrow.png"
                   : "lib/src/assets/rightBlackArrow.png",
             )
@@ -1881,11 +1935,11 @@ class _HomePageState extends State<HomePage> {
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
-              assetPath: at == "Home" && node.snips.isNotEmpty
+              assetPath: at == "Home" && node.snips!.isNotEmpty
                   ? "lib/src/assets/rightRedArrow.png"
                   : "lib/src/assets/rightBlackArrow.png",
               pressFunc: at == "Home"
-                  ? node.snips.isNotEmpty
+                  ? node.snips!.isNotEmpty
                       ? checkSnips
                       : openChat
                   : openNode,
@@ -1904,8 +1958,8 @@ class _HomePageState extends State<HomePage> {
           buttonsInfo: [
             ButtonsInfo(
               rightMost: true,
-              pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
-              assetPath: node.snips.isNotEmpty
+              pressFunc: node.snips!.isNotEmpty ? checkSnips : openChat,
+              assetPath: node.snips!.isNotEmpty
                   ? "lib/src/assets/rightRedArrow.png"
                   : "lib/src/assets/rightBlackArrow.png",
             )
@@ -1938,18 +1992,20 @@ class _HomePageState extends State<HomePage> {
       var success = r.snipRequest(MessageRequest(
         withUpload: true,
         msg: Down4Message(
-            messageID: "", // can be ommited
+            messageID: "",
+            // can be ommited
             root: homePalettes
                 .where((p) => p.selected)
                 .map((e) => e.node.id)
                 .toList()
-                .join(" "), // can be omited
+                .join(" "),
+            // can be omited
             timestamp: timestamp,
             media: media,
             senderID: widget.self.id,
             senderName: widget.self.name,
             senderLastName: widget.self.lastName,
-            senderThumbnail: base64Encode(widget.self.image.thumbnail!)),
+            senderThumbnail: base64Encode(widget.self.image!.thumbnail!)),
         targets: selectedHomeUserIDs,
       ));
       homePage();
@@ -1972,7 +2028,7 @@ class _HomePageState extends State<HomePage> {
           }
           if (nodeAt(msg.root) != null) {
             nodeAt(msg.root)!
-              ..messages.add(msg.messageID)
+              ..messages!.add(msg.messageID)
               ..updateActivity();
             box.saveNode(nodeAt(msg.root)!);
             box.saveMessage(msg);
@@ -1984,7 +2040,7 @@ class _HomePageState extends State<HomePage> {
               writePalette(
                 nonFriend!.first
                   ..mutateType(Nodes.nonFriend)
-                  ..messages.add(msg.messageID)
+                  ..messages!.add(msg.messageID)
                   ..updateActivity(),
               );
               box.saveNode(nonFriend.first);
@@ -2003,7 +2059,7 @@ class _HomePageState extends State<HomePage> {
         {
           final msg = await notif.toDown4Message();
           final node = (await notif.nodeOfHyperchat())
-            ?..messages.add(msg.messageID)
+            ?..messages!.add(msg.messageID)
             ..updateActivity();
           if (node != null) {
             box.saveNode(node);
@@ -2022,7 +2078,7 @@ class _HomePageState extends State<HomePage> {
         {
           final msg = await notif.toDown4Message();
           var node = (await notif.nodeOfGroup())
-            ?..messages.add(msg.messageID)
+            ?..messages!.add(msg.messageID)
             ..updateActivity();
           if (node != null) {
             box.saveNode(node);
@@ -2050,7 +2106,7 @@ class _HomePageState extends State<HomePage> {
             writePalette(
               node
                 ..updateActivity()
-                ..snips.add(notif.mediaID!),
+                ..snips!.add(notif.mediaID!),
             );
             box.saveNode(node);
           }
@@ -2147,16 +2203,19 @@ class _HomePageState extends State<HomePage> {
     return false;
   }
 
-  void toggleExtra() {
-    _extra = !_extra;
-    homePage();
+  void putNodeOffLine(Node node) {
+    final p = nodeToPalette("Search", node);
+    if (p != null) {
+      _palettes["Search"]?.putIfAbsent(node.id, () => p);
+      searchPage();
+    }
   }
 
   Future<bool> chatRequest(MessageRequest req) async {
     final success = r.chatRequest(req);
     final node = nodeAt(req.msg.root)!;
     chatPage(node
-      ..messages.add(req.msg.messageID)
+      ..messages!.add(req.msg.messageID)
       ..updateActivity());
     box.saveNode(node);
     return await success;
@@ -2176,7 +2235,7 @@ class _HomePageState extends State<HomePage> {
       } else {
         node = nodeAt(id, at)!;
       }
-      final childNodes = await r.getNodes(node.childs);
+      final childNodes = await r.getNodes(node.childs ?? []);
       if (childNodes != null) {
         for (final node in childNodes) {
           _palettes[id]!.putIfAbsent(node.id, () => nodeToPalette(id, node)!);
@@ -2227,7 +2286,7 @@ class _HomePageState extends State<HomePage> {
     );
     var idsInSelGroups = [];
     for (final shc in selectedGroups) {
-      for (final uid in shc.node.group) {
+      for (final uid in shc.node.group!) {
         if (!idsInSelGroups.contains(uid)) {
           idsInSelGroups.add(uid);
         }
@@ -2255,7 +2314,7 @@ class _HomePageState extends State<HomePage> {
     );
     var idsInSelGroups = <Identifier>[];
     for (final shc in selectedGroups) {
-      for (final uid in shc.node.group) {
+      for (final uid in shc.node.group!) {
         if (!idsInSelGroups.contains(uid)) {
           idsInSelGroups.add(uid);
         }
@@ -2313,27 +2372,27 @@ class _HomePageState extends State<HomePage> {
 
   // ============================================================== BUILD ================================================================ //
 
-  void homePage() {
+  void homePage([extra = false]) {
     _view = Down4PalettePage(
       palettes: formatedHomePalettes,
       bottomInputs: [
         ConsoleInput(
           tec: _tec,
-          inputCallBack: (text) => _pingInput = text,
+          inputCallBack: (text) => text,
           placeHolder: ":)",
         ),
       ],
       bottomButtons: [
         ConsoleButton(
-            showExtra: _extra,
+            showExtra: extra,
             name: "Delete",
-            onPress: _extra ? toggleExtra : delete,
+            onPress: () => extra ? homePage(!extra) : delete,
             isSpecial: true,
-            onLongPress: toggleExtra,
+            onLongPress: () => homePage(!extra),
             extraButtons: [
-              ConsoleButton(name: "Nigger", onPress: toggleExtra),
-              ConsoleButton(name: "Shit", onPress: toggleExtra),
-              ConsoleButton(name: "Wacko", onPress: toggleExtra),
+              ConsoleButton(name: "Nigger", onPress: () => homePage(!extra)),
+              ConsoleButton(name: "Shit", onPress: () => homePage(!extra)),
+              ConsoleButton(name: "Wacko", onPress: () => homePage(!extra)),
             ]),
         ConsoleButton(
           name: "Search",
@@ -2390,6 +2449,7 @@ class _HomePageState extends State<HomePage> {
   void searchPage() {
     _view = AddFriendPage(
       cameras: widget.cameras,
+      putNodeOffline: putNodeOffLine,
       self: widget.self,
       search: search,
       palettes: _palettes["Search"]?.values.toList().reversed.toList() ?? [],
@@ -2496,12 +2556,12 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> snipView(Node node) async {
     final mediaSize = MediaQuery.of(context).size; // full screen
-    if (node.snips.isEmpty) {
+    if (node.snips!.isEmpty) {
       writePalette(node);
       homePage();
     } else {
-      final snip = node.snips.first;
-      node.snips.remove(snip); // consume it
+      final snip = node.snips!.first;
+      node.snips!.remove(snip); // consume it
       box.saveNode(node);
       Down4Media? media;
       dynamic jsonEncodedMedia;
