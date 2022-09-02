@@ -347,7 +347,7 @@ class Down4Message {
       forwarderID: self.id != senderID ? self.id : null,
       forwarderName: self.id != senderID ? self.name : null,
       forwarderThumbnail:
-          self.id != senderID ? base64Encode(self.image.thumbnail!) : null,
+          self.id != senderID ? base64Encode(self.image!.thumbnail!) : null,
       media: media,
       nodes: nodes,
       reactions: reactions,
@@ -442,35 +442,35 @@ class Node {
 
   String name;
   String? lastName;
-  Down4Media image;
+  Down4Media? image;
   String? description;
   Nodes type;
   int activity;
-  List<Identifier> admins = [];
-  List<Identifier> childs = [];
-  List<Identifier> parents = [];
-  List<Identifier> friends = [];
-  List<Identifier> snips = [];
-  List<Identifier> group = [];
-  List<Identifier> messages = [];
-  List<Identifier> posts = []; // messages / either post or chat
+  List<Identifier>? admins;
+  List<Identifier>? childs;
+  List<Identifier>? parents;
+  List<Identifier>? friends;
+  List<Identifier>? snips;
+  List<Identifier>? group;
+  List<Identifier>? messages;
+  List<Identifier>? posts; // messages / either post or chat
   Node({
     required this.type,
     required this.id,
-    required this.image,
     required this.name,
+    this.image,
     this.neuter,
     this.description,
     this.activity = 0,
     this.lastName,
-    required this.posts,
-    required this.messages,
-    required this.admins,
-    required this.childs,
-    required this.group,
-    required this.parents,
-    required this.friends,
-    required this.snips,
+    this.posts,
+    this.messages,
+    this.admins,
+    this.childs,
+    this.group,
+    this.parents,
+    this.friends,
+    this.snips,
   });
 
   void mutateType(Nodes t) => type = t;
@@ -570,7 +570,7 @@ class Node {
         "a": activity,
         "nm": name,
         "ln": lastName,
-        "im": withMedia ? image.toJson() : image.id,
+        "im": withMedia ? image!.toJson() : image!.id,
         "msg": messages,
         "adm": admins,
         "chl": childs,

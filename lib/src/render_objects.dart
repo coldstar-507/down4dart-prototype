@@ -339,7 +339,7 @@ class ProfileWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Image.memory(
-            node.image.data,
+            node.image!.data,
             fit: BoxFit.cover,
             width: squareImageSize,
             height: squareImageSize,
@@ -447,10 +447,15 @@ class Palette extends StatelessWidget {
               onLongPress: () => imLongPress?.call(node.id, at),
               child: SizedBox(
                 width: paletteHeight - 2.0, // borderWidth x2
-                child: Image.memory(
-                  node.image.data,
-                  fit: BoxFit.cover,
-                ),
+                child: node.image != null
+                    ? Image.memory(
+                        node.image!.data,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.asset(
+                        "lib/src/assets/hashirama.jpg",
+                        fit: BoxFit.cover,
+                      ),
               ),
             ),
             Expanded(
@@ -496,7 +501,7 @@ class Palette extends StatelessWidget {
                           : const [Nodes.hyperchat, Nodes.group]
                                   .contains(node.type)
                               ? Text(
-                                  node.group.map((id) => "@" + id).join(" "),
+                                  node.group!.map((id) => "@" + id).join(" "),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -517,17 +522,17 @@ class Palette extends StatelessWidget {
                                 Nodes.hyperchat,
                                 Nodes.group,
                               ].contains(node.type) &&
-                              node.messages.isNotEmpty
+                              node.messages!.isNotEmpty
                           ? Text(
                               (Boxes.instance
-                                              .loadMessage(node.messages.last)
+                                              .loadMessage(node.messages!.last)
                                               .text
                                               ?.length ??
                                           0) >
                                       0
                                   ? '"' +
                                       Boxes.instance
-                                          .loadMessage(node.messages.last)
+                                          .loadMessage(node.messages!.last)
                                           .text! +
                                       '"'
                                   : "&attachment",
