@@ -114,7 +114,7 @@ class Boxes {
 
   void deleteNode(t.Identifier id) {
     final node = loadNode(id);
-    for (final msgID in node.messages) {
+    for (final msgID in node.messages ?? <String>[]) {
       messages.delete(msgID);
     }
     home.delete(id);
