@@ -244,6 +244,7 @@ class SnipCamera extends StatefulWidget {
   final CameraController ctrl;
   final double minZoom, maxZoom;
   final int camNum;
+  final void Function() cameraBack, nextRes, flip;
   final void Function(
     String? filePath,
     bool? isVideo,
@@ -251,7 +252,6 @@ class SnipCamera extends StatefulWidget {
     String? text,
     double aspectRatio,
   ) cameraCallBack;
-  final void Function() cameraBack, nextRes, flip;
   final bool enableVideo;
   const SnipCamera({
     required this.maxZoom,
@@ -499,101 +499,6 @@ class _SnipCameraState extends State<SnipCamera> {
       ]),
     );
 
-    // _preview = Stack(
-    //   children: [
-    //     SizedBox(
-    //       height: mediaSize.height,
-    //       width: mediaSize.width,
-    //       child: Transform.scale(
-    //         scaleX: scale,
-    //         child: Transform(
-    //           alignment: Alignment.center,
-    //           transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-    //           child: VideoPlayer(vpc),
-    //         ),
-    //       ),
-    //     ),
-    //     Scaffold(
-    //       backgroundColor: Colors.transparent,
-    //       body: Stack(children: [
-    //         input
-    //             ? Center(
-    //                 child: Container(
-    //                   width: mediaSize.width,
-    //                   decoration: const BoxDecoration(
-    //                     // border: Border.symmetric(
-    //                     //   horizontal: BorderSide(color: Colors.black38),
-    //                     // ),
-    //                     color: Colors.black38,
-    //                     // color: PinkTheme.snipRibbon,
-    //                   ),
-    //                   constraints: BoxConstraints(
-    //                     minHeight: 16,
-    //                     maxHeight: mediaSize.height,
-    //                   ),
-    //                   child: TextField(
-    //                     autofocus: input,
-    //                     textInputAction: TextInputAction.done,
-    //                     cursorColor: Colors.white,
-    //                     controller: tec,
-    //                     textAlign: TextAlign.center,
-    //                     decoration: const InputDecoration(
-    //                       border: InputBorder.none,
-    //                       isDense: true,
-    //                       isCollapsed: true,
-    //                     ),
-    //                     maxLines: 15,
-    //                     minLines: 1,
-    //                     style: const TextStyle(color: Colors.white),
-    //                     // style: const TextStyle(color: PinkTheme.black),
-    //                   ),
-    //                 ),
-    //               )
-    //             : const SizedBox.shrink(),
-    //         Column(
-    //           children: [
-    //             const Spacer(),
-    //             Console(topButtons: [
-    //               ConsoleButton(
-    //                 name: "Accept",
-    //                 onPress: () async {
-    //                   await vpc.dispose();
-    //                   widget.cameraCallBack(
-    //                     filePath,
-    //                     isVideo,
-    //                     toReverse,
-    //                     tec.value.text,
-    //                     widget.ctrl.value.aspectRatio,
-    //                   );
-    //                 },
-    //               ),
-    //             ], bottomButtons: [
-    //               ConsoleButton(
-    //                 name: "Back",
-    //                 onPress: () {
-    //                   _preview = null;
-    //                   vpc.dispose();
-    //                   setState(() {});
-    //                 },
-    //               ),
-    //               ConsoleButton(
-    //                 name: "Text",
-    //                 onPress: () => videoPreview(
-    //                   vpc,
-    //                   filePath,
-    //                   isVideo,
-    //                   toReverse,
-    //                   text,
-    //                   !input,
-    //                 ),
-    //               ),
-    //             ]),
-    //           ],
-    //         ),
-    //       ]),
-    //     )
-    //   ],
-    // );
     setState(() {});
   }
 
@@ -622,9 +527,6 @@ class _SnipCameraState extends State<SnipCamera> {
                 child: Container(
                   width: mediaSize.width,
                   decoration: const BoxDecoration(
-                    // border: Border.symmetric(
-                    //   horizontal: BorderSide(color: Colors.black38),
-                    // ),
                     color: Colors.black38,
                     // color: PinkTheme.snipRibbon,
                   ),
@@ -646,7 +548,6 @@ class _SnipCameraState extends State<SnipCamera> {
                     maxLines: 15,
                     minLines: 1,
                     style: const TextStyle(color: Colors.white),
-                    // style: const TextStyle(color: PinkTheme.black),
                   ),
                 ),
               )
@@ -684,92 +585,6 @@ class _SnipCameraState extends State<SnipCamera> {
         ],
       ),
     );
-
-    // _preview = Stack(
-    //   children: [
-    //     SizedBox(
-    //       height: mediaSize.height,
-    //       width: mediaSize.width,
-    //       child: Transform(
-    //         alignment: Alignment.center,
-    //         transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-    //         child: Image.file(File(filePath), fit: BoxFit.cover),
-    //       ),
-    //     ),
-    //     Scaffold(
-    //       backgroundColor: Colors.transparent,
-    //       body: Stack(children: [
-    //         input
-    //             ? Center(
-    //                 child: Container(
-    //                   width: mediaSize.width,
-    //                   decoration: const BoxDecoration(
-    //                     // border: Border.symmetric(
-    //                     //   horizontal: BorderSide(color: Colors.black38),
-    //                     // ),
-    //                     color: Colors.black38,
-    //                     // color: PinkTheme.snipRibbon,
-    //                   ),
-    //                   constraints: BoxConstraints(
-    //                     minHeight: 16,
-    //                     maxHeight: mediaSize.height,
-    //                   ),
-    //                   child: TextField(
-    //                     autofocus: input,
-    //                     textInputAction: TextInputAction.done,
-    //                     cursorColor: Colors.white,
-    //                     controller: tec,
-    //                     textAlign: TextAlign.center,
-    //                     decoration: const InputDecoration(
-    //                       border: InputBorder.none,
-    //                       isDense: true,
-    //                       isCollapsed: true,
-    //                     ),
-    //                     maxLines: 15,
-    //                     minLines: 1,
-    //                     style: const TextStyle(color: Colors.white),
-    //                     // style: const TextStyle(color: PinkTheme.black),
-    //                   ),
-    //                 ),
-    //               )
-    //             : const SizedBox.shrink(),
-    //         Column(
-    //           children: [
-    //             const Spacer(),
-    //             Console(topButtons: [
-    //               ConsoleButton(
-    //                 name: "Accept",
-    //                 onPress: () => widget.cameraCallBack(
-    //                   filePath,
-    //                   isVideo,
-    //                   toReverse,
-    //                   tec.value.text,
-    //                   widget.ctrl.value.aspectRatio,
-    //                 ),
-    //               ),
-    //             ], bottomButtons: [
-    //               ConsoleButton(
-    //                 name: "Back",
-    //                 onPress: () => setState(() => _preview = null),
-    //               ),
-    //               ConsoleButton(
-    //                 name: "Text",
-    //                 isMode: false,
-    //                 onPress: () => imagePreview(
-    //                   filePath,
-    //                   isVideo,
-    //                   toReverse,
-    //                   text,
-    //                   !input,
-    //                 ),
-    //               ),
-    //             ]),
-    //           ],
-    //         ),
-    //       ]),
-    //     )
-    //   ],
-    // );
 
     setState(() {});
   }

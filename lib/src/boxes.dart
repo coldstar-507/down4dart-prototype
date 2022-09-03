@@ -4,7 +4,7 @@ import '../main.dart' as main;
 import 'dart:convert';
 import 'dart:io';
 
-import 'data_objects.dart' as t;
+import 'data_objects.dart' as d;
 
 class Boxes {
   static Boxes? _instance;
@@ -36,30 +36,30 @@ class Boxes {
         savedMessages = Hive.box("SavedMessages"),
         snip = Hive.box("Snips");
 
-  File writeMediaToFile(t.Down4Media m) {
+  File writeMediaToFile(d.Down4Media m) {
     var f = File(dirPath + "/" + m.id);
     f.writeAsBytes(m.data);
     return f;
   }
 
-  void saveImage(t.Down4Media im) {
+  void saveImage(d.Down4Media im) {
     images.put(im.id, jsonEncode(im));
   }
 
-  t.Down4Media loadImage(t.Identifier id) {
-    return t.Down4Media.fromJson(jsonDecode(images.get(id)));
+  d.Down4Media loadImage(d.Identifier id) {
+    return d.Down4Media.fromJson(jsonDecode(images.get(id)));
   }
 
-  void deleteImage(t.Identifier id) {
+  void deleteImage(d.Identifier id) {
     images.delete(id);
   }
 
-  void saveVideo(t.Down4Media im) {
+  void saveVideo(d.Down4Media im) {
     videos.put(im.id, jsonEncode(im));
   }
 
-  t.Down4Media loadVideo(t.Identifier id) {
-    return t.Down4Media.fromJson(jsonDecode(videos.get(id)));
+  d.Down4Media loadVideo(d.Identifier id) {
+    return d.Down4Media.fromJson(jsonDecode(videos.get(id)));
   }
 
   Map<String, dynamic>? loadExchangeRate() {
@@ -72,28 +72,28 @@ class Boxes {
     user.put("exchangeRate", jsonEncode(exchangeRate));
   }
 
-  void deleteVideo(t.Identifier id) {
+  void deleteVideo(d.Identifier id) {
     videos.delete(id);
   }
 
-  void saveSnip(t.Down4Media snip) {
+  void saveSnip(d.Down4Media snip) {
     images.put(snip.id, jsonEncode(snip));
   }
 
-  t.Down4Media loadSnip(t.Identifier id) {
-    return t.Down4Media.fromJson(jsonDecode(snip.get(id)));
+  d.Down4Media loadSnip(d.Identifier id) {
+    return d.Down4Media.fromJson(jsonDecode(snip.get(id)));
   }
 
-  void deleteSnip(t.Identifier id) {
+  void deleteSnip(d.Identifier id) {
     snip.delete(id);
   }
 
-  void saveUser(t.Node u) {
+  void saveUser(d.Node u) {
     user.put("user", jsonEncode(u));
   }
 
-  t.Node loadUser() {
-    return t.Node.fromJson(jsonDecode(user.get("user")));
+  d.Node loadUser() {
+    return d.Node.fromJson(jsonDecode(user.get("user")));
   }
 
   void saveWallet(Wallet w) {
@@ -104,15 +104,15 @@ class Boxes {
     return Wallet.fromJson(jsonDecode(user.get("wallet")));
   }
 
-  void saveNode(t.Node p) {
+  void saveNode(d.Node p) {
     home.put(p.id, jsonEncode(p));
   }
 
-  t.Node loadNode(t.Identifier id) {
-    return t.Node.fromJson(jsonDecode(home.get(id)));
+  d.Node loadNode(d.Identifier id) {
+    return d.Node.fromJson(jsonDecode(home.get(id)));
   }
 
-  void deleteNode(t.Identifier id) {
+  void deleteNode(d.Identifier id) {
     final node = loadNode(id);
     for (final msgID in node.messages ?? <String>[]) {
       messages.delete(msgID);
@@ -120,15 +120,15 @@ class Boxes {
     home.delete(id);
   }
 
-  void saveMessage(t.Down4Message msg) {
+  void saveMessage(d.Down4Message msg) {
     messages.put(msg.messageID, jsonEncode(msg));
   }
 
-  t.Down4Message loadMessage(t.Identifier id) {
-    return t.Down4Message.fromJson(jsonDecode(messages.get(id)));
+  d.Down4Message loadMessage(d.Identifier id) {
+    return d.Down4Message.fromJson(jsonDecode(messages.get(id)));
   }
 
-  void deleteMessage(t.Identifier id) {
+  void deleteMessage(d.Identifier id) {
     messages.delete(id);
   }
 

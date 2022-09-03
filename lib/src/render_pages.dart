@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:bip32/bip32.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
-import 'package:flutter_testproject/src/wallet.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'render_objects.dart';
@@ -18,7 +16,6 @@ import 'package:file_picker/file_picker.dart';
 import 'web_requests.dart' as r;
 import 'down4_utility.dart' as u;
 import 'package:random_words/random_words.dart' as rw;
-import 'render_utility.dart';
 import 'dart:math' as math;
 import 'simple_bsv.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -417,32 +414,6 @@ class _MoneyPageState extends State<MoneyPage> {
         ],
       ),
     );
-
-    // _view = Down4Page(
-    //   scanCallBack: onScan,
-    //   scanController: ctrl,
-    //   bottomInputs: scanning
-    //       ? null
-    //       : [
-    //           reloadInput
-    //               ? mainViewInput
-    //               : _cachedMainViewInput ?? mainViewInput,
-    //         ],
-    //   topButtons: [
-    //     ConsoleButton(name: "Scan", onPress: () => emptyMainView(!scanning))
-    //   ],
-    //   bottomButtons: [
-    //     ConsoleButton(name: "Back", onPress: widget.back),
-    //     ConsoleButton(
-    //       isMode: true,
-    //       name: currency,
-    //       onPress: () {
-    //         rotateCurrency();
-    //         emptyMainView(scanning, true);
-    //       },
-    //     ),
-    //   ],
-    // );
     setState(() {});
   }
 
@@ -705,32 +676,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
       columnWidgets: widget.palettes,
       console: _console!,
     );
-
-    // return Scaffold(
-    //   body: Down4StackBackground(
-    //     children: [
-    //       Container(
-    //         padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
-    //         child: Align(
-    //           alignment: AlignmentDirectional.topCenter,
-    //           child: QrImage(
-    //             foregroundColor: PinkTheme.qrColor,
-    //             data: [
-    //               widget.self.id,
-    //               widget.self.name,
-    //               widget.self.lastName,
-    //               widget.self.neuter?.toBase58() ?? "",
-    //             ].join(" "),
-    //           ),
-    //         ),
-    //       ),
-    //       Column(children: [
-    //         PaletteList(palettes: widget.palettes),
-    //         defaultConsole,
-    //       ]),
-    //     ],
-    //   ),
-    // );
   }
 }
 

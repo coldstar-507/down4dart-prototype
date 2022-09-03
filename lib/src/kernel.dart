@@ -2,25 +2,19 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:bip39/bip39.dart' as b39;
 import 'package:bip32/bip32.dart' as b32;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'web_requests.dart' as r;
-import 'boxes.dart';
-import 'package:pointycastle/digests/sha256.dart' as pc256;
-import 'package:hex/hex.dart';
-
-import 'render_pages.dart';
-import 'data_objects.dart';
-
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
+import 'web_requests.dart' as r;
+import 'boxes.dart';
 import 'down4_utility.dart' as d4utils;
-
 import 'simple_bsv.dart';
-
-import 'package:bip39/bip39.dart' as b39;
+import 'render_pages.dart';
+import 'data_objects.dart';
 
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -60,7 +54,7 @@ class _Down4State extends State<Down4> {
       _user = Node.fromJson(jsonDecode(userData));
       final moneyData = Boxes.instance.user.get('money');
       _wallet = Wallet.fromJson(jsonDecode(moneyData)); // if this crashes gg
-      homePage();
+      home();
     } else {
       // returns false if user hasn't been initialized
       createUser();
@@ -169,7 +163,7 @@ class _Down4State extends State<Down4> {
 
   // ============================================================ RENDER ============================================================ //
 
-  void homePage() {
+  void home() {
     _view = Home(
       wallet: _wallet!,
       cameras: widget.cameras,
@@ -191,7 +185,7 @@ class _Down4State extends State<Down4> {
     _view = WelcomePage(
       mnemonic: _wallet!.mnemonic,
       userInfo: _user!,
-      understood: homePage,
+      understood: home,
     );
     setState(() {});
   }
