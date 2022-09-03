@@ -170,7 +170,7 @@ class _Down4State extends State<Down4> {
   // ============================================================ RENDER ============================================================ //
 
   void homePage() {
-    _view = HomePage(
+    _view = Home(
       wallet: _wallet!,
       cameras: widget.cameras,
       self: _user!,

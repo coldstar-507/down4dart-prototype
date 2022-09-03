@@ -41,218 +41,6 @@ class PinkTheme {
   };
 }
 
-// class RealButton {
-//   final ConsoleButton mainButton;
-//   final List<ConsoleButton>? extraButtons;
-//   final bool showExtra;
-//   RealButton(
-//       {required this.mainButton, this.extraButtons, this.showExtra = false});
-// }
-
-class Down4PalettePage extends StatelessWidget {
-  final List<Palette> palettes;
-  final List<ConsoleButton> bottomButtons;
-  final List<ConsoleButton>? topButtons;
-  final List<ConsoleInput>? bottomInputs, topInputs;
-  const Down4PalettePage({
-    required this.palettes,
-    required this.bottomButtons,
-    this.topButtons,
-    this.bottomInputs,
-    this.topInputs,
-    Key? key,
-  }) : super(key: key);
-
-  List<Widget> getExtraTopButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 31) / (topButtons?.length ?? 1);
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in topButtons ?? <ConsoleButton>[]) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-            bottom: 16.0 + (ConsoleButton.height * 2),
-            left: 16.0 + (buttonWidth * i),
-            child: Container(
-              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-              width: (screenWidth - 32) / topButtons!.length,
-              decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.extraButtons!),
-            )));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  List<Widget> getExtraBottomButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 30) / bottomButtons.length;
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in bottomButtons) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-          bottom: 16.0 + ConsoleButton.height,
-          left: 16.0 + (buttonWidth * i),
-          child: Container(
-            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
-            width: buttonWidth,
-            decoration: BoxDecoration(border: Border.all(width: 0.5)),
-            child: Column(children: b.extraButtons!),
-          ),
-        ));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final extraBottomButtons = getExtraBottomButtons(screenWidth);
-    final extraTopButtons = getExtraTopButtons(screenWidth);
-    return Scaffold(
-      body: Container(
-        color: PinkTheme.backGroundColor,
-        child: Stack(children: [
-          Column(children: [
-            PaletteList(palettes: palettes),
-            Console(
-              bottomButtons: bottomButtons,
-              topButtons: topButtons,
-              topInputs: topInputs,
-              inputs: bottomInputs,
-            )
-          ]),
-          ...extraBottomButtons,
-          ...extraTopButtons,
-        ]),
-      ),
-    );
-  }
-}
-
-class Down4ColumnBackground extends StatelessWidget {
-  final List<Widget> children;
-  const Down4ColumnBackground({required this.children, Key? key})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: Column(
-          // crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: children),
-    );
-  }
-}
-
-class Down4StackBackground extends StatelessWidget {
-  final List<Widget> children;
-  const Down4StackBackground({required this.children, Key? key})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: Stack(children: children),
-    );
-  }
-}
-
-class Down4StackBackground2 extends StatelessWidget {
-  final List<Widget> children;
-  final List<ConsoleButton> bottomButtons;
-  final List<ConsoleButton>? topButtons;
-  final List<ConsoleInput>? bottomInputs, topInputs;
-  const Down4StackBackground2({
-    required this.children,
-    required this.bottomButtons,
-    this.topButtons,
-    this.bottomInputs,
-    this.topInputs,
-    Key? key,
-  }) : super(key: key);
-
-  List<Widget> getExtraTopButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 31) / (topButtons?.length ?? 1);
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in topButtons ?? <ConsoleButton>[]) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-            bottom: 16.0 + (ConsoleButton.height * 2),
-            left: 16.0 + (buttonWidth * i),
-            child: Container(
-              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-              width: (screenWidth - 32) / topButtons!.length,
-              decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.extraButtons!),
-            )));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  List<Widget> getExtraBottomButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 31) / bottomButtons.length;
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in bottomButtons) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-          bottom: 16.0 + ConsoleButton.height,
-          left: 16.0 + (buttonWidth * i),
-          child: Container(
-            height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-            width: buttonWidth,
-            decoration: BoxDecoration(border: Border.all(width: 0.5)),
-            child: Column(children: b.extraButtons!),
-          ),
-        ));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final extraBottomButtons = getExtraBottomButtons(screenWidth);
-    final extraTopButtons = getExtraTopButtons(screenWidth);
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: Stack(children: [
-        ...children,
-        Column(children: [
-          const Spacer(),
-          Console(
-            bottomButtons: bottomButtons,
-            topButtons: topButtons,
-            topInputs: topInputs,
-            inputs: bottomInputs,
-          )
-        ]),
-        ...extraBottomButtons,
-        ...extraTopButtons,
-      ]),
-    );
-  }
-}
-
 class BasicActionButton extends StatelessWidget {
   final void Function(String, String) goPress;
   final void Function(String, String)? goLongPress;
@@ -650,16 +438,17 @@ class ConsoleInput extends StatefulWidget {
   final bool activated;
   final String placeHolder;
   final String value;
-  final String prefix;
-  final void Function(String) inputCallBack;
+  final String prefix, suffix;
+  final void Function(String)? inputCallBack;
   final Key k = GlobalKey();
-  TextEditingController tec;
+  final TextEditingController tec;
   ConsoleInput({
     this.type = TextInputType.text,
-    required this.inputCallBack,
+    this.inputCallBack,
     required this.placeHolder,
     required this.tec,
     this.prefix = "",
+    this.suffix = "",
     this.value = "",
     this.activated = true,
     Key? key,
@@ -670,14 +459,6 @@ class ConsoleInput extends StatefulWidget {
 }
 
 class _ConsoleInputState extends State<ConsoleInput> {
-  @override
-  void initState() {
-    super.initState();
-    widget.tec = widget.tec
-      ..text = widget.value
-      ..selection = TextSelection.collapsed(offset: widget.value.length);
-  }
-
   @override
   Widget build(BuildContext context) {
     final buttonHeight = Sizes.h * 0.038; // 3.8%
@@ -708,28 +489,19 @@ class _ConsoleInputState extends State<ConsoleInput> {
                   contentPadding: const EdgeInsets.all(2.0),
                   hintText: widget.placeHolder,
                   border: InputBorder.none,
+                  prefixIcon: Text(widget.prefix),
+                  prefixIconConstraints: const BoxConstraints(
+                    minHeight: 0,
+                    minWidth: 0,
+                  ),
+                  suffixIcon: Text(widget.suffix),
+                  suffixIconConstraints: const BoxConstraints(
+                    minHeight: 0,
+                    minWidth: 0,
+                  ),
                 ),
                 textDirection: TextDirection.ltr,
-                onChanged: (value) {
-                  if (value.isNotEmpty) {
-                    String output;
-                    if (value.substring(0, widget.prefix.length) !=
-                        widget.prefix) {
-                      output = widget.prefix + value;
-                    } else {
-                      output = value;
-                    }
-                    setState(() {
-                      widget.tec.text = output;
-                      widget.tec.selection =
-                          TextSelection.collapsed(offset: output.length);
-                    });
-                    widget
-                        .inputCallBack(output.substring(widget.prefix.length));
-                  } else {
-                    widget.inputCallBack(value);
-                  }
-                },
+                onChanged: widget.inputCallBack,
               )
             : Center(child: Text(widget.placeHolder)),
       ),
@@ -740,68 +512,51 @@ class _ConsoleInputState extends State<ConsoleInput> {
 class Down4Input extends StatefulWidget {
   final TextInputType type;
   final String placeHolder;
-  final String value;
-  final String prefix;
+  final String? prefix, postfix;
   final TextAlign textAlign;
+  final TextAlignVertical textAlignVertical;
   final EdgeInsets padding;
-  final void Function(String) inputCallBack;
-  const Down4Input(
-      {this.type = TextInputType.text,
-      required this.inputCallBack,
-      required this.placeHolder,
-      this.padding = EdgeInsets.zero,
-      this.textAlign = TextAlign.left,
-      this.prefix = "",
-      this.value = "",
-      Key? key})
-      : super(key: key);
+  final TextEditingController tec;
+  final void Function(String)? inputCallBack;
+  const Down4Input({
+    this.type = TextInputType.text,
+    required this.placeHolder,
+    required this.tec,
+    this.inputCallBack,
+    this.padding = EdgeInsets.zero,
+    this.textAlign = TextAlign.left,
+    this.textAlignVertical = TextAlignVertical.top,
+    this.prefix,
+    this.postfix,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _Down4InputState createState() => _Down4InputState();
 }
 
 class _Down4InputState extends State<Down4Input> {
-  var tec = TextEditingController();
   final Key k = GlobalKey();
-
-  @override
-  void initState() {
-    super.initState();
-    tec = tec
-      ..text = widget.value
-      ..selection = TextSelection.collapsed(offset: widget.value.length);
-  }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: tec,
+      controller: widget.tec,
       key: k,
       keyboardType: widget.type,
-      textAlignVertical: TextAlignVertical.top,
+      textAlignVertical: widget.textAlignVertical,
       textAlign: widget.textAlign,
       decoration: InputDecoration(
-          contentPadding: widget.padding,
-          hintText: widget.placeHolder,
-          border: InputBorder.none),
+        contentPadding: widget.padding,
+        hintText: widget.placeHolder,
+        border: InputBorder.none,
+        prefixIcon: widget.prefix != null ? Text(widget.prefix!) : null,
+        prefixIconConstraints: const BoxConstraints(minHeight: 0, minWidth: 0),
+        suffixIcon: widget.postfix != null ? Text(widget.postfix!) : null,
+        suffixIconConstraints: const BoxConstraints(minHeight: 0, minWidth: 0),
+      ),
       textDirection: TextDirection.ltr,
-      onChanged: (value) {
-        if (value.isNotEmpty) {
-          String output;
-          if (value.substring(0, widget.prefix.length) != widget.prefix) {
-            output = widget.prefix + value;
-          } else {
-            output = value;
-          }
-          setState(() {
-            tec.text = output;
-            tec.selection = TextSelection.collapsed(offset: output.length);
-          });
-          widget.inputCallBack(output.substring(widget.prefix.length));
-        } else {
-          widget.inputCallBack(value);
-        }
-      },
+      onChanged: widget.inputCallBack,
     );
   }
 }
@@ -1546,7 +1301,9 @@ class PaletteMaker extends StatelessWidget {
   final void Function(Identifier)? go;
   final Nodes type;
   final Nodes? parentType;
+  final TextEditingController tec;
   const PaletteMaker({
+    required this.tec,
     required this.id,
     required this.name,
     required this.nameCallBack,
@@ -1615,6 +1372,7 @@ class PaletteMaker extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 10.0, top: 10.0),
                     color: PinkTheme.nodeColors[type], //PinkTheme.headerColor,
                     child: Down4Input(
+                      tec: tec,
                       inputCallBack: nameCallBack,
                       placeHolder: hintText,
                       padding:
