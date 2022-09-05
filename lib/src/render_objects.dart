@@ -612,28 +612,33 @@ class Console extends StatelessWidget {
           forwardingNodes != null
               ? Container(
                   height: ConsoleButton.height,
-                  width: Sizes.w - (Sizes.h * 0.046),
+                  width: camWidthAndHeight,
                   decoration: BoxDecoration(border: Border.all(width: 0.5)),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     textDirection: TextDirection.ltr,
                     children: forwardingNodes!
-                        .map((node) => Row(
-                              textDirection: TextDirection.ltr,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Image.memory(
-                                  node.image!.data,
-                                  fit: BoxFit.cover,
-                                  width: ConsoleButton.height,
-                                  height: ConsoleButton.height,
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(2.0),
-                                  color: PinkTheme.nodeColors[node.type],
-                                  child: Text(node.name),
-                                ),
-                              ],
+                        .map((node) => SizedBox(
+                              height: ConsoleButton.height,
+                              width:
+                              (camWidthAndHeight / forwardingNodes!.length) - 2,
+                              child: Row(
+                                textDirection: TextDirection.ltr,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Image.memory(
+                                    node.image!.data,
+                                    fit: BoxFit.cover,
+                                    width: ConsoleButton.height,
+                                    height: ConsoleButton.height,
+                                  ),
+                                  Expanded(child: Container(
+                                    padding: const EdgeInsets.all(2.0),
+                                    color: PinkTheme.nodeColors[node.type],
+                                    child: Text(node.name),
+                                  ),),
+                                ],
+                              ),
                             ))
                         .toList(),
                   ),
