@@ -739,6 +739,11 @@ class BatchResponse {
 }
 
 void main() {
+  final tx = Down4TX(
+    txsIn: [],
+    txsOut: [],
+  );
+
   // final String mnemonic = bip39.generateMnemonic();
   // final seed = bip39.mnemonicToSeed(mnemonic);
 

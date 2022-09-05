@@ -15,7 +15,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:file_picker/file_picker.dart';
 import 'web_requests.dart' as r;
 import 'down4_utility.dart' as u;
-import 'package:random_words/random_words.dart' as rw;
+import 'package:english_words/english_words.dart' as rw;
 import 'dart:math' as math;
 import 'simple_bsv.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -115,6 +115,22 @@ class Down4Page2 extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class ForwardingPage extends StatelessWidget {
+  final List<Palette> homeUsers;
+  final Console console;
+
+  const ForwardingPage({
+    required this.homeUsers,
+    required this.console,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Down4Page2(console: console, palettes: homeUsers);
   }
 }
 
@@ -334,7 +350,7 @@ class _MoneyPageState extends State<MoneyPage> {
   String get method => _paymentMethod["l"][_paymentMethod["i"]] as String;
 
   int get inputAsSatoshis {
-    var amount;
+    int amount;
     final numInput = num.parse(tec.value.text);
     if (currency == "Satoshis") {
       amount = method == "Split"
@@ -559,20 +575,19 @@ class _MoneyPageState extends State<MoneyPage> {
 class AddFriendPage extends StatefulWidget {
   final Node self;
   final List<Palette> palettes;
-  final List<CameraDescription> cameras;
   final Future<bool> Function(String) search;
   final void Function(Node node) putNodeOffline;
-  final void Function(List<Node>) addCallback;
+  final void Function(List<Node>) addCallback, forwardNodes;
   final void Function() backCallback;
 
   const AddFriendPage({
     required this.palettes,
     required this.search,
-    required this.cameras,
     required this.self,
     required this.putNodeOffline,
     required this.addCallback,
     required this.backCallback,
+    required this.forwardNodes,
     Key? key,
   }) : super(key: key);
 
@@ -647,7 +662,15 @@ class _AddFriendPageState extends State<AddFriendPage> {
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.backCallback),
         ConsoleButton(name: "Scan", onPress: () => defaultConsole(!scanning)),
-        ConsoleButton(name: "Forward", onPress: () => print("FORWARD")),
+        ConsoleButton(
+          name: "Forward",
+          onPress: () => widget.forwardNodes(
+            widget.palettes
+                .where((p) => p.selected)
+                .map((p) => p.node)
+                .toList(),
+          ),
+        ),
       ],
     );
     setState(() {});
@@ -2091,6 +2114,19 @@ class _HomeState extends State<Home> {
     return await success;
   }
 
+  void back([remove = true]) {
+    if (remove) _loc.removeLast();
+    if (_loc.last["at"] == "Home" && _loc.last["type"] == null) {
+      homePage();
+    } else if (_loc.last["at"] == "Search" && _loc.last["type"] == null) {
+      searchPage();
+    } else if (_loc.last["type"] == "Node") {
+      nodePage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
+    } else if (_loc.last["type"] == "Chat") {
+      chatPage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
+    }
+  }
+
   // ======================================================== NODE ACTIONS ============================================================== //
 
   Future<void> openNode(String id, String at) async {
@@ -2287,6 +2323,23 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
+  void forwardPage(List<Node> forwardingNodes) {
+    _view = ForwardingPage(
+      homeUsers: homePalettes.where((p) => p.node.type.isUser()).toList(),
+      console: Console(
+        forwardingNodes: forwardingNodes,
+        topButtons: [
+          ConsoleButton(name: "Forward", onPress: () => print("TODO")),
+        ],
+        bottomButtons: [
+          ConsoleButton(name: "Back", onPress: () => back(false)),
+          ConsoleButton(name: "Hyper", onPress: () => print("TODO")),
+        ],
+      ),
+    );
+    setState(() {});
+  }
+
   void moneyPage() {
     updateExchangeRate();
     print(exchangeRate);
@@ -2319,16 +2372,15 @@ class _HomeState extends State<Home> {
 
   void searchPage() {
     _view = AddFriendPage(
-      cameras: widget.cameras,
+      forwardNodes: forwardPage,
       putNodeOffline: putNodeOffLine,
       self: widget.self,
       search: search,
       palettes: _palettes["Search"]?.values.toList().reversed.toList() ?? [],
       addCallback: addUsers,
       backCallback: () {
-        _loc.removeLast();
         _palettes["Search"]?.clear();
-        homePage();
+        back();
       },
     );
     setState(() {});
@@ -2343,18 +2395,7 @@ class _HomeState extends State<Home> {
       palettes: _palettes[node.id]?.values.toList() ?? <Palette>[],
       openNode: openNode,
       nodeToPalette: nodeToPalette,
-      back: () {
-        _loc.removeLast();
-        if (_loc.last["at"] == "Home" && _loc.last["type"] == null) {
-          homePage();
-        } else if (_loc.last["at"] == "Search" && _loc.last["type"] == null) {
-          searchPage();
-        } else if (_loc.last["type"] == "Node") {
-          nodePage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
-        } else if (_loc.last["type"] == "Chat") {
-          chatPage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
-        }
-      },
+      back: back,
     );
     setState(() {});
   }
@@ -2406,22 +2447,12 @@ class _HomeState extends State<Home> {
 
   void chatPage(Node node) {
     _view = ChatPage(
-        send: chatRequest,
-        self: widget.self,
-        node: node,
-        cameras: widget.cameras,
-        back: () {
-          _loc.removeLast();
-          if (_loc.last["at"] == "Home" && _loc.last["type"] == null) {
-            homePage();
-          } else if (_loc.last["at"] == "Search" && _loc.last["type"] == null) {
-            searchPage();
-          } else if (_loc.last["type"] == "Node") {
-            nodePage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
-          } else if (_loc.last["type"] == "Chat") {
-            chatPage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
-          }
-        });
+      send: chatRequest,
+      self: widget.self,
+      node: node,
+      cameras: widget.cameras,
+      back: back,
+    );
     setState(() {});
   }
 

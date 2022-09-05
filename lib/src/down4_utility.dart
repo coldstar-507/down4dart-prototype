@@ -1,6 +1,11 @@
 import 'package:convert/convert.dart';
 import 'dart:typed_data';
 import 'package:pointycastle/digests/sha1.dart' as sha1;
+import 'data_objects.dart';
+
+extension IsUser on Nodes {
+  bool isUser() => [Nodes.nonFriend, Nodes.friend, Nodes.user].contains(this);
+}
 
 extension AsUint8List on List<int> {
   Uint8List asUint8List() => Uint8List.fromList(this);
