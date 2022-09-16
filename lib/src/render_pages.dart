@@ -10,6 +10,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'render_objects.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'boxes.dart';
 import 'camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -1644,41 +1645,42 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   var box = Boxes.instance;
-  Widget? _view;
+  Widget? view;
   Map<String, dynamic> exchangeRate = {};
 
   // The base location is Home with the home palettes
   // You can traverse palettes which will be cached
   // Home -> home palettes
   // paletteID -> child palettes
-  Map<Identifier, Map<Identifier, Palette>> _palettes = {
+
+  Map<Identifier, Map<Identifier, Palette>> paletteMap = {
     "Home": {},
     "Search": {},
     "Forward": {},
   };
 
   // similar to the palettes, used for local data and caching messages
-  Map<String, Map<String, ChatMessage>> _messages = {
+  Map<String, Map<String, ChatMessage>> messageMap = {
     "Saved": {},
     "MyPosts": {},
   };
 
-  Map<Identifier, StreamSubscription<DatabaseEvent>> _chatConnection = {};
-  Map<Identifier, StreamSubscription<DatabaseEvent>> _snipConnection = {};
+  Map<Identifier, StreamSubscription<DatabaseEvent>> chatConnections = {};
+  Map<Identifier, StreamSubscription<DatabaseEvent>> snipConnections = {};
   StreamSubscription<dynamic>? paymentListener, nodeListener;
 
   // Node? _node; // the node we are currently traversing, always null at start
   // List<String> _locations = ["Home"]; // to keep an history of traversed nodes
-  List<Map<String, String>> _loc = [
+  List<Map<String, String>> locations = [
     {"at": "Home"},
   ];
 
   // we pop it when backing in node views
   // when it's empty we should be on home view
   // if _currentLocation is not "Home", it should be _node.id
-  List<Node> _forwardingNodes = [];
+  List<Node> forwardingNodes = [];
 
-  var _tec = TextEditingController();
+  var tec = TextEditingController();
 
   // ======================================================= INITIALIZATION ============================================================ //
 
@@ -1689,17 +1691,16 @@ class _HomeState extends State<Home> {
     updateExchangeRate();
     loadLocalHomePalettes();
     // processMessageQueue();
-    // initializeMessageListener();
     homePage();
   }
 
   @override
   void dispose() {
-    for (var chatConnection in _chatConnection.values) {
+    for (var chatConnection in chatConnections.values) {
       chatConnection.cancel();
     }
 
-    for (var snipConnection in _snipConnection.values) {
+    for (var snipConnection in snipConnections.values) {
       snipConnection.cancel();
     }
 
@@ -1717,7 +1718,7 @@ class _HomeState extends State<Home> {
         exchangeRate["rate"] = rate;
         exchangeRate["update"] = rightNow;
         box.saveExchangeRate(exchangeRate);
-        if (_view is MoneyPage) moneyPage();
+        if (view is MoneyPage) moneyPage();
       }
     }
   }
@@ -1729,10 +1730,10 @@ class _HomeState extends State<Home> {
       writePalette(node);
       if (node.isGroupchat || node.isGroupchat) {
         var chatConnection = connectToChat(node);
-        if (chatConnection != null) _chatConnection[node.id] = chatConnection;
+        if (chatConnection != null) chatConnections[node.id] = chatConnection;
 
         var snipConnection = connectToSnip(node);
-        if (snipConnection != null) _snipConnection[node.id] = snipConnection;
+        if (snipConnection != null) snipConnections[node.id] = snipConnection;
       }
     }
   }
@@ -1775,7 +1776,7 @@ class _HomeState extends State<Home> {
               var d4msg = Down4Message.fromJson(msg);
               node.messages!.add(d4msg.messageID!);
               box.saveMessage(d4msg);
-              if (_view is ChatPage && _loc.last["id"] == node.id) {
+              if (view is ChatPage && locations.last["id"] == node.id) {
                 chatPage(node);
               }
             }
@@ -1822,7 +1823,7 @@ class _HomeState extends State<Home> {
           .startAfter(null, key: lastSnip)
           .onChildAdded
           .listen((event) async {
-            
+
         var value = event.snapshot.value;
         switch (event.type) {
           case DatabaseEventType.childAdded:
@@ -1837,7 +1838,7 @@ class _HomeState extends State<Home> {
                 if (d4m != null) box.saveSnip(d4m);
               }
 
-              if (_view is HomePage) homePage();
+              if (view is HomePage) homePage();
             }
             break;
           case DatabaseEventType.childRemoved:
@@ -1892,10 +1893,10 @@ class _HomeState extends State<Home> {
             if (docData != null) {
               var node = Node.fromJson(docData);
               var connection = connectToChat(node);
-              if (connection != null) _chatConnection[node.id] = connection;
+              if (connection != null) chatConnections[node.id] = connection;
               writePalette(node);
               box.saveNode(node);
-              if (_view is HomePage) homePage();
+              if (view is HomePage) homePage();
             }
             break;
           case DocumentChangeType.modified:
@@ -1903,10 +1904,10 @@ class _HomeState extends State<Home> {
           case DocumentChangeType.removed:
             final nodeID = docData?["id"];
             if (nodeID != null) {
-              _palettes["Home"]?.remove(nodeID);
+              paletteMap["Home"]?.remove(nodeID);
               box.deleteNode(nodeID);
-              _chatConnection[nodeID]?.cancel();
-              if (_view is HomePage) homePage();
+              chatConnections[nodeID]?.cancel();
+              if (view is HomePage) homePage();
             }
             break;
         }
@@ -1923,16 +1924,16 @@ class _HomeState extends State<Home> {
     if (updateActivity) {
       for (final p in palettes(at)) {
         if (p.selected) {
-          _palettes[at]
-              ?[p.node.id] = _palettes[at]![p.node.id]!.invertedSelection()
+          paletteMap[at]
+              ?[p.node.id] = paletteMap[at]![p.node.id]!.invertedSelection()
             ..node.updateActivity();
         }
       }
     } else {
       for (final p in palettes(at)) {
         if (p.selected) {
-          _palettes[at]?[p.node.id] =
-              _palettes[at]![p.node.id]!.invertedSelection();
+          paletteMap[at]?[p.node.id] =
+              paletteMap[at]![p.node.id]!.invertedSelection();
         }
       }
     }
@@ -2128,11 +2129,11 @@ class _HomeState extends State<Home> {
 
   void addUsers(List<Node> friends) {
     for (final friend in friends) {
-      _palettes["Search"]![friend.id] = _palettes["Search"]![friend.id]!
+      paletteMap["Search"]![friend.id] = paletteMap["Search"]![friend.id]!
           .invertedSelection()
         ..node.mutateType(Nodes.friend);
 
-      _palettes["Home"]!.putIfAbsent(
+      paletteMap["Home"]!.putIfAbsent(
         friend.id,
         () => nodeToPalette(
           "Home",
@@ -2154,10 +2155,10 @@ class _HomeState extends State<Home> {
   void delete([String at = "Home"]) {
     for (final p in palettes(at).selected()) {
       box.deleteNode(p.node.id);
-      _palettes[at]?.remove(p.node.id);
+      paletteMap[at]?.remove(p.node.id);
     }
     // TODO for other places than home
-    if (_view is HomePage) homePage();
+    if (view is HomePage) homePage();
   }
 
   Future<bool> search(List<String> ids) async {
@@ -2175,7 +2176,7 @@ class _HomeState extends State<Home> {
   void putNodeOffLine(Node node) {
     final p = nodeToPalette("Search", node);
     if (p != null) {
-      _palettes["Search"]?.putIfAbsent(node.id, () => p);
+      paletteMap["Search"]?.putIfAbsent(node.id, () => p);
       searchPage();
     }
   }
@@ -2185,16 +2186,16 @@ class _HomeState extends State<Home> {
   }
 
   void back([bool remove = true]) {
-    if (remove) _loc.removeLast();
-    if (_loc.last["at"] == "Home" && _loc.last["type"] == null) {
+    if (remove) locations.removeLast();
+    if (locations.last["at"] == "Home" && locations.last["type"] == null) {
       homePage();
-    } else if (_loc.last["at"] == "Search" && _loc.last["type"] == null) {
+    } else if (locations.last["at"] == "Search" && locations.last["type"] == null) {
       searchPage();
-    } else if (_loc.last["type"] == "Node") {
-      nodePage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
-    } else if (_loc.last["type"] == "Chat") {
+    } else if (locations.last["type"] == "Node") {
+      nodePage(nodeAt(locations.last["id"]!, locations.last["at"]!)!);
+    } else if (locations.last["type"] == "Chat") {
       // TODO
-      chatPage(nodeAt(_loc.last["id"]!, _loc.last["at"]!)!);
+      chatPage(nodeAt(locations.last["id"]!, locations.last["at"]!)!);
     }
   }
 
@@ -2204,14 +2205,14 @@ class _HomeState extends State<Home> {
   }
 
   void forward(List<Node> nodes) {
-    _forwardingNodes = nodes;
+    forwardingNodes = nodes;
     forwardPage();
   }
 
   // ======================================================== NODE ACTIONS ============================================================== //
 
   Future<void> openNode(String id, String at) async {
-    if (_palettes[id] == null) {
+    if (paletteMap[id] == null) {
       Node node;
       if (at == "Home") {
         final nodes = await r.getNodes([id]);
@@ -2225,29 +2226,29 @@ class _HomeState extends State<Home> {
       final childNodes = await r.getNodes(node.childs ?? []);
       if (childNodes != null) {
         for (final node in childNodes) {
-          _palettes[id]!.putIfAbsent(node.id, () => nodeToPalette(id, node)!);
+          paletteMap[id]!.putIfAbsent(node.id, () => nodeToPalette(id, node)!);
         }
       }
     }
-    _loc.add({"type": "Node", "id": id, "at": at});
+    locations.add({"type": "Node", "id": id, "at": at});
     nodePage(nodeAt(id, at)!);
   }
 
   void select(String id, String at) {
-    _palettes[at]![id] = _palettes[at]![id]!.invertedSelection();
-    if (_view is ForwardingPage) {
+    paletteMap[at]![id] = paletteMap[at]![id]!.invertedSelection();
+    if (view is ForwardingPage) {
       forwardPage();
     } else {
-      _loc.last["at"] == "Home"
+      locations.last["at"] == "Home"
           ? homePage()
-          : _loc.last["at"] == "Search"
+          : locations.last["at"] == "Search"
               ? searchPage()
               : nodePage(nodeAt(at, previousLocation["id"]!)!);
     }
   }
 
   void openChat(String id, String at) {
-    _loc.add({"at": at, "id": id, "type": "Chat"});
+    locations.add({"at": at, "id": id, "type": "Chat"});
     // TODO
     chatPage(nodeAt(id, at)!);
   }
@@ -2259,17 +2260,17 @@ class _HomeState extends State<Home> {
   // ======================================================== COMPLEXITY REDUCING GETTERS ? =============================================== //
 
   Palette? paletteAt(String id, [String at = "Home"]) {
-    return _palettes[at]?[id];
+    return paletteMap[at]?[id];
   }
 
   Node? nodeAt(String id, [String at = "Home"]) {
-    return _palettes[at]?[id]?.node;
+    return paletteMap[at]?[id]?.node;
   }
 
   void writePalette(Node node, [String at = "Home"]) {
-    if (_palettes[at] == null) _palettes[at] = {};
+    if (paletteMap[at] == null) paletteMap[at] = {};
     final p = nodeToPalette(at, node);
-    if (p != null) _palettes[at]?[node.id] = p;
+    if (p != null) paletteMap[at]?[node.id] = p;
   }
 
   List<Palette> get selectedFriendPalettesDeactivated {
@@ -2337,7 +2338,7 @@ class _HomeState extends State<Home> {
   }
 
   List<Palette> palettes([String at = "Home"]) {
-    return _palettes[at]?.values.toList(growable: false) ?? <Palette>[];
+    return paletteMap[at]?.values.toList(growable: false) ?? <Palette>[];
   }
 
   List<Palette> get formattedHomePalettes {
@@ -2346,8 +2347,8 @@ class _HomeState extends State<Home> {
   }
 
   Map<String, String> get previousLocation {
-    if (_loc.length > 2) {
-      return _loc[_loc.length - 2];
+    if (locations.length > 2) {
+      return locations[locations.length - 2];
     }
     throw "Invalid previous location";
   }
@@ -2362,12 +2363,12 @@ class _HomeState extends State<Home> {
   // ============================================================== BUILD ================================================================ //
 
   void homePage([bool extra = false]) {
-    _view = HomePage(
+    view = HomePage(
       palettes: formattedHomePalettes,
       console: Console(
         inputs: [
           ConsoleInput(
-            tec: _tec,
+            tec: tec,
             placeHolder: ":)",
           ),
         ],
@@ -2386,7 +2387,7 @@ class _HomeState extends State<Home> {
           ConsoleButton(
             name: "Search",
             onPress: () {
-              _loc.add({"at": "Search"});
+              locations.add({"at": "Search"});
               searchPage();
             },
           ),
@@ -2410,19 +2411,19 @@ class _HomeState extends State<Home> {
     var userAndGroups =
         palettes().where((p) => p.node.isGroupchat || p.node.isUser);
 
-    if (userAndGroups.length != _palettes["Forward"]!.length) {
+    if (userAndGroups.length != paletteMap["Forward"]!.length) {
       for (final p in formattedHomePalettes) {
-        if (!_palettes["Forward"]!.containsKey(p.node.id) &&
+        if (!paletteMap["Forward"]!.containsKey(p.node.id) &&
             (p.node.isUser || p.node.isGroupchat)) {
           writePalette(p.node, "Forward");
         }
       }
     }
 
-    _view = ForwardingPage(
-      homeUsers: _palettes["Forward"]!.values.toList(),
+    view = ForwardingPage(
+      homeUsers: paletteMap["Forward"]!.values.toList(),
       console: Console(
-        forwardingNodes: _forwardingNodes,
+        forwardingNodes: forwardingNodes,
         topButtons: [
           ConsoleButton(name: "Forward", onPress: () => print("TODO")),
         ],
@@ -2438,7 +2439,7 @@ class _HomeState extends State<Home> {
   void moneyPage() {
     updateExchangeRate();
     print(exchangeRate);
-    _view = MoneyPage(
+    view = MoneyPage(
       self: widget.self,
       wallet: widget.wallet,
       exchangeRate: exchangeRate["rate"],
@@ -2449,14 +2450,14 @@ class _HomeState extends State<Home> {
   }
 
   void hyperchatPage() {
-    _view = GroupPage(
+    view = GroupPage(
       isHyperchat: true,
       self: widget.self,
       afterMessageCallback: (node) {
         writePalette(node);
         var connection = connectToChat(node);
-        if (connection != null) _chatConnection[node.id] = connection;
-        _loc.add({"at": "Home", "id": node.id, "type": "Chat"});
+        if (connection != null) chatConnections[node.id] = connection;
+        locations.add({"at": "Home", "id": node.id, "type": "Chat"});
         chatPage(node);
       },
       back: homePage,
@@ -2467,15 +2468,15 @@ class _HomeState extends State<Home> {
   }
 
   void searchPage() {
-    _view = AddFriendPage(
+    view = AddFriendPage(
       forwardNodes: forward,
       putNodeOffline: putNodeOffLine,
       self: widget.self,
       search: search,
-      palettes: _palettes["Search"]?.values.toList().reversed.toList() ?? [],
+      palettes: paletteMap["Search"]?.values.toList().reversed.toList() ?? [],
       addCallback: addUsers,
       backCallback: () {
-        _palettes["Search"]?.clear();
+        paletteMap["Search"]?.clear();
         back();
       },
     );
@@ -2483,12 +2484,12 @@ class _HomeState extends State<Home> {
   }
 
   void nodePage(Node node) {
-    _view = NodePage(
+    view = NodePage(
       cameras: widget.cameras,
       self: widget.self,
       openChat: openChat,
-      palette: _palettes[_loc.last["at"]!]![node.id]!,
-      palettes: _palettes[node.id]?.values.toList() ?? <Palette>[],
+      palette: paletteMap[locations.last["at"]!]![node.id]!,
+      palettes: paletteMap[node.id]?.values.toList() ?? <Palette>[],
       openNode: openNode,
       nodeToPalette: nodeToPalette,
       back: back,
@@ -2511,7 +2512,7 @@ class _HomeState extends State<Home> {
     int nextCam() => camera == 0 ? 1 : 0;
 
     void snip() async {
-      _view = SnipCamera(
+      view = SnipCamera(
         maxZoom: await ctrl!.getMaxZoomLevel(),
         minZoom: await ctrl.getMinZoomLevel(),
         camNum: camera,
@@ -2567,7 +2568,7 @@ class _HomeState extends State<Home> {
       senders[node.id] = node;
     }
 
-    _view = ChatPage(
+    view = ChatPage(
       senders: senders,
       send: send,
       self: widget.self,
@@ -2608,7 +2609,7 @@ class _HomeState extends State<Home> {
         await ctrl.initialize();
         await ctrl.setLooping(true);
         await ctrl.play();
-        _view = Down4Page2(
+        view = Down4Page2(
           title: "TODO",
           stackWidgets: [
             SizedBox(
@@ -2672,7 +2673,7 @@ class _HomeState extends State<Home> {
         );
       } else {
         await precacheImage(MemoryImage(media.data), context);
-        _view = Down4Page2(
+        view = Down4Page2(
           title: "TODO",
           stackWidgets: [
             SizedBox(
@@ -2732,7 +2733,7 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return _view ?? const LoadingPage();
+    return view ?? const LoadingPage();
   }
 }
 
