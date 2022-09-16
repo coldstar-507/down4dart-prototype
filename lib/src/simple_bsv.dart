@@ -7,7 +7,7 @@ import 'package:pointycastle/digests/ripemd160.dart' as r160;
 import 'package:bip32/bip32.dart';
 import 'down4_utility.dart';
 import 'web_requests.dart' as r;
-// import 'package:bip39/bip39.dart' as bip39;
+import 'package:bip39/bip39.dart' as bip39;
 // import 'dart:io' as io;
 
 const SATS_PER_BYTE = 0.05;
@@ -28,16 +28,47 @@ Uint8List _makeAddress(Uint8List pubKey) => ripemd160(sha256(pubKey));
 int _deterministicWalletIndex() =>
     (DateTime.now().millisecondsSinceEpoch / 86400000).floor();
 
+class Down4InternetPayment {
+  List<String> targets;
+  String sender;
+  Down4Payment pay;
+  Down4InternetPayment(this.targets, this.sender, this.pay);
+
+  Map<String, dynamic> toJson() => {
+        "trgts": targets,
+        "sdrid": sender,
+        "pay": pay.toJson(),
+      };
+}
+
 class Down4Payment {
   List<Down4TX> txs;
   bool safe;
   Down4Payment(this.txs, this.safe);
+
+  String get id => sha256(txs.fold<List<int>>(
+          [], (prev, tx) => prev + tx.txID!.data).asUint8List())
+      .toHex();
 
   Map<String, dynamic> toJsoni(int i) => {
         "tx": txs[i].toJson(),
         "len": txs.length,
         "safe": safe,
       };
+
+  Map<String, dynamic> toJson() => {
+        "tx": txs.map((tx) => tx.toJson()).toList(),
+        "len": txs.length,
+        "safe": safe,
+      };
+  factory Down4Payment.fromJson(dynamic decodedJson) {
+    return Down4Payment(
+      List<dynamic>.from(decodedJson["tx"])
+          .map((e) => Down4TX.fromJson(e))
+          .toList(),
+      decodedJson["safe"],
+    );
+  }
 }
 
 class Wallet {
@@ -137,8 +168,8 @@ class Wallet {
           walletIndex: utxos[i].walletIndex,
           sats: utxos[i].sats,
           spentFrom: utxos[i].txid!,
-          outIndex: FourByteInt(utxos[i].outIndex!),
-          sequenceNo: FourByteInt(0),
+          outIndex: utxos[i].outIndex!,
+          sequenceNo: 0,
           dependance: uTXID.contains(utxos[i].txid!) ? utxos[i].txid : null));
 
       sats = sats + utxos[i].sats;
@@ -266,8 +297,8 @@ class Wallet {
           walletIndex: utxos[i].walletIndex,
           sats: utxos[i].sats,
           spentFrom: utxos[i].txid!,
-          outIndex: FourByteInt(utxos[i].outIndex!),
-          sequenceNo: FourByteInt(0),
+          outIndex: utxos[i].outIndex!,
+          sequenceNo: 0,
           dependance: uTXID.contains(utxos[i].txid!) ? utxos[i].txid : null,
         ),
       );
@@ -364,8 +395,8 @@ class Wallet {
     var lastPerfectIn = Down4TXIN(
       spentFrom: desiredOut.txid!,
       walletIndex: desiredOut.walletIndex,
-      outIndex: FourByteInt(desiredOut.outIndex!),
-      sequenceNo: FourByteInt(0),
+      outIndex: desiredOut.outIndex!,
+      sequenceNo: 0,
       dependance: desiredOut.txid,
       sats: desiredOut.sats,
     );
@@ -497,28 +528,29 @@ class Down4TXIN {
     this.sats,
     required this.spentFrom,
     this.scriptSig,
-    required this.outIndex,
-    required this.sequenceNo,
+    required int outIndex,
+    int? sequenceNo,
     this.scriptSigLen,
     this.dependance,
-  });
+  })  : outIndex = FourByteInt(outIndex),
+        sequenceNo = FourByteInt(sequenceNo ?? 0);
 
-  // factory Down4TXIN.fromTXOUT(Down4TXOUT txout) {
-  //   return Down4TXIN(
-  //     spender: txout.receiver,
-  //     spentFrom: txout.txid!,
-  //     outIndex: FourByteInt(txout.outIndex!),
-  //     sequenceNo: FourByteInt(0),
-  //   );
-  // }
+  factory Down4TXIN.fromP2PKH(Down4TXOUT txout) {
+    return Down4TXIN(
+      spender: txout.receiver,
+      spentFrom: txout.txid!,
+      outIndex: txout.outIndex!,
+      sequenceNo: 0,
+    );
+  }
 
   factory Down4TXIN.fromJson(dynamic decodedJson) => Down4TXIN(
         spender: decodedJson["sp"],
         walletIndex: decodedJson["wi"],
         sats: Sats(decodedJson["s"]),
         spentFrom: TXID.fromHex(decodedJson["id"]),
-        outIndex: FourByteInt(decodedJson["oi"]),
-        sequenceNo: FourByteInt(decodedJson["sn"]),
+        outIndex: decodedJson["oi"],
+        sequenceNo: decodedJson["sn"],
         scriptSigLen: VarInt.fromInt(decodedJson["sl"]),
         scriptSig: hex.decode(decodedJson["sc"]),
         dependance:
@@ -738,78 +770,62 @@ class BatchResponse {
   }
 }
 
-void main() {
-  final tx = Down4TX(
-    txsIn: [],
-    txsOut: [],
+void main() async {
+  final target = BIP32.fromBase58(
+    "xpub6C6sG3rf3ssoCsxDU9VnPGfuRwfKd8b5PeJNjDawxp6uCqjKYZo6qKzun5VARDGxZgqvXQdQW6L9B18ekzAZaScL6stdL2p48wvJwxYigzh",
   );
 
-  // final String mnemonic = bip39.generateMnemonic();
-  // final seed = bip39.mnemonicToSeed(mnemonic);
+  final pub = target.publicKey;
 
-  // BIP32 down4neuter = BIP32.fromSeed(seed).derivePath("m/4'/0'/0'").neutered();
+  final tx = Down4TX(
+    txsIn: [
+      Down4TXIN(
+        spentFrom: TXID.fromHex(
+          "c0f7d62657b468203444cd708c3f5bcd1462dc8c422590782791a069680d871d",
+        ),
+        outIndex: 0,
+      ),
+    ],
+    txsOut: [
+      Down4TXOUT(
+        sats: Sats(350000),
+        outIndex: 0,
+        scriptPubKey: _p2pkh(_makeAddress(pub)),
+        receiver: "bob",
+      )
+    ],
+  );
 
-  // var f = io.File("/home/scott/Desktop/jeff.txt");
+  final txdata = tx.sigAllRawData.asUint8List();
+  final seed = bip39.mnemonicToSeed(
+    "pledge fury alcohol lunar trust album arrest fabric result hand husband dove",
+  );
+  final bip = BIP32.fromSeed(seed);
+  final derived = bip.derivePath('m/0/0');
+  for (var txin in tx.txsIn) {
+    final Uint8List sig = derived.sign(txdata);
+    final r = sig.sublist(0, 32);
+    final s = sig.sublist(32, 64);
+    const len = 1 + 1 + 32 + 1 + 1 + 32;
+    final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
+    final unlockScript = [...der, 0x41, ...derived.publicKey];
 
-  // f.writeAsStringSync(mnemonic + "\n" + down4neuter.toBase58());
+    txin.script = unlockScript;
+  }
+  final txid = tx.txid();
+  for (var txout in tx.txsOut) {
+    txout.txid = txid;
+  }
 
-  // var scriptSig = hex.decode(
-  //   "4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8",
-  // );
+  final pay = Down4Payment([tx], true);
+  final internetPayment = Down4InternetPayment(["bob"], "myself", pay);
 
-  // var tx = Down4TX(
-  //   maker: "scott",
-  //   nLockTime: 598793,
-  //   versionNo: 1,
-  //   txsIn: [
-  //     Down4TXIN(
-  //       spentFrom: TXID.fromBigEndianHex(
-  //         "b8ed28aa87b92328e26a20553ac49fcb21e1f68daeb6cf7bcf4536e40503ffa8",
-  //       ),
-  //       sats: Sats(100),
-  //       spender: "scott",
-  //       outIndex: FourByteInt(0),
-  //       sequenceNo: FourByteInt(4294967294),
-  //       scriptSig: scriptSig,
-  //       scriptSigLen: VarInt.fromInt(scriptSig.length),
-  //     ),
-  //   ],
-  //   txsOut: [
-  //     Down4TXOUT(
-  //       sats: Sats(1800),
-  //       scriptPubKey: hex.decode(
-  //         "76a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac",
-  //       ),
-  //     ),
-  //     Down4TXOUT(
-  //       sats: Sats(90000),
-  //       scriptPubKey: hex.decode(
-  //         "76a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac",
-  //       ),
-  //     ),
-  //   ],
-  // );
+  final success = await r.sendInternetPayment(internetPayment);
+  if (success) {
+    print("Should receive payment on your phone baby!");
+  } else {
+    print("It was not a success, you will not receive any payment bro...");
+  }
 
-  // var txid = tx.txid();
-  // print("Tx ID: ${txid.asHex}\nSerialized Tx: ${tx.asRawHex}");
-
-  // const full =
-  //     "0100000001a8ff0305e43645cf7bcfb6ae8df6e121cb9fc43a55206ae22823b987aa28edb8000000006b4830450221008824eee04a2fbe62d2c3ee330eb2523b2c0188240714bb1d893aced1c454fa9a02202d32dbccc2af1c4b830795f2fa8cd569a06ee70cb9d836bbd510f0b45a47711b4121028580686976c0e6a7e44a78387913e2d7508ff2344d5f48669ba111dcd04170a8feffffff0208070000000000001976a9146b0a9ed05da7223a1fe57e1a4d307556f7d6200788ac905f0100000000001976a914b993e512cb186f3f1c3f556a09716a1580eb99a188ac09230900";
-
-  // print(tx.asRawHex == full);
-
-  // const txid_ =
-  //     "d8c5c42cbd1df7e48acab76fe05f2c9e612a20996fd37f4ffd4dc251385b6ba3";
-
-  // print(txid.asHex == txid_);
-
-  // print(tx.asJsonString.length); // throws error because no txid in outputs
-
-  // var jeff = VarInt.fromInt(14435729);
-  // var andrew = VarInt.fromInt(134250981);
-
-  // print(jeff.toHex());
-  // print(andrew.toHex());
-
-  // int dd = 32432;
+  // Down4Payment([tx], true);
 }

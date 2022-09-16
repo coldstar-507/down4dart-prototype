@@ -24,6 +24,8 @@ Future<void> _initBox() async {
   await Hive.openBox("Payments");
   await Hive.openBox("SavedMessages");
   await Hive.openBox("Snips");
+  await Hive.openBox("MessageMedias");
+
 }
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {

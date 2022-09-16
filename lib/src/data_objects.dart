@@ -156,178 +156,25 @@ class Reaction {
 
 class MessageNotification {
   final Messages type;
-  final Identifier msgID, senderID, root;
-  final Identifier? mediaID, forwarderID;
-  final int timestamp;
-  final String senderThumbnail, senderName;
-  final String? text, forwarderThumbnail, forwarderName;
-  final String? hyperchatName, hyperchatLastName, hyperchatID, hyperchatMediaID;
-  final String? groupName, groupID, groupMediaID;
-  final List<Identifier>? nodes, reactions, groupFriends, hyperchatFriends;
-  final bool isChat;
-  MessageNotification({
-    required this.type,
-    required this.msgID,
-    required this.root,
-    required this.isChat,
-    required this.timestamp,
-    required this.senderID,
-    required this.senderName,
-    required this.senderThumbnail,
-    this.forwarderID,
-    this.forwarderName,
-    this.forwarderThumbnail,
-    this.hyperchatID,
-    this.hyperchatName,
-    this.hyperchatLastName,
-    this.hyperchatMediaID,
-    this.hyperchatFriends,
-    this.groupID,
-    this.groupName,
-    this.groupMediaID,
-    this.groupFriends,
-    this.mediaID,
-    this.text,
-    this.nodes,
-    this.reactions,
-  });
-
-  factory MessageNotification.fromNotification(Map<String, String> ntf) {
-    return MessageNotification(
-      type: Messages.values.byName(ntf["t"]!),
-      timestamp: int.parse(ntf["ts"] ?? "0"),
-      msgID: ntf["msgid"] ?? "",
-      mediaID: ntf["mid"],
-      root: ntf["rt"] ?? "",
-      senderID: ntf["sdrid"]!,
-      senderThumbnail: ntf["sdrtn"]!,
-      senderName: ntf["sdrnm"]!,
-      forwarderID: ntf["fdrid"],
-      forwarderName: ntf["fdrnm"],
-      forwarderThumbnail: ntf["fdrid"],
-      hyperchatID: ntf["hcid"],
-      hyperchatName: ntf["hcnm"],
-      hyperchatLastName: ntf["hcln"],
-      hyperchatMediaID: ntf["hcim"],
-      hyperchatFriends: ntf["hcfr"]?.split(" "),
-      groupID: ntf["gid"],
-      groupName: ntf["gnm"],
-      groupMediaID: ntf["gim"],
-      groupFriends: ntf["gfr"]?.split(" "),
-      isChat: ntf["ischt"] == "true",
-      text: ntf["txt"],
-      nodes: ntf["n"]?.split(" "),
-      reactions: ntf["r"]?.split(" "),
-    );
-  }
-
-  Future<Down4Message> toDown4Message() async {
-    Down4Media? m = mediaID != null || mediaID != ""
-        ? await r.getMessageMedia(mediaID!)
-        : null;
-    return Down4Message(
-      messageID: msgID,
-      senderThumbnail: senderThumbnail,
-      senderID: senderID,
-      root: root,
-      senderName: senderName,
-      timestamp: timestamp,
-      media: m,
-      text: text,
-      nodes: nodes,
-      reactions: reactions,
-      isChat: isChat,
-      forwarderID: forwarderID,
-      forwarderName: forwarderName,
-      forwarderThumbnail: forwarderThumbnail,
-    );
-  }
-
-  Future<Node?> nodeOfGroup() async {
-    Down4Media? m;
-    if (groupMediaID != null) {
-      m = await r.getMessageMedia(groupMediaID!);
-    }
-    if (m != null &&
-        groupName != null &&
-        groupFriends != null &&
-        groupID != null) {
-      return Node(
-        type: Nodes.group,
-        id: groupID!,
-        name: groupName!,
-        image: m,
-        group: groupFriends!,
-        posts: [],
-        messages: [],
-        admins: [],
-        childs: [],
-        friends: [],
-        parents: [],
-        snips: [],
-      );
-    }
-    return null;
-  }
-
-  Future<Node?> nodeOfHyperchat() async {
-    Down4Media? m;
-    if (hyperchatMediaID != null) {
-      m = await r.getMessageMedia(hyperchatMediaID!);
-    }
-    if (m != null &&
-        hyperchatName != null &&
-        hyperchatFriends != null &&
-        hyperchatID != null) {
-      return Node(
-        type: Nodes.hyperchat,
-        id: hyperchatID!,
-        name: hyperchatName!,
-        image: m,
-        group: hyperchatFriends!,
-        friends: [],
-        admins: [],
-        messages: [],
-        posts: [],
-        childs: [],
-        parents: [],
-        snips: [],
-      );
-    }
-    return null;
-  }
+  final String? base64jsonData;
+  MessageNotification({required this.type, this.base64jsonData});
 }
 
 class Down4Message {
-  Identifier root;
-  final Identifier messageID;
+  Identifier? messageID;
+  final Identifier senderID;
+  final Identifier? forwarderID;
   final String? text;
-  final Down4Media? media;
+  Down4Media? media;
   final bool isChat; // true is chat, false is post
   final int timestamp;
   final List<Identifier>? reactions, nodes; // reactions, nodes
 
-  final Identifier senderID;
-  final String senderName;
-  final String? senderLastName;
-  final String senderThumbnail;
-
-  final Identifier? forwarderID;
-  final String? forwarderName, forwarderLastName;
-  final String? forwarderThumbnail;
-
   Down4Message({
-    required this.messageID,
-    required this.root,
+    this.messageID,
     required this.timestamp,
     required this.senderID,
-    required this.senderName,
-    required this.senderThumbnail,
-    this.senderLastName,
     this.forwarderID,
-    this.forwarderName,
-    this.forwarderLastName,
-    this.forwarderThumbnail,
     this.media,
     this.text,
     this.nodes,
@@ -338,16 +185,10 @@ class Down4Message {
   Down4Message forwarded(Node self) {
     return Down4Message(
       messageID: messageID,
-      root: root,
       text: text,
       timestamp: timestamp,
       senderID: senderID,
-      senderName: senderName,
-      senderThumbnail: senderThumbnail,
       forwarderID: self.id != senderID ? self.id : null,
-      forwarderName: self.id != senderID ? self.name : null,
-      forwarderThumbnail:
-          self.id != senderID ? base64Encode(self.image!.thumbnail!) : null,
       media: media,
       nodes: nodes,
       reactions: reactions,
@@ -357,16 +198,9 @@ class Down4Message {
 
   factory Down4Message.fromJson(Map<String, dynamic> decodedJson) {
     return Down4Message(
-      root: decodedJson["rt"],
       messageID: decodedJson["msgid"],
       senderID: decodedJson["sdrid"],
-      senderName: decodedJson["sdrnm"],
-      senderLastName: decodedJson["sdrln"],
-      senderThumbnail: decodedJson["sdrtn"],
       forwarderID: decodedJson["fdrid"],
-      forwarderName: decodedJson["fdrnm"],
-      forwarderLastName: decodedJson["fdrln"],
-      forwarderThumbnail: decodedJson["fdrtn"],
       isChat: decodedJson["ischt"],
       text: decodedJson["txt"],
       media: decodedJson["m"] != null
@@ -380,25 +214,13 @@ class Down4Message {
     );
   }
 
-  // factory Down4Message.fromLocal(String id) {
-  //   final decodedJson = jsonDecode(Boxes.instance.messages.get(id));
-  //   return Down4Message.fromJson(decodedJson);
-  // }
-
   Map<String, dynamic> toJson([bool withMediaData = true]) => {
-        'rt': root,
         'msgid': messageID,
         if (text != null) 'txt': text,
         'sdrid': senderID,
-        'sdrtn': senderThumbnail,
-        'sdrnm': senderName,
-        if (senderLastName != null) 'sdrln': senderLastName!,
         'ts': timestamp,
         'ischt': isChat,
         if (forwarderID != null) 'fdrid': forwarderID,
-        if (forwarderName != null) 'fdrnm': forwarderName,
-        if (forwarderLastName != null) 'fdrln': forwarderLastName!,
-        if (forwarderThumbnail != null) 'fdrtn': forwarderThumbnail,
         if (reactions != null) 'r': reactions,
         if (nodes != null) 'n': nodes,
         if (media != null)
@@ -408,32 +230,6 @@ class Down4Message {
                   "id": media!.id,
                 },
       };
-
-  // factory Down4Message.fromSave(String id) {
-  //   Map<String, dynamic> saved = Boxes.instance.savedMessages.get(id);
-  //   Down4Media? m;
-  //   if (saved["m"]?["id"] != null) {
-  //     m = Down4Media.fromSave(saved["m"]!["id"]);
-  //   }
-  //   saved["m"] = m;
-  //   return Down4Message.fromJson(saved);
-  // }
-
-  // void save() {
-  //   Boxes.instance.savedMessages.put(
-  //     messageID,
-  //     jsonEncode(toJson(false)),
-  //   );
-  //   media?.save();
-  // }
-
-  // void saveLocally() {
-  //   Boxes.instance.messages.put(messageID, jsonEncode(this));
-  // }
-
-  // void deleteLocally() {
-  //   Boxes.instance.messages.delete(messageID);
-  // }
 }
 
 class Node {
@@ -607,17 +403,19 @@ class Node {
 
 class MessageRequest {
   Down4Message msg;
+  bool withUpload;
   final List<Identifier> targets;
-  bool? withUpload;
   final Node? rootNode;
+
   MessageRequest({
     required this.msg,
     required this.targets,
     this.rootNode,
     this.withUpload = false,
   });
+
   Map<String, dynamic> toJson() => {
-        if (withUpload != null) "wu": withUpload,
+        "wu": withUpload,
         if (rootNode != null)
           "g": {
             "id": rootNode!.id,
@@ -625,7 +423,7 @@ class MessageRequest {
             "nm": rootNode!.name,
             if (rootNode!.lastName != null) "ln": rootNode!.lastName,
           },
-        "msg": msg.toJson(withUpload == true),
+        "msg": msg.toJson(withUpload),
         "trgts": targets,
       };
 }

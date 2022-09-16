@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter_testproject/src/down4_utility.dart';
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
 import 'simple_bsv.dart' as w;
@@ -125,7 +126,7 @@ Future<bool> groupRequest(MessageRequest req, [retried = false]) async {
     return groupRequest(
       req
         ..withUpload = true
-        ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+        ..msg.media?.metadata.timestamp = timeStamp(),
       true,
     );
   }
@@ -141,7 +142,7 @@ Future<bool> hyperchatRequest(MessageRequest req, [retried = false]) async {
     return hyperchatRequest(
       req
         ..withUpload = true
-        ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+        ..msg.media?.metadata.timestamp = timeStamp(),
       true,
     );
   }
@@ -157,7 +158,7 @@ Future<bool> chatRequest(MessageRequest req, [retried = false]) async {
     return chatRequest(
       req
         ..withUpload = true
-        ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
+        ..msg.media?.metadata.timestamp = timeStamp(),
       true,
     );
   }
@@ -175,6 +176,14 @@ Future<int> refreshTokenRequest(String newToken) async {
 Future<List<Down4Message>?> getPosts(List<String> ids) async {
   // TODO: getPosts
   return null;
+}
+
+Future<bool> sendInternetPayment(w.Down4InternetPayment payment) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePayment",
+  );
+  final res = await http.post(url, body: jsonEncode(payment));
+  return res.statusCode == 200;
 }
 
 

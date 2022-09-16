@@ -2,9 +2,18 @@ import 'package:convert/convert.dart';
 import 'dart:typed_data';
 import 'package:pointycastle/digests/sha1.dart' as sha1;
 import 'data_objects.dart';
+import 'render_objects.dart';
 
-extension IsUser on Nodes {
+extension PaletteExtensions on List<Palette> {
+  List<Node> asNodes() => map((e) => e.node).toList(growable: false);
+  List<Palette> selected() => where((p) => p.selected).toList(growable: false);
+  List<Identifier> asIds() => map((e) => e.node.id).toList(growable: false);
+
+}
+
+extension IsTypes on Nodes {
   bool isUser() => [Nodes.nonFriend, Nodes.friend, Nodes.user].contains(this);
+  bool isGroup() => [Nodes.hyperchat, Nodes.group].contains(this);
 }
 
 extension AsUint8List on List<int> {
@@ -17,7 +26,7 @@ extension ToHex on List<int> {
 
 extension StringExtension on String {
   String capitalize() {
-    return "${this[0].toUpperCase()}${this.substring(1).toLowerCase()}";
+    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   }
 }
 

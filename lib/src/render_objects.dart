@@ -1,18 +1,17 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:io';
-
-import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/boxes.dart';
-import 'data_objects.dart';
-import 'render_utility.dart';
-import 'package:file_picker/file_picker.dart';
 import 'dart:io' as io;
 import 'dart:math' as math;
+
 import 'package:video_player/video_player.dart';
-import 'boxes.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+
+import 'data_objects.dart';
+import 'render_utility.dart';
+import 'boxes.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
@@ -57,6 +56,7 @@ class BasicActionButton extends StatelessWidget {
     this.goLongPress,
     Key? key,
   }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -105,8 +105,7 @@ class ProfileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final squareImageSize = size.width - 88;
+    final squareImageSize = Sizes.w - 88;
     return Container(
       clipBehavior: Clip.hardEdge,
       width: squareImageSize,
@@ -610,34 +609,42 @@ class Console extends StatelessWidget {
       child: Column(
         children: [
           forwardingNodes != null
-              ? Container(
+              ? SizedBox(
                   height: ConsoleButton.height,
                   width: camWidthAndHeight,
-                  decoration: BoxDecoration(border: Border.all(width: 0.5)),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     textDirection: TextDirection.ltr,
                     children: forwardingNodes!
-                        .map((node) => SizedBox(
-                              height: ConsoleButton.height,
-                              width:
-                              (camWidthAndHeight / forwardingNodes!.length) - 2,
-                              child: Row(
-                                textDirection: TextDirection.ltr,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Image.memory(
-                                    node.image!.data,
-                                    fit: BoxFit.cover,
-                                    width: ConsoleButton.height,
-                                    height: ConsoleButton.height,
-                                  ),
-                                  Expanded(child: Container(
-                                    padding: const EdgeInsets.all(2.0),
-                                    color: PinkTheme.nodeColors[node.type],
-                                    child: Text(node.name),
-                                  ),),
-                                ],
+                        .map((node) => Flexible(
+                              child: DecoratedBox(
+                                position: DecorationPosition.foreground,
+                                decoration: BoxDecoration(
+                                  border: Border.all(width: 0.5),
+                                ),
+                                child: Row(
+                                  textDirection: TextDirection.ltr,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Image.memory(
+                                      node.image!.data,
+                                      fit: BoxFit.cover,
+                                      width: ConsoleButton.height,
+                                      height: ConsoleButton.height,
+                                    ),
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2.0),
+                                        color: PinkTheme.nodeColors[node.type],
+                                        child: Text(
+                                          node.name,
+                                          overflow: TextOverflow.clip,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ))
                         .toList(),
@@ -778,12 +785,14 @@ class Console extends StatelessWidget {
 }
 
 class ChatMessage extends StatelessWidget {
+  final Node sender;
   static const double headerHeight = 24.0;
   final String at;
   final Down4Message message;
   final bool myMessage, selected, hasHeader;
   final void Function(Identifier, Identifier)? select;
   const ChatMessage({
+    required this.sender,
     required this.message,
     required this.myMessage,
     required this.at,
@@ -795,6 +804,7 @@ class ChatMessage extends StatelessWidget {
 
   ChatMessage invertedSelection() {
     return ChatMessage(
+      sender: sender,
       hasHeader: hasHeader,
       message: message,
       myMessage: myMessage,
@@ -844,7 +854,7 @@ class ChatMessage extends StatelessWidget {
                       textDirection: TextDirection.ltr,
                       children: [
                         GestureDetector(
-                          onTap: () => select?.call(message.messageID, at),
+                          onTap: () => select?.call(message.messageID!, at),
                           child: Container(
                             clipBehavior: Clip.hardEdge,
                             decoration: const BoxDecoration(
@@ -855,7 +865,7 @@ class ChatMessage extends StatelessWidget {
                             height: ChatMessage.headerHeight,
                             width: ChatMessage.headerHeight,
                             child: Image.memory(
-                              base64Decode(message.senderThumbnail),
+                              sender.image!.data,
                               fit: BoxFit.cover,
                               gaplessPlayback: true,
                             ),
@@ -863,7 +873,7 @@ class ChatMessage extends StatelessWidget {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => select?.call(message.messageID, at),
+                            onTap: () => select?.call(message.messageID!, at),
                             child: Container(
                               clipBehavior: Clip.hardEdge,
                               decoration: const BoxDecoration(
@@ -876,7 +886,7 @@ class ChatMessage extends StatelessWidget {
                                   left: 2.0, top: 2.0, right: 2.0),
                               height: ChatMessage.headerHeight,
                               child: Text(
-                                message.senderName,
+                                sender.name,
                                 textDirection: TextDirection.ltr,
                               ),
                             ),
@@ -888,7 +898,7 @@ class ChatMessage extends StatelessWidget {
               message.text == null || message.text == ""
                   ? const SizedBox.shrink()
                   : GestureDetector(
-                      onTap: () => select?.call(message.messageID, at),
+                      onTap: () => select?.call(message.messageID!, at),
                       child: Container(
                         padding: const EdgeInsets.all(6.0),
                         clipBehavior: Clip.hardEdge,
@@ -941,7 +951,7 @@ class ChatMessage extends StatelessWidget {
                             key: GlobalKey(),
                           ))
                       : GestureDetector(
-                          onTap: () => select?.call(message.messageID, at),
+                          onTap: () => select?.call(message.messageID!, at),
                           child: Container(
                             clipBehavior: Clip.hardEdge,
                             decoration: BoxDecoration(
@@ -972,7 +982,7 @@ class ChatMessage extends StatelessWidget {
 }
 
 class Down4VideoPlayer extends StatefulWidget {
-  final File vid;
+  final io.File vid;
   const Down4VideoPlayer({required this.vid, Key? key}) : super(key: key);
 
   @override
@@ -1045,12 +1055,14 @@ class PaletteList extends StatelessWidget {
 }
 
 class MessageList4 extends StatelessWidget {
+  final Map<Identifier, Node> senders;
   final Map<Identifier, ChatMessage> messageMap;
   final void Function(String, String) select;
   final void Function(ChatMessage) cache;
   final List<Identifier> messages;
   final Node self;
   const MessageList4({
+    required this.senders,
     required this.messages,
     required this.self,
     required this.messageMap,
@@ -1082,6 +1094,7 @@ class MessageList4 extends StatelessWidget {
               final msg =
                   prevMsgCache ?? Boxes.instance.loadMessage(messages[i - 1]);
               final chat = ChatMessage(
+                sender: senders[msg.senderID]!,
                 message: msg,
                 myMessage: msg.senderID == self.id,
                 at: "",

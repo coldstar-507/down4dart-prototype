@@ -4,7 +4,9 @@ import 'dart:typed_data';
 
 import 'package:bip39/bip39.dart' as b39;
 import 'package:bip32/bip32.dart' as b32;
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -38,6 +40,8 @@ class _Down4State extends State<Down4> {
   @override
   void initState() {
     super.initState();
+    FirebaseDatabase.instance.setPersistenceEnabled(false);
+    fs.settings = const Settings(persistenceEnabled: false);
     loadTokenChangeListener();
     loadUser();
   }
@@ -194,7 +198,7 @@ class _Down4State extends State<Down4> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
-    Sizes.h = size.height - padding.top - padding.bottom;
+    Sizes.h = size.height - padding.top - padding.bottom - 21;
     Sizes.w = size.width - padding.left - padding.right;
     return SafeArea(child: _view ?? const LoadingPage());
   }

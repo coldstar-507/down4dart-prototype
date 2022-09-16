@@ -253,6 +253,7 @@ class SnipCamera extends StatefulWidget {
     double aspectRatio,
   ) cameraCallBack;
   final bool enableVideo;
+  
   const SnipCamera({
     required this.maxZoom,
     required this.minZoom,
@@ -335,6 +336,7 @@ class _SnipCameraState extends State<SnipCamera> {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
     return Down4Page2(
+      title: "TODO",
       stackWidgets: [
         GestureDetector(
           onTap: () => print("LALALALALAL"),
@@ -414,6 +416,7 @@ class _SnipCameraState extends State<SnipCamera> {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
     _preview = Down4Page2(
+      title: "TODO",
       stackWidgets: [
         SizedBox(
           height: mediaSize.height,
@@ -512,6 +515,7 @@ class _SnipCameraState extends State<SnipCamera> {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
     _preview = Down4Page2(
+      title: "TODO",
       stackWidgets: [
         SizedBox(
           height: mediaSize.height,
