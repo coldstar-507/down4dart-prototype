@@ -11,6 +11,34 @@ import 'data_objects.dart';
 var db = FirebaseDatabase.instance.ref();
 var fs = FirebaseFirestore.instance;
 var st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
+var st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+
+Future<Node?> getNode(Identifier nodeID) async {
+  var doc = await fs.collection("Nodes").doc(nodeID).get();
+  var jsonNode = doc.data();
+  if (jsonNode == null) return null;
+
+  var node = Node.fromJson(jsonNode);
+
+  Down4Media? nodeMedia;
+  final imageID = jsonNode["im"];
+  if (imageID != null) {
+    var imRef = st_node.ref(imageID);
+    final fData = imRef.getData();
+    final fMD = imRef.getMetadata();
+
+    final jsonMetadata = (await fMD).customMetadata;
+    if (jsonMetadata != null) {
+      final md = MediaMetadata.fromJson(jsonMetadata);
+      final imData = await fData;
+      if (imData != null) {
+        nodeMedia = Down4Media(id: imageID, data: imData, metadata: md);
+      }
+    }
+  }
+  node.image = nodeMedia;
+  return node;
+}
 
 Future<Down4Media?> getMessageMedia(Identifier mediaID) async {
   var ref = st.ref(mediaID);
@@ -146,7 +174,7 @@ class Boxes {
   }
 
   void saveMessage(Down4Message msg) {
-    messages.put(msg.messageID, jsonEncode(msg.toJson(false)));
+    messages.put(msg.id, jsonEncode(msg.toJson(false)));
     if (msg.media != null) {
       messageMedias.put(msg.media!.id, jsonEncode(msg.media!));
     }
@@ -190,5 +218,5 @@ class Sizes2 {
         h = 0;
   double w, h;
   static Sizes2? _instance;
-  static Sizes2 get instance => _instance ??= Sizes2._();
+  Sizes2 get instance => _instance ??= Sizes2._();
 }

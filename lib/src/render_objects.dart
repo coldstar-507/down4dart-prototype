@@ -789,7 +789,7 @@ class ChatMessage extends StatelessWidget {
   static const double headerHeight = 24.0;
   final String at;
   final Down4Message message;
-  final bool myMessage, selected, hasHeader;
+  final bool myMessage, selected, hasHeader, isPost;
   final void Function(Identifier, Identifier)? select;
   const ChatMessage({
     required this.sender,
@@ -797,6 +797,7 @@ class ChatMessage extends StatelessWidget {
     required this.myMessage,
     required this.at,
     required this.hasHeader,
+    this.isPost = false,
     this.selected = false,
     this.select,
     Key? key,
@@ -818,7 +819,7 @@ class ChatMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final maxWidth = Sizes.w * 0.76;
     return Align(
-      alignment: message.isChat == false
+      alignment: isPost == false
           ? Alignment.topCenter
           : myMessage
               ? Alignment.topRight
@@ -854,7 +855,7 @@ class ChatMessage extends StatelessWidget {
                       textDirection: TextDirection.ltr,
                       children: [
                         GestureDetector(
-                          onTap: () => select?.call(message.messageID!, at),
+                          onTap: () => select?.call(message.id!, at),
                           child: Container(
                             clipBehavior: Clip.hardEdge,
                             decoration: const BoxDecoration(
@@ -873,7 +874,7 @@ class ChatMessage extends StatelessWidget {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => select?.call(message.messageID!, at),
+                            onTap: () => select?.call(message.id!, at),
                             child: Container(
                               clipBehavior: Clip.hardEdge,
                               decoration: const BoxDecoration(
@@ -898,7 +899,7 @@ class ChatMessage extends StatelessWidget {
               message.text == null || message.text == ""
                   ? const SizedBox.shrink()
                   : GestureDetector(
-                      onTap: () => select?.call(message.messageID!, at),
+                      onTap: () => select?.call(message.id!, at),
                       child: Container(
                         padding: const EdgeInsets.all(6.0),
                         clipBehavior: Clip.hardEdge,
@@ -951,7 +952,7 @@ class ChatMessage extends StatelessWidget {
                             key: GlobalKey(),
                           ))
                       : GestureDetector(
-                          onTap: () => select?.call(message.messageID!, at),
+                          onTap: () => select?.call(message.id!, at),
                           child: Container(
                             clipBehavior: Clip.hardEdge,
                             decoration: BoxDecoration(

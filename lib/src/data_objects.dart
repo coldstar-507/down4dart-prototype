@@ -53,22 +53,6 @@ class Down4Media {
 
   factory Down4Media.fromJson(Map<String, dynamic> decodedJson) {
     final metadata = MediaMetadata.fromJson(decodedJson["md"]);
-    // if (metadata.isVideo) {
-    //   final path = Boxes.instance.dirPath + "/" + decodedJson["id"];
-    //   var file = File(path);
-    //   final data = base64Decode(decodedJson["d"]);
-    //   file.writeAsBytesSync(data);
-    //   return Down4Media(
-    //     id: decodedJson["id"],
-    //     file: file,
-    //     path: path,
-    //     metadata: MediaMetadata.fromJson(decodedJson["md"]),
-    //     data: data,
-    //     thumbnail: decodedJson["tn"] != null && decodedJson["tn"] != ""
-    //         ? base64Decode(decodedJson["tn"])
-    //         : null,
-    //   );
-    // } else {
     return Down4Media(
       id: decodedJson["id"],
       metadata: metadata,
@@ -77,7 +61,6 @@ class Down4Media {
           ? base64Decode(decodedJson["tn"])
           : null,
     );
-    // }
   }
 
   factory Down4Media.fromCamera(String filePath, MediaMetadata md) {
@@ -98,61 +81,35 @@ class Down4Media {
         "d": base64Encode(data),
         if (thumbnail != null) "tn": base64Encode(thumbnail!),
       };
-
-  // void save() {
-  //   metadata.isVideo
-  //       ? Boxes.instance.videos.put(id, jsonEncode(this))
-  //       : Boxes.instance.images.put(id, jsonEncode(this));
-  // }
-
-  // void writeToFile() {
-  //   path = Boxes.instance.dirPath + "/" + id;
-  //   file = File(path!);
-  //   file!.writeAsBytesSync(data);
-  // }
-
-  // void deleteFile() {
-  //   file?.delete();
-  // }
-
-  // factory Down4Media.fromSave(String id) {
-  //   return Down4Media.fromJson(jsonDecode(Boxes.instance.images.get(id)));
-  // }
 }
 
-class Reaction {
-  final Identifier id, sender;
-  final Down4Media image; // target, sender
-  final List<String> messageTargets;
-  Reaction({
-    required this.id,
-    required this.messageTargets,
-    required this.sender,
-    required this.image,
-  });
-
-  factory Reaction.fromJson(Map<String, dynamic> decodedJson) {
-    return Reaction(
-      id: decodedJson["id"],
-      messageTargets: decodedJson["mtg"],
-      sender: decodedJson["sd"],
-      image: Down4Media.fromJson(decodedJson["m"]),
-      // image: Down4Image.fromString(decodedJson["m"]),
-    );
-  }
-
-  // factory Reaction.fromLocal(String id) {
-  //   final decodedJson = jsonDecode(Boxes.instance.reactions.get(id));
-  //   return Reaction.fromJson(decodedJson);
-  // }
-
-  Map<String, dynamic> toLocal() => {
-        'id': id,
-        'sd': sender,
-        'mtg': messageTargets,
-        'm': image.toJson(),
-      };
-}
+// class Reaction {
+//   final Identifier id, sender;
+//   final Down4Media image; // target, sender
+//   final List<String> messageTargets;
+//   Reaction({
+//     required this.id,
+//     required this.messageTargets,
+//     required this.sender,
+//     required this.image,
+//   });
+//
+//   factory Reaction.fromJson(Map<String, dynamic> decodedJson) {
+//     return Reaction(
+//       id: decodedJson["id"],
+//       messageTargets: decodedJson["mtg"],
+//       sender: decodedJson["sd"],
+//       image: Down4Media.fromJson(decodedJson["m"]),
+//     );
+//   }
+//
+//   Map<String, dynamic> toLocal() => {
+//         'id': id,
+//         'sd': sender,
+//         'mtg': messageTargets,
+//         'm': image.toJson(),
+//       };
+// }
 
 class MessageNotification {
   final Messages type;
@@ -161,68 +118,67 @@ class MessageNotification {
 }
 
 class Down4Message {
-  Identifier? messageID;
+  Identifier? id;
+  final Identifier? root;
   final Identifier senderID;
   final Identifier? forwarderID;
   final String? text;
   Down4Media? media;
-  final bool isChat; // true is chat, false is post
   final int timestamp;
-  final List<Identifier>? reactions, nodes; // reactions, nodes
+  final List<Identifier>? replies, nodes; // reactions, nodes
 
   Down4Message({
-    this.messageID,
+    this.id,
+    this.root,
     required this.timestamp,
     required this.senderID,
     this.forwarderID,
     this.media,
     this.text,
     this.nodes,
-    this.reactions,
-    this.isChat = true,
+    this.replies,
   });
 
   Down4Message forwarded(Node self) {
     return Down4Message(
-      messageID: messageID,
+      id: id,
       text: text,
       timestamp: timestamp,
       senderID: senderID,
       forwarderID: self.id != senderID ? self.id : null,
       media: media,
       nodes: nodes,
-      reactions: reactions,
-      isChat: isChat,
+      replies: replies,
     );
   }
 
   factory Down4Message.fromJson(Map<String, dynamic> decodedJson) {
     return Down4Message(
-      messageID: decodedJson["msgid"],
-      senderID: decodedJson["sdrid"],
-      forwarderID: decodedJson["fdrid"],
-      isChat: decodedJson["ischt"],
+      id: decodedJson["id"],
+      senderID: decodedJson["s"],
+      forwarderID: decodedJson["f"],
       text: decodedJson["txt"],
-      media: decodedJson["m"] != null
+      media: decodedJson["m"]?["d"] != null
           ? Down4Media.fromJson(decodedJson["m"])
           : null,
       timestamp: decodedJson["ts"],
-      reactions:
-          decodedJson["r"] != null ? List<String>.from(decodedJson["r"]) : null,
-      nodes:
-          decodedJson["n"] != null ? List<String>.from(decodedJson["n"]) : null,
+      replies: ((decodedJson["r"] as String?) ?? "").isNotEmpty
+          ? List<String>.from(decodedJson["r"].split(" "))
+          : null,
+      nodes: ((decodedJson["n"] as String?) ?? "").isNotEmpty
+          ? List<String>.from(decodedJson["n"].split(" "))
+          : null,
     );
   }
 
   Map<String, dynamic> toJson([bool withMediaData = true]) => {
-        'msgid': messageID,
+        'id': id,
         if (text != null) 'txt': text,
-        'sdrid': senderID,
+        's': senderID,
         'ts': timestamp,
-        'ischt': isChat,
-        if (forwarderID != null) 'fdrid': forwarderID,
-        if (reactions != null) 'r': reactions,
-        if (nodes != null) 'n': nodes,
+        if (forwarderID != null) 'f': forwarderID,
+        if (replies != null) 'r': replies!.join(" "),
+        if (nodes != null) 'n': nodes!.join(" "),
         if (media != null)
           'm': withMediaData
               ? media!.toJson()
@@ -271,26 +227,6 @@ class Node {
 
   void mutateType(Nodes t) => type = t;
 
-  Node mutatedType(Nodes t) {
-    return Node(
-      id: id,
-      name: name,
-      lastName: lastName,
-      image: image,
-      description: description,
-      type: t,
-      activity: activity,
-      admins: admins,
-      childs: childs,
-      parents: parents,
-      friends: friends,
-      group: group,
-      messages: messages,
-      posts: posts,
-      snips: snips,
-    );
-  }
-
   void updateActivity() => activity = d4utils.timeStamp();
 
   void merge(Node mergeNode) {
@@ -305,100 +241,58 @@ class Node {
     lastName = mergeNode.lastName;
   }
 
-  // factory Node.fromLocal(Identifier id) {
-  //   final decodedJson = jsonDecode(Boxes.instance.home.get(id));
-  //   return Node.fromJson(decodedJson);
-  // }
-
   factory Node.fromJson(Map<String, dynamic> decodedJson) {
     return Node(
       id: decodedJson["id"],
       name: decodedJson["nm"],
       lastName: decodedJson["ln"],
       activity: decodedJson["a"] ?? 0,
-      image: Down4Media.fromJson(decodedJson["im"]),
+      image: decodedJson["im"] != null
+          ? Down4Media.fromJson(decodedJson["im"])
+          : null,
       type: Nodes.values.byName(decodedJson["t"]),
-      messages: List<String>.from(decodedJson["msg"] ?? []),
-      admins: List<String>.from(decodedJson["adm"] ?? []),
-      childs: List<String>.from(decodedJson["chl"] ?? []),
-      parents: List<String>.from(decodedJson["prt"] ?? []),
-      posts: List<String>.from(decodedJson["pst"] ?? []),
-      group: List<String>.from(decodedJson["grp"] ?? []),
-      friends: List<String>.from(decodedJson["frd"] ?? []),
-      snips: List<String>.from(decodedJson["snp"] ?? []),
+      messages: decodedJson["msg"] != null
+          ? List<String>.from(decodedJson["msg"])
+          : null,
+      admins: decodedJson["adm"] != null
+          ? List<String>.from(decodedJson["adm"])
+          : null,
+      childs: decodedJson["chl"] != null
+          ? List<String>.from(decodedJson["chl"])
+          : null,
+      parents: decodedJson["prt"] != null
+          ? List<String>.from(decodedJson["prt"])
+          : null,
+      posts: decodedJson["pst"] != null
+          ? List<String>.from(decodedJson["pst"])
+          : null,
+      group: decodedJson["grp"] != null
+          ? List<String>.from(decodedJson["grp"])
+          : null,
+      friends: decodedJson["frd"] != null
+          ? List<String>.from(decodedJson["frd"])
+          : null,
+      snips: decodedJson["snp"] != null
+          ? List<String>.from(decodedJson["snp"])
+          : null,
     );
   }
-
-  // Map<String, dynamic> toFirebase() => {
-  //       "id": id,
-  //       "t": type.name,
-  //       "nm": name,
-  //       "ln": lastName,
-  //       "im": image.id,
-  //       "msg": messages,
-  //       "adm": admins,
-  //       "chl": childs,
-  //       "prt": parents,
-  //       "pst": posts,
-  //       "grp": group,
-  //       "snp": snips,
-  //     };
-
-  // Map<String, dynamic> toLocal() => {
-  //       "id": id,
-  //       "t": type.name,
-  //       "a": activity,
-  //       "nm": name,
-  //       "ln": lastName,
-  //       "im": image.toJson(),
-  //       "msg": messages,
-  //       "adm": admins,
-  //       "chl": childs,
-  //       "prt": parents,
-  //       "pst": posts,
-  //       "grp": group,
-  //       "snp": snips,
-  //     };
 
   Map<String, dynamic> toJson([bool withMedia = true]) => {
         "id": id,
         "t": type.name,
         "a": activity,
         "nm": name,
-        "ln": lastName,
-        "im": withMedia ? image!.toJson() : image!.id,
-        "msg": messages,
-        "adm": admins,
-        "chl": childs,
-        "prt": parents,
-        "pst": posts,
-        "grp": group,
-        "snp": snips,
+        if (lastName != null) "ln": lastName,
+        if (image != null) "im": withMedia ? image!.toJson() : image!.id,
+        if (messages != null) "msg": messages,
+        if (admins != null) "adm": admins,
+        if (childs != null) "chl": childs,
+        if (parents != null) "prt": parents,
+        if (posts != null) "pst": posts,
+        if (group != null) "grp": group,
+        if (snips != null) "snp": snips,
       };
-
-  // void saveLocally() {
-  //   Boxes.instance.home.put(id, jsonEncode(toLocal()));
-  // }
-
-  // void deleteLocally() {
-  //   Boxes.instance.home.delete(id);
-  //   for (final msgID in messages) {
-  //     Boxes.instance.messages.delete(msgID);
-  //   }
-  // }
-
-  // factory Node.fromLocal(String id, Box<dynamic> box) {
-  //   if (isFriend) {
-  //     final decodedJson = jsonDecode(Boxes.instance.friends.get(id));
-  //     return Node.fromJson(decodedJson);
-  //   } else {
-  //     final decodedJson = jsonDecode(Boxes.instance.others.get(id));
-  //     return Node.fromJson(decodedJson);
-  //   }
-  // }
-  bool get isUser =>
-      const [Nodes.friend, Nodes.nonFriend, Nodes.user].contains(type);
-  bool get isGroupchat => const [Nodes.group, Nodes.hyperchat].contains(type);
 }
 
 class MessageRequest {

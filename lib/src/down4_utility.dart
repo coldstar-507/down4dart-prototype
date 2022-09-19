@@ -8,19 +8,21 @@ extension PaletteExtensions on List<Palette> {
   List<Node> asNodes() => map((e) => e.node).toList(growable: false);
   List<Palette> selected() => where((p) => p.selected).toList(growable: false);
   List<Identifier> asIds() => map((e) => e.node.id).toList(growable: false);
-
 }
 
-extension IsTypes on Nodes {
-  bool isUser() => [Nodes.nonFriend, Nodes.friend, Nodes.user].contains(this);
-  bool isGroup() => [Nodes.hyperchat, Nodes.group].contains(this);
+extension IsTypes on Node {
+  bool get isFriendOrGroup => const [Nodes.friend, Nodes.group].contains(type);
+  bool get isFriend => Nodes.friend == type;
+  bool get isUser =>
+      const [Nodes.nonFriend, Nodes.friend, Nodes.user].contains(type);
+  bool get isGroup => const [Nodes.hyperchat, Nodes.group].contains(type);
 }
 
 extension AsUint8List on List<int> {
   Uint8List asUint8List() => Uint8List.fromList(this);
 }
 
-extension ToHex on List<int> {
+extension ByteEncoding on List<int> {
   String toHex() => hex.encode(this);
 }
 

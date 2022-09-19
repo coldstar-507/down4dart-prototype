@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:collection/collection.dart';
 import 'package:bip32/bip32.dart';
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,21 +11,22 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:video_player/video_player.dart';
-import 'render_objects.dart';
-import 'dart:convert';
-import 'dart:typed_data';
-import 'boxes.dart';
-import 'camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'package:file_picker/file_picker.dart';
-import 'web_requests.dart' as r;
-import 'down4_utility.dart' as u;
+import 'package:video_player/video_player.dart';
 import 'package:english_words/english_words.dart' as rw;
-import 'dart:math' as math;
-import 'simple_bsv.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+
+import 'render_objects.dart';
+import 'boxes.dart';
+import 'camera.dart';
+import 'web_requests.dart' as r;
+import 'down4_utility.dart' as u;
+import 'dart:math' as math;
+import 'simple_bsv.dart';
+
+final listEqual = const ListEquality().equals;
 
 class Down4Page2 extends StatelessWidget {
   final String title;
@@ -179,7 +184,7 @@ class GroupPage extends StatefulWidget {
 class _GroupPageState extends State<GroupPage> {
   dynamic _console;
   dynamic singleInput;
-  List<Widget> _items = [];
+  List<Widget> items = [];
   var tec = TextEditingController();
   var tec2 = TextEditingController();
 
@@ -227,9 +232,9 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   void loadPalettes() {
-    _items.clear();
-    _items.add(hyperchatMaker());
-    _items.addAll(widget.palettes);
+    items.clear();
+    items.add(hyperchatMaker());
+    items.addAll(widget.palettes);
     setState(() {});
   }
 
@@ -243,7 +248,6 @@ class _GroupPageState extends State<GroupPage> {
       final msg = Down4Message(
         media: _cameraInput ?? _mediaInput,
         senderID: widget.self.id,
-        isChat: true,
         timestamp: ts,
         text: _input,
         nodes: _forwardingNodes,
@@ -257,7 +261,7 @@ class _GroupPageState extends State<GroupPage> {
         name: wp.first,
         lastName: wp.second,
         image: _hyperchatImage ?? widget.self.image,
-        messages: [msg.messageID!],
+        messages: [msg.id!],
         posts: [],
         friends: [],
         group: targets + [widget.self.id],
@@ -317,7 +321,7 @@ class _GroupPageState extends State<GroupPage> {
     return Down4Page2(
       title: widget.isHyperchat ? "Hyperchat" : "Group",
       console: _console!,
-      columnWidgets: _items,
+      columnWidgets: items,
     );
   }
 }
@@ -1082,7 +1086,7 @@ class NodePage extends StatefulWidget {
   final List<Palette> palettes;
   final Palette palette;
   final Node self;
-  final Palette? Function(String, Node) nodeToPalette;
+  final Palette? Function(Node, String) nodeToPalette;
   final void Function(String, String) openNode, openChat;
   final void Function() back;
 
@@ -1189,7 +1193,7 @@ class _NodePageState extends State<NodePage> {
     if (_fetchablePalettes[currentMode]!.isEmpty) {
       final nodes = await r.getNodes(_stupidMap[currentMode]!);
       for (final node in nodes ?? []) {
-        final p = widget.nodeToPalette(widget.palette.node.id, node);
+        final p = widget.nodeToPalette(node, widget.palette.node.id);
         if (p != null) {
           _fetchablePalettes[currentMode] = {p.node.id: p};
         }
@@ -1346,7 +1350,7 @@ class _ChatPageState extends State<ChatPage> {
             Boxes.instance.saveImage(msg.message.media!);
           }
         }
-        _chachedMessages[msg.message.messageID!] = msg.invertedSelection();
+        _chachedMessages[msg.message.id!] = msg.invertedSelection();
       }
     }
     setState(() {});
@@ -1359,7 +1363,7 @@ class _ChatPageState extends State<ChatPage> {
         ..removeWhere((element) => element == widget.self.id);
 
       var msg = Down4Message(
-        messageID: u.generateMessageID(widget.self.id, ts),
+        id: u.generateMessageID(widget.self.id, ts),
         timestamp: ts,
         senderID: widget.self.id,
         media: mediaInput,
@@ -1377,7 +1381,7 @@ class _ChatPageState extends State<ChatPage> {
         messages: widget.node.messages ?? <String>[],
         self: widget.self,
         messageMap: _chachedMessages,
-        cache: (msg) => _chachedMessages[msg.message.messageID!] = msg,
+        cache: (msg) => _chachedMessages[msg.message.id!] = msg,
         select: (id, _) {
           _chachedMessages[id] = _chachedMessages[id]!.invertedSelection();
           setState(() {});
@@ -1665,9 +1669,7 @@ class _HomeState extends State<Home> {
     "MyPosts": {},
   };
 
-  Map<Identifier, StreamSubscription<DatabaseEvent>> chatConnections = {};
-  Map<Identifier, StreamSubscription<DatabaseEvent>> snipConnections = {};
-  StreamSubscription<dynamic>? paymentListener, nodeListener;
+  StreamSubscription? messageListener, snipListener, paymentListener;
 
   // Node? _node; // the node we are currently traversing, always null at start
   // List<String> _locations = ["Home"]; // to keep an history of traversed nodes
@@ -1696,16 +1698,9 @@ class _HomeState extends State<Home> {
 
   @override
   void dispose() {
-    for (var chatConnection in chatConnections.values) {
-      chatConnection.cancel();
-    }
-
-    for (var snipConnection in snipConnections.values) {
-      snipConnection.cancel();
-    }
-
+    messageListener?.cancel();
+    snipListener?.cancel();
     paymentListener?.cancel();
-    nodeListener?.cancel();
     super.dispose();
   }
 
@@ -1728,188 +1723,125 @@ class _HomeState extends State<Home> {
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = Node.fromJson(jsonDecode(jsonEncodedHomeNode));
       writePalette(node);
-      if (node.isGroupchat || node.isGroupchat) {
-        var chatConnection = connectToChat(node);
-        if (chatConnection != null) chatConnections[node.id] = chatConnection;
-
-        var snipConnection = connectToSnip(node);
-        if (snipConnection != null) snipConnections[node.id] = snipConnection;
-      }
     }
   }
 
-  StreamSubscription<DatabaseEvent>? connectToChat(Node node) {
-    String chatID;
-    if (node.isUser) {
-      chatID = ([widget.self.id, node.id]..sort()).join("%");
-    } else if (node.isGroupchat) {
-      chatID = node.id;
-    } else {
-      return null;
-    }
+  void connectToPayment() {
+    var paymentQueue = db.child("Users").child(widget.self.id).child("p");
 
-    var chatRef = db.child("Chats/" + chatID + "/c");
-
-    if (palettes().asIds().contains(node.id)) {
-      String? lastMessage;
-      if (node.messages != null) {
-        if (node.messages!.isNotEmpty) lastMessage = node.messages!.last;
-      } else {
-        node.messages = <Identifier>[];
-      }
-      var chatConnection = chatRef
-          .startAfter(null, key: lastMessage)
-          .onChildAdded
-          .listen((event) async {
-        var value = event.snapshot.value;
-        final msgID = event.snapshot.key;
-        switch (event.type) {
-          case DatabaseEventType.childAdded:
-            if (value != null) {
-              var msg = Map<String, dynamic>.from(value as Map);
-              msg["id"] = msgID;
-              final mediaID = msg["m"]?["id"];
-              if (mediaID != null) {
-                Down4Media? msgMedia = await r.getMessageMedia(mediaID);
-                msg["m"] = msgMedia?.toJson();
-              }
-              var d4msg = Down4Message.fromJson(msg);
-              node.messages!.add(d4msg.messageID!);
-              box.saveMessage(d4msg);
-              if (view is ChatPage && locations.last["id"] == node.id) {
-                chatPage(node);
-              }
-            }
-            break;
-          case DatabaseEventType.childRemoved:
-            // TODO: Handle this case.
-            break;
-          case DatabaseEventType.childChanged:
-            // TODO: Handle this case.
-            break;
-          case DatabaseEventType.childMoved:
-            // TODO: Handle this case.
-            break;
-          case DatabaseEventType.value:
-            // TODO: Handle this case.
-            break;
-        }
-      });
-
-      return chatConnection;
-    }
-    return null;
+    paymentListener = paymentQueue.onChildAdded.listen((event) async {
+      final paymentID = event.snapshot.key;
+      if (paymentID == null) return;
+      paymentQueue.child(paymentID).remove();
+      final paymentData = await st.ref(paymentID).getData();
+      if (paymentData == null) return;
+      final paymentString = String.fromCharCodes(paymentData);
+      final paymentJson = jsonDecode(paymentString);
+      final payment = Down4Payment.fromJson(paymentJson);
+      widget.wallet.parsePayment(widget.self, payment);
+      if (view is MoneyPage) moneyPage();
+    });
   }
 
-  StreamSubscription<DatabaseEvent>? connectToSnip(Node node) {
-    String chatID;
-    if (node.isUser) {
-      chatID = ([widget.self.id, node.id]..sort()).join("%");
-    } else if (node.isGroupchat) {
-      chatID = node.id;
-    } else {
-      return null;
-    }
-    var snipRef = db.child("Chats/" + chatID + "/s");
+  void connectToMessages() {
+    var messageQueue = db.child("Users").child(widget.self.id).child("c");
 
-    if (palettes().asIds().contains(node.id)) {
-      String? lastSnip;
-      if (node.snips != null) {
-        if (node.snips!.isNotEmpty) lastSnip = node.snips!.last;
-      } else {
-        node.snips = <Identifier>[];
-      }
-      var snipConnection = snipRef
-          .startAfter(null, key: lastSnip)
-          .onChildAdded
-          .listen((event) async {
+    // can reuse Down4Message and Messages for snips
+    // we know it's a snip because we are listening on child("s")
+    var messages = db.child("Messages");
 
-        var value = event.snapshot.value;
-        switch (event.type) {
-          case DatabaseEventType.childAdded:
-            if (value != null) {
-              final mediaID = value as Identifier;
-              node
-                ..updateActivity()
-                ..snips!.add(mediaID);
+    messageListener = messageQueue.onChildAdded.listen((event) async {
+      var messageID = event.snapshot.key;
+      if (messageID == null) return;
 
-              if (node.type != Nodes.nonFriend) {
-                final d4m = await getMessageMedia(mediaID);
-                if (d4m != null) box.saveSnip(d4m);
+      final val = (await messages.child(messageID).get()).value;
+      if (val == null) return;
+
+      var asJson = Map<String, dynamic>.from(val as Map);
+      final mediaID = asJson["m"]?["id"];
+      if (mediaID == null) return;
+
+      var d4msg = Down4Message.fromJson(asJson);
+      Down4Media? messageMedia;
+
+      if (d4msg.root != null) {
+        var node = nodeAt(d4msg.root!);
+        if (node != null) {
+          (node.messages ??= []).add(messageID);
+          if (node.isFriendOrGroup) {
+            messageMedia = await getMessageMedia(mediaID);
+            d4msg.media = messageMedia;
+            box.saveMessage(d4msg);
+          }
+          writePalette(node);
+          if (view is HomePage) homePage();
+        } else {
+          node = await getNode(d4msg.root!);
+          if (node != null) {
+            writePalette(node);
+            var mutatedNode = nodeAt(d4msg.root!);
+            if (mutatedNode != null) {
+              (mutatedNode.messages ??= []).add(mediaID);
+              if (mutatedNode.isFriendOrGroup) {
+                messageMedia = await getMessageMedia(mediaID);
+                d4msg.media = messageMedia;
+                box.saveMessage(d4msg);
               }
-
+              writePalette(mutatedNode);
               if (view is HomePage) homePage();
             }
-            break;
-          case DatabaseEventType.childRemoved:
-            if (value != null) {
-              final mediaID = value as Identifier;
-              node.snips!.removeWhere((snipID) => snipID == mediaID);
-            }
-            break;
-          case DatabaseEventType.childChanged:
-            break;
-          case DatabaseEventType.childMoved:
-            break;
-          case DatabaseEventType.value:
-            break;
-        }
-      });
-
-      return snipConnection;
-    }
-    return null;
-  }
-
-  void connectToSelf() {
-    var self = fs.collection("Nodes").doc(widget.self.id);
-
-    var payments = self.collection("Payments");
-    paymentListener = payments.snapshots().listen((event) {
-      for (var change in event.docChanges) {
-        switch (change.type) {
-          case DocumentChangeType.added:
-            final docData = change.doc.data();
-            if (docData != null) {
-              final payment = Down4Payment.fromJson(docData);
-              widget.wallet.parsePayment(widget.self, payment);
-              payments.doc(change.doc.id).delete();
-            }
-            break;
-          case DocumentChangeType.modified:
-            break;
-          case DocumentChangeType.removed:
-            break;
+          }
         }
       }
     });
+  }
 
-    var nodes = self.collection("Nodes");
-    nodeListener = nodes.snapshots().listen((event) {
-      for (var change in event.docChanges) {
-        final docData = change.doc.data();
-        switch (change.type) {
-          case DocumentChangeType.added:
-            if (docData != null) {
-              var node = Node.fromJson(docData);
-              var connection = connectToChat(node);
-              if (connection != null) chatConnections[node.id] = connection;
-              writePalette(node);
-              box.saveNode(node);
+  void connectToSnips() {
+    var snips = db.child("Users").child(widget.self.id).child("s");
+
+    // can reuse Down4Message and Messages for snips
+    // we know it's a snip because we are listening on child("s")
+    var messages = db.child("Messages");
+
+    snipListener = snips.onChildAdded.listen((event) async {
+      var snipID = event.snapshot.key;
+      if (snipID == null) return;
+
+      final val = (await messages.child(snipID).get()).value;
+      if (val == null) return;
+
+      var asJson = Map<String, dynamic>.from(val as Map);
+      final mediaID = asJson["m"]?["id"];
+      if (mediaID == null) return;
+
+      var d4msg = Down4Message.fromJson(asJson);
+      Down4Media? snipMedia;
+
+      if (d4msg.root != null) {
+        var node = nodeAt(d4msg.root!);
+        if (node != null) {
+          (node.snips ??= []).add(mediaID);
+          if (node.isFriendOrGroup) {
+            snipMedia = await getMessageMedia(mediaID);
+            if (snipMedia != null) box.saveSnip(snipMedia);
+          }
+          writePalette(node);
+          if (view is HomePage) homePage();
+        } else {
+          node = await getNode(d4msg.root!);
+          if (node != null) {
+            writePalette(node);
+            var mutatedNode = nodeAt(d4msg.root!);
+            if (mutatedNode != null) {
+              (mutatedNode.snips ??= []).add(mediaID);
+              if (mutatedNode.isFriendOrGroup) {
+                snipMedia = await getMessageMedia(mediaID);
+                if (snipMedia != null) box.saveSnip(snipMedia);
+              }
+              writePalette(mutatedNode);
               if (view is HomePage) homePage();
             }
-            break;
-          case DocumentChangeType.modified:
-            break;
-          case DocumentChangeType.removed:
-            final nodeID = docData?["id"];
-            if (nodeID != null) {
-              paletteMap["Home"]?.remove(nodeID);
-              box.deleteNode(nodeID);
-              chatConnections[nodeID]?.cancel();
-              if (view is HomePage) homePage();
-            }
-            break;
+          }
         }
       }
     });
@@ -1939,7 +1871,7 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Palette? nodeToPalette(String at, Node node) {
+  Palette? nodeToPalette(Node node, [String at = "Home"]) {
     switch (node.type) {
       case Nodes.user:
         final friendIDs = palettes()
@@ -1947,8 +1879,8 @@ class _HomeState extends State<Home> {
             .map((e) => e.node.id)
             .toList();
         return friendIDs.contains(node.id)
-            ? nodeToPalette(at, node.mutatedType(Nodes.friend))
-            : nodeToPalette(at, node.mutatedType(Nodes.nonFriend));
+            ? nodeToPalette(node..mutateType(Nodes.friend), at)
+            : nodeToPalette(node..mutateType(Nodes.nonFriend), at);
 
       case Nodes.root:
         return Palette(
@@ -2133,10 +2065,13 @@ class _HomeState extends State<Home> {
           .invertedSelection()
         ..node.mutateType(Nodes.friend);
 
+      writePalette(friend
+        ..mutateType(Nodes.friend)
+        ..updateActivity());
+
       paletteMap["Home"]!.putIfAbsent(
         friend.id,
         () => nodeToPalette(
-          "Home",
           friend
             ..mutateType(Nodes.friend)
             ..updateActivity(),
@@ -2174,22 +2109,21 @@ class _HomeState extends State<Home> {
   }
 
   void putNodeOffLine(Node node) {
-    final p = nodeToPalette("Search", node);
+    final p = nodeToPalette(node, "Search");
     if (p != null) {
       paletteMap["Search"]?.putIfAbsent(node.id, () => p);
       searchPage();
     }
   }
 
-  Future<void> chatRequest(Node node, Down4Message msg) async {
-
-  }
+  Future<void> chatRequest(Node node, Down4Message msg) async {}
 
   void back([bool remove = true]) {
     if (remove) locations.removeLast();
     if (locations.last["at"] == "Home" && locations.last["type"] == null) {
       homePage();
-    } else if (locations.last["at"] == "Search" && locations.last["type"] == null) {
+    } else if (locations.last["at"] == "Search" &&
+        locations.last["type"] == null) {
       searchPage();
     } else if (locations.last["type"] == "Node") {
       nodePage(nodeAt(locations.last["id"]!, locations.last["at"]!)!);
@@ -2226,7 +2160,8 @@ class _HomeState extends State<Home> {
       final childNodes = await r.getNodes(node.childs ?? []);
       if (childNodes != null) {
         for (final node in childNodes) {
-          paletteMap[id]!.putIfAbsent(node.id, () => nodeToPalette(id, node)!);
+          var p = nodeToPalette(node, id);
+          if (p != null) paletteMap[id]!.putIfAbsent(node.id, () => p);
         }
       }
     }
@@ -2259,7 +2194,7 @@ class _HomeState extends State<Home> {
 
   // ======================================================== COMPLEXITY REDUCING GETTERS ? =============================================== //
 
-  Palette? paletteAt(String id, [String at = "Home"]) {
+  Palette? palette(String id, [String at = "Home"]) {
     return paletteMap[at]?[id];
   }
 
@@ -2269,7 +2204,7 @@ class _HomeState extends State<Home> {
 
   void writePalette(Node node, [String at = "Home"]) {
     if (paletteMap[at] == null) paletteMap[at] = {};
-    final p = nodeToPalette(at, node);
+    final p = nodeToPalette(node, at);
     if (p != null) paletteMap[at]?[node.id] = p;
   }
 
@@ -2318,8 +2253,8 @@ class _HomeState extends State<Home> {
 
     var palettes = <Palette>[];
     for (final id in idsInSelGroups) {
-      if (paletteAt(id) != null) {
-        palettes.add(paletteAt(id)!.deactivated());
+      if (palette(id) != null) {
+        palettes.add(palette(id)!.deactivated());
       }
     }
 
@@ -2355,7 +2290,7 @@ class _HomeState extends State<Home> {
 
   List<Identifier> get groupRoots {
     return palettes()
-        .where((e) => e.node.isGroupchat)
+        .where((e) => e.node.isGroup)
         .map((e) => e.node.id)
         .toList();
   }
@@ -2409,12 +2344,12 @@ class _HomeState extends State<Home> {
 
   void forwardPage() {
     var userAndGroups =
-        palettes().where((p) => p.node.isGroupchat || p.node.isUser);
+        palettes().where((p) => p.node.isGroup || p.node.isUser);
 
     if (userAndGroups.length != paletteMap["Forward"]!.length) {
       for (final p in formattedHomePalettes) {
         if (!paletteMap["Forward"]!.containsKey(p.node.id) &&
-            (p.node.isUser || p.node.isGroupchat)) {
+            (p.node.isUser || p.node.isGroup)) {
           writePalette(p.node, "Forward");
         }
       }
@@ -2454,9 +2389,8 @@ class _HomeState extends State<Home> {
       isHyperchat: true,
       self: widget.self,
       afterMessageCallback: (node) {
+        // TODO
         writePalette(node);
-        var connection = connectToChat(node);
-        if (connection != null) chatConnections[node.id] = connection;
         locations.add({"at": "Home", "id": node.id, "type": "Chat"});
         chatPage(node);
       },
@@ -2544,7 +2478,7 @@ class _HomeState extends State<Home> {
 
   void chatPage(Node node) async {
     var senders = <String, Node>{};
-    if (node.isGroupchat) {
+    if (node.isGroup) {
       var toFetch = <String>[];
       Node? homeNode;
       for (final nodeID in node.group ?? <String>[]) {

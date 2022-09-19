@@ -1,24 +1,9 @@
-
-class Jeff {
-  List<String>? caca;
-  Jeff([this.caca]);
-}
-
+import 'package:english_words/english_words.dart' as w;
 
 void main() {
+  final wp = w.WordPair.random();
 
-  var jeff = Jeff();
-
-  var caca = jeff.caca;
-
-  print(caca);
-  print(jeff.caca);
-
-  caca = <String>["what", "are", "you", "talking", "about"];
-
-  print(caca);
-  print(jeff.caca);
-
+  print("${wp.first} ${wp.second}");
 
   return;
 }
