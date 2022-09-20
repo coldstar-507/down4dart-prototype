@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:convert/convert.dart';
 import 'data_objects.dart';
 import 'package:pointycastle/digests/sha256.dart' as s256;
@@ -20,7 +22,10 @@ final DOWN4_NEUTER = BIP32.fromBase58(
   "xpub6DTufsTvxdAJaPhAMcowwgNWghwUXw8fexqjY5rEdBdBiVAJiKCY7SQzVwBb7JXgMLFcoNqAxwJZUEEVnGFjj8ngbu2HGwTDBhPfVvHcGYs",
 );
 
-List<int> _p2pkh(List<int> address) => [0x76, 0xa9, ...address, 0x88, 0xac];
+List<int> _d4out(List<int> address, int walletIndex) {
+  var wIdxBuf = Uint8List(4)..buffer.asByteData().setUint32(0, walletIndex);
+  return [0x76, 0xa9, ...address, 0x88, 0xac, 0x64, 0x4c, 0x04, ...wIdxBuf];
+}
 
 Uint8List sha256(Uint8List data) => s256.SHA256Digest().process(data);
 
@@ -35,8 +40,14 @@ Uint8List _makeAddress(Uint8List pubKey) {
   return [...extended, ...checkSum].asUint8List();
 }
 
-int _deterministicWalletIndex() =>
-    (DateTime.now().millisecondsSinceEpoch / 86400000).floor();
+int _randomWalletIndex() {
+  final maxUint32 = int.parse("FFFFFFFF", radix: 16);
+  return Random().nextInt(maxUint32);
+}
+
+int _deterministicWalletIndex() {
+  return (DateTime.now().millisecondsSinceEpoch / 86400000).floor();
+}
 
 class Down4InternetPayment {
   List<String> targets;
@@ -162,7 +173,7 @@ class Wallet {
         walletIndex: wIdx,
         outIndex: i,
         sats: satsPerTarget,
-        scriptPubKey: _p2pkh(address),
+        scriptPubKey: _d4out(address, wIdx),
       ));
     }
     return outs;
@@ -212,7 +223,7 @@ class Wallet {
       final changeAddress = _makeAddress(changePubKey);
       outs.add(Down4TXOUT(
         sats: changeAmount,
-        scriptPubKey: _p2pkh(changeAddress),
+        scriptPubKey: _d4out(changeAddress, walletIndex),
         walletIndex: walletIndex,
         receiver: self.id,
         outIndex: outs.length,
@@ -224,7 +235,7 @@ class Wallet {
     final relayChangeAddress = _makeAddress(relayPubKey);
     outs.add(Down4TXOUT(
       sats: down4Fees,
-      scriptPubKey: _p2pkh(relayChangeAddress),
+      scriptPubKey: _d4out(relayChangeAddress, walletIndex),
       walletIndex: walletIndex,
       outIndex: outs.length,
     ));
@@ -334,7 +345,7 @@ class Wallet {
     var changeOut = Down4TXOUT(
       receiver: self.id,
       sats: changeAmount,
-      scriptPubKey: _p2pkh(changeAddr),
+      scriptPubKey: _d4out(changeAddr, wIdx),
       walletIndex: wIdx,
       outIndex: 0,
     );
@@ -344,7 +355,7 @@ class Wallet {
     final down4feeAddr = _makeAddress(DOWN4_NEUTER.derive(wIdx).publicKey);
     var taxOut = Down4TXOUT(
       sats: firstTxDown4Fees,
-      scriptPubKey: _p2pkh(down4feeAddr),
+      scriptPubKey: _d4out(down4feeAddr, wIdx),
       walletIndex: wIdx,
       outIndex: 1,
     );
@@ -355,7 +366,7 @@ class Wallet {
     var desiredOut = Down4TXOUT(
       receiver: self.id,
       sats: desiredUtxoAmount,
-      scriptPubKey: _p2pkh(changeAddr),
+      scriptPubKey: _d4out(changeAddr, wIdx),
       walletIndex: wIdx,
       outIndex: 2,
     );
@@ -391,7 +402,7 @@ class Wallet {
 
     var lastTaxOut = Down4TXOUT(
       sats: lastTxDown4Fees,
-      scriptPubKey: _p2pkh(down4feeAddr),
+      scriptPubKey: _d4out(down4feeAddr, wIdx),
       walletIndex: wIdx,
       outIndex: 0,
     );
@@ -783,19 +794,24 @@ class BatchResponse {
 }
 
 void main() async {
-  var wif = "L5ki3jzwFDiz8MjExqAFnEa4cvv3BHwJdCe84QLpcDnMaMzkLcuM";
 
-  var pair = ec.ECPair.fromWIF(wif);
-
-  var addr = _makeAddress(pair.publicKey);
-  var b58Addr = b58.Base58Encode(addr);
-
-  String utxoHttps(String address, [String network = "main"]) =>
-      "https://api.whatsonchain.com/v1/bsv/$network/address/$address/unspent";
-
-  var uri = Uri.parse(utxoHttps(b58Addr));
-
-  http.get(uri).then((value) => print(jsonDecode(value.body)));
+  // var bip = BIP32.fromSeed([0x00].asUint8List());
+  //
+  // bip.derive(2);
+  //
+  // var wif = "L5ki3jzwFDiz8MjExqAFnEa4cvv3BHwJdCe84QLpcDnMaMzkLcuM";
+  //
+  // var pair = ec.ECPair.fromWIF(wif);
+  //
+  // var addr = _makeAddress(pair.publicKey);
+  // var b58Addr = b58.Base58Encode(addr);
+  //
+  // String utxoHttps(String address, [String network = "main"]) =>
+  //     "https://api.whatsonchain.com/v1/bsv/$network/address/$address/unspent";
+  //
+  // var uri = Uri.parse(utxoHttps(b58Addr));
+  //
+  // http.get(uri).then((value) => print(jsonDecode(value.body)));
 
   // final target = BIP32.fromBase58(
   //   "xpub6C6sG3rf3ssoCsxDU9VnPGfuRwfKd8b5PeJNjDawxp6uCqjKYZo6qKzun5VARDGxZgqvXQdQW6L9B18ekzAZaScL6stdL2p48wvJwxYigzh",
