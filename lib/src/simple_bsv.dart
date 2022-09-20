@@ -7,7 +7,12 @@ import 'package:pointycastle/digests/ripemd160.dart' as r160;
 import 'package:bip32/bip32.dart';
 import 'down4_utility.dart';
 import 'web_requests.dart' as r;
-import 'package:bip39/bip39.dart' as bip39;
+import 'package:http/http.dart' as http;
+// import 'package:bip39/bip39.dart' as bip39;
+import 'package:fast_base58/fast_base58.dart' as b58;
+// import 'package:elliptic/elliptic.dart' as ell;
+// import 'package:ecdsa/ecdsa.dart' as ecdsa;
+import 'package:dart_ecpair/dart_ecpair.dart' as ec;
 // import 'dart:io' as io;
 
 const SATS_PER_BYTE = 0.05;
@@ -23,7 +28,12 @@ Uint8List sha256sha256(Uint8List data) => sha256(sha256(data));
 
 Uint8List ripemd160(Uint8List data) => r160.RIPEMD160Digest().process(data);
 
-Uint8List _makeAddress(Uint8List pubKey) => ripemd160(sha256(pubKey));
+Uint8List _makeAddress(Uint8List pubKey) {
+  var hash = ripemd160(sha256(pubKey));
+  var extended = [0x00, ...hash].asUint8List();
+  var checkSum = sha256sha256(extended).sublist(0, 4);
+  return [...extended, ...checkSum].asUint8List();
+}
 
 int _deterministicWalletIndex() =>
     (DateTime.now().millisecondsSinceEpoch / 86400000).floor();
@@ -104,6 +114,8 @@ class Wallet {
           .toList(),
     );
   }
+
+  void importMoneyFromPrivateKey(String privateKey) {}
 
   Map<String, dynamic> toJson() => {
         "m": mnemonic,
@@ -771,61 +783,75 @@ class BatchResponse {
 }
 
 void main() async {
-  final target = BIP32.fromBase58(
-    "xpub6C6sG3rf3ssoCsxDU9VnPGfuRwfKd8b5PeJNjDawxp6uCqjKYZo6qKzun5VARDGxZgqvXQdQW6L9B18ekzAZaScL6stdL2p48wvJwxYigzh",
-  );
+  var wif = "L5ki3jzwFDiz8MjExqAFnEa4cvv3BHwJdCe84QLpcDnMaMzkLcuM";
 
-  final pub = target.publicKey;
+  var pair = ec.ECPair.fromWIF(wif);
 
-  final tx = Down4TX(
-    txsIn: [
-      Down4TXIN(
-        spentFrom: TXID.fromHex(
-          "c0f7d62657b468203444cd708c3f5bcd1462dc8c422590782791a069680d871d",
-        ),
-        outIndex: 0,
-      ),
-    ],
-    txsOut: [
-      Down4TXOUT(
-        sats: Sats(350000),
-        outIndex: 0,
-        scriptPubKey: _p2pkh(_makeAddress(pub)),
-        receiver: "bob",
-      )
-    ],
-  );
+  var addr = _makeAddress(pair.publicKey);
+  var b58Addr = b58.Base58Encode(addr);
 
-  final txdata = tx.sigAllRawData.asUint8List();
-  final seed = bip39.mnemonicToSeed(
-    "pledge fury alcohol lunar trust album arrest fabric result hand husband dove",
-  );
-  final bip = BIP32.fromSeed(seed);
-  final derived = bip.derivePath('m/0/0');
-  for (var txin in tx.txsIn) {
-    final Uint8List sig = derived.sign(txdata);
-    final r = sig.sublist(0, 32);
-    final s = sig.sublist(32, 64);
-    const len = 1 + 1 + 32 + 1 + 1 + 32;
-    final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
-    final unlockScript = [...der, 0x41, ...derived.publicKey];
+  String utxoHttps(String address, [String network = "main"]) =>
+      "https://api.whatsonchain.com/v1/bsv/$network/address/$address/unspent";
 
-    txin.script = unlockScript;
-  }
-  final txid = tx.txid();
-  for (var txout in tx.txsOut) {
-    txout.txid = txid;
-  }
+  var uri = Uri.parse(utxoHttps(b58Addr));
 
-  final pay = Down4Payment([tx], true);
-  final internetPayment = Down4InternetPayment(["bob"], "myself", pay);
+  http.get(uri).then((value) => print(jsonDecode(value.body)));
 
-  final success = await r.sendInternetPayment(internetPayment);
-  if (success) {
-    print("Should receive payment on your phone baby!");
-  } else {
-    print("It was not a success, you will not receive any payment bro...");
-  }
+  // final target = BIP32.fromBase58(
+  //   "xpub6C6sG3rf3ssoCsxDU9VnPGfuRwfKd8b5PeJNjDawxp6uCqjKYZo6qKzun5VARDGxZgqvXQdQW6L9B18ekzAZaScL6stdL2p48wvJwxYigzh",
+  // );
+  //
+  // final pub = target.publicKey;
+  //
+  // final tx = Down4TX(
+  //   txsIn: [
+  //     Down4TXIN(
+  //       spentFrom: TXID.fromHex(
+  //         "c0f7d62657b468203444cd708c3f5bcd1462dc8c422590782791a069680d871d",
+  //       ),
+  //       outIndex: 0,
+  //     ),
+  //   ],
+  //   txsOut: [
+  //     Down4TXOUT(
+  //       sats: Sats(350000),
+  //       outIndex: 0,
+  //       scriptPubKey: _p2pkh(_makeAddress(pub)),
+  //       receiver: "bob",
+  //     )
+  //   ],
+  // );
+  //
+  // final txdata = tx.sigAllRawData.asUint8List();
+  // final seed = bip39.mnemonicToSeed(
+  //   "pledge fury alcohol lunar trust album arrest fabric result hand husband dove",
+  // );
+  // final bip = BIP32.fromSeed(seed);
+  // final derived = bip.derivePath('m/0/0');
+  // for (var txin in tx.txsIn) {
+  //   final Uint8List sig = derived.sign(txdata);
+  //   final r = sig.sublist(0, 32);
+  //   final s = sig.sublist(32, 64);
+  //   const len = 1 + 1 + 32 + 1 + 1 + 32;
+  //   final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
+  //   final unlockScript = [...der, 0x41, ...derived.publicKey];
+  //
+  //   txin.script = unlockScript;
+  // }
+  // final txid = tx.txid();
+  // for (var txout in tx.txsOut) {
+  //   txout.txid = txid;
+  // }
+  //
+  // final pay = Down4Payment([tx], true);
+  // final internetPayment = Down4InternetPayment(["bob"], "myself", pay);
+  //
+  // final success = await r.sendInternetPayment(internetPayment);
+  // if (success) {
+  //   print("Should receive payment on your phone baby!");
+  // } else {
+  //   print("It was not a success, you will not receive any payment bro...");
+  // }
 
   // Down4Payment([tx], true);
 }
