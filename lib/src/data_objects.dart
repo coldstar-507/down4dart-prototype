@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:bip32/bip32.dart';
-import 'web_requests.dart' as r;
 import 'down4_utility.dart' as d4utils;
 
 typedef Identifier = String;

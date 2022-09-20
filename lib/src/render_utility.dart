@@ -1,4 +1,13 @@
 import 'package:flutter/material.dart';
+import 'render_objects.dart';
+import 'data_objects.dart';
+
+
+extension PaletteExtensions on List<Palette> {
+  List<Node> asNodes() => map((e) => e.node).toList(growable: false);
+  List<Palette> selected() => where((p) => p.selected).toList(growable: false);
+  List<Identifier> asIds() => map((e) => e.node.id).toList(growable: false);
+}
 
 class NoGlow extends ScrollBehavior {
   @override

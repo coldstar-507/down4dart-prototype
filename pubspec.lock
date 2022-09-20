@@ -14,7 +14,7 @@ packages:
       name: async
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.8.2"
+    version: "2.9.0"
   bip32:
     dependency: "direct main"
     description:
@@ -84,21 +84,14 @@ packages:
       name: characters
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.2.0"
-  charcode:
-    dependency: transitive
-    description:
-      name: charcode
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "1.3.1"
+    version: "1.2.1"
   clock:
     dependency: transitive
     description:
       name: clock
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.1.0"
+    version: "1.1.1"
   cloud_firestore:
     dependency: "direct main"
     description:
@@ -162,6 +155,48 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.5"
+  dart_base_x:
+    dependency: transitive
+    description:
+      name: dart_base_x
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.0"
+  dart_bip32:
+    dependency: transitive
+    description:
+      name: dart_bip32
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.0.5"
+  dart_bs58:
+    dependency: transitive
+    description:
+      name: dart_bs58
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.1"
+  dart_bs58check:
+    dependency: transitive
+    description:
+      name: dart_bs58check
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "3.0.2"
+  dart_ecpair:
+    dependency: "direct main"
+    description:
+      name: dart_ecpair
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.2"
+  dart_wif:
+    dependency: transitive
+    description:
+      name: dart_wif
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.1.1"
   dbus:
     dependency: transitive
     description:
@@ -169,6 +204,20 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "0.7.4"
+  ecdsa:
+    dependency: "direct main"
+    description:
+      name: ecdsa
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.0.4"
+  elliptic:
+    dependency: "direct main"
+    description:
+      name: elliptic
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.3.8"
   english_words:
     dependency: "direct main"
     description:
@@ -182,7 +231,14 @@ packages:
       name: fake_async
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.3.0"
+    version: "1.3.1"
+  fast_base58:
+    dependency: "direct main"
+    description:
+      name: fast_base58
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.2.1"
   ffi:
     dependency: transitive
     description:
@@ -400,25 +456,32 @@ packages:
       name: matcher
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.12.11"
+    version: "0.12.12"
   material_color_utilities:
     dependency: transitive
     description:
       name: material_color_utilities
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.1.4"
+    version: "0.1.5"
   meta:
     dependency: transitive
     description:
       name: meta
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.7.0"
+    version: "1.8.0"
   mobile_scanner:
     dependency: "direct main"
     description:
       name: mobile_scanner
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "2.0.0"
+  ninja_asn1:
+    dependency: transitive
+    description:
+      name: ninja_asn1
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.0.0"
@@ -428,7 +491,7 @@ packages:
       name: path
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.8.1"
+    version: "1.8.2"
   path_provider:
     dependency: "direct main"
     description:
@@ -545,7 +608,7 @@ packages:
       name: source_span
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.8.2"
+    version: "1.9.0"
   stack_trace:
     dependency: transitive
     description:
@@ -573,21 +636,21 @@ packages:
       name: string_scanner
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.1.0"
+    version: "1.1.1"
   term_glyph:
     dependency: transitive
     description:
       name: term_glyph
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "1.2.0"
+    version: "1.2.1"
   test_api:
     dependency: transitive
     description:
       name: test_api
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "0.4.9"
+    version: "0.4.12"
   timezone:
     dependency: transitive
     description:
