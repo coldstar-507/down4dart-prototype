@@ -22,11 +22,6 @@ final DOWN4_NEUTER = BIP32.fromBase58(
   "xpub6DTufsTvxdAJaPhAMcowwgNWghwUXw8fexqjY5rEdBdBiVAJiKCY7SQzVwBb7JXgMLFcoNqAxwJZUEEVnGFjj8ngbu2HGwTDBhPfVvHcGYs",
 );
 
-List<int> _d4out(List<int> address, int walletIndex) {
-  var wIdxBuf = Uint8List(4)..buffer.asByteData().setUint32(0, walletIndex);
-  return [..._p2pkh(address), 0x6a, 0x4c, 0x04, ...wIdxBuf];
-}
-
 Future<List<Down4TXOUT>?> getUtxos(String address) async {
   final url = Uri.parse(
     "https://api.whatsonchain.com/v1/bsv/main/address/$address/unspent",
@@ -50,6 +45,11 @@ Future<List<Down4TXOUT>?> getUtxos(String address) async {
   return d4utxos;
 }
 
+List<int> _d4out(List<int> address, int walletIndex) {
+  var wIdxBuf = Uint8List(4)..buffer.asByteData().setUint32(0, walletIndex);
+  return [..._p2pkh(address), 0x6a, 0x4c, 0x04, ...wIdxBuf];
+}
+
 List<int> _p2pkh(List<int> address) => [0x76, 0xa9, ...address, 0x88, 0xac];
 
 Uint8List sha256(Uint8List data) => s256.SHA256Digest().process(data);
@@ -70,7 +70,12 @@ int _randomWalletIndex() {
   return Random().nextInt(maxUint32);
 }
 
+// need deterministicWalletIndex to be able to crawl back transactions and
+// utxos on a recovery, the only problem is that it is based on the mobile
+// clock. Most mobiles will be fine, some clock might be off, so might need to
+// add a mechanism and save mobile start time on user creation
 int _deterministicWalletIndex() {
+  // The divisor is the time required to be sending to different addresses
   // const oneDayInMilliseconds = 86400000;
   const fourHoursInMilliseconds = 14400000;
   final number = timeStamp() / fourHoursInMilliseconds;
