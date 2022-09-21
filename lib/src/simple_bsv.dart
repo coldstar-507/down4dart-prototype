@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:typed_data';
 import 'dart:math';
 import 'package:convert/convert.dart';
@@ -18,14 +17,40 @@ import 'package:dart_ecpair/dart_ecpair.dart' as ec;
 // import 'dart:io' as io;
 
 const SATS_PER_BYTE = 0.05;
+
 final DOWN4_NEUTER = BIP32.fromBase58(
   "xpub6DTufsTvxdAJaPhAMcowwgNWghwUXw8fexqjY5rEdBdBiVAJiKCY7SQzVwBb7JXgMLFcoNqAxwJZUEEVnGFjj8ngbu2HGwTDBhPfVvHcGYs",
 );
 
 List<int> _d4out(List<int> address, int walletIndex) {
   var wIdxBuf = Uint8List(4)..buffer.asByteData().setUint32(0, walletIndex);
-  return [0x76, 0xa9, ...address, 0x88, 0xac, 0x64, 0x4c, 0x04, ...wIdxBuf];
+  return [..._p2pkh(address), 0x6a, 0x4c, 0x04, ...wIdxBuf];
 }
+
+Future<List<Down4TXOUT>?> getUtxos(String address) async {
+  final url = Uri.parse(
+    "https://api.whatsonchain.com/v1/bsv/main/address/$address/unspent",
+  );
+
+  final res = await http.get(url);
+
+  if (res.statusCode != 200) return null;
+
+  final utxos = List<dynamic>.from(jsonDecode(res.body));
+
+  var d4utxos = <Down4TXOUT>[];
+  for (final utxo in utxos) {
+    var d4txout = Down4TXOUT(
+      txid: TXID.fromHex(utxo["tx_hash"]),
+      sats: Sats(utxo["value"]),
+      outIndex: utxo["tx_pos"],
+    );
+    d4utxos.add(d4txout);
+  }
+  return d4utxos;
+}
+
+List<int> _p2pkh(List<int> address) => [0x76, 0xa9, ...address, 0x88, 0xac];
 
 Uint8List sha256(Uint8List data) => s256.SHA256Digest().process(data);
 
@@ -34,9 +59,9 @@ Uint8List sha256sha256(Uint8List data) => sha256(sha256(data));
 Uint8List ripemd160(Uint8List data) => r160.RIPEMD160Digest().process(data);
 
 Uint8List _makeAddress(Uint8List pubKey) {
-  var hash = ripemd160(sha256(pubKey));
-  var extended = [0x00, ...hash].asUint8List();
-  var checkSum = sha256sha256(extended).sublist(0, 4);
+  final hash = ripemd160(sha256(pubKey));
+  final extended = [0x00, ...hash].asUint8List();
+  final checkSum = sha256sha256(extended).sublist(0, 4);
   return [...extended, ...checkSum].asUint8List();
 }
 
@@ -46,7 +71,10 @@ int _randomWalletIndex() {
 }
 
 int _deterministicWalletIndex() {
-  return (DateTime.now().millisecondsSinceEpoch / 86400000).floor();
+  // const oneDayInMilliseconds = 86400000;
+  const fourHoursInMilliseconds = 14400000;
+  final number = timeStamp() / fourHoursInMilliseconds;
+  return number.ceil();
 }
 
 class Down4InternetPayment {
@@ -126,7 +154,63 @@ class Wallet {
     );
   }
 
-  void importMoneyFromPrivateKey(String privateKey) {}
+  Future<Down4Payment?> importFromWif(String wif, Node self) async {
+    var pair = ec.ECPair.fromWIF(wif);
+
+    final wIdx = _deterministicWalletIndex();
+    final down4Address = _makeAddress(DOWN4_NEUTER.derive(wIdx).publicKey);
+    final myAddress = _makeAddress(self.neuter!.derive(wIdx).publicKey);
+
+    final importAddress = _makeAddress(pair.publicKey).toBase58();
+
+    var utxos = await getUtxos(importAddress);
+    if (utxos == null) return null;
+
+    final inSats = utxos.fold<Sats>(Sats(0), (s, u) => s + u.sats);
+    final inLen = utxos.length;
+    final txSize = 4 + 4 + 9 + 9 + (148 * inLen) + (34 * 2);
+    final minerFees = (txSize * SATS_PER_BYTE).ceil();
+    final down4Fees = (minerFees / 2).ceil();
+    final totalFees = down4Fees + minerFees;
+
+    final myGets = inSats - Sats(totalFees);
+
+    var txsIn = <Down4TXIN>[];
+    for (final utxo in utxos) {
+      txsIn.add(Down4TXIN.fromP2PKH(utxo));
+    }
+
+    var txsOut = <Down4TXOUT>[
+      Down4TXOUT(
+        sats: Sats(down4Fees),
+        scriptPubKey: _p2pkh(down4Address),
+        outIndex: 0,
+      ),
+      Down4TXOUT(
+        receiver: self.id,
+        sats: myGets,
+        scriptPubKey: _p2pkh(myAddress),
+        outIndex: 1,
+      ),
+    ];
+
+    var tx = Down4TX(txsIn: txsIn, txsOut: txsOut);
+    final txid = tx.txid();
+    final txdata = tx.sigAllRawData;
+
+    for (var txin in tx.txsIn) {
+      final Uint8List sig = pair.sign(txdata.asUint8List());
+      final r = sig.sublist(0, 32);
+      final s = sig.sublist(32, 64);
+      const len = 1 + 1 + 32 + 1 + 1 + 32;
+      final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
+      final unlockScript = [...der, 0x41, ...pair.publicKey];
+
+      txin.script = unlockScript;
+    }
+
+    return Down4Payment([tx], true);
+  }
 
   Map<String, dynamic> toJson() => {
         "m": mnemonic,
@@ -207,7 +291,7 @@ class Wallet {
   }
 
   Down4Payment? payUsers(List<Node> targets, Node self, Sats amount) {
-    final walletIndex = _deterministicWalletIndex();
+    final walletIndex = _randomWalletIndex();
     var outs = _reqOuts(targets, self, amount, walletIndex);
     var inInfo = _unsignedIns(self, amount, targets.length + 2);
     if (inInfo == null) return null;
@@ -291,7 +375,7 @@ class Wallet {
     Down4TX firstTx;
     var firstTxsIn = <Down4TXIN>[];
     var firstTxsOut = <Down4TXOUT>[];
-    final wIdx = _deterministicWalletIndex();
+    final wIdx = _randomWalletIndex();
     // we want our utxo to be amount + minerfees + down4fees
     // our final tx should be exactly 1 input and 2 outputs of p2pkh script
     const lastTxSize = 4 + 1 + 148 + 1 + 34 + 34 + 4;
@@ -506,7 +590,7 @@ class TXID {
   int get hashCode => BigInt.parse(asHexBigEndian, radix: 16).hashCode;
 
   @override
-  bool operator ==(other) => other is TXID && other.data == data;
+  bool operator ==(other) => other is TXID && listEqual(other.data, data);
 }
 
 class Sats {
@@ -794,80 +878,47 @@ class BatchResponse {
 }
 
 void main() async {
+  Future<List<Down4TXOUT>?> getUtxos(
+    String b58Address, [
+    String network = "main",
+  ]) async {
+    final url = Uri.parse(
+      "https://api.whatsonchain.com/v1/bsv/$network/address/$b58Address/unspent",
+    );
 
-  // var bip = BIP32.fromSeed([0x00].asUint8List());
-  //
-  // bip.derive(2);
-  //
-  // var wif = "L5ki3jzwFDiz8MjExqAFnEa4cvv3BHwJdCe84QLpcDnMaMzkLcuM";
-  //
-  // var pair = ec.ECPair.fromWIF(wif);
-  //
-  // var addr = _makeAddress(pair.publicKey);
-  // var b58Addr = b58.Base58Encode(addr);
-  //
-  // String utxoHttps(String address, [String network = "main"]) =>
-  //     "https://api.whatsonchain.com/v1/bsv/$network/address/$address/unspent";
-  //
-  // var uri = Uri.parse(utxoHttps(b58Addr));
-  //
-  // http.get(uri).then((value) => print(jsonDecode(value.body)));
+    final res = await http.get(url);
 
-  // final target = BIP32.fromBase58(
-  //   "xpub6C6sG3rf3ssoCsxDU9VnPGfuRwfKd8b5PeJNjDawxp6uCqjKYZo6qKzun5VARDGxZgqvXQdQW6L9B18ekzAZaScL6stdL2p48wvJwxYigzh",
-  // );
-  //
-  // final pub = target.publicKey;
-  //
-  // final tx = Down4TX(
-  //   txsIn: [
-  //     Down4TXIN(
-  //       spentFrom: TXID.fromHex(
-  //         "c0f7d62657b468203444cd708c3f5bcd1462dc8c422590782791a069680d871d",
-  //       ),
-  //       outIndex: 0,
-  //     ),
-  //   ],
-  //   txsOut: [
-  //     Down4TXOUT(
-  //       sats: Sats(350000),
-  //       outIndex: 0,
-  //       scriptPubKey: _p2pkh(_makeAddress(pub)),
-  //       receiver: "bob",
-  //     )
-  //   ],
-  // );
-  //
-  // final txdata = tx.sigAllRawData.asUint8List();
-  // final seed = bip39.mnemonicToSeed(
-  //   "pledge fury alcohol lunar trust album arrest fabric result hand husband dove",
-  // );
-  // final bip = BIP32.fromSeed(seed);
-  // final derived = bip.derivePath('m/0/0');
-  // for (var txin in tx.txsIn) {
-  //   final Uint8List sig = derived.sign(txdata);
-  //   final r = sig.sublist(0, 32);
-  //   final s = sig.sublist(32, 64);
-  //   const len = 1 + 1 + 32 + 1 + 1 + 32;
-  //   final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
-  //   final unlockScript = [...der, 0x41, ...derived.publicKey];
-  //
-  //   txin.script = unlockScript;
-  // }
-  // final txid = tx.txid();
-  // for (var txout in tx.txsOut) {
-  //   txout.txid = txid;
-  // }
-  //
-  // final pay = Down4Payment([tx], true);
-  // final internetPayment = Down4InternetPayment(["bob"], "myself", pay);
-  //
-  // final success = await r.sendInternetPayment(internetPayment);
-  // if (success) {
-  //   print("Should receive payment on your phone baby!");
-  // } else {
-  //   print("It was not a success, you will not receive any payment bro...");
-  // }
+    if (res.statusCode != 200) return null;
 
-  // Down4Payment([tx], true);
+    final utxos = List<dynamic>.from(jsonDecode(res.body));
+
+    var d4utxos = <Down4TXOUT>[];
+    for (final utxo in utxos) {
+      var d4txout = Down4TXOUT(
+        txid: TXID.fromHex(utxo["tx_hash"]),
+        sats: Sats(utxo["value"]),
+        outIndex: utxo["tx_pos"],
+      );
+      d4utxos.add(d4txout);
+    }
+    return d4utxos;
+  }
+
+  var pair = ec.ECPair.fromWIF(
+    "L5ki3jzwFDiz8MjExqAFnEa4cvv3BHwJdCe84QLpcDnMaMzkLcuM",
+  );
+
+  var address = _makeAddress(pair.publicKey).toBase58();
+
+  var utxos = await getUtxos(address);
+  if (utxos == null) return;
+
+  final inSats = utxos.fold<Sats>(Sats(0), (s, u) => s + u.sats);
+  final inLen = utxos.length;
+  final txSize = 4 + 4 + 9 + 9 + (148 * inLen) + (34 + 7);
+  final minerFees = (txSize * SATS_PER_BYTE).ceil();
+  final down4Fees = (minerFees / 2).ceil();
+  final totalFees = down4Fees + minerFees;
+
+  // Import from wif
 }

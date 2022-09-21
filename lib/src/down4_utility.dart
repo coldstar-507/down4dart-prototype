@@ -2,6 +2,11 @@ import 'package:convert/convert.dart';
 import 'dart:typed_data';
 import 'package:pointycastle/digests/sha1.dart' as sha1;
 import 'data_objects.dart';
+import 'package:collection/collection.dart';
+import 'package:fast_base58/fast_base58.dart' as b58;
+
+
+final listEqual = const ListEquality().equals;
 
 extension IsTypes on Node {
   bool get isFriendOrGroup => const [Nodes.friend, Nodes.group].contains(type);
@@ -17,6 +22,7 @@ extension AsUint8List on List<int> {
 
 extension ByteEncoding on List<int> {
   String toHex() => hex.encode(this);
+  String toBase58() => b58.Base58Encode(this);
 }
 
 extension StringExtension on String {

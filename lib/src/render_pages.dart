@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:collection/collection.dart';
 import 'package:bip32/bip32.dart';
 import 'package:camera/camera.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,8 +25,6 @@ import 'down4_utility.dart' as u;
 import 'render_utility.dart';
 import 'dart:math' as math;
 import 'simple_bsv.dart';
-
-final listEqual = const ListEquality().equals;
 
 class Down4Page2 extends StatelessWidget {
   final String title;
