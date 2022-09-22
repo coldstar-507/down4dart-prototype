@@ -96,7 +96,7 @@ class _Down4State extends State<Down4> {
     final down4priv = master.derivePath("m/4'/0'/0'");
     final neuter = down4priv.neutered();
 
-    final secret = sha256sha256(secretData.asUint8List());
+    final secret = sha256d(secretData.asUint8List());
 
     final imageID = d4utils.generateMediaID(imData);
     Down4Media image = Down4Media(

@@ -13,8 +13,17 @@ import 'package:http/http.dart' as http;
 import 'package:fast_base58/fast_base58.dart' as b58;
 // import 'package:elliptic/elliptic.dart' as ell;
 // import 'package:ecdsa/ecdsa.dart' as ecdsa;
-import 'package:dart_ecpair/dart_ecpair.dart' as ec;
+import 'package:dart_ecpair/dart_ecpair.dart';
 // import 'dart:io' as io;
+
+class SIGHASH {
+  static const ALL = 0x41;
+  static const NONE = 0x42;
+  static const SINGLE = 0x43;
+  static const ALL_ANYONECANPAY = 0xc1;
+  static const NONE_ANYONECANPAY = 0xc2;
+  static const SINGLE_ANYONECANPAY = 0xc3;
+}
 
 const SATS_PER_BYTE = 0.05;
 
@@ -52,17 +61,43 @@ List<int> _d4out(List<int> address, int walletIndex) {
 
 List<int> _p2pkh(List<int> address) => [0x76, 0xa9, ...address, 0x88, 0xac];
 
-Uint8List sha256(Uint8List data) => s256.SHA256Digest().process(data);
+List<int> _makeDER(Uint8List sig) {
+  final r = sig.sublist(0, 32);
+  final s = sig.sublist(32, 64);
+  const len = 1 + 1 + 32 + 1 + 1 + 32;
+  return [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
+}
 
-Uint8List sha256sha256(Uint8List data) => sha256(sha256(data));
+List<int>? _p2pkhSig(
+  Uint8List privateKey,
+  Down4TX tx,
+  int nIn, [
+  int sigHash = SIGHASH.ALL,
+]) {
+  var pair = ECPair.fromPrivateKey(privateKey);
+  final sigData = tx.sigData(nIn, sigHash);
+  if (sigData == null) return null;
+  final sig = pair.sign(sigData.asUint8List());
+  return [..._makeDER(sig), sigHash, ...pair.publicKey];
+}
 
-Uint8List ripemd160(Uint8List data) => r160.RIPEMD160Digest().process(data);
+List<int> sha256(List<int> data) {
+  return s256.SHA256Digest().process(data.asUint8List());
+}
 
-Uint8List _makeAddress(Uint8List pubKey) {
+List<int> sha256d(List<int> data) {
+  return sha256(sha256(data));
+}
+
+List<int> ripemd160(List<int> data) {
+  return r160.RIPEMD160Digest().process(data.asUint8List());
+}
+
+List<int> _makeAddress(List<int> pubKey) {
   final hash = ripemd160(sha256(pubKey));
-  final extended = [0x00, ...hash].asUint8List();
-  final checkSum = sha256sha256(extended).sublist(0, 4);
-  return [...extended, ...checkSum].asUint8List();
+  final extended = [0x00, ...hash];
+  final checkSum = sha256d(extended).sublist(0, 4);
+  return [...extended, ...checkSum];
 }
 
 int _randomWalletIndex() {
@@ -157,64 +192,6 @@ class Wallet {
           .map((jsonTx) => Down4TX.fromJson(jsonTx))
           .toList(),
     );
-  }
-
-  Future<Down4Payment?> importFromWif(String wif, Node self) async {
-    var pair = ec.ECPair.fromWIF(wif);
-
-    final wIdx = _deterministicWalletIndex();
-    final down4Address = _makeAddress(DOWN4_NEUTER.derive(wIdx).publicKey);
-    final myAddress = _makeAddress(self.neuter!.derive(wIdx).publicKey);
-
-    final importAddress = _makeAddress(pair.publicKey).toBase58();
-
-    var utxos = await getUtxos(importAddress);
-    if (utxos == null) return null;
-
-    final inSats = utxos.fold<Sats>(Sats(0), (s, u) => s + u.sats);
-    final inLen = utxos.length;
-    final txSize = 4 + 4 + 9 + 9 + (148 * inLen) + (34 * 2);
-    final minerFees = (txSize * SATS_PER_BYTE).ceil();
-    final down4Fees = (minerFees / 2).ceil();
-    final totalFees = down4Fees + minerFees;
-
-    final myGets = inSats - Sats(totalFees);
-
-    var txsIn = <Down4TXIN>[];
-    for (final utxo in utxos) {
-      txsIn.add(Down4TXIN.fromP2PKH(utxo));
-    }
-
-    var txsOut = <Down4TXOUT>[
-      Down4TXOUT(
-        sats: Sats(down4Fees),
-        scriptPubKey: _p2pkh(down4Address),
-        outIndex: 0,
-      ),
-      Down4TXOUT(
-        receiver: self.id,
-        sats: myGets,
-        scriptPubKey: _p2pkh(myAddress),
-        outIndex: 1,
-      ),
-    ];
-
-    var tx = Down4TX(txsIn: txsIn, txsOut: txsOut);
-    final txid = tx.txid();
-    final txdata = tx.sigAllRawData;
-
-    for (var txin in tx.txsIn) {
-      final Uint8List sig = pair.sign(txdata.asUint8List());
-      final r = sig.sublist(0, 32);
-      final s = sig.sublist(32, 64);
-      const len = 1 + 1 + 32 + 1 + 1 + 32;
-      final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
-      final unlockScript = [...der, 0x41, ...pair.publicKey];
-
-      txin.script = unlockScript;
-    }
-
-    return Down4Payment([tx], true);
   }
 
   Map<String, dynamic> toJson() => {
@@ -331,17 +308,18 @@ class Wallet {
 
     // here we should have all the tx data necessary for signing
     var tx = Down4TX(txsIn: txsIn, maker: self.id, txsOut: outs);
-    final txdata = tx.sigAllRawData.asUint8List();
-    for (var txin in tx.txsIn) {
-      final derived = bip.derive(txin.walletIndex!);
-      final Uint8List sig = derived.sign(txdata);
+    for (var i = 0; i < tx.txsIn.length; i++) {
+      final derived = bip.derive(tx.txsIn[i].walletIndex!);
+      final sigData = tx.sigData(i);
+      if (sigData == null) return null;
+      final Uint8List sig = derived.sign(sigData.asUint8List());
       final r = sig.sublist(0, 32);
       final s = sig.sublist(32, 64);
       const len = 1 + 1 + 32 + 1 + 1 + 32;
       final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
       final unlockScript = [...der, 0x41, ...derived.publicKey];
 
-      txin.script = unlockScript;
+      tx.txsIn[i].script = unlockScript;
     }
     final txid = tx.txid();
     for (var txout in tx.txsOut) {
@@ -464,23 +442,24 @@ class Wallet {
     // now we must sign and terminate this tx
     // we use SIG_HASH_ALL for this one, it's immutable
     firstTx = Down4TX(txsIn: firstTxsIn, txsOut: firstTxsOut, maker: self.id);
-    final txdata = firstTx.sigAllRawData.asUint8List();
-    for (var txin in firstTx.txsIn) {
-      final derived = bip.derive(txin.walletIndex!);
-      final Uint8List sig = derived.sign(txdata);
+    for (var i = 0; i < firstTx.txsIn.length; i++) {
+      final derived = bip.derive(firstTx.txsIn[i].walletIndex!);
+      final txData = firstTx.sigData(i, SIGHASH.ALL);
+      if (txData == null) return null;
+      final Uint8List sig = derived.sign(txData.asUint8List());
       final r = sig.sublist(0, 32);
       final s = sig.sublist(32, 64);
       const len = 1 + 1 + 32 + 1 + 1 + 32;
       final der = [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
       final unlockScript = [...der, 0x41, ...derived.publicKey];
 
-      txin.script = unlockScript;
+      firstTx.txsIn[i].script = unlockScript;
     }
     final firstTxID = firstTx.txid();
-    for (var txout in firstTx.txsOut) {
-      txout.txid = firstTxID;
-      if (txout.receiver == self.id && txout.walletIndex != 2) {
-        utxos.add(txout);
+    for (var txOut in firstTx.txsOut) {
+      txOut.txid = firstTxID;
+      if (txOut.receiver == self.id && txOut.walletIndex != 2) {
+        utxos.add(txOut);
       }
     }
 
@@ -518,7 +497,9 @@ class Wallet {
 
     // now we sign with either SIGHASH_SINGLE or SIGHASH_SINGLE|ANYONECANPAY
     final derived = bip.derive(lastPerfectIn.walletIndex!);
-    final Uint8List sig = derived.sign(lastTx.sigSingleData(0).asUint8List());
+    final sigData = lastTx.sigData(0, SIGHASH.SINGLE);
+    if (sigData == null) return null;
+    final Uint8List sig = derived.sign(sigData.asUint8List());
     final r = sig.sublist(0, 32);
     final s = sig.sublist(32, 64);
     const len = 1 + 1 + 32 + 1 + 1 + 32;
@@ -530,6 +511,64 @@ class Wallet {
 
     final chain = _chainedTxs([firstTx]);
     return Down4Payment([...chain, lastTx], false);
+  }
+
+  Future<Down4Payment?> importFromWif(String wif, Node self) async {
+    var pair = ECPair.fromWIF(wif);
+    final pk = pair.privateKey;
+    if (pk == null) return null;
+
+    final wIdx = _deterministicWalletIndex();
+    final down4Address = _makeAddress(DOWN4_NEUTER.derive(wIdx).publicKey);
+    final myAddress = _makeAddress(self.neuter!.derive(wIdx).publicKey);
+
+    final importAddress = _makeAddress(pair.publicKey).toBase58();
+
+    var utxos = await getUtxos(importAddress);
+    if (utxos == null) return null;
+
+    final inSats = utxos.fold<Sats>(Sats(0), (s, u) => s + u.sats);
+    final inCount = utxos.length;
+    final txSize = 4 + 4 + 9 + 9 + (148 * inCount) + (34 * 2);
+    final minerFees = Sats((txSize * SATS_PER_BYTE).ceil());
+    final down4Fees = Sats((minerFees.asInt / 2).ceil());
+    final totalFees = down4Fees + minerFees;
+
+    final myGets = inSats - totalFees;
+
+    var txsIn = <Down4TXIN>[];
+    for (final utxo in utxos) {
+      txsIn.add(Down4TXIN.fromP2PKH(utxo));
+    }
+
+    var txsOut = <Down4TXOUT>[
+      Down4TXOUT(
+        sats: down4Fees,
+        scriptPubKey: _p2pkh(down4Address),
+        outIndex: 0,
+      ),
+      Down4TXOUT(
+        receiver: self.id,
+        sats: myGets,
+        scriptPubKey: _p2pkh(myAddress),
+        outIndex: 1,
+      ),
+    ];
+
+    var tx = Down4TX(txsIn: txsIn, txsOut: txsOut);
+    final txID = tx.txid();
+
+    for (var i = 0; i < tx.txsIn.length; i++) {
+      final unlockScript = _p2pkhSig(pk, tx, i);
+      if (unlockScript == null) return null;
+      tx.txsIn[i].script = unlockScript;
+    }
+
+    for (var txOut in tx.txsOut) {
+      txOut.txid = txID;
+    }
+
+    return Down4Payment([tx], true);
   }
 }
 
@@ -647,11 +686,11 @@ class Down4TXIN {
   })  : outIndex = FourByteInt(outIndex),
         sequenceNo = FourByteInt(sequenceNo ?? 0);
 
-  factory Down4TXIN.fromP2PKH(Down4TXOUT txout) {
+  factory Down4TXIN.fromP2PKH(Down4TXOUT txOut) {
     return Down4TXIN(
-      spender: txout.receiver,
-      spentFrom: txout.txid!,
-      outIndex: txout.outIndex!,
+      spender: txOut.receiver,
+      spentFrom: txOut.txid!,
+      outIndex: txOut.outIndex!,
       sequenceNo: 0,
     );
   }
@@ -677,7 +716,9 @@ class Down4TXIN {
         ...sequenceNo.data,
       ];
 
-  List<int> get sigData => [
+  List<int> get seqNo => sequenceNo.data;
+
+  List<int> get prevOut => [
         ...spentFrom.data,
         ...outIndex.data,
       ];
@@ -787,45 +828,119 @@ class Down4TX {
             .toList(),
       );
 
-  List<int> get fullRawData => [
-        ...versionNo.data,
-        ...inCounter.data,
-        ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
-        ...outCounter.data,
-        ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
-        ...nLockTime.data,
-      ];
+  List<int> get raw {
+    return [
+      ...versionNo.data,
+      ...inCounter.data,
+      ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
+      ...outCounter.data,
+      ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
+      ...nLockTime.data,
+    ];
+  }
 
-  List<int> get sigAllRawData => [
-        ...versionNo.data,
-        ...inCounter.data,
-        ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.sigData]),
-        ...outCounter.data,
-        ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
-        ...nLockTime.data,
-      ];
+  List<int>? sigData(int nIn, [int sigHash = SIGHASH.ALL]) {
+    switch (sigHash) {
+      case SIGHASH.ALL:
+        return sha256d([
+          ...versionNo.data,
+          ...sha256d(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
+          ...sha256d(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
+          ...txsIn[nIn].prevOut,
+          ...txsIn[nIn].scriptSigLen!.data,
+          ...txsIn[nIn].scriptSig!,
+          ...txsIn[nIn].sats!.data,
+          ...txsIn[nIn].sequenceNo.data,
+          ...sha256d(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData])),
+          ...nLockTime.data,
+          ...FourByteInt(sigHash).data,
+        ]);
+      case SIGHASH.SINGLE:
+        return sha256d([
+          ...versionNo.data,
+          ...sha256d(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
+          ...sha256d(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
+          ...txsIn[nIn].prevOut,
+          ...txsIn[nIn].scriptSigLen!.data,
+          ...txsIn[nIn].scriptSig!,
+          ...txsIn[nIn].sats!.data,
+          ...txsIn[nIn].sequenceNo.data,
+          ...sha256d(txsOut[nIn].asData),
+          ...nLockTime.data,
+          ...FourByteInt(sigHash).data,
+        ]);
+      case SIGHASH.NONE:
+        return sha256d([
+          ...versionNo.data,
+          ...sha256d(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
+          ...sha256d(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
+          ...txsIn[nIn].prevOut,
+          ...txsIn[nIn].scriptSigLen!.data,
+          ...txsIn[nIn].scriptSig!,
+          ...txsIn[nIn].sats!.data,
+          ...txsIn[nIn].sequenceNo.data,
+          ...Uint8List(32),
+          ...nLockTime.data,
+          ...FourByteInt(sigHash).data,
+        ]);
+      case SIGHASH.ALL_ANYONECANPAY:
+        return sha256d([
+          ...versionNo.data,
+          ...Uint8List(32),
+          ...Uint8List(32),
+          ...txsIn[nIn].prevOut,
+          ...txsIn[nIn].scriptSigLen!.data,
+          ...txsIn[nIn].scriptSig!,
+          ...txsIn[nIn].sats!.data,
+          ...txsIn[nIn].sequenceNo.data,
+          ...sha256d(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData])),
+          ...nLockTime.data,
+          ...FourByteInt(sigHash).data,
+        ]);
+      case SIGHASH.SINGLE_ANYONECANPAY:
+        return sha256d([
+          ...versionNo.data,
+          ...Uint8List(32),
+          ...Uint8List(32),
+          ...txsIn[nIn].prevOut,
+          ...txsIn[nIn].scriptSigLen!.data,
+          ...txsIn[nIn].scriptSig!,
+          ...txsIn[nIn].sats!.data,
+          ...txsIn[nIn].sequenceNo.data,
+          ...sha256d(txsOut[nIn].asData),
+          ...nLockTime.data,
+          ...FourByteInt(sigHash).data,
+        ]);
+      case SIGHASH.NONE_ANYONECANPAY:
+        return sha256d([
+          ...versionNo.data,
+          ...Uint8List(32),
+          ...Uint8List(32),
+          ...txsIn[nIn].prevOut,
+          ...txsIn[nIn].scriptSigLen!.data,
+          ...txsIn[nIn].scriptSig!,
+          ...txsIn[nIn].sats!.data,
+          ...txsIn[nIn].sequenceNo.data,
+          ...Uint8List(32),
+          ...nLockTime.data,
+          ...FourByteInt(sigHash).data,
+        ]);
+    }
+  }
 
-  List<int> sigSingleData(int nIn) => [
-        ...versionNo.data,
-        ...inCounter.data,
-        ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.sigData]),
-        ...outCounter.data,
-        ...txsOut[nIn].asData,
-        ...nLockTime.data,
-      ];
+  List<TXID> get txidDeps {
+    return txsIn.fold(<TXID>[], (deps, txin) {
+      if (txin.dependance != null) {
+        return deps..add(txin.dependance!);
+      } else {
+        return deps;
+      }
+    });
+  }
 
-  List<TXID> get txidDeps => txsIn.fold(<TXID>[], (deps, txin) {
-        if (txin.dependance != null) {
-          return deps..add(txin.dependance!);
-        } else {
-          return deps;
-        }
-      });
+  TXID txid() => txID = TXID.fromBigEndian(sha256d(raw.asUint8List()));
 
-  TXID txid() =>
-      txID = TXID.fromBigEndian(sha256sha256(fullRawData.asUint8List()));
-
-  String get fullRawHex => hex.encode(fullRawData);
+  String get fullRawHex => hex.encode(raw);
 
   Map<String, dynamic> toJson() => {
         "mk": maker,
@@ -882,48 +997,4 @@ class BatchResponse {
   }
 }
 
-void main() async {
-  Future<List<Down4TXOUT>?> getUtxos(
-    String b58Address, [
-    String network = "main",
-  ]) async {
-    final url = Uri.parse(
-      "https://api.whatsonchain.com/v1/bsv/$network/address/$b58Address/unspent",
-    );
-
-    final res = await http.get(url);
-
-    if (res.statusCode != 200) return null;
-
-    final utxos = List<dynamic>.from(jsonDecode(res.body));
-
-    var d4utxos = <Down4TXOUT>[];
-    for (final utxo in utxos) {
-      var d4txout = Down4TXOUT(
-        txid: TXID.fromHex(utxo["tx_hash"]),
-        sats: Sats(utxo["value"]),
-        outIndex: utxo["tx_pos"],
-      );
-      d4utxos.add(d4txout);
-    }
-    return d4utxos;
-  }
-
-  var pair = ec.ECPair.fromWIF(
-    "L5ki3jzwFDiz8MjExqAFnEa4cvv3BHwJdCe84QLpcDnMaMzkLcuM",
-  );
-
-  var address = _makeAddress(pair.publicKey).toBase58();
-
-  var utxos = await getUtxos(address);
-  if (utxos == null) return;
-
-  final inSats = utxos.fold<Sats>(Sats(0), (s, u) => s + u.sats);
-  final inLen = utxos.length;
-  final txSize = 4 + 4 + 9 + 9 + (148 * inLen) + (34 + 7);
-  final minerFees = (txSize * SATS_PER_BYTE).ceil();
-  final down4Fees = (minerFees / 2).ceil();
-  final totalFees = down4Fees + minerFees;
-
-  // Import from wif
-}
+void main() async {}
