@@ -5,7 +5,6 @@ import 'data_objects.dart';
 import 'package:collection/collection.dart';
 import 'package:fast_base58/fast_base58.dart' as b58;
 
-
 final listEqual = const ListEquality().equals;
 
 extension IsTypes on Node {
@@ -83,6 +82,4 @@ String generateMediaID(Uint8List mediaData) {
   return hex.encode(sha1.SHA1Digest().process(bytes.asUint8List()));
 }
 
-int timeStamp() {
-  return DateTime.now().millisecondsSinceEpoch;
-}
+int timeStamp() => DateTime.now().millisecondsSinceEpoch;

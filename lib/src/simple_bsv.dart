@@ -5,15 +5,18 @@ import 'package:convert/convert.dart';
 import 'data_objects.dart';
 import 'package:pointycastle/digests/sha256.dart' as s256;
 import 'package:pointycastle/digests/ripemd160.dart' as r160;
-import 'package:bip32/bip32.dart';
+// import 'package:bip32/bip32.dart';
 import 'down4_utility.dart';
 import 'web_requests.dart' as r;
 import 'package:http/http.dart' as http;
-// import 'package:bip39/bip39.dart' as bip39;
-import 'package:fast_base58/fast_base58.dart' as b58;
+import 'package:bip39/bip39.dart' as bip39;
+// import 'package:fast_base58/fast_base58.dart' as b58;
 // import 'package:elliptic/elliptic.dart' as ell;
 // import 'package:ecdsa/ecdsa.dart' as ecdsa;
+import 'package:dart_bs58/dart_bs58.dart';
+import 'package:dart_wif/dart_wif.dart';
 import 'package:dart_ecpair/dart_ecpair.dart';
+import 'package:dart_bip32/dart_bip32.dart';
 // import 'dart:io' as io;
 
 class SIGHASH {
@@ -162,29 +165,33 @@ class Down4Payment {
 
 class Wallet {
   final String _mnemonic;
-  BIP32 bip;
-  List<Down4TXOUT> utxos;
-  List<Down4TX> unsettledTxs;
+  BIP32 _bip;
+  List<Down4TXOUT> _utxos;
+  List<Down4TX> _unsettledTxs;
 
-  String get mnemonic => _mnemonic;
-  int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
-  List<TXID> get uTXID => unsettledTxs.map((e) => e.txID!).toList();
+  BIP32 get bip => _bip;
+  // String get mnemonic => _mnemonic;
+  int get balance => _utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
+  List<TXID> get uTXID => _unsettledTxs.map((e) => e.txID!).toList();
 
   Future<BatchResponse?> trySettlement([List<Down4TX>? txs]) async {
-    return await r.broadcastTxs(txs ?? unsettledTxs);
+    return await r.broadcastTxs(txs ?? _unsettledTxs);
   }
 
   Wallet({
-    required this.utxos,
-    required this.bip,
-    required this.unsettledTxs,
+    List<Down4TXOUT>? utxos,
+    List<Down4TX>? unsettledTxs,
     required String mnemonic,
-  }) : _mnemonic = mnemonic;
+  })  : _mnemonic = mnemonic,
+        _utxos = utxos ?? <Down4TXOUT>[],
+        _unsettledTxs = unsettledTxs ?? <Down4TX>[],
+        _bip = BIP32
+            .fromSeed(bip39.mnemonicToSeed(mnemonic))
+            .derivePath("m/4'/0'/0'");
 
   factory Wallet.fromJson(dynamic decodedJson) {
     return Wallet(
       mnemonic: decodedJson["m"],
-      bip: BIP32.fromBase58(decodedJson["bip"]),
       utxos: List<dynamic>.from(decodedJson["utxos"])
           .map((jsonUtxo) => Down4TXOUT.fromJson(jsonUtxo))
           .toList(),
@@ -195,10 +202,9 @@ class Wallet {
   }
 
   Map<String, dynamic> toJson() => {
-        "m": mnemonic,
-        "bip": bip.toBase58(),
-        "utxos": utxos.map((e) => e.toJson()).toList(),
-        "txs": unsettledTxs.map((e) => e.toJson()).toList(),
+        "m": _mnemonic,
+        "utxos": _utxos.map((e) => e.toJson()).toList(),
+        "txs": _unsettledTxs.map((e) => e.toJson()).toList(),
       };
 
   void parsePayment(Node self, Down4Payment pay) {
@@ -207,8 +213,8 @@ class Wallet {
     var lastTx = sortedTxs.last;
     if (pay.safe) {
       for (final utxo in lastTx.txsOut) {
-        if (utxo.receiver == self.id && !utxos.contains(utxo)) {
-          utxos.add(utxo);
+        if (utxo.receiver == self.id && !_utxos.contains(utxo)) {
+          _utxos.add(utxo);
         }
       }
     } else {
@@ -221,7 +227,7 @@ class Wallet {
         .map((tx) => tx.txidDeps..add(tx.txID!))
         .expand((txid) => txid)
         .toSet()
-        .map((txid) => unsettledTxs.singleWhere((tx) => tx.txID == txid))
+        .map((txid) => _unsettledTxs.singleWhere((tx) => tx.txID == txid))
         .toList();
 
     if (newDeps.length == deps.length) return deps;
@@ -251,17 +257,17 @@ class Wallet {
         Sats((((nOuts * 34) + 4 + 4 + 9 + 9) * SATS_PER_BYTE).ceil());
     var down4Fees = Sats((minerFees.asInt / 2).ceil());
     var sats = Sats(0);
-    for (int i = 0; i < utxos.length; i++) {
+    for (int i = 0; i < _utxos.length; i++) {
       ins.add(Down4TXIN(
           spender: self.id,
-          walletIndex: utxos[i].walletIndex,
-          sats: utxos[i].sats,
-          spentFrom: utxos[i].txid!,
-          outIndex: utxos[i].outIndex!,
+          walletIndex: _utxos[i].walletIndex,
+          sats: _utxos[i].sats,
+          spentFrom: _utxos[i].txid!,
+          outIndex: _utxos[i].outIndex!,
           sequenceNo: 0,
-          dependance: uTXID.contains(utxos[i].txid!) ? utxos[i].txid : null));
+          dependance: uTXID.contains(_utxos[i].txid!) ? _utxos[i].txid : null));
 
-      sats = sats + utxos[i].sats;
+      sats = sats + _utxos[i].sats;
       minerFees = Sats(minerFees.asInt + (148 * SATS_PER_BYTE).ceil());
       down4Fees = Sats((minerFees.asInt / 2).ceil());
 
@@ -324,9 +330,9 @@ class Wallet {
     final txid = tx.txid();
     for (var txout in tx.txsOut) {
       txout.txid = txid;
-      if (txout.receiver == self.id) utxos.add(txout);
+      if (txout.receiver == self.id) _utxos.add(txout);
     }
-    unsettledTxs.add(tx);
+    _unsettledTxs.add(tx);
     final chain = _chainedTxs([tx]);
     return Down4Payment(chain, true);
   }
@@ -380,16 +386,16 @@ class Wallet {
     var firstTxDown4Fees = Sats((firstTxMinerFees.asInt / 2).ceil());
     var firstTxTotalReqs =
         firstTxMinerFees + firstTxDown4Fees + desiredUtxoAmount;
-    for (int i = 0; i < utxos.length; i++) {
+    for (int i = 0; i < _utxos.length; i++) {
       firstTxsIn.add(
         Down4TXIN(
           spender: self.id,
-          walletIndex: utxos[i].walletIndex,
-          sats: utxos[i].sats,
-          spentFrom: utxos[i].txid!,
-          outIndex: utxos[i].outIndex!,
+          walletIndex: _utxos[i].walletIndex,
+          sats: _utxos[i].sats,
+          spentFrom: _utxos[i].txid!,
+          outIndex: _utxos[i].outIndex!,
           sequenceNo: 0,
-          dependance: uTXID.contains(utxos[i].txid!) ? utxos[i].txid : null,
+          dependance: uTXID.contains(_utxos[i].txid!) ? _utxos[i].txid : null,
         ),
       );
 
@@ -397,11 +403,11 @@ class Wallet {
       firstTxDown4Fees = Sats((firstTxMinerFees.asInt / 2).ceil());
       firstTxTotalReqs =
           firstTxMinerFees + firstTxDown4Fees + desiredUtxoAmount;
-      count += utxos[i].sats;
+      count += _utxos[i].sats;
 
       if (count >= firstTxTotalReqs) {
         break;
-      } else if (i == utxos.length - 1) {
+      } else if (i == _utxos.length - 1) {
         return null;
       }
     }
@@ -459,7 +465,7 @@ class Wallet {
     for (var txOut in firstTx.txsOut) {
       txOut.txid = firstTxID;
       if (txOut.receiver == self.id && txOut.walletIndex != 2) {
-        utxos.add(txOut);
+        _utxos.add(txOut);
       }
     }
 
@@ -507,14 +513,22 @@ class Wallet {
     final unlockScript = [...der, 0x43, ...derived.publicKey];
 
     lastTx.txsIn.first.script = unlockScript;
-    unsettledTxs.add(firstTx);
+    _unsettledTxs.add(firstTx);
 
     final chain = _chainedTxs([firstTx]);
     return Down4Payment([...chain, lastTx], false);
   }
 
-  Future<Down4Payment?> importFromWif(String wif, Node self) async {
-    var pair = ECPair.fromWIF(wif);
+  Future<Down4Payment?> importMoney(Node self, String base58) async {
+    ECPair pair;
+    final key = bs58.decode(base58);
+    if (key.lengthInBytes > 32) {
+      // is WIF
+      pair = ECPair.fromWIF(base58);
+    } else {
+      // is raw privateKey
+      pair = ECPair.fromPrivateKey(key);
+    }
     final pk = pair.privateKey;
     if (pk == null) return null;
 
@@ -997,4 +1011,15 @@ class BatchResponse {
   }
 }
 
-void main() async {}
+void main() {
+  final seed = _genSeed(32).asUint8List();
+  print(seed.toBase58());
+
+  var b = BIP32.fromSeed(seed);
+  print(b.toWIF());
+}
+
+List<int> _genSeed(int byteCount) {
+  var rs = Random.secure();
+  return List<int>.generate(byteCount, (_) => rs.nextInt(256));
+}

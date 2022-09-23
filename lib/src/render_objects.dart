@@ -309,7 +309,7 @@ class Palette extends StatelessWidget {
                                 Nodes.hyperchat,
                                 Nodes.group,
                               ].contains(node.type) &&
-                              node.messages!.isNotEmpty
+                          (node.messages ?? const []).isNotEmpty
                           ? Text(
                               (Boxes.instance
                                               .loadMessage(node.messages!.last)

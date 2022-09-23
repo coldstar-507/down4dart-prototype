@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:bip32/bip32.dart';
@@ -14,6 +15,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_player/video_player.dart';
 import 'package:english_words/english_words.dart' as rw;
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:scroll_navigation/scroll_navigation.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -23,8 +25,157 @@ import 'camera.dart';
 import 'web_requests.dart' as r;
 import 'down4_utility.dart' as u;
 import 'render_utility.dart';
-import 'dart:math' as math;
+
 import 'simple_bsv.dart';
+
+class Down4Navigator extends StatelessWidget {
+  final List<Down4Page> pages;
+  final List<ScrollNavigationItem> titles;
+
+  Down4Navigator(this.pages, {Key? key})
+      : titles = pages
+            .map(
+              (p) => ScrollNavigationItem(
+                icon: Text(
+                  p.title,
+                  style: const TextStyle(color: Colors.white, fontSize: 18.0),
+                ),
+              ),
+            )
+            .toList(),
+        super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollNavigation(
+      bodyStyle: const NavigationBodyStyle(
+        background: PinkTheme.qrColor,
+        // borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+      barStyle: const NavigationBarStyle(
+        activeColor: Colors.redAccent,
+        deactiveColor: Colors.black,
+        verticalPadding: 7,
+        position: NavigationPosition.top,
+        background: PinkTheme.qrColor,
+        elevation: 0.0,
+      ),
+      pages: pages,
+      items: titles,
+    );
+  }
+}
+
+class Down4Page extends StatelessWidget {
+  final String title;
+  final List<Widget>? stackWidgets;
+  final List<Palette>? palettes;
+  final List<ChatMessage>? messages;
+  final MessageList4? messageList;
+  final List<Widget>? columnWidgets;
+  final Console console;
+
+  const Down4Page({
+    required this.title,
+    required this.console,
+    this.columnWidgets,
+    this.palettes,
+    this.stackWidgets,
+    this.messageList,
+    this.messages,
+    Key? key,
+  }) : super(key: key);
+
+  List<Widget> getExtraTopButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in console.topButtons ?? <ConsoleButton>[]) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+            bottom: 16.0 + (ConsoleButton.height * 2),
+            left: 16.0 + (buttonWidth * i),
+            child: Container(
+              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
+              width: (screenWidth - 32) / console.topButtons!.length,
+              decoration: BoxDecoration(border: Border.all(width: 0.5)),
+              child: Column(children: b.extraButtons!),
+            )));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  List<Widget> getExtraBottomButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in console.bottomButtons) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+          bottom: 16.0 + ConsoleButton.height,
+          left: 16.0 + (buttonWidth * i),
+          child: Container(
+            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
+            width: buttonWidth,
+            decoration: BoxDecoration(border: Border.all(width: 0.5)),
+            child: Column(children: b.extraButtons!),
+          ),
+        ));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final extraBottomButtons = getExtraBottomButtons(screenWidth);
+    final extraTopButtons = getExtraTopButtons(screenWidth);
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
+    );
+    return Container(
+      color: PinkTheme.backGroundColor,
+      child: Scaffold(
+        // appBar: PreferredSize(
+        //   preferredSize: const Size.fromHeight(24),
+        //   child: AppBar(
+        //     backgroundColor: PinkTheme.qrColor,
+        //     title: Text(title, style: const TextStyle(fontSize: 16)),
+        //     centerTitle: true,
+        //   ),
+        // ),
+        body: Stack(
+          children: [
+            ...(stackWidgets ?? []),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                messageList ??
+                    ((palettes != null ||
+                            messages != null ||
+                            columnWidgets != null)
+                        ? DynamicList(
+                            list: palettes ?? messages ?? columnWidgets!)
+                        : const SizedBox.shrink()),
+                console,
+              ],
+            ),
+            ...extraTopButtons,
+            ...extraBottomButtons,
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class Down4Page2 extends StatelessWidget {
   final String title;
@@ -105,7 +256,7 @@ class Down4Page2 extends StatelessWidget {
       color: PinkTheme.backGroundColor,
       child: Scaffold(
         appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(21),
+          preferredSize: const Size.fromHeight(24),
           child: AppBar(
             backgroundColor: PinkTheme.qrColor,
             title: Text(title, style: const TextStyle(fontSize: 16)),
@@ -1621,11 +1772,13 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Down4Page2(
-      title: "Home",
-      palettes: palettes,
-      console: console,
-    );
+    return Down4Navigator([
+      Down4Page(
+        title: "Home",
+        palettes: palettes,
+        console: console,
+      ),
+    ]);
   }
 }
 

@@ -151,12 +151,7 @@ class _Down4State extends State<Down4> {
       snips: [],
     );
 
-    _wallet = Wallet(
-      mnemonic: mnemonic,
-      bip: down4priv,
-      utxos: [],
-      unsettledTxs: [],
-    );
+    _wallet = Wallet(mnemonic: mnemonic);
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user));
@@ -187,7 +182,7 @@ class _Down4State extends State<Down4> {
 
   void welcomePage() {
     _view = WelcomePage(
-      mnemonic: _wallet!.mnemonic,
+      mnemonic: "No giving it bro sorry",
       userInfo: _user!,
       understood: home,
     );
@@ -198,7 +193,7 @@ class _Down4State extends State<Down4> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
-    Sizes.h = size.height - padding.top - padding.bottom - 21;
+    Sizes.h = size.height - padding.top - padding.bottom - 32;
     Sizes.w = size.width - padding.left - padding.right;
     return SafeArea(child: _view ?? const LoadingPage());
   }
