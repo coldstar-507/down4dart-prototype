@@ -8,10 +8,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'data_objects.dart';
 
+var b = Boxes.instance;
 var db = FirebaseDatabase.instance.ref();
 var fs = FirebaseFirestore.instance;
 var st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 var st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+
+String messagePushId() => db.child("Messages").push().key!;
 
 Future<Node?> getNode(Identifier nodeID) async {
   var doc = await fs.collection("Nodes").doc(nodeID).get();
@@ -57,6 +60,40 @@ Future<Down4Media?> getMessageMedia(Identifier mediaID) async {
   return null;
 }
 
+extension MessageSave on Down4Message {
+  void save() => b.messages.put(id, jsonEncode(this));
+}
+
+extension NodeSave on Node {
+  void save() => b.home.put(id, jsonEncode(this));
+}
+
+extension MediaSave on Down4Media {
+  void writeFile() {
+    var f = File(b.dirPath + "/" + id);
+    f.writeAsBytesSync(data);
+    file = f;
+  }
+
+  void save({bool toPersonal = false, bool toSnips = false}) {
+    if (!toPersonal) {
+      b.messageMedias.put(id, jsonEncode(this));
+    } else if (toSnips) {
+      b.snips.put(id, jsonEncode(this));
+    } else {
+      if (metadata.isVideo) {
+        b.videos.put(id, jsonEncode(this));
+      } else {
+        b.images.put(id, jsonEncode(this));
+      }
+    }
+  }
+}
+
+extension PaymentSave on Down4Payment {
+  void save() => b.payments.put(id, jsonEncode(this));
+}
+
 class Boxes {
   static Boxes? _instance;
   List<String> fileIDs;
@@ -72,7 +109,7 @@ class Boxes {
       payments,
       savedMessages,
       messageMedias,
-      snip;
+      snips;
   Boxes()
       : dirPath = main.docDirPath,
         fileIDs = [],
@@ -86,7 +123,7 @@ class Boxes {
         bills = Hive.box("Bills"),
         payments = Hive.box("Payments"),
         savedMessages = Hive.box("SavedMessages"),
-        snip = Hive.box("Snips"),
+        snips = Hive.box("Snips"),
         messageMedias = Hive.box("MessageMedias");
 
   File writeMediaToFile(Down4Media m) {
@@ -134,11 +171,11 @@ class Boxes {
   }
 
   Down4Media loadSnip(Identifier id) {
-    return Down4Media.fromJson(jsonDecode(snip.get(id)));
+    return Down4Media.fromJson(jsonDecode(snips.get(id)));
   }
 
   void deleteSnip(Identifier id) {
-    snip.delete(id);
+    snips.delete(id);
   }
 
   void saveUser(Node u) {
@@ -174,10 +211,7 @@ class Boxes {
   }
 
   void saveMessage(Down4Message msg) {
-    messages.put(msg.id, jsonEncode(msg.toJson(false)));
-    if (msg.media != null) {
-      messageMedias.put(msg.media!.id, jsonEncode(msg.media!));
-    }
+    messages.put(msg.id, jsonEncode(msg));
   }
 
   Down4Message loadMessage(Identifier id) {

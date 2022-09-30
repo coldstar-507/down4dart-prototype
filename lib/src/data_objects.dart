@@ -3,17 +3,15 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:bip32/bip32.dart';
 import 'down4_utility.dart' as d4utils;
+import 'simple_bsv.dart';
 
 typedef Identifier = String;
 
 enum Messages {
   chat,
-  hyperchat,
-  group,
-  bill,
   payment,
+  bill,
   snip,
-  ping,
 }
 
 enum Nodes {
@@ -82,34 +80,6 @@ class Down4Media {
       };
 }
 
-// class Reaction {
-//   final Identifier id, sender;
-//   final Down4Media image; // target, sender
-//   final List<String> messageTargets;
-//   Reaction({
-//     required this.id,
-//     required this.messageTargets,
-//     required this.sender,
-//     required this.image,
-//   });
-//
-//   factory Reaction.fromJson(Map<String, dynamic> decodedJson) {
-//     return Reaction(
-//       id: decodedJson["id"],
-//       messageTargets: decodedJson["mtg"],
-//       sender: decodedJson["sd"],
-//       image: Down4Media.fromJson(decodedJson["m"]),
-//     );
-//   }
-//
-//   Map<String, dynamic> toLocal() => {
-//         'id': id,
-//         'sd': sender,
-//         'mtg': messageTargets,
-//         'm': image.toJson(),
-//       };
-// }
-
 class MessageNotification {
   final Messages type;
   final String? base64jsonData;
@@ -117,22 +87,23 @@ class MessageNotification {
 }
 
 class Down4Message {
+  Messages type;
   Identifier? id;
-  final Identifier? root;
   final Identifier senderID;
-  final Identifier? forwarderID;
+  final Identifier? root, forwarderID, paymentID, mediaID;
   final String? text;
-  Down4Media? media;
   final int timestamp;
   final List<Identifier>? replies, nodes; // reactions, nodes
 
   Down4Message({
+    required this.senderID,
+    this.type = Messages.chat,
+    required this.timestamp,
     this.id,
     this.root,
-    required this.timestamp,
-    required this.senderID,
+    this.mediaID,
+    this.paymentID,
     this.forwarderID,
-    this.media,
     this.text,
     this.nodes,
     this.replies,
@@ -140,12 +111,14 @@ class Down4Message {
 
   Down4Message forwarded(Node self) {
     return Down4Message(
+      type: type,
       id: id,
       text: text,
       timestamp: timestamp,
       senderID: senderID,
       forwarderID: self.id != senderID ? self.id : null,
-      media: media,
+      mediaID: mediaID,
+      paymentID: paymentID,
       nodes: nodes,
       replies: replies,
     );
@@ -153,13 +126,13 @@ class Down4Message {
 
   factory Down4Message.fromJson(Map<String, dynamic> decodedJson) {
     return Down4Message(
+      type: Messages.values.byName(decodedJson["t"]),
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
       text: decodedJson["txt"],
-      media: decodedJson["m"]?["d"] != null
-          ? Down4Media.fromJson(decodedJson["m"])
-          : null,
+      mediaID: decodedJson["m"],
+      paymentID: decodedJson["p"],
       timestamp: decodedJson["ts"],
       replies: ((decodedJson["r"] as String?) ?? "").isNotEmpty
           ? List<String>.from(decodedJson["r"].split(" "))
@@ -170,7 +143,8 @@ class Down4Message {
     );
   }
 
-  Map<String, dynamic> toJson([bool withMediaData = true]) => {
+  Map<String, dynamic> toJson() => {
+        't': type.toString(),
         'id': id,
         if (text != null) 'txt': text,
         's': senderID,
@@ -178,12 +152,8 @@ class Down4Message {
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
-        if (media != null)
-          'm': withMediaData
-              ? media!.toJson()
-              : {
-                  "id": media!.id,
-                },
+        if (paymentID != null) 'p': paymentID,
+        if (mediaID != null) 'm': mediaID,
       };
 }
 
@@ -296,28 +266,104 @@ class Node {
 
 class MessageRequest {
   Down4Message msg;
-  bool withUpload;
   final List<Identifier> targets;
+  Down4Media? media;
+  Down4Payment? payment;
   final Node? rootNode;
 
   MessageRequest({
     required this.msg,
     required this.targets,
     this.rootNode,
-    this.withUpload = false,
+    this.media,
+    this.payment,
   });
 
   Map<String, dynamic> toJson() => {
-        "wu": withUpload,
         if (rootNode != null)
           "g": {
             "id": rootNode!.id,
-            "im": rootNode!.image,
+            "im": rootNode!.image!.toJson(),
             "nm": rootNode!.name,
             if (rootNode!.lastName != null) "ln": rootNode!.lastName,
           },
-        "msg": msg.toJson(withUpload),
+        "msg": msg.toJson(),
         "trgts": targets,
+        if (media != null) "m": media!.toJson(),
+        if (payment != null) "p": payment!.toJson(),
+      };
+}
+
+class ChatRequest {
+  Down4Message msg;
+  List<Identifier> targets;
+  Down4Media? media;
+
+  ChatRequest({
+    required this.msg,
+    required this.targets,
+    this.media,
+  });
+
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": msg.toJson(),
+        "trgts": targets,
+        if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class HyperchatRequest extends ChatRequest {
+  List<String> wordPairs;
+  HyperchatRequest({
+    required Down4Message msg,
+    required List<Identifier> targets,
+    Down4Media? media,
+    required this.wordPairs,
+  }) : super(msg: msg, targets: targets, media: media);
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": msg.toJson(),
+        "prompts": wordPairs,
+        "trgts": targets,
+        if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class GroupRequest extends ChatRequest {
+  String name;
+  Down4Media groupImage;
+  GroupRequest({
+    required this.name,
+    required this.groupImage,
+    required Down4Message msg,
+    Down4Media? media,
+    required List<Identifier> targets,
+  }) : super(msg: msg, media: media, targets: targets);
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": msg.toJson(),
+        "nm": name,
+        "im": groupImage.toJson(),
+        "trgts": targets,
+        if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class PaymentRequest extends ChatRequest {
+  Down4Payment payment;
+  PaymentRequest({
+    required this.payment,
+    required Down4Message msg,
+    required List<Identifier> targets,
+  }) : super(msg: msg, targets: targets);
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": msg.toJson(),
+        "trgts": targets,
+        "p": payment.toJson(),
       };
 }
 
@@ -369,3 +415,31 @@ class MediaMetadata {
     };
   }
 }
+
+// class Reaction {
+//   final Identifier id, sender;
+//   final Down4Media image; // target, sender
+//   final List<String> messageTargets;
+//   Reaction({
+//     required this.id,
+//     required this.messageTargets,
+//     required this.sender,
+//     required this.image,
+//   });
+//
+//   factory Reaction.fromJson(Map<String, dynamic> decodedJson) {
+//     return Reaction(
+//       id: decodedJson["id"],
+//       messageTargets: decodedJson["mtg"],
+//       sender: decodedJson["sd"],
+//       image: Down4Media.fromJson(decodedJson["m"]),
+//     );
+//   }
+//
+//   Map<String, dynamic> toLocal() => {
+//         'id': id,
+//         'sd': sender,
+//         'mtg': messageTargets,
+//         'm': image.toJson(),
+//       };
+// }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:bip39/bip39.dart' as b39;
 import 'package:bip32/bip32.dart' as b32;
 import 'package:firebase_database/firebase_database.dart';
@@ -17,6 +18,7 @@ import 'down4_utility.dart' as d4utils;
 import 'simple_bsv.dart';
 import 'render_pages.dart';
 import 'data_objects.dart';
+import 'themes.dart';
 
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -191,6 +193,9 @@ class _Down4State extends State<Down4> {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
+    );
     final size = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
     Sizes.h = size.height - padding.top - padding.bottom - 32;

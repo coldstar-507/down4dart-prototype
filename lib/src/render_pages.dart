@@ -16,6 +16,8 @@ import 'package:video_player/video_player.dart';
 import 'package:english_words/english_words.dart' as rw;
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:scroll_navigation/scroll_navigation.dart';
+import 'customized_packages/custom_scroll_navigation/scroll_navigation.dart'
+    as custom_scroll;
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -25,45 +27,226 @@ import 'camera.dart';
 import 'web_requests.dart' as r;
 import 'down4_utility.dart' as u;
 import 'render_utility.dart';
+import 'themes.dart';
 
 import 'simple_bsv.dart';
 
 class Down4Navigator extends StatelessWidget {
   final List<Down4Page> pages;
-  final List<ScrollNavigationItem> titles;
+  final navigationKey = GlobalKey<ScrollNavigationState>();
 
-  Down4Navigator(this.pages, {Key? key})
-      : titles = pages
-            .map(
-              (p) => ScrollNavigationItem(
-                icon: Text(
-                  p.title,
-                  style: const TextStyle(color: Colors.white, fontSize: 18.0),
-                ),
-              ),
-            )
-            .toList(),
-        super(key: key);
+  Down4Navigator(this.pages, {Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return ScrollNavigation(
-      bodyStyle: const NavigationBodyStyle(
+    return TitleScrollNavigation(
+      showIdentifier: false,
+      bodyStyle: const NavigationBodyStyle(background: PinkTheme.qrColor),
+      barStyle: const TitleNavigationBarStyle(
+        style: TextStyle(fontSize: 18),
+        padding: EdgeInsets.all(5.0),
         background: PinkTheme.qrColor,
-        // borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        activeColor: Colors.white,
+        deactiveColor: Colors.white24,
       ),
-      barStyle: const NavigationBarStyle(
-        activeColor: Colors.redAccent,
-        deactiveColor: Colors.black,
-        verticalPadding: 7,
-        position: NavigationPosition.top,
-        background: PinkTheme.qrColor,
-        elevation: 0.0,
-      ),
+      // identiferStyle: NavigationIdentiferStyle(
+      //   color: pages.length > 1 ? Colors.redAccent : PinkTheme.qrColor,
+      // ),
+      titles: pages.map((p) => p.title).toList(growable: false),
       pages: pages,
-      items: titles,
+    );
+
+    // return ScrollNavigation(
+    //   // bodyStyle: const NavigationBodyStyle(background: PinkTheme.qrColor),
+    //   barStyle: const NavigationBarStyle(
+    //     verticalPadding: 5.0,
+    //     position: NavigationPosition.top,
+    //     background: PinkTheme.qrColor,
+    //   ),
+    //   identiferStyle: NavigationIdentiferStyle(
+    //     color: pages.length > 1 ? Colors.redAccent : PinkTheme.qrColor,
+    //   ),
+    //   pages: pages,
+    //   items: titles,
+    // );
+  }
+}
+
+class Down4Navigator2 extends StatefulWidget {
+  final int firstPage;
+  final List<Page> pages;
+  final navigationKey = GlobalKey<ScrollNavigationState>();
+  Down4Navigator2({
+    required this.pages,
+    required this.firstPage,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  _Down4Navigator2State createState() => _Down4Navigator2State();
+}
+
+class _Down4Navigator2State extends State<Down4Navigator2> {
+  int _currentPage = 0;
+  Widget? _view;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.firstPage;
+  }
+
+  void onPageChange(int newPage) {
+    _currentPage = newPage;
+    print("New page: $newPage");
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Jeff(
+      titles: widget.pages.map((e) => e.pageBody.title).toList(growable: false),
+      bodies: widget.pages.map((e) => e.pageBody).toList(growable: false),
+      consoles: widget.pages.map((e) => e.pageConsole).toList(growable: false),
+      index: widget.firstPage,
+    );
+
+    return Scaffold(
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: Sizes.h - 60,
+            child: custom_scroll.TitleScrollNavigation(
+              initialPage: _currentPage,
+              pageChangeCurrentIndex: onPageChange,
+              showIdentifier: false,
+              // bodyStyle: const NavigationBodyStyle(
+              //   background: PinkTheme.backGroundColor,
+              // ),
+              barStyle: const TitleNavigationBarStyle(
+                style: TextStyle(fontSize: 18),
+                padding: EdgeInsets.all(5.0),
+                background: PinkTheme.qrColor,
+                activeColor: Colors.white,
+                deactiveColor: Colors.white24,
+              ),
+              titles: widget.pages
+                  .map((p) => p.pageBody.title)
+                  .toList(growable: false),
+              pages:
+                  widget.pages.map((p) => p.pageBody).toList(growable: false),
+            ),
+          ),
+          widget.pages[_currentPage].pageConsole,
+        ],
+      ),
     );
   }
+}
+
+class PageBody extends StatelessWidget {
+  final String title;
+  final List<Widget>? stackWidgets;
+  final List<Palette>? palettes;
+  final List<ChatMessage>? messages;
+  final MessageList4? messageList;
+  final List<Widget>? columnWidgets;
+
+  const PageBody({
+    required this.title,
+    this.columnWidgets,
+    this.palettes,
+    this.stackWidgets,
+    this.messageList,
+    this.messages,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ...(stackWidgets ?? []),
+        messageList ??
+            ((palettes != null || messages != null || columnWidgets != null)
+                ? DynamicList(list: palettes ?? messages ?? columnWidgets!)
+                : const SizedBox.shrink()),
+      ],
+    );
+  }
+}
+
+class PageConsole extends StatelessWidget {
+  final Console console;
+  const PageConsole({required this.console, Key? key}) : super(key: key);
+
+  List<Widget> getExtraTopButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in console.topButtons ?? <ConsoleButton>[]) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+            bottom: 16.0 + (ConsoleButton.height * 2),
+            left: 16.0 + (buttonWidth * i),
+            child: Container(
+              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
+              width: (screenWidth - 32) / console.topButtons!.length,
+              decoration: BoxDecoration(border: Border.all(width: 0.5)),
+              child: Column(children: b.extraButtons!),
+            )));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  List<Widget> getExtraBottomButtons(double screenWidth) {
+    final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
+    List<Widget> extras = [];
+    int i = 0;
+    for (final b in console.bottomButtons) {
+      if (b.showExtra) {
+        extras.add(Positioned(
+          bottom: 16.0 + ConsoleButton.height,
+          left: 16.0 + (buttonWidth * i),
+          child: Container(
+            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
+            width: buttonWidth,
+            decoration: BoxDecoration(border: Border.all(width: 0.5)),
+            child: Column(children: b.extraButtons!),
+          ),
+        ));
+      } else {
+        extras.add(const SizedBox.shrink());
+      }
+      i++;
+    }
+    return extras;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final extraBottomButtons = getExtraBottomButtons(screenWidth);
+    final extraTopButtons = getExtraTopButtons(screenWidth);
+    return Stack(
+      children: [
+        console,
+        ...extraTopButtons,
+        ...extraBottomButtons,
+      ],
+    );
+  }
+}
+
+class Page {
+  final PageBody pageBody;
+  final PageConsole pageConsole;
+  const Page({required this.pageBody, required this.pageConsole});
 }
 
 class Down4Page extends StatelessWidget {
@@ -144,14 +327,6 @@ class Down4Page extends StatelessWidget {
     return Container(
       color: PinkTheme.backGroundColor,
       child: Scaffold(
-        // appBar: PreferredSize(
-        //   preferredSize: const Size.fromHeight(24),
-        //   child: AppBar(
-        //     backgroundColor: PinkTheme.qrColor,
-        //     title: Text(title, style: const TextStyle(fontSize: 16)),
-        //     centerTitle: true,
-        //   ),
-        // ),
         body: Stack(
           children: [
             ...(stackWidgets ?? []),
@@ -395,21 +570,18 @@ class _GroupPageState extends State<GroupPage> {
       final wp = rw.WordPair.random(safeOnly: false);
       final root = u.deterministicHyperchatRoot(targets + [widget.self.id]);
       final msg = Down4Message(
-        media: _cameraInput ?? _mediaInput,
+        mediaID: _cameraInput?.id ?? _mediaInput?.id,
         senderID: widget.self.id,
         timestamp: ts,
         text: _input,
         nodes: _forwardingNodes,
-      );
-
-      Boxes.instance.saveMessage(msg);
+      )..save();
 
       var hyperchatNode = Node(
         type: Nodes.hyperchat,
         id: root,
         name: wp.first,
         lastName: wp.second,
-        image: _hyperchatImage ?? widget.self.image,
         messages: [msg.id!],
         posts: [],
         friends: [],
@@ -422,12 +594,14 @@ class _GroupPageState extends State<GroupPage> {
 
       Boxes.instance.saveNode(hyperchatNode);
       final f = widget.isHyperchat ? r.hyperchatRequest : r.groupRequest;
-      final success = await f(MessageRequest(
-        msg: msg,
-        targets: targets,
-        rootNode: hyperchatNode,
-        withUpload: _cameraInput != null,
-      ));
+      final success = await f(
+        MessageRequest(
+          msg: msg,
+          targets: targets,
+          rootNode: hyperchatNode,
+          media: _cameraInput ?? _mediaInput,
+        ),
+      );
 
       if (success) {
         widget.afterMessageCallback(hyperchatNode);
@@ -553,7 +727,47 @@ class _MoneyPageState extends State<MoneyPage> {
         (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
   }
 
-  void emptyMainView([bool scanning = false, bool reloadInput = false]) {
+  void importView() {
+    var importTec = TextEditingController();
+
+    _view = Down4Navigator(
+      [
+        Down4Page(
+          title: "Money",
+          console: Console(
+            inputs: [ConsoleInput(placeHolder: "WIF / PK", tec: importTec)],
+            topButtons: [
+              ConsoleButton(
+                  name: "Import",
+                  onPress: () async {
+                    final pay = await widget.wallet
+                        .importMoney(widget.self, importTec.value.text);
+                    if (pay != null) {
+                      widget.wallet.parsePayment(widget.self, pay);
+                    }
+                  })
+            ],
+            bottomButtons: [
+              ConsoleButton(
+                name: "Back",
+                onPress: () =>
+                    widget.palettes.length > 0 ? mainView() : emptyMainView(),
+              ),
+              ConsoleButton(name: "Check", onPress: () => print("TODO")),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    setState(() {});
+  }
+
+  void emptyMainView([
+    bool scanning = false,
+    bool reloadInput = false,
+    bool extraBack = false,
+  ]) {
     var len = 0;
     var safe = false;
     var txBuf = <Down4TX>[];
@@ -592,7 +806,21 @@ class _MoneyPageState extends State<MoneyPage> {
           ConsoleButton(name: "Scan", onPress: () => emptyMainView(!scanning))
         ],
         bottomButtons: [
-          ConsoleButton(name: "Back", onPress: widget.back),
+          ConsoleButton(
+            name: "Back",
+            isSpecial: true,
+            showExtra: extraBack,
+            onPress: () => extraBack
+                ? emptyMainView(scanning, reloadInput, !extraBack)
+                : widget.back(),
+            onLongPress: () => emptyMainView(scanning, reloadInput, !extraBack),
+            extraButtons: [
+              ConsoleButton(
+                name: "Import",
+                onPress: () => importView(),
+              )
+            ],
+          ),
           ConsoleButton(
             isMode: true,
             name: currency,
@@ -607,7 +835,7 @@ class _MoneyPageState extends State<MoneyPage> {
     setState(() {});
   }
 
-  void mainView([bool reloadInput = false]) {
+  void mainView([bool reloadInput = false, bool extraBack = false]) {
     _view = Down4Page2(
       title: "Money",
       palettes: widget.palettes,
@@ -616,7 +844,17 @@ class _MoneyPageState extends State<MoneyPage> {
           reloadInput ? mainViewInput : _cachedMainViewInput ?? mainViewInput,
         ],
         bottomButtons: [
-          ConsoleButton(name: "Back", onPress: widget.back),
+          ConsoleButton(
+            name: "Back",
+            isSpecial: true,
+            showExtra: extraBack,
+            onPress: () =>
+                extraBack ? mainView(reloadInput, !extraBack) : widget.back(),
+            onLongPress: () => mainView(reloadInput, !extraBack),
+            extraButtons: [
+              ConsoleButton(name: "Import", onPress: importView),
+            ],
+          ),
           ConsoleButton(
               name: method,
               isMode: true,
@@ -1564,17 +1802,17 @@ class _ChatPageState extends State<ChatPage> {
         ? camConsole(ctrl, 1, resolution, FlashMode.off, true)
         : camConsole(ctrl, 0, resolution, FlashMode.off, true);
 
-    void nextRes() {
-      switch (resolution as ResolutionPreset) {
+    void nextRes() async {
+      switch (resolution) {
         case ResolutionPreset.low:
-          camConsole(ctrl, cameraIdx, ResolutionPreset.medium, flashMode, true);
-          break;
+          return camConsole(
+              ctrl, cameraIdx, ResolutionPreset.medium, flashMode, true);
         case ResolutionPreset.medium:
-          camConsole(ctrl, cameraIdx, ResolutionPreset.high, flashMode, true);
-          break;
+          return camConsole(
+              ctrl, cameraIdx, ResolutionPreset.high, flashMode, true);
         case ResolutionPreset.high:
-          camConsole(ctrl, cameraIdx, ResolutionPreset.low, flashMode, true);
-          break;
+          return camConsole(
+              ctrl, cameraIdx, ResolutionPreset.low, flashMode, true);
         case ResolutionPreset.veryHigh:
           // TODO: Handle this case.
           break;
@@ -1768,17 +2006,50 @@ class _ChatPageState extends State<ChatPage> {
 class HomePage extends StatelessWidget {
   final List<Palette> palettes;
   final Console console;
-  HomePage({required this.palettes, required this.console});
+  const HomePage({required this.palettes, required this.console, Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Down4Navigator([
-      Down4Page(
-        title: "Home",
-        palettes: palettes,
-        console: console,
-      ),
-    ]);
+    return Down4Navigator2(
+      firstPage: 0,
+      pages: [
+        Page(
+          pageBody: PageBody(title: "Home", palettes: palettes),
+          pageConsole: PageConsole(console: console),
+        ),
+        Page(
+          pageBody: PageBody(title: "Friends", palettes: palettes),
+          pageConsole: PageConsole(
+            console: Console(
+              inputs: [
+                ConsoleInput(
+                  placeHolder: "Nice",
+                  tec: TextEditingController(),
+                )
+              ],
+              bottomButtons: [
+                ConsoleButton(name: "Nigga", onPress: () => print("LOL")),
+                ConsoleButton(name: "What", onPress: () => print("LOL")),
+                ConsoleButton(name: "Lol", onPress: () => print("LOL")),
+              ],
+              topButtons: [
+                ConsoleButton(name: "Apple", onPress: () => print("LOL")),
+                ConsoleButton(name: "Orange", onPress: () => print("LOL")),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    // [
+    //   Down4Page(
+    //     title: "Home",
+    //     palettes: palettes,
+    //     console: console,
+    //   ),
+    // ]);
   }
 }
 
@@ -1820,7 +2091,7 @@ class _HomeState extends State<Home> {
     "MyPosts": {},
   };
 
-  StreamSubscription? messageListener, snipListener, paymentListener;
+  StreamSubscription? messageListener;
 
   // Node? _node; // the node we are currently traversing, always null at start
   // List<String> _locations = ["Home"]; // to keep an history of traversed nodes
@@ -1840,23 +2111,20 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    exchangeRate = box.loadExchangeRate() ?? {"rate": 0.0, "update": 0};
     updateExchangeRate();
     loadLocalHomePalettes();
-    // processMessageQueue();
+    connectToMessages();
     homePage();
   }
 
   @override
   void dispose() {
     messageListener?.cancel();
-    snipListener?.cancel();
-    paymentListener?.cancel();
     super.dispose();
   }
 
   Future<void> updateExchangeRate() async {
-    final lastUpdate = exchangeRate["update"] as int;
+    final lastUpdate = exchangeRate["update"] ?? 0;
     final rightNow = u.timeStamp();
     if (rightNow - lastUpdate > const Duration(minutes: 10).inMilliseconds) {
       final rate = await r.getExchangeRate();
@@ -1877,123 +2145,127 @@ class _HomeState extends State<Home> {
     }
   }
 
-  void connectToPayment() {
-    var paymentQueue = db.child("Users").child(widget.self.id).child("p");
-
-    paymentListener = paymentQueue.onChildAdded.listen((event) async {
-      final paymentID = event.snapshot.key;
-      if (paymentID == null) return;
-      paymentQueue.child(paymentID).remove();
-      final paymentData = await st.ref(paymentID).getData();
-      if (paymentData == null) return;
-      final paymentString = String.fromCharCodes(paymentData);
-      final paymentJson = jsonDecode(paymentString);
-      final payment = Down4Payment.fromJson(paymentJson);
-      widget.wallet.parsePayment(widget.self, payment);
-      if (view is MoneyPage) moneyPage();
-    });
-  }
-
   void connectToMessages() {
-    var messageQueue = db.child("Users").child(widget.self.id).child("c");
+    var msgQueue = db.child("Users").child(widget.self.id).child("M");
+    var messagesRef = db.child("Messages");
 
-    // can reuse Down4Message and Messages for snips
-    // we know it's a snip because we are listening on child("s")
-    var messages = db.child("Messages");
+    messageListener = msgQueue.onChildAdded.listen((event) async {
+      var msgID = event.snapshot.key;
+      if (msgID == null) return;
+      msgQueue.child(msgID).remove(); // consume it
 
-    messageListener = messageQueue.onChildAdded.listen((event) async {
-      var messageID = event.snapshot.key;
-      if (messageID == null) return;
+      final snapshot = await messagesRef.child(msgID).get();
+      if (!snapshot.exists) return;
+      final msgJson = Map<String, dynamic>.from(snapshot.value as Map);
+      final msg = Down4Message.fromJson(msgJson);
 
-      final val = (await messages.child(messageID).get()).value;
-      if (val == null) return;
-
-      var asJson = Map<String, dynamic>.from(val as Map);
-      final mediaID = asJson["m"]?["id"];
-      if (mediaID == null) return;
-
-      var d4msg = Down4Message.fromJson(asJson);
-      Down4Media? messageMedia;
-
-      if (d4msg.root != null) {
-        var node = nodeAt(d4msg.root!);
-        if (node != null) {
-          (node.messages ??= []).add(messageID);
-          if (node.isFriendOrGroup) {
-            messageMedia = await getMessageMedia(mediaID);
-            d4msg.media = messageMedia;
-            box.saveMessage(d4msg);
-          }
-          writePalette(node);
-          if (view is HomePage) homePage();
-        } else {
-          node = await getNode(d4msg.root!);
-          if (node != null) {
-            writePalette(node);
-            var mutatedNode = nodeAt(d4msg.root!);
-            if (mutatedNode != null) {
-              (mutatedNode.messages ??= []).add(mediaID);
-              if (mutatedNode.isFriendOrGroup) {
-                messageMedia = await getMessageMedia(mediaID);
-                d4msg.media = messageMedia;
-                box.saveMessage(d4msg);
+      switch (msg.type) {
+        case Messages.chat:
+          msg.save();
+          if (msg.root != null) {
+            var rootNode = nodeAt(msg.root!);
+            if (rootNode != null) {
+              (rootNode.messages ??= []).add(msg.id!);
+              // if root is group of hyperchat, we download the media right away
+              if (rootNode.isFriendOrGroup && msg.mediaID != null) {
+                (await r.getMessageMedia(msg.mediaID!))?.save();
               }
-              writePalette(mutatedNode);
-              if (view is HomePage) homePage();
+              writePalette(rootNode
+                ..updateActivity()
+                ..save());
+            } else {
+              // root node is not in home
+              final newNode = await getNode(msg.root!);
+              if (newNode == null) return;
+              (newNode.messages ??= []).add(msg.id!);
+              writePalette(newNode
+                ..updateActivity()
+                ..save());
+            }
+          } else {
+            // msg.root == null
+            var userNode = nodeAt(msg.senderID);
+            if (userNode != null) {
+              // user is in home
+              (userNode.messages ??= []).add(msg.id!);
+              // if is friend, we download the media right away
+              if (userNode.isFriendOrGroup && msg.mediaID != null) {
+                (await r.getMessageMedia(msg.mediaID!))?.save();
+              }
+              writePalette(userNode
+                ..updateActivity()
+                ..save());
+            } else {
+              // userNode is not in home
+              final newUserNode = await getNode(msg.senderID);
+              if (newUserNode == null) return;
+              (newUserNode.messages ??= []).add(msg.id!);
+              writePalette(newUserNode
+                ..updateActivity()
+                ..save());
             }
           }
-        }
-      }
-    });
-  }
-
-  void connectToSnips() {
-    var snips = db.child("Users").child(widget.self.id).child("s");
-
-    // can reuse Down4Message and Messages for snips
-    // we know it's a snip because we are listening on child("s")
-    var messages = db.child("Messages");
-
-    snipListener = snips.onChildAdded.listen((event) async {
-      var snipID = event.snapshot.key;
-      if (snipID == null) return;
-
-      final val = (await messages.child(snipID).get()).value;
-      if (val == null) return;
-
-      var asJson = Map<String, dynamic>.from(val as Map);
-      final mediaID = asJson["m"]?["id"];
-      if (mediaID == null) return;
-
-      var d4msg = Down4Message.fromJson(asJson);
-      Down4Media? snipMedia;
-
-      if (d4msg.root != null) {
-        var node = nodeAt(d4msg.root!);
-        if (node != null) {
-          (node.snips ??= []).add(mediaID);
-          if (node.isFriendOrGroup) {
-            snipMedia = await getMessageMedia(mediaID);
-            if (snipMedia != null) box.saveSnip(snipMedia);
+          if (view is HomePage) {
+            homePage();
+          } else if (view is NodePage &&
+              locations.last["id"] == (msg.root ?? msg.senderID)) {
+            var n = nodeAt(msg.root ?? msg.senderID);
+            if (n != null) nodePage(n);
           }
-          writePalette(node);
-          if (view is HomePage) homePage();
-        } else {
-          node = await getNode(d4msg.root!);
-          if (node != null) {
-            writePalette(node);
-            var mutatedNode = nodeAt(d4msg.root!);
-            if (mutatedNode != null) {
-              (mutatedNode.snips ??= []).add(mediaID);
-              if (mutatedNode.isFriendOrGroup) {
-                snipMedia = await getMessageMedia(mediaID);
-                if (snipMedia != null) box.saveSnip(snipMedia);
-              }
-              writePalette(mutatedNode);
-              if (view is HomePage) homePage();
+          break;
+        case Messages.payment:
+          final paymentID = msg.paymentID;
+          if (paymentID == null) return;
+          final paymentData = await st.ref(paymentID).getData();
+          if (paymentData == null) return;
+          final paymentString = utf8.decode(paymentData);
+          final paymentJson = jsonDecode(paymentString);
+          final payment = Down4Payment.fromJson(paymentJson)..save();
+          widget.wallet.parsePayment(widget.self, payment);
+          if (view is MoneyPage) moneyPage();
+          break;
+        case Messages.bill:
+          // TODO: Handle this case.
+          break;
+        case Messages.snip:
+          if (msg.root != null) {
+            var nodeRoot = nodeAt(msg.root!);
+            if (nodeRoot == null) {
+              // nodeRoot is not in home, need to download it
+              final newRootNode = await getNode(msg.root!);
+              if (newRootNode == null) return;
+              (newRootNode.snips ??= []).add(msg.mediaID!);
+              writePalette(newRootNode
+                ..updateActivity()
+                ..save());
+            } else {
+              // nodeRoot is in home
+              (nodeRoot.snips ??= []).add(msg.mediaID!);
+              writePalette(nodeRoot
+                ..updateActivity()
+                ..save());
+            }
+          } else {
+            // user snip
+            final homeUserRoot = nodeAt(msg.senderID);
+            if (homeUserRoot != null) {
+              // user is in home
+              (homeUserRoot.snips ??= []).add(msg.mediaID!);
+              writePalette(homeUserRoot
+                ..updateActivity()
+                ..save());
+            } else {
+              // user is not in home
+              var userNode = await getNode(msg.senderID);
+              if (userNode == null) return;
+              (userNode.snips ??= []).add(msg.mediaID!);
+              writePalette(userNode
+                ..updateActivity()
+                ..save());
             }
           }
-        }
+          if (view is HomePage) homePage();
+          break;
       }
     });
   }
@@ -2169,7 +2441,7 @@ class _HomeState extends State<Home> {
     return null;
   }
 
-  Future<void> handleSnipCameraCallback(
+  Future<void> sendSnip(
     String? path,
     bool? isVideo,
     bool? toReverse,
@@ -2189,23 +2461,37 @@ class _HomeState extends State<Home> {
           aspectRatio: aspectRatio,
         ),
       );
-      var success = r.snipRequest(MessageRequest(
-        withUpload: true,
+      var userTargets = <Identifier>[];
+      for (final p in palettes().selected()) {
+        if (p.node.isGroup) {
+          final mr = MessageRequest(
+            msg: Down4Message(
+              root: p.node.id,
+              timestamp: timestamp,
+              mediaID: media.id,
+              senderID: widget.self.id,
+            ),
+            targets: (p.node.group ??= [])
+              ..removeWhere((userID) => widget.self.id == userID),
+            media: media,
+          );
+          r.snipRequest(mr);
+        } else {
+          userTargets.add(p.node.id);
+        }
+      }
+      r.snipRequest(MessageRequest(
         msg: Down4Message(
           timestamp: timestamp,
-          media: media,
+          mediaID: media.id,
           senderID: widget.self.id,
         ),
         targets: selectedHomeUserPaletteDeactivated.asIds(),
+        media: media,
       ));
-      homePage();
-      if (await success) {
-        unselectSelectedPalettes("Home", true);
-        homePage();
-      }
-    } else {
-      homePage();
+      unselectSelectedPalettes("Home", true);
     }
+    homePage();
   }
 
   // ======================================================= CONSOLE ACTIONS ============================================================ //
@@ -2602,7 +2888,7 @@ class _HomeState extends State<Home> {
         minZoom: await ctrl.getMinZoomLevel(),
         camNum: camera,
         cameraBack: homePage,
-        cameraCallBack: handleSnipCameraCallback,
+        cameraCallBack: sendSnip,
         ctrl: ctrl,
         nextRes: () => snipPage(
           ctrl: ctrl,
@@ -2676,11 +2962,11 @@ class _HomeState extends State<Home> {
       box.saveNode(node);
       Down4Media? media;
       dynamic jsonEncodedMedia;
-      if ((jsonEncodedMedia = box.snip.get(snip)) == null) {
+      if ((jsonEncodedMedia = box.snips.get(snip)) == null) {
         media = await r.getMessageMedia(snip);
       } else {
         media = Down4Media.fromJson(jsonDecode(jsonEncodedMedia));
-        box.snip.delete(snip); // consume it
+        box.snips.delete(snip); // consume it
       }
       if (media == null) {
         writePalette(node);

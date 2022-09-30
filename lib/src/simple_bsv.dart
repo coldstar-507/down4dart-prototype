@@ -14,10 +14,10 @@ import 'package:bip39/bip39.dart' as bip39;
 // import 'package:elliptic/elliptic.dart' as ell;
 // import 'package:ecdsa/ecdsa.dart' as ecdsa;
 import 'package:dart_bs58/dart_bs58.dart';
-import 'package:dart_wif/dart_wif.dart';
+import 'package:dart_wif/dart_wif.dart' as wif;
 import 'package:dart_ecpair/dart_ecpair.dart';
 import 'package:dart_bip32/dart_bip32.dart';
-// import 'dart:io' as io;
+import 'dart:io' as io;
 
 class SIGHASH {
   static const ALL = 0x41;
@@ -131,6 +131,8 @@ class Down4InternetPayment {
         "sdrid": sender,
         "pay": pay.toJson(),
       };
+
+  List<int> toData() => utf8.encode(jsonEncode(this));
 }
 
 class Down4Payment {
@@ -138,9 +140,10 @@ class Down4Payment {
   bool safe;
   Down4Payment(this.txs, this.safe);
 
-  String get id => sha256(txs.fold<List<int>>(
-          [], (prev, tx) => prev + tx.txID!.data).asUint8List())
-      .toHex();
+  String get id => sha256(
+        txs.fold<List<int>>(
+            [], (prev, tx) => prev + tx.txID!.data).asUint8List(),
+      ).toHex();
 
   Map<String, dynamic> toJsoni(int i) => {
         "tx": txs[i].toJson(),
@@ -149,6 +152,7 @@ class Down4Payment {
       };
 
   Map<String, dynamic> toJson() => {
+        "id": id,
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,
         "safe": safe,
@@ -1012,14 +1016,10 @@ class BatchResponse {
 }
 
 void main() {
-  final seed = _genSeed(32).asUint8List();
-  print(seed.toBase58());
+  var pk = io.File("/home/scott/Desktop/priv.txt").readAsStringSync();
+  var pair = ECPair.fromPrivateKey(bs58.decode(pk));
 
-  var b = BIP32.fromSeed(seed);
-  print(b.toWIF());
-}
+  var addr = _makeAddress(pair.publicKey);
 
-List<int> _genSeed(int byteCount) {
-  var rs = Random.secure();
-  return List<int>.generate(byteCount, (_) => rs.nextInt(256));
+  print(addr.toBase58());
 }

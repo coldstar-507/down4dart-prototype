@@ -12,33 +12,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'data_objects.dart';
 import 'render_utility.dart';
 import 'boxes.dart';
-
-class PinkTheme {
-  static const buttonColor = Color.fromARGB(255, 250, 222, 224);
-  static const bodyColor = buttonColor;
-  static const inactivatedButtonColor = Color.fromARGB(255, 219, 214, 214);
-  static const backGroundColor = Color.fromARGB(255, 255, 241, 242);
-  static const headerColor = Color.fromARGB(255, 236, 155, 182);
-  static const imageBorderColor = Color.fromARGB(255, 143, 29, 67);
-  static const borderColor = Colors.black;
-  static const qrColor = Color.fromARGB(255, 56, 3, 17);
-  static const black = Colors.black;
-  static const snipRibbon = Color.fromARGB(153, 255, 241, 242);
-  static const Map<Nodes, Color> nodeColors = {
-    Nodes.root: Color.fromARGB(255, 53, 3, 20),
-    Nodes.hyperchat: Color.fromARGB(255, 212, 168, 182),
-    Nodes.checkpoint: Color.fromARGB(255, 22, 94, 161),
-    Nodes.event: Color.fromARGB(255, 95, 28, 219),
-    Nodes.item: Color.fromARGB(255, 187, 108, 34),
-    Nodes.journal: Color.fromARGB(255, 90, 62, 134),
-    Nodes.market: Color.fromARGB(255, 34, 134, 64),
-    Nodes.ticket: Color.fromARGB(255, 233, 220, 30),
-    Nodes.user: Color.fromARGB(255, 230, 174, 193),
-    Nodes.friend: Color.fromARGB(255, 230, 174, 193),
-    Nodes.group: Color.fromARGB(255, 175, 134, 209),
-    Nodes.nonFriend: Color.fromARGB(255, 158, 92, 114),
-  };
-}
+import 'themes.dart';
 
 class BasicActionButton extends StatelessWidget {
   final void Function(String, String) goPress;
@@ -309,7 +283,7 @@ class Palette extends StatelessWidget {
                                 Nodes.hyperchat,
                                 Nodes.group,
                               ].contains(node.type) &&
-                          (node.messages ?? const []).isNotEmpty
+                              (node.messages ?? const []).isNotEmpty
                           ? Text(
                               (Boxes.instance
                                               .loadMessage(node.messages!.last)
@@ -789,6 +763,7 @@ class ChatMessage extends StatelessWidget {
   static const double headerHeight = 24.0;
   final String at;
   final Down4Message message;
+  final Down4Media? media;
   final bool myMessage, selected, hasHeader, isPost;
   final void Function(Identifier, Identifier)? select;
   const ChatMessage({
@@ -797,6 +772,7 @@ class ChatMessage extends StatelessWidget {
     required this.myMessage,
     required this.at,
     required this.hasHeader,
+    this.media,
     this.isPost = false,
     this.selected = false,
     this.select,
@@ -809,6 +785,7 @@ class ChatMessage extends StatelessWidget {
       hasHeader: hasHeader,
       message: message,
       myMessage: myMessage,
+      media: media,
       at: at,
       select: select,
       selected: !selected,
@@ -903,7 +880,7 @@ class ChatMessage extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(6.0),
                         clipBehavior: Clip.hardEdge,
-                        decoration: message.media == null
+                        decoration: media == null
                             ? BoxDecoration(
                                 color: PinkTheme.bodyColor,
                                 borderRadius: hasHeader
@@ -932,8 +909,8 @@ class ChatMessage extends StatelessWidget {
                         ),
                       ),
                     ),
-              message.media != null
-                  ? message.media!.metadata.isVideo
+              media != null
+                  ? media!.metadata.isVideo
                       ? Container(
                           clipBehavior: Clip.hardEdge,
                           height: maxWidth,
@@ -948,7 +925,7 @@ class ChatMessage extends StatelessWidget {
                                 : const BorderRadius.all(Radius.circular(4.0)),
                           ),
                           child: Down4VideoPlayer(
-                            vid: message.media!.file!,
+                            vid: media!.file!,
                             key: GlobalKey(),
                           ))
                       : GestureDetector(
@@ -967,7 +944,7 @@ class ChatMessage extends StatelessWidget {
                                       Radius.circular(4.0)),
                             ),
                             child: Image.memory(
-                              message.media!.data,
+                              media!.data,
                               fit: BoxFit.cover,
                               gaplessPlayback: true,
                             ),
@@ -1121,19 +1098,19 @@ class DynamicList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gapSize = Sizes.h * 0.02;
-    return Expanded(
-        child: ScrollConfiguration(
-            behavior: NoGlow(),
-            child: ListView.separated(
-                padding: const EdgeInsets.only(top: 0),
-                reverse: true,
-                itemBuilder: (c, i) => i == 0
-                    ? const SizedBox.shrink()
-                    : i == list.length + 2 - 1
-                        ? const SizedBox.shrink()
-                        : list[i - 1],
-                separatorBuilder: (c, i) => Container(height: gapSize),
-                itemCount: list.length + 2)));
+    return ScrollConfiguration(
+      behavior: NoGlow(),
+      child: ListView.separated(
+          padding: const EdgeInsets.only(top: 0),
+          reverse: true,
+          itemBuilder: (c, i) => i == 0
+              ? const SizedBox.shrink()
+              : i == list.length + 2 - 1
+                  ? const SizedBox.shrink()
+                  : list[i - 1],
+          separatorBuilder: (c, i) => Container(height: gapSize),
+          itemCount: list.length + 2),
+    );
   }
 }
 
