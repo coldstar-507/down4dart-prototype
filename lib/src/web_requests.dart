@@ -117,50 +117,35 @@ Future<bool> snipRequest(MessageRequest req) async {
   return res.statusCode == 200;
 }
 
-Future<bool> groupRequest(MessageRequest req, [retried = false]) async {
+Future<bool> groupRequest(GroupRequest req, [withMedia = false]) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
   );
-  final res = await http.post(url, body: jsonEncode(req));
-  if (res.statusCode == HttpStatus.noContent && retried == false) {
-    return groupRequest(
-      req
-        ..withUpload = true
-        ..msg.media?.metadata.timestamp = timeStamp(),
-      true,
-    );
+  final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
+  if (res.statusCode == HttpStatus.noContent) {
+    return groupRequest(req, true);
   }
   return res.statusCode == 200;
 }
 
-Future<bool> hyperchatRequest(MessageRequest req, [retried = false]) async {
+Future<bool> hyperchatRequest(HyperchatRequest req, [withMedia = false]) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
   );
-  final res = await http.post(url, body: jsonEncode(req));
-  if (res.statusCode == HttpStatus.noContent && retried == false) {
-    return hyperchatRequest(
-      req
-        ..withUpload = true
-        ..msg.media?.metadata.timestamp = timeStamp(),
-      true,
-    );
+  final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
+  if (res.statusCode == HttpStatus.noContent) {
+    return hyperchatRequest(req, true);
   }
   return res.statusCode == 200;
 }
 
-Future<bool> chatRequest(MessageRequest req, [retried = false]) async {
+Future<bool> chatRequest(ChatRequest req, [withMedia = false]) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
   );
-  final res = await http.post(url, body: jsonEncode(req));
-  if (res.statusCode == HttpStatus.noContent && retried == false) {
-    return chatRequest(
-      req
-        ..withUpload = true
-        ..msg.media?.metadata.timestamp = timeStamp(),
-      true,
-    );
+  final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
+  if (res.statusCode == HttpStatus.noContent) {
+    return chatRequest(req, true);
   }
   return res.statusCode == 200;
 }
@@ -185,7 +170,6 @@ Future<bool> sendInternetPayment(w.Down4InternetPayment payment) async {
   final res = await http.post(url, body: jsonEncode(payment));
   return res.statusCode == 200;
 }
-
 
 // Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
 //   final url = Uri.parse(

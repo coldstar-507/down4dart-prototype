@@ -15,9 +15,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_player/video_player.dart';
 import 'package:english_words/english_words.dart' as rw;
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:scroll_navigation/scroll_navigation.dart';
-import 'customized_packages/custom_scroll_navigation/scroll_navigation.dart'
-    as custom_scroll;
+// import 'package:scroll_navigation/scroll_navigation.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -31,52 +29,51 @@ import 'themes.dart';
 
 import 'simple_bsv.dart';
 
-class Down4Navigator extends StatelessWidget {
-  final List<Down4Page> pages;
-  final navigationKey = GlobalKey<ScrollNavigationState>();
-
-  Down4Navigator(this.pages, {Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return TitleScrollNavigation(
-      showIdentifier: false,
-      bodyStyle: const NavigationBodyStyle(background: PinkTheme.qrColor),
-      barStyle: const TitleNavigationBarStyle(
-        style: TextStyle(fontSize: 18),
-        padding: EdgeInsets.all(5.0),
-        background: PinkTheme.qrColor,
-        activeColor: Colors.white,
-        deactiveColor: Colors.white24,
-      ),
-      // identiferStyle: NavigationIdentiferStyle(
-      //   color: pages.length > 1 ? Colors.redAccent : PinkTheme.qrColor,
-      // ),
-      titles: pages.map((p) => p.title).toList(growable: false),
-      pages: pages,
-    );
-
-    // return ScrollNavigation(
-    //   // bodyStyle: const NavigationBodyStyle(background: PinkTheme.qrColor),
-    //   barStyle: const NavigationBarStyle(
-    //     verticalPadding: 5.0,
-    //     position: NavigationPosition.top,
-    //     background: PinkTheme.qrColor,
-    //   ),
-    //   identiferStyle: NavigationIdentiferStyle(
-    //     color: pages.length > 1 ? Colors.redAccent : PinkTheme.qrColor,
-    //   ),
-    //   pages: pages,
-    //   items: titles,
-    // );
-  }
-}
+// class Down4Navigator extends StatelessWidget {
+//   final List<Down4Page> pages;
+//   final navigationKey = GlobalKey<ScrollNavigationState>();
+//
+//   Down4Navigator(this.pages, {Key? key}) : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return TitleScrollNavigation(
+//       showIdentifier: false,
+//       bodyStyle: const NavigationBodyStyle(background: PinkTheme.qrColor),
+//       barStyle: const TitleNavigationBarStyle(
+//         style: TextStyle(fontSize: 18),
+//         padding: EdgeInsets.all(5.0),
+//         background: PinkTheme.qrColor,
+//         activeColor: Colors.white,
+//         deactiveColor: Colors.white24,
+//       ),
+//       // identiferStyle: NavigationIdentiferStyle(
+//       //   color: pages.length > 1 ? Colors.redAccent : PinkTheme.qrColor,
+//       // ),
+//       titles: pages.map((p) => p.title).toList(growable: false),
+//       pages: pages,
+//     );
+//
+//     // return ScrollNavigation(
+//     //   // bodyStyle: const NavigationBodyStyle(background: PinkTheme.qrColor),
+//     //   barStyle: const NavigationBarStyle(
+//     //     verticalPadding: 5.0,
+//     //     position: NavigationPosition.top,
+//     //     background: PinkTheme.qrColor,
+//     //   ),
+//     //   identiferStyle: NavigationIdentiferStyle(
+//     //     color: pages.length > 1 ? Colors.redAccent : PinkTheme.qrColor,
+//     //   ),
+//     //   pages: pages,
+//     //   items: titles,
+//     // );
+//   }
+// }
 
 class Down4Navigator2 extends StatefulWidget {
   final int firstPage;
   final List<Page> pages;
-  final navigationKey = GlobalKey<ScrollNavigationState>();
-  Down4Navigator2({
+  const Down4Navigator2({
     required this.pages,
     required this.firstPage,
     Key? key,
@@ -111,37 +108,37 @@ class _Down4Navigator2State extends State<Down4Navigator2> {
       index: widget.firstPage,
     );
 
-    return Scaffold(
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: Sizes.h - 60,
-            child: custom_scroll.TitleScrollNavigation(
-              initialPage: _currentPage,
-              pageChangeCurrentIndex: onPageChange,
-              showIdentifier: false,
-              // bodyStyle: const NavigationBodyStyle(
-              //   background: PinkTheme.backGroundColor,
-              // ),
-              barStyle: const TitleNavigationBarStyle(
-                style: TextStyle(fontSize: 18),
-                padding: EdgeInsets.all(5.0),
-                background: PinkTheme.qrColor,
-                activeColor: Colors.white,
-                deactiveColor: Colors.white24,
-              ),
-              titles: widget.pages
-                  .map((p) => p.pageBody.title)
-                  .toList(growable: false),
-              pages:
-                  widget.pages.map((p) => p.pageBody).toList(growable: false),
-            ),
-          ),
-          widget.pages[_currentPage].pageConsole,
-        ],
-      ),
-    );
+    // return Scaffold(
+    //   body: Column(
+    //     mainAxisAlignment: MainAxisAlignment.start,
+    //     children: [
+    //       SizedBox(
+    //         height: Sizes.h - 60,
+    //         child: custom_scroll.TitleScrollNavigation(
+    //           initialPage: _currentPage,
+    //           pageChangeCurrentIndex: onPageChange,
+    //           showIdentifier: false,
+    //           // bodyStyle: const NavigationBodyStyle(
+    //           //   background: PinkTheme.backGroundColor,
+    //           // ),
+    //           barStyle: const TitleNavigationBarStyle(
+    //             style: TextStyle(fontSize: 18),
+    //             padding: EdgeInsets.all(5.0),
+    //             background: PinkTheme.qrColor,
+    //             activeColor: Colors.white,
+    //             deactiveColor: Colors.white24,
+    //           ),
+    //           titles: widget.pages
+    //               .map((p) => p.pageBody.title)
+    //               .toList(growable: false),
+    //           pages:
+    //               widget.pages.map((p) => p.pageBody).toList(growable: false),
+    //         ),
+    //       ),
+    //       widget.pages[_currentPage].pageConsole,
+    //     ],
+    //   ),
+    // );
   }
 }
 
@@ -563,7 +560,8 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   Future<void> send() async {
-    if (_input != "" || _mediaInput != null || _cameraInput != null) {
+    // let's do 2 different views for hyperchat and group
+    if ((_input != "" || _mediaInput != null || _cameraInput != null)) {
       final ts = u.timeStamp();
       var targets = widget.palettes.map((e) => e.node.id).toList()
         ..remove(widget.self.id);
@@ -583,27 +581,34 @@ class _GroupPageState extends State<GroupPage> {
         name: wp.first,
         lastName: wp.second,
         messages: [msg.id!],
-        posts: [],
-        friends: [],
         group: targets + [widget.self.id],
-        parents: [],
-        childs: [],
-        admins: [],
         snips: [],
       )..updateActivity();
 
       Boxes.instance.saveNode(hyperchatNode);
       final f = widget.isHyperchat ? r.hyperchatRequest : r.groupRequest;
-      final success = await f(
-        MessageRequest(
-          msg: msg,
-          targets: targets,
-          rootNode: hyperchatNode,
-          media: _cameraInput ?? _mediaInput,
-        ),
-      );
 
-      if (success) {
+      var success = widget.isHyperchat
+          ? r.hyperchatRequest(
+              HyperchatRequest(
+                msg: msg,
+                targets: targets,
+                media: _cameraInput ?? _mediaInput,
+                wordPairs: rw
+                    .generateWordPairs()
+                    .take(10)
+                    .map((e) => e.first + " " + e.second)
+                    .toList(),
+              ),
+            )
+          : r.groupRequest(GroupRequest(
+              name: _hyperchatName,
+              groupImage: _hyperchatImage!,
+              msg: msg,
+              targets: targets,
+            ));
+
+      if (await success) {
         widget.afterMessageCallback(hyperchatNode);
       }
     }
@@ -730,10 +735,13 @@ class _MoneyPageState extends State<MoneyPage> {
   void importView() {
     var importTec = TextEditingController();
 
-    _view = Down4Navigator(
-      [
-        Down4Page(
+    _view = Down4Navigator2(pages: [
+      Page(
+        pageBody: PageBody(
           title: "Money",
+          palettes: widget.palettes,
+        ),
+        pageConsole: PageConsole(
           console: Console(
             inputs: [ConsoleInput(placeHolder: "WIF / PK", tec: importTec)],
             topButtons: [
@@ -757,8 +765,38 @@ class _MoneyPageState extends State<MoneyPage> {
             ],
           ),
         ),
-      ],
-    );
+      )
+    ], firstPage: 0);
+
+    // _view = Down4Navigator(
+    //   [
+    //     Down4Page(
+    //       title: "Money",
+    //       console: Console(
+    //         inputs: [ConsoleInput(placeHolder: "WIF / PK", tec: importTec)],
+    //         topButtons: [
+    //           ConsoleButton(
+    //               name: "Import",
+    //               onPress: () async {
+    //                 final pay = await widget.wallet
+    //                     .importMoney(widget.self, importTec.value.text);
+    //                 if (pay != null) {
+    //                   widget.wallet.parsePayment(widget.self, pay);
+    //                 }
+    //               })
+    //         ],
+    //         bottomButtons: [
+    //           ConsoleButton(
+    //             name: "Back",
+    //             onPress: () =>
+    //                 widget.palettes.length > 0 ? mainView() : emptyMainView(),
+    //           ),
+    //           ConsoleButton(name: "Check", onPress: () => print("TODO")),
+    //         ],
+    //       ),
+    //     ),
+    //   ],
+    // );
 
     setState(() {});
   }
@@ -1730,12 +1768,8 @@ class _ChatPageState extends State<ChatPage> {
   void saveSelectedMessages() {
     for (final msg in _chachedMessages.values) {
       if (msg.selected) {
-        if (msg.message.media != null) {
-          if (msg.message.media!.metadata.isVideo) {
-            Boxes.instance.saveVideo(msg.message.media!);
-          } else {
-            Boxes.instance.saveImage(msg.message.media!);
-          }
+        if (msg.media != null) {
+          msg.media!.save(toPersonal: true);
         }
         _chachedMessages[msg.message.id!] = msg.invertedSelection();
       }
@@ -1753,7 +1787,7 @@ class _ChatPageState extends State<ChatPage> {
         id: u.generateMessageID(widget.self.id, ts),
         timestamp: ts,
         senderID: widget.self.id,
-        media: mediaInput,
+        mediaID: mediaInput?.id,
         text: textInput,
       );
 
