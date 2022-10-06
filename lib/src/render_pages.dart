@@ -70,93 +70,95 @@ import 'simple_bsv.dart';
 //   }
 // }
 
-class Down4Navigator2 extends StatefulWidget {
-  final int firstPage;
-  final List<Page> pages;
-  const Down4Navigator2({
-    required this.pages,
-    required this.firstPage,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  _Down4Navigator2State createState() => _Down4Navigator2State();
-}
-
-class _Down4Navigator2State extends State<Down4Navigator2> {
-  int _currentPage = 0;
-  Widget? _view;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentPage = widget.firstPage;
-  }
-
-  void onPageChange(int newPage) {
-    _currentPage = newPage;
-    print("New page: $newPage");
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Jeff(
-      titles: widget.pages.map((e) => e.pageBody.title).toList(growable: false),
-      bodies: widget.pages.map((e) => e.pageBody).toList(growable: false),
-      consoles: widget.pages.map((e) => e.pageConsole).toList(growable: false),
-      index: widget.firstPage,
-    );
-
-    // return Scaffold(
-    //   body: Column(
-    //     mainAxisAlignment: MainAxisAlignment.start,
-    //     children: [
-    //       SizedBox(
-    //         height: Sizes.h - 60,
-    //         child: custom_scroll.TitleScrollNavigation(
-    //           initialPage: _currentPage,
-    //           pageChangeCurrentIndex: onPageChange,
-    //           showIdentifier: false,
-    //           // bodyStyle: const NavigationBodyStyle(
-    //           //   background: PinkTheme.backGroundColor,
-    //           // ),
-    //           barStyle: const TitleNavigationBarStyle(
-    //             style: TextStyle(fontSize: 18),
-    //             padding: EdgeInsets.all(5.0),
-    //             background: PinkTheme.qrColor,
-    //             activeColor: Colors.white,
-    //             deactiveColor: Colors.white24,
-    //           ),
-    //           titles: widget.pages
-    //               .map((p) => p.pageBody.title)
-    //               .toList(growable: false),
-    //           pages:
-    //               widget.pages.map((p) => p.pageBody).toList(growable: false),
-    //         ),
-    //       ),
-    //       widget.pages[_currentPage].pageConsole,
-    //     ],
-    //   ),
-    // );
-  }
-}
+// class Down4Navigator2 extends StatefulWidget {
+//   final int firstPage;
+//   final List<Page> pages;
+//   const Down4Navigator2({
+//     required this.pages,
+//     required this.firstPage,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   @override
+//   _Down4Navigator2State createState() => _Down4Navigator2State();
+// }
+//
+// class _Down4Navigator2State extends State<Down4Navigator2> {
+//   int _currentPage = 0;
+//   Widget? _view;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _currentPage = widget.firstPage;
+//   }
+//
+//   void onPageChange(int newPage) {
+//     _currentPage = newPage;
+//     print("New page: $newPage");
+//     setState(() {});
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Jeff(
+//       titles: widget.pages.map((e) => e.title).toList(growable: false),
+//       bodies: widget.pages.map((e) => e.pageBody).toList(growable: false),
+//       consoles: widget.pages.map((e) => e.pageConsole).toList(growable: false),
+//       index: widget.firstPage,
+//     );
+//
+//     // return Scaffold(
+//     //   body: Column(
+//     //     mainAxisAlignment: MainAxisAlignment.start,
+//     //     children: [
+//     //       SizedBox(
+//     //         height: Sizes.h - 60,
+//     //         child: custom_scroll.TitleScrollNavigation(
+//     //           initialPage: _currentPage,
+//     //           pageChangeCurrentIndex: onPageChange,
+//     //           showIdentifier: false,
+//     //           // bodyStyle: const NavigationBodyStyle(
+//     //           //   background: PinkTheme.backGroundColor,
+//     //           // ),
+//     //           barStyle: const TitleNavigationBarStyle(
+//     //             style: TextStyle(fontSize: 18),
+//     //             padding: EdgeInsets.all(5.0),
+//     //             background: PinkTheme.qrColor,
+//     //             activeColor: Colors.white,
+//     //             deactiveColor: Colors.white24,
+//     //           ),
+//     //           titles: widget.pages
+//     //               .map((p) => p.pageBody.title)
+//     //               .toList(growable: false),
+//     //           pages:
+//     //               widget.pages.map((p) => p.pageBody).toList(growable: false),
+//     //         ),
+//     //       ),
+//     //       widget.pages[_currentPage].pageConsole,
+//     //     ],
+//     //   ),
+//     // );
+//   }
+// }
 
 class PageBody extends StatelessWidget {
-  final String title;
   final List<Widget>? stackWidgets;
   final List<Palette>? palettes;
   final List<ChatMessage>? messages;
   final MessageList4? messageList;
   final List<Widget>? columnWidgets;
+  final List<Widget>? topDownColumnWidget;
+  final FutureNodes? futureNodes;
 
   const PageBody({
-    required this.title,
     this.columnWidgets,
     this.palettes,
     this.stackWidgets,
     this.messageList,
     this.messages,
+    this.topDownColumnWidget,
+    this.futureNodes,
     Key? key,
   }) : super(key: key);
 
@@ -166,9 +168,12 @@ class PageBody extends StatelessWidget {
       children: [
         ...(stackWidgets ?? []),
         messageList ??
+            futureNodes ??
             ((palettes != null || messages != null || columnWidgets != null)
                 ? DynamicList(list: palettes ?? messages ?? columnWidgets!)
-                : const SizedBox.shrink()),
+                : topDownColumnWidget != null
+                    ? DynamicList(list: topDownColumnWidget!, reversed: false)
+                    : const SizedBox.shrink()),
       ],
     );
   }
@@ -176,23 +181,29 @@ class PageBody extends StatelessWidget {
 
 class PageConsole extends StatelessWidget {
   final Console console;
+
   const PageConsole({required this.console, Key? key}) : super(key: key);
 
-  List<Widget> getExtraTopButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
+  List<Widget> getExtraTopButtons() {
+    final consoleHorizontalGap = Sizes.h * 0.023;
+    final consoleVerticalGap = Sizes.h * 0.021;
+    final buttonWidth = ((Sizes.w - (consoleHorizontalGap * 2.0)) /
+            (console.bottomButtons.length.toDouble())) +
+        1.0; // 1.0 for borders
     List<Widget> extras = [];
     int i = 0;
     for (final b in console.topButtons ?? <ConsoleButton>[]) {
       if (b.showExtra) {
         extras.add(Positioned(
-            bottom: 16.0 + (ConsoleButton.height * 2),
-            left: 16.0 + (buttonWidth * i),
-            child: Container(
-              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-              width: (screenWidth - 32) / console.topButtons!.length,
-              decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.extraButtons!),
-            )));
+          bottom: consoleVerticalGap + (ConsoleButton.height * 2),
+          left: consoleHorizontalGap + (buttonWidth * i),
+          child: Container(
+            height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
+            width: buttonWidth,
+            decoration: BoxDecoration(border: Border.all(width: 0.5)),
+            child: Column(children: b.extraButtons!),
+          ),
+        ));
       } else {
         extras.add(const SizedBox.shrink());
       }
@@ -201,17 +212,21 @@ class PageConsole extends StatelessWidget {
     return extras;
   }
 
-  List<Widget> getExtraBottomButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
+  List<Widget> getExtraBottomButtons() {
+    final consoleHorizontalGap = Sizes.h * 0.023;
+    final consoleVerticalGap = Sizes.h * 0.021;
+    final buttonWidth = ((Sizes.w - (consoleHorizontalGap * 2.0)) /
+            (console.bottomButtons.length.toDouble())) +
+        0.75; // 1.0 for borders
     List<Widget> extras = [];
     int i = 0;
     for (final b in console.bottomButtons) {
       if (b.showExtra) {
         extras.add(Positioned(
-          bottom: 16.0 + ConsoleButton.height,
-          left: 16.0 + (buttonWidth * i),
+          bottom: consoleVerticalGap + ConsoleButton.height - 0.75,
+          left: consoleHorizontalGap + (buttonWidth * i),
           child: Container(
-            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
+            height: (b.extraButtons!.length * ConsoleButton.height) - 0.5,
             width: buttonWidth,
             decoration: BoxDecoration(border: Border.all(width: 0.5)),
             child: Column(children: b.extraButtons!),
@@ -227,238 +242,344 @@ class PageConsole extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final extraBottomButtons = getExtraBottomButtons(screenWidth);
-    final extraTopButtons = getExtraTopButtons(screenWidth);
+    return console;
+  }
+}
+
+class Page {
+  final String title;
+  final List<Widget>? stackWidgets;
+  final List<Palette>? palettes;
+  final FutureNodes? futureNodes;
+  final List<ChatMessage>? messages;
+  final MessageList4? messageList;
+  final List<Widget>? columnWidgets;
+  final List<Widget>? topDownColumnWidgets;
+  final Console console;
+  Page({
+    required this.title,
+    this.futureNodes,
+    this.stackWidgets,
+    this.palettes,
+    this.messages,
+    this.messageList,
+    this.columnWidgets,
+    this.topDownColumnWidgets,
+    required this.console,
+  });
+}
+
+class Jeff extends StatefulWidget {
+  final List<Page> pages;
+  final int initialPageIndex;
+
+  const Jeff({
+    required this.pages,
+    this.initialPageIndex = 0,
+    Key? key,
+  }) : super(key: key);
+  @override
+  _JeffState createState() => _JeffState();
+}
+
+class _JeffState extends State<Jeff> {
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialPageIndex;
+  }
+
+  void onPageChanged(int index) {
+    _index = index;
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final titles = widget.pages.map((e) => e.title).toList(growable: false);
+    final bodies = widget.pages
+        .map((e) => PageBody(
+              topDownColumnWidget: e.topDownColumnWidgets,
+              futureNodes: e.futureNodes,
+              palettes: e.palettes,
+              messageList: e.messageList,
+              messages: e.messages,
+              stackWidgets: e.stackWidgets,
+              columnWidgets: e.columnWidgets,
+            ))
+        .toList(growable: false);
+    final consoles = widget.pages
+        .map((e) => PageConsole(console: e.console))
+        .toList(growable: false);
+
+    var w = MediaQuery.of(context).size.width;
     return Stack(
       children: [
-        console,
-        ...extraTopButtons,
-        ...extraBottomButtons,
+        Scaffold(
+          body: Container(
+            color: PinkTheme.backGroundColor,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  decoration: const BoxDecoration(
+                    color: PinkTheme.qrColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black38,
+                        blurRadius: 3.0,
+                        spreadRadius: 3.0,
+                      ),
+                    ],
+                  ),
+                  height: 32,
+                  child: Row(
+                    textDirection: TextDirection.ltr,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: titles
+                        .map((e) => Text(" " + e + " ",
+                            style: TextStyle(
+                              color: e == titles[_index]
+                                  ? Colors.white
+                                  : Colors.white38,
+                              fontSize: e == titles[_index] ? 18 : 14,
+                            )))
+                        .toList(growable: false),
+                  ),
+                ),
+                Expanded(
+                  child: PageView(
+                    children: bodies,
+                    onPageChanged: onPageChanged,
+                  ),
+                ),
+                consoles[_index],
+              ],
+            ),
+          ),
+        ),
+        ...consoles[_index].getExtraTopButtons(),
+        ...consoles[_index].getExtraBottomButtons(),
       ],
     );
   }
 }
 
-class Page {
-  final PageBody pageBody;
-  final PageConsole pageConsole;
-  const Page({required this.pageBody, required this.pageConsole});
-}
-
-class Down4Page extends StatelessWidget {
-  final String title;
-  final List<Widget>? stackWidgets;
-  final List<Palette>? palettes;
-  final List<ChatMessage>? messages;
-  final MessageList4? messageList;
-  final List<Widget>? columnWidgets;
-  final Console console;
-
-  const Down4Page({
-    required this.title,
-    required this.console,
-    this.columnWidgets,
-    this.palettes,
-    this.stackWidgets,
-    this.messageList,
-    this.messages,
-    Key? key,
-  }) : super(key: key);
-
-  List<Widget> getExtraTopButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in console.topButtons ?? <ConsoleButton>[]) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-            bottom: 16.0 + (ConsoleButton.height * 2),
-            left: 16.0 + (buttonWidth * i),
-            child: Container(
-              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-              width: (screenWidth - 32) / console.topButtons!.length,
-              decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.extraButtons!),
-            )));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  List<Widget> getExtraBottomButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in console.bottomButtons) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-          bottom: 16.0 + ConsoleButton.height,
-          left: 16.0 + (buttonWidth * i),
-          child: Container(
-            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
-            width: buttonWidth,
-            decoration: BoxDecoration(border: Border.all(width: 0.5)),
-            child: Column(children: b.extraButtons!),
-          ),
-        ));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final extraBottomButtons = getExtraBottomButtons(screenWidth);
-    final extraTopButtons = getExtraTopButtons(screenWidth);
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
-    );
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: Scaffold(
-        body: Stack(
-          children: [
-            ...(stackWidgets ?? []),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                messageList ??
-                    ((palettes != null ||
-                            messages != null ||
-                            columnWidgets != null)
-                        ? DynamicList(
-                            list: palettes ?? messages ?? columnWidgets!)
-                        : const SizedBox.shrink()),
-                console,
-              ],
-            ),
-            ...extraTopButtons,
-            ...extraBottomButtons,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class Down4Page2 extends StatelessWidget {
-  final String title;
-  final List<Widget>? stackWidgets;
-  final List<Palette>? palettes;
-  final List<ChatMessage>? messages;
-  final MessageList4? messageList;
-  final List<Widget>? columnWidgets;
-  final Console console;
-
-  const Down4Page2({
-    required this.title,
-    required this.console,
-    this.columnWidgets,
-    this.palettes,
-    this.stackWidgets,
-    this.messageList,
-    this.messages,
-    Key? key,
-  }) : super(key: key);
-
-  List<Widget> getExtraTopButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in console.topButtons ?? <ConsoleButton>[]) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-            bottom: 16.0 + (ConsoleButton.height * 2),
-            left: 16.0 + (buttonWidth * i),
-            child: Container(
-              height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-              width: (screenWidth - 32) / console.topButtons!.length,
-              decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.extraButtons!),
-            )));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  List<Widget> getExtraBottomButtons(double screenWidth) {
-    final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in console.bottomButtons) {
-      if (b.showExtra) {
-        extras.add(Positioned(
-          bottom: 16.0 + ConsoleButton.height,
-          left: 16.0 + (buttonWidth * i),
-          child: Container(
-            height: (b.extraButtons!.length * ConsoleButton.height) + 1,
-            width: buttonWidth,
-            decoration: BoxDecoration(border: Border.all(width: 0.5)),
-            child: Column(children: b.extraButtons!),
-          ),
-        ));
-      } else {
-        extras.add(const SizedBox.shrink());
-      }
-      i++;
-    }
-    return extras;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final extraBottomButtons = getExtraBottomButtons(screenWidth);
-    final extraTopButtons = getExtraTopButtons(screenWidth);
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
-    );
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: Scaffold(
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(24),
-          child: AppBar(
-            backgroundColor: PinkTheme.qrColor,
-            title: Text(title, style: const TextStyle(fontSize: 16)),
-            centerTitle: true,
-          ),
-        ),
-        body: Stack(
-          children: [
-            ...(stackWidgets ?? []),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                messageList ??
-                    ((palettes != null ||
-                            messages != null ||
-                            columnWidgets != null)
-                        ? DynamicList(
-                            list: palettes ?? messages ?? columnWidgets!)
-                        : const SizedBox.shrink()),
-                console,
-              ],
-            ),
-            ...extraTopButtons,
-            ...extraBottomButtons,
-          ],
-        ),
-      ),
-    );
-  }
-}
+// class Down4Page extends StatelessWidget {
+//   final String title;
+//   final List<Widget>? stackWidgets;
+//   final List<Palette>? palettes;
+//   final List<ChatMessage>? messages;
+//   final MessageList4? messageList;
+//   final List<Widget>? columnWidgets;
+//   final Console console;
+//
+//   const Down4Page({
+//     required this.title,
+//     required this.console,
+//     this.columnWidgets,
+//     this.palettes,
+//     this.stackWidgets,
+//     this.messageList,
+//     this.messages,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   List<Widget> getExtraTopButtons(double screenWidth) {
+//     final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
+//     List<Widget> extras = [];
+//     int i = 0;
+//     for (final b in console.topButtons ?? <ConsoleButton>[]) {
+//       if (b.showExtra) {
+//         extras.add(Positioned(
+//             bottom: 16.0 + (ConsoleButton.height * 2),
+//             left: 16.0 + (buttonWidth * i),
+//             child: Container(
+//               height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
+//               width: (screenWidth - 32) / console.topButtons!.length,
+//               decoration: BoxDecoration(border: Border.all(width: 0.5)),
+//               child: Column(children: b.extraButtons!),
+//             )));
+//       } else {
+//         extras.add(const SizedBox.shrink());
+//       }
+//       i++;
+//     }
+//     return extras;
+//   }
+//
+//   List<Widget> getExtraBottomButtons(double screenWidth) {
+//     final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
+//     List<Widget> extras = [];
+//     int i = 0;
+//     for (final b in console.bottomButtons) {
+//       if (b.showExtra) {
+//         extras.add(Positioned(
+//           bottom: 16.0 + ConsoleButton.height,
+//           left: 16.0 + (buttonWidth * i),
+//           child: Container(
+//             height: (b.extraButtons!.length * ConsoleButton.height) + 1,
+//             width: buttonWidth,
+//             decoration: BoxDecoration(border: Border.all(width: 0.5)),
+//             child: Column(children: b.extraButtons!),
+//           ),
+//         ));
+//       } else {
+//         extras.add(const SizedBox.shrink());
+//       }
+//       i++;
+//     }
+//     return extras;
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final screenWidth = MediaQuery.of(context).size.width;
+//     final extraBottomButtons = getExtraBottomButtons(screenWidth);
+//     final extraTopButtons = getExtraTopButtons(screenWidth);
+//     SystemChrome.setSystemUIOverlayStyle(
+//       const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
+//     );
+//     return Container(
+//       color: PinkTheme.backGroundColor,
+//       child: Scaffold(
+//         body: Stack(
+//           children: [
+//             ...(stackWidgets ?? []),
+//             Column(
+//               mainAxisAlignment: MainAxisAlignment.end,
+//               children: [
+//                 messageList ??
+//                     ((palettes != null ||
+//                             messages != null ||
+//                             columnWidgets != null)
+//                         ? DynamicList(
+//                             list: palettes ?? messages ?? columnWidgets!)
+//                         : const SizedBox.shrink()),
+//                 console,
+//               ],
+//             ),
+//             ...extraTopButtons,
+//             ...extraBottomButtons,
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+//
+// class Down4Page2 extends StatelessWidget {
+//   final String title;
+//   final List<Widget>? stackWidgets;
+//   final List<Palette>? palettes;
+//   final List<ChatMessage>? messages;
+//   final MessageList4? messageList;
+//   final List<Widget>? columnWidgets;
+//   final Console console;
+//
+//   const Down4Page2({
+//     required this.title,
+//     required this.console,
+//     this.columnWidgets,
+//     this.palettes,
+//     this.stackWidgets,
+//     this.messageList,
+//     this.messages,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   List<Widget> getExtraTopButtons(double screenWidth) {
+//     final buttonWidth = (screenWidth - 31) / (console.topButtons?.length ?? 1);
+//     List<Widget> extras = [];
+//     int i = 0;
+//     for (final b in console.topButtons ?? <ConsoleButton>[]) {
+//       if (b.showExtra) {
+//         extras.add(Positioned(
+//             bottom: 16.0 + (ConsoleButton.height * 2),
+//             left: 16.0 + (buttonWidth * i),
+//             child: Container(
+//               height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
+//               width: (screenWidth - 32) / console.topButtons!.length,
+//               decoration: BoxDecoration(border: Border.all(width: 0.5)),
+//               child: Column(children: b.extraButtons!),
+//             )));
+//       } else {
+//         extras.add(const SizedBox.shrink());
+//       }
+//       i++;
+//     }
+//     return extras;
+//   }
+//
+//   List<Widget> getExtraBottomButtons(double screenWidth) {
+//     final buttonWidth = (screenWidth - 30) / console.bottomButtons.length;
+//     List<Widget> extras = [];
+//     int i = 0;
+//     for (final b in console.bottomButtons) {
+//       if (b.showExtra) {
+//         extras.add(Positioned(
+//           bottom: 16.0 + ConsoleButton.height,
+//           left: 16.0 + (buttonWidth * i),
+//           child: Container(
+//             height: (b.extraButtons!.length * ConsoleButton.height) + 1,
+//             width: buttonWidth,
+//             decoration: BoxDecoration(border: Border.all(width: 0.5)),
+//             child: Column(children: b.extraButtons!),
+//           ),
+//         ));
+//       } else {
+//         extras.add(const SizedBox.shrink());
+//       }
+//       i++;
+//     }
+//     return extras;
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final screenWidth = MediaQuery.of(context).size.width;
+//     final extraBottomButtons = getExtraBottomButtons(screenWidth);
+//     final extraTopButtons = getExtraTopButtons(screenWidth);
+//     SystemChrome.setSystemUIOverlayStyle(
+//       const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
+//     );
+//     return Container(
+//       color: PinkTheme.backGroundColor,
+//       child: Scaffold(
+//         appBar: PreferredSize(
+//           preferredSize: const Size.fromHeight(24),
+//           child: AppBar(
+//             backgroundColor: PinkTheme.qrColor,
+//             title: Text(title, style: const TextStyle(fontSize: 16)),
+//             centerTitle: true,
+//           ),
+//         ),
+//         body: Stack(
+//           children: [
+//             ...(stackWidgets ?? []),
+//             Column(
+//               mainAxisAlignment: MainAxisAlignment.end,
+//               children: [
+//                 messageList ??
+//                     ((palettes != null ||
+//                             messages != null ||
+//                             columnWidgets != null)
+//                         ? DynamicList(
+//                             list: palettes ?? messages ?? columnWidgets!)
+//                         : const SizedBox.shrink()),
+//                 console,
+//               ],
+//             ),
+//             ...extraTopButtons,
+//             ...extraBottomButtons,
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 class ForwardingPage extends StatelessWidget {
   final List<Palette> homeUsers;
@@ -472,27 +593,25 @@ class ForwardingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Down4Page2(
-      title: "Forward",
-      console: console,
-      palettes: homeUsers,
-    );
+    return Jeff(pages: [
+      Page(title: "Forward", console: console, palettes: homeUsers),
+    ]);
   }
 }
 
 class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final bool isHyperchat;
   final Node self;
   final List<Palette> palettes;
   final void Function(Node) afterMessageCallback;
   final void Function() back;
+  final Future<bool> Function(GroupRequest) groupRequest;
 
   const GroupPage({
-    required this.isHyperchat,
     required this.self,
     required this.afterMessageCallback,
     required this.back,
+    required this.groupRequest,
     required this.palettes,
     required this.cameras,
     Key? key,
@@ -503,154 +622,599 @@ class GroupPage extends StatefulWidget {
 }
 
 class _GroupPageState extends State<GroupPage> {
-  dynamic _console;
-  dynamic singleInput;
+  Console? console;
+  ConsoleInput? singleInput;
+  CameraController? ctrl;
   List<Widget> items = [];
   var tec = TextEditingController();
   var tec2 = TextEditingController();
 
-  String _input = "";
-  Down4Media? _mediaInput;
-  Down4Media? _cameraInput;
+  Map<Identifier, Down4Media> cachedImages = {};
+  Map<Identifier, Down4Media> cachedVideos = {};
 
-  String _hyperchatName = "";
-  Down4Media? _hyperchatImage;
+  List<Down4Media> get savedImages {
+    if (cachedImages.isEmpty && b.images.keys.isEmpty) {
+      return <Down4Media>[];
+    } else if (cachedImages.values.isEmpty && b.images.keys.isNotEmpty) {
+      for (final mediaID in b.images.keys) {
+        cachedImages[mediaID] = b.loadSavedImage(mediaID);
+      }
+      return cachedImages.values.toList();
+    } else {
+      return cachedImages.values.toList();
+    }
+  }
 
-  List<Identifier>? _forwardingNodes;
+  List<Down4Media> get savedVideos {
+    if (cachedVideos.isEmpty && b.videos.keys.isEmpty) {
+      return <Down4Media>[];
+    } else if (cachedVideos.values.isEmpty && b.videos.keys.isNotEmpty) {
+      for (final mediaID in b.videos.keys) {
+        cachedVideos[mediaID] = b.loadSavedVideo(mediaID);
+      }
+      return cachedVideos.values.toList();
+    } else {
+      return cachedVideos.values.toList();
+    }
+  }
+
+  Down4Media? groupImage;
+  Down4Media? mediaInput;
+  String groupName = "";
 
   @override
   void initState() {
     super.initState();
-    loadTextInput();
-    loadChatConsole();
+    loadBaseConsole();
     loadPalettes();
   }
 
-  PaletteMaker hyperchatMaker() {
-    return PaletteMaker(
-      tec: tec2,
-      id: "",
-      // will calculate the ID on hyperchat creation for hyperchats
-      name: _hyperchatName,
-      hintText: "(Name)",
-      nameCallBack: (name) => setState(() => _hyperchatName = name),
-      type: widget.isHyperchat ? Nodes.hyperchat : Nodes.group,
-      imageCallBack: (data) {
-        final dataForID = widget.self.id.codeUnits + data.toList();
-        final imageID = u.generateMediaID(dataForID.asUint8List());
-        _hyperchatImage = Down4Media(
-          data: data,
-          id: imageID,
-          metadata: MediaMetadata(
-            owner: widget.self.id,
-            timestamp: DateTime.now().millisecondsSinceEpoch,
-          ),
-        );
-        loadPalettes();
-      },
-      image: _hyperchatImage?.data ?? Uint8List(0),
-    );
-  }
+  PaletteMaker groupMaker() => PaletteMaker(
+        tec: tec2,
+        id: "",
+        // will calculate the ID on hyperchat creation for hyperchats
+        name: groupName,
+        hintText: "Group Name",
+        image: groupImage?.data ?? Uint8List(0),
+        nameCallBack: (name) => setState(() => groupName = name),
+        type: Nodes.group,
+        imageCallBack: (data) {
+          final dataForID = widget.self.id.codeUnits + data.toList();
+          final imageID = u.generateMediaID(dataForID.asUint8List());
+          groupImage = Down4Media(
+            data: data,
+            id: imageID,
+            metadata: MediaMetadata(
+              owner: widget.self.id,
+              timestamp: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
+          loadPalettes();
+        },
+      );
 
   void loadPalettes() {
     items.clear();
-    items.add(hyperchatMaker());
+    items.add(groupMaker());
     items.addAll(widget.palettes);
     setState(() {});
   }
 
-  Future<void> send() async {
-    // let's do 2 different views for hyperchat and group
-    if ((_input != "" || _mediaInput != null || _cameraInput != null)) {
-      final ts = u.timeStamp();
-      var targets = widget.palettes.map((e) => e.node.id).toList()
-        ..remove(widget.self.id);
-      final wp = rw.WordPair.random(safeOnly: false);
-      final root = u.deterministicHyperchatRoot(targets + [widget.self.id]);
-      final msg = Down4Message(
-        mediaID: _cameraInput?.id ?? _mediaInput?.id,
-        senderID: widget.self.id,
-        timestamp: ts,
-        text: _input,
-        nodes: _forwardingNodes,
-      )..save();
+  void send(bool private) {
+    if (mediaInput == null && tec.value.text.isEmpty) return;
+    if (groupImage == null || groupName.isEmpty) return;
 
-      var hyperchatNode = Node(
-        type: Nodes.hyperchat,
-        id: root,
-        name: wp.first,
-        lastName: wp.second,
-        messages: [msg.id!],
-        group: targets + [widget.self.id],
-        snips: [],
-      )..updateActivity();
+    final selfID = widget.self.id;
+    final targets = widget.palettes.asIds();
 
-      Boxes.instance.saveNode(hyperchatNode);
-      final f = widget.isHyperchat ? r.hyperchatRequest : r.groupRequest;
+    final msg = Down4Message(
+      id: messagePushId(),
+      senderID: selfID,
+      timestamp: u.timeStamp(),
+      mediaID: mediaInput?.id,
+      text: tec.value.text,
+    );
 
-      var success = widget.isHyperchat
-          ? r.hyperchatRequest(
-              HyperchatRequest(
-                msg: msg,
-                targets: targets,
-                media: _cameraInput ?? _mediaInput,
-                wordPairs: rw
-                    .generateWordPairs()
-                    .take(10)
-                    .map((e) => e.first + " " + e.second)
-                    .toList(),
-              ),
-            )
-          : r.groupRequest(GroupRequest(
-              name: _hyperchatName,
-              groupImage: _hyperchatImage!,
-              msg: msg,
-              targets: targets,
-            ));
+    final grpReq = GroupRequest(
+      name: groupName,
+      groupImage: groupImage!,
+      msg: msg,
+      private: private,
+      targets: targets,
+      media: mediaInput,
+    );
 
-      if (await success) {
-        widget.afterMessageCallback(hyperchatNode);
+    widget.groupRequest(grpReq);
+  }
+
+  void ping() {
+    // TODO
+  }
+
+  Future<void> handleImport() async {
+    FilePickerResult? r = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'png', 'jpeg'],
+      withData: true,
+      allowMultiple: true,
+    );
+    final ts = u.timeStamp();
+    for (final pf in r?.files ?? <PlatformFile>[]) {
+      if (pf.bytes != null) {
+        final compressedData = await FlutterImageCompress.compressWithList(
+          pf.bytes!,
+          minHeight: 520,
+          minWidth: 0,
+        );
+        final mediaID = u.generateMediaID(compressedData);
+        cachedImages[mediaID] = Down4Media(
+          id: mediaID,
+          data: compressedData,
+          metadata: MediaMetadata(owner: widget.self.id, timestamp: ts),
+        );
+        b.saveImage(cachedImages[mediaID]!);
       }
+    }
+    setState(() {});
+  }
+
+  void loadMediaConsole([bool images = true]) {
+    console = Console(
+      images: true,
+      medias: images ? savedImages : savedVideos,
+      topButtons: [
+        ConsoleButton(name: "Import", onPress: handleImport),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+          isMode: true,
+          name: images ? "Images" : "Videos",
+          onPress: () => loadMediaConsole(!images),
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  void loadFullCamera() {
+    // TODO
+  }
+
+  void loadBaseConsole([bool private = true]) {
+    console = Console(
+      inputs: [ConsoleInput(placeHolder: ":)", tec: tec)],
+      topButtons: [
+        ConsoleButton(name: "Medias", onPress: loadMediaConsole),
+        ConsoleButton(name: "Send", onPress: () => send(private)),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: widget.back),
+        ConsoleButton(
+          name: mediaInput == null ? "Camera" : "@Camera",
+          onPress: loadSquaredCameraConsole,
+        ),
+        ConsoleButton(
+          isMode: true,
+          name: private ? "Private" : "Public",
+          onPress: () => loadBaseConsole(!private),
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  Future<void> loadSquaredCameraPreview() async {
+    if (mediaInput == null) return loadBaseConsole();
+    VideoPlayerController? vpc;
+    String? path;
+    if (mediaInput!.metadata.isVideo) {
+      vpc = VideoPlayerController.file(mediaInput!.file!);
+      await vpc.initialize();
+    } else {
+      path = mediaInput!.path;
+    }
+
+    console = Console(
+      videoPlayerController: vpc,
+      imagePreviewPath: path,
+      topButtons: [
+        ConsoleButton(name: "Accept", onPress: loadBaseConsole),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+            name: "Back",
+            onPress: () {
+              mediaInput = null;
+              loadSquaredCameraConsole();
+            }),
+        ConsoleButton(
+            name: "Cancel",
+            onPress: () {
+              mediaInput = null;
+              loadBaseConsole();
+            }),
+      ],
+    );
+
+    setState(() {});
+  }
+
+  Future<void> loadSquaredCameraConsole([
+    int cam = 0,
+    FlashMode fm = FlashMode.off,
+    bool reloadCtrl = false,
+  ]) async {
+    if (ctrl == null || reloadCtrl) {
+      try {
+        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
+        await ctrl?.initialize();
+      } catch (error) {
+        loadBaseConsole();
+      }
+    }
+    ctrl?.setFlashMode(fm);
+    console = Console(
+      aspectRatio: ctrl?.value.aspectRatio,
+      cameraController: ctrl,
+      topButtons: [
+        ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
+        ConsoleButton(
+          name: "Capture",
+          isSpecial: true,
+          shouldBeDownButIsnt: ctrl?.value.isRecordingVideo == true,
+          onPress: () async {
+            var file = await ctrl?.takePicture();
+            if (file == null) loadBaseConsole();
+            mediaInput = Down4Media.fromCamera(
+                file!.path,
+                MediaMetadata(
+                  owner: widget.self.id,
+                  isVideo: false,
+                  timestamp: u.timeStamp(),
+                  toReverse: cam == 1,
+                ));
+            loadSquaredCameraPreview();
+          },
+          onLongPress: () async {
+            await ctrl?.startVideoRecording();
+            loadSquaredCameraConsole(cam, fm);
+          },
+          onLongPressUp: () async {
+            var file = await ctrl?.stopVideoRecording();
+            if (file == null) loadBaseConsole();
+            mediaInput = Down4Media.fromCamera(
+                file!.path,
+                MediaMetadata(
+                  owner: widget.self.id,
+                  isVideo: true,
+                  timestamp: u.timeStamp(),
+                  toReverse: cam == 1,
+                ));
+            loadSquaredCameraPreview();
+          },
+        ),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+          name: cam == 0 ? "Rear" : "Front",
+          isMode: true,
+          onPress: () => loadSquaredCameraConsole((cam + 1) % 2, fm, true),
+        ),
+        ConsoleButton(
+          isMode: true,
+          name: fm.name.capitalize(),
+          onPress: () => loadSquaredCameraConsole(
+              cam, fm == FlashMode.off ? FlashMode.torch : FlashMode.off),
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  @override
+  void dispose() async {
+    await ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Jeff(pages: [
+      Page(title: "Group", columnWidgets: items, console: console!),
+    ]);
+  }
+}
+
+class HyperchatPage extends StatefulWidget {
+  final List<CameraDescription> cameras;
+  final List<Palette> palettes;
+  final void Function(HyperchatRequest) hyperchatRequest;
+  final Future<bool> Function(ChatRequest) ping;
+  final void Function() back;
+  final Node self;
+
+  const HyperchatPage({
+    required this.self,
+    required this.palettes,
+    required this.hyperchatRequest,
+    required this.cameras,
+    required this.back,
+    required this.ping,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  _HyperchatPageState createState() => _HyperchatPageState();
+}
+
+class _HyperchatPageState extends State<HyperchatPage> {
+  var tec = TextEditingController();
+  Down4Media? mediaInput;
+  CameraController? ctrl;
+  Console? console;
+  Map<Identifier, Down4Media> cachedImages = {};
+  Map<Identifier, Down4Media> cachedVideos = {};
+
+  @override
+  void initState() {
+    super.initState();
+    loadBaseConsole();
+  }
+
+  List<Down4Media> get savedImages {
+    if (cachedImages.isEmpty && b.images.keys.isEmpty) {
+      return <Down4Media>[];
+    } else if (cachedImages.values.isEmpty && b.images.keys.isNotEmpty) {
+      for (final mediaID in b.images.keys) {
+        cachedImages[mediaID] = b.loadSavedImage(mediaID);
+      }
+      return cachedImages.values.toList();
+    } else {
+      return cachedImages.values.toList();
     }
   }
 
-  void loadChatConsole() {
-    _console = Console(
-      inputs: [singleInput],
+  List<Down4Media> get savedVideos {
+    if (cachedVideos.isEmpty && b.videos.keys.isEmpty) {
+      return <Down4Media>[];
+    } else if (cachedVideos.values.isEmpty && b.videos.keys.isNotEmpty) {
+      for (final mediaID in b.videos.keys) {
+        cachedVideos[mediaID] = b.loadSavedVideo(mediaID);
+      }
+      return cachedVideos.values.toList();
+    } else {
+      return cachedVideos.values.toList();
+    }
+  }
+
+  void send() {
+    if (mediaInput == null && tec.value.text.isEmpty) return;
+    final selfID = widget.self.id;
+    final targets = widget.palettes.map((e) => e.node.id).toList() + [selfID];
+
+    final msg = Down4Message(
+      id: messagePushId(),
+      senderID: selfID,
+      timestamp: u.timeStamp(),
+      mediaID: mediaInput?.id,
+      text: tec.value.text,
+    );
+
+    final pairs = rw
+        .generateWordPairs(safeOnly: false)
+        .take(10)
+        .map((e) => e.first + " " + e.second)
+        .toList(growable: false);
+
+    final hcReq = HyperchatRequest(
+      msg: msg,
+      targets: targets,
+      wordPairs: pairs,
+      media: mediaInput,
+    );
+
+    widget.hyperchatRequest(hcReq);
+  }
+
+  void ping() {
+    // TODO
+  }
+
+  Future<void> handleImport() async {
+    FilePickerResult? r = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'png', 'jpeg'],
+      withData: true,
+      allowMultiple: true,
+    );
+    final ts = u.timeStamp();
+    for (final pf in r?.files ?? <PlatformFile>[]) {
+      if (pf.bytes != null) {
+        final compressedData = await FlutterImageCompress.compressWithList(
+          pf.bytes!,
+          minHeight: 520,
+          minWidth: 0,
+        );
+        final mediaID = u.generateMediaID(compressedData);
+        cachedImages[mediaID] = Down4Media(
+          id: mediaID,
+          data: compressedData,
+          metadata: MediaMetadata(owner: widget.self.id, timestamp: ts),
+        );
+        b.saveImage(cachedImages[mediaID]!);
+      }
+    }
+    setState(() {});
+  }
+
+  void loadMediaConsole([bool images = true]) {
+    console = Console(
+      images: true,
+      medias: images ? savedImages : savedVideos,
       topButtons: [
+        ConsoleButton(name: "Import", onPress: handleImport),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
         ConsoleButton(
-          name: "Images",
-          onPress: () => print("TODO"),
+          isMode: true,
+          name: images ? "Images" : "Videos",
+          onPress: () => loadMediaConsole(!images),
         ),
+      ],
+    );
+    setState(() {});
+  }
+
+  void loadFullCamera() {
+    // TODO
+  }
+
+  void loadBaseConsole() {
+    console = Console(
+      inputs: [ConsoleInput(placeHolder: ":)", tec: tec)],
+      topButtons: [
+        ConsoleButton(name: "Medias", onPress: loadMediaConsole),
         ConsoleButton(name: "Send", onPress: send),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
-          name: _mediaInput == null ? "Camera" : "&Camera",
-          onPress: () => print("TODO"),
+          name: mediaInput == null ? "Camera" : "@Camera",
+          onPress: loadSquaredCameraConsole,
         ),
-        ConsoleButton(name: "Ping", onPress: () => print("TODO"))
+        ConsoleButton(name: "Ping", onPress: ping),
       ],
     );
+    setState(() {});
   }
 
-  void loadTextInput() {
-    singleInput = ConsoleInput(
-      tec: tec,
-      inputCallBack: (text) => _input = text,
-      placeHolder: ":)",
-      value: _input,
+  Future<void> loadSquaredCameraPreview() async {
+    if (mediaInput == null) return loadBaseConsole();
+    VideoPlayerController? vpc;
+    String? path;
+    if (mediaInput!.metadata.isVideo) {
+      vpc = VideoPlayerController.file(mediaInput!.file!);
+      await vpc.initialize();
+    } else {
+      path = mediaInput!.path;
+    }
+
+    console = Console(
+      videoPlayerController: vpc,
+      imagePreviewPath: path,
+      topButtons: [
+        ConsoleButton(name: "Accept", onPress: loadBaseConsole),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+            name: "Back",
+            onPress: () {
+              mediaInput = null;
+              loadSquaredCameraConsole();
+            }),
+        ConsoleButton(
+            name: "Cancel",
+            onPress: () {
+              mediaInput = null;
+              loadBaseConsole();
+            }),
+      ],
     );
+
+    setState(() {});
+  }
+
+  Future<void> loadSquaredCameraConsole([
+    int cam = 0,
+    FlashMode fm = FlashMode.off,
+    bool reloadCtrl = false,
+  ]) async {
+    if (ctrl == null || reloadCtrl) {
+      try {
+        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
+        await ctrl?.initialize();
+      } catch (error) {
+        loadBaseConsole();
+      }
+    }
+    ctrl?.setFlashMode(fm);
+    console = Console(
+      cameraController: ctrl,
+      aspectRatio: ctrl?.value.aspectRatio,
+      topButtons: [
+        ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
+        ConsoleButton(
+          name: "Capture",
+          isSpecial: true,
+          shouldBeDownButIsnt: ctrl?.value.isRecordingVideo == true,
+          onPress: () async {
+            var file = await ctrl?.takePicture();
+            if (file == null) loadBaseConsole();
+            mediaInput = Down4Media.fromCamera(
+                file!.path,
+                MediaMetadata(
+                  owner: widget.self.id,
+                  isVideo: false,
+                  timestamp: u.timeStamp(),
+                  toReverse: cam == 1,
+                ));
+            // await ctrl?.dispose();
+            // ctrl = null;
+            loadSquaredCameraPreview();
+          },
+          onLongPress: () async {
+            await ctrl?.startVideoRecording();
+            loadSquaredCameraConsole(cam, fm);
+          },
+          onLongPressUp: () async {
+            var file = await ctrl?.stopVideoRecording();
+            if (file == null) loadBaseConsole();
+            mediaInput = Down4Media.fromCamera(
+                file!.path,
+                MediaMetadata(
+                  owner: widget.self.id,
+                  isVideo: true,
+                  timestamp: u.timeStamp(),
+                  toReverse: cam == 1,
+                ));
+            // await ctrl?.dispose();
+            // ctrl = null;
+            loadSquaredCameraPreview();
+          },
+        ),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+          name: cam == 0 ? "Rear" : "Front",
+          isMode: true,
+          onPress: () => loadSquaredCameraConsole((cam + 1) % 2, fm, true),
+        ),
+        ConsoleButton(
+          isMode: true,
+          name: fm.name.capitalize(),
+          onPress: () => loadSquaredCameraConsole(
+              cam, fm == FlashMode.off ? FlashMode.torch : FlashMode.off),
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  @override
+  void dispose() async {
+    await ctrl?.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Down4Page2(
-      title: widget.isHyperchat ? "Hyperchat" : "Group",
-      console: _console!,
-      columnWidgets: items,
-    );
+    return Jeff(pages: [
+      Page(title: "Hyperchat", console: console!, palettes: widget.palettes),
+    ]);
   }
 }
 
@@ -735,68 +1299,36 @@ class _MoneyPageState extends State<MoneyPage> {
   void importView() {
     var importTec = TextEditingController();
 
-    _view = Down4Navigator2(pages: [
-      Page(
-        pageBody: PageBody(
-          title: "Money",
-          palettes: widget.palettes,
+    final importViewConsole = Console(
+      inputs: [ConsoleInput(placeHolder: "WIF / PK", tec: importTec)],
+      topButtons: [
+        ConsoleButton(
+            name: "Import",
+            onPress: () async {
+              final pay = await widget.wallet
+                  .importMoney(widget.self, importTec.value.text);
+              if (pay != null) {
+                widget.wallet.parsePayment(widget.self, pay);
+              }
+            })
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () =>
+              widget.palettes.length > 0 ? mainView() : emptyMainView(),
         ),
-        pageConsole: PageConsole(
-          console: Console(
-            inputs: [ConsoleInput(placeHolder: "WIF / PK", tec: importTec)],
-            topButtons: [
-              ConsoleButton(
-                  name: "Import",
-                  onPress: () async {
-                    final pay = await widget.wallet
-                        .importMoney(widget.self, importTec.value.text);
-                    if (pay != null) {
-                      widget.wallet.parsePayment(widget.self, pay);
-                    }
-                  })
-            ],
-            bottomButtons: [
-              ConsoleButton(
-                name: "Back",
-                onPress: () =>
-                    widget.palettes.length > 0 ? mainView() : emptyMainView(),
-              ),
-              ConsoleButton(name: "Check", onPress: () => print("TODO")),
-            ],
-          ),
-        ),
-      )
-    ], firstPage: 0);
+        ConsoleButton(name: "Check", onPress: () => print("TODO")),
+      ],
+    );
 
-    // _view = Down4Navigator(
-    //   [
-    //     Down4Page(
-    //       title: "Money",
-    //       console: Console(
-    //         inputs: [ConsoleInput(placeHolder: "WIF / PK", tec: importTec)],
-    //         topButtons: [
-    //           ConsoleButton(
-    //               name: "Import",
-    //               onPress: () async {
-    //                 final pay = await widget.wallet
-    //                     .importMoney(widget.self, importTec.value.text);
-    //                 if (pay != null) {
-    //                   widget.wallet.parsePayment(widget.self, pay);
-    //                 }
-    //               })
-    //         ],
-    //         bottomButtons: [
-    //           ConsoleButton(
-    //             name: "Back",
-    //             onPress: () =>
-    //                 widget.palettes.length > 0 ? mainView() : emptyMainView(),
-    //           ),
-    //           ConsoleButton(name: "Check", onPress: () => print("TODO")),
-    //         ],
-    //       ),
-    //     ),
-    //   ],
-    // );
+    _view = Jeff(pages: [
+      Page(
+        title: "Money",
+        console: importViewConsole,
+        palettes: widget.palettes,
+      )
+    ]);
 
     setState(() {});
   }
@@ -828,92 +1360,97 @@ class _MoneyPageState extends State<MoneyPage> {
       }
     }
 
-    _view = Down4Page2(
-      title: "Money",
-      console: Console(
-        scanCallBack: onScan,
-        scanController: ctrl,
-        inputs: scanning
-            ? null
-            : [
-                reloadInput
-                    ? mainViewInput
-                    : _cachedMainViewInput ?? mainViewInput,
-              ],
-        topButtons: [
-          ConsoleButton(name: "Scan", onPress: () => emptyMainView(!scanning))
-        ],
-        bottomButtons: [
-          ConsoleButton(
-            name: "Back",
-            isSpecial: true,
-            showExtra: extraBack,
-            onPress: () => extraBack
-                ? emptyMainView(scanning, reloadInput, !extraBack)
-                : widget.back(),
-            onLongPress: () => emptyMainView(scanning, reloadInput, !extraBack),
-            extraButtons: [
-              ConsoleButton(
-                name: "Import",
-                onPress: () => importView(),
-              )
+    final emptyViewConsole = Console(
+      scanCallBack: onScan,
+      scanController: ctrl,
+      inputs: scanning
+          ? null
+          : [
+              reloadInput
+                  ? mainViewInput
+                  : _cachedMainViewInput ?? mainViewInput,
             ],
-          ),
-          ConsoleButton(
-            isMode: true,
-            name: currency,
-            onPress: () {
-              rotateCurrency();
-              emptyMainView(scanning, true);
-            },
-          ),
-        ],
-      ),
+      topButtons: [
+        ConsoleButton(name: "Scan", onPress: () => emptyMainView(!scanning))
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          isSpecial: true,
+          showExtra: extraBack,
+          onPress: () => extraBack
+              ? emptyMainView(scanning, reloadInput, !extraBack)
+              : widget.back(),
+          onLongPress: () => emptyMainView(scanning, reloadInput, !extraBack),
+          extraButtons: [
+            ConsoleButton(
+              name: "Import",
+              onPress: () => importView(),
+            )
+          ],
+        ),
+        ConsoleButton(
+          isMode: true,
+          name: currency,
+          onPress: () {
+            rotateCurrency();
+            emptyMainView(scanning, true);
+          },
+        ),
+      ],
     );
+
+    _view = Jeff(pages: [Page(title: "Money", console: emptyViewConsole)]);
+
     setState(() {});
   }
 
   void mainView([bool reloadInput = false, bool extraBack = false]) {
-    _view = Down4Page2(
-      title: "Money",
-      palettes: widget.palettes,
-      console: Console(
-        inputs: [
-          reloadInput ? mainViewInput : _cachedMainViewInput ?? mainViewInput,
-        ],
-        bottomButtons: [
-          ConsoleButton(
-            name: "Back",
-            isSpecial: true,
-            showExtra: extraBack,
-            onPress: () =>
-                extraBack ? mainView(reloadInput, !extraBack) : widget.back(),
-            onLongPress: () => mainView(reloadInput, !extraBack),
-            extraButtons: [
-              ConsoleButton(name: "Import", onPress: importView),
-            ],
-          ),
-          ConsoleButton(
-              name: method,
-              isMode: true,
-              onPress: () {
-                rotateMethod();
-                mainView();
-              }),
-          ConsoleButton(
-              name: currency,
-              isMode: true,
-              onPress: () {
-                rotateCurrency();
-                mainView(tec.value.text.isEmpty ? true : false);
-              }),
-        ],
-        topButtons: [
-          ConsoleButton(name: "Bill", onPress: () => print("TODO")),
-          ConsoleButton(name: "Pay", onPress: () => confirmationView(currency)),
-        ],
-      ),
+    final mainViewConsole = Console(
+      inputs: [
+        reloadInput ? mainViewInput : _cachedMainViewInput ?? mainViewInput,
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          isSpecial: true,
+          showExtra: extraBack,
+          onPress: () =>
+              extraBack ? mainView(reloadInput, !extraBack) : widget.back(),
+          onLongPress: () => mainView(reloadInput, !extraBack),
+          extraButtons: [
+            ConsoleButton(name: "Import", onPress: importView),
+          ],
+        ),
+        ConsoleButton(
+            name: method,
+            isMode: true,
+            onPress: () {
+              rotateMethod();
+              mainView();
+            }),
+        ConsoleButton(
+            name: currency,
+            isMode: true,
+            onPress: () {
+              rotateCurrency();
+              mainView(tec.value.text.isEmpty ? true : false);
+            }),
+      ],
+      topButtons: [
+        ConsoleButton(name: "Bill", onPress: () => print("TODO")),
+        ConsoleButton(name: "Pay", onPress: () => confirmationView(currency)),
+      ],
     );
+
+    _view = Jeff(pages: [
+      Page(
+        title: "Money",
+        palettes: widget.palettes,
+        console: mainViewConsole,
+      )
+    ]);
+
     setState(() {});
   }
 
@@ -942,47 +1479,52 @@ class _MoneyPageState extends State<MoneyPage> {
         .values
         .reduce((value, element) => [...element, ...value]));
 
-    _view = Down4Page2(
-      title: "Money",
-      palettes: widget.palettes,
-      console: Console(
-        inputs: [
-          ConsoleInput(
-            placeHolder: currency == "USD"
-                ? asUSD.toStringAsFixed(4) + " \$"
-                : satsString + " sat",
-            tec: tec,
-            activated: false,
-          ),
-        ],
-        topButtons: [
-          ConsoleButton(
-              name: "Confirm",
-              onPress: () {
-                final pay = widget.wallet.payUsers(
-                  widget.palettes.map((p) => p.node).toList(),
-                  widget.self,
-                  Sats(inputAsSatoshis),
-                );
-                if (pay != null) {
-                  widget.wallet.trySettlement();
-                  transactedView(pay);
-                }
-              }),
-        ],
-        bottomButtons: [
-          ConsoleButton(name: "Back", onPress: mainView),
-          ConsoleButton(
-            name: currency,
-            isMode: true,
+    final confirmationViewConsole = Console(
+      inputs: [
+        ConsoleInput(
+          placeHolder: currency == "USD"
+              ? asUSD.toStringAsFixed(4) + " \$"
+              : satsString + " sat",
+          tec: tec,
+          activated: false,
+        ),
+      ],
+      topButtons: [
+        ConsoleButton(
+            name: "Confirm",
             onPress: () {
-              rotateCurrency();
-              confirmationView(inputCurrency);
-            },
-          ),
-        ],
-      ),
+              final pay = widget.wallet.payUsers(
+                widget.palettes.map((p) => p.node).toList(),
+                widget.self,
+                Sats(inputAsSatoshis),
+              );
+              if (pay != null) {
+                widget.wallet.trySettlement();
+                transactedView(pay);
+              }
+            }),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: mainView),
+        ConsoleButton(
+          name: currency,
+          isMode: true,
+          onPress: () {
+            rotateCurrency();
+            confirmationView(inputCurrency);
+          },
+        ),
+      ],
     );
+
+    _view = Jeff(pages: [
+      Page(
+        title: "Money",
+        console: confirmationViewConsole,
+        palettes: widget.palettes,
+      )
+    ]);
+
     if (reload) setState(() {});
   }
 
@@ -992,28 +1534,29 @@ class _MoneyPageState extends State<MoneyPage> {
       (_) => transactedView(pay, (i + 1) % pay.txs.length),
     );
 
-    _view = Down4Page2(
-      title: "Money",
-      stackWidgets: [
-        Positioned(
-          top: 0,
-          left: 0,
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: QrImage(
-              data: jsonEncode(pay.toJsoni(i)),
-              foregroundColor: PinkTheme.qrColor,
-              backgroundColor: Colors.transparent,
-            ),
-          ),
+    final paymentWidget = Positioned(
+      top: 0,
+      left: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: QrImage(
+          data: jsonEncode(pay.toJsoni(i)),
+          foregroundColor: PinkTheme.qrColor,
+          backgroundColor: Colors.transparent,
         ),
-      ],
-      console: Console(
-        bottomButtons: [
-          ConsoleButton(name: "Done", onPress: widget.back),
-        ],
       ),
     );
+
+    final transactedViewConsole = Console(bottomButtons: [
+      ConsoleButton(name: "Done", onPress: widget.back),
+    ]);
+
+    _view = Jeff(pages: [
+      Page(
+          title: "Money",
+          console: transactedViewConsole,
+          stackWidgets: [paymentWidget]),
+    ]);
 
     if (reload) setState(() {});
   }
@@ -1147,12 +1690,14 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Down4Page2(
-      title: "Search",
-      stackWidgets: [qr],
-      columnWidgets: widget.palettes,
-      console: _console!,
-    );
+    return Jeff(pages: [
+      Page(
+        title: "Search",
+        console: _console!,
+        stackWidgets: [qr],
+        palettes: widget.palettes,
+      )
+    ]);
   }
 }
 
@@ -1408,43 +1953,46 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Down4Page2(
-      title: "Initialization",
-      console: _console!,
-      columnWidgets: [
-        _errorTryAgain
-            ? Container(
-                margin: const EdgeInsets.symmetric(horizontal: 22.0),
-                child: const Text(
-                  "Rare error, someone might have just taken that username, please try again",
-                  textAlign: TextAlign.center,
-                ))
-            : const SizedBox.shrink(),
-        UserMakerPalette(
-          selectFile: () async {
-            FilePickerResult? r = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['jpg', 'png', 'jpeg'],
-                withData: true);
-            if (r?.files.single.bytes != null) {
-              final compressedBytes =
-                  await FlutterImageCompress.compressWithList(
-                r!.files.single.bytes!,
-                minHeight: 520,
-                minWidth: 520,
-                quality: 40,
-              );
-              setState(() => _image = compressedBytes);
-              baseConsole();
-            }
-          },
-          name: _name,
-          id: _id,
-          lastName: _lastName,
-          image: _image,
-        ),
-      ],
-    );
+    final columnWidgets = [
+      _errorTryAgain
+          ? Container(
+              margin: const EdgeInsets.symmetric(horizontal: 22.0),
+              child: const Text(
+                "Rare error, someone might have just taken that username, please try again",
+                textAlign: TextAlign.center,
+              ))
+          : const SizedBox.shrink(),
+      UserMakerPalette(
+        selectFile: () async {
+          FilePickerResult? r = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: ['jpg', 'png', 'jpeg'],
+              withData: true);
+          if (r?.files.single.bytes != null) {
+            final compressedBytes = await FlutterImageCompress.compressWithList(
+              r!.files.single.bytes!,
+              minHeight: 520,
+              minWidth: 520,
+              quality: 40,
+            );
+            setState(() => _image = compressedBytes);
+            baseConsole();
+          }
+        },
+        name: _name,
+        id: _id,
+        lastName: _lastName,
+        image: _image,
+      ),
+    ];
+
+    return Jeff(pages: [
+      Page(
+        title: "Initialization",
+        console: _console!,
+        columnWidgets: columnWidgets,
+      )
+    ]);
   }
 }
 
@@ -1465,50 +2013,51 @@ class WelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Down4Page2(
-      title: "Welcome",
-      stackWidgets: [
-        Positioned(
-          width: Sizes.w,
-          height: Sizes.h - (16.0 + ConsoleButton.height),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Palette(node: _userInfo, at: ""),
-              Container(
-                margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-                child: Text(
-                  _mnemonic,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 26.0,
-                    fontWeight: FontWeight.bold,
-                  ),
+    final stackWidgets = [
+      Positioned(
+        width: Sizes.w,
+        height: Sizes.h - (16.0 + ConsoleButton.height),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Palette(node: _userInfo, at: ""),
+            Container(
+              margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+              child: Text(
+                _mnemonic,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 26.0,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              Container(
-                margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-                child: const Text(
-                  "Those twelve words are the key to your account, money & personal infrastructure, save it somewhere secure. We recommend a piece of paper.",
-                  textAlign: TextAlign.center,
-                ),
+            ),
+            Container(
+              margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+              child: const Text(
+                "Those twelve words are the key to your account, money & personal infrastructure, save it somewhere secure. We recommend a piece of paper.",
+                textAlign: TextAlign.center,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
-      console: Console(
-        bottomButtons: [
-          ConsoleButton(name: "Understood", onPress: _understood)
-        ],
       ),
+    ];
+
+    final console = Console(
+      bottomButtons: [ConsoleButton(name: "Understood", onPress: _understood)],
     );
+
+    return Jeff(pages: [
+      Page(title: "Welcome", console: console, stackWidgets: stackWidgets),
+    ]);
   }
 }
 
 class NodePage extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final List<Palette> palettes;
+  final List<Palette>? palettes;
+  final MessageList4? messageList;
   final Palette palette;
   final Node self;
   final Palette? Function(Node, String) nodeToPalette;
@@ -1523,7 +2072,8 @@ class NodePage extends StatefulWidget {
     required this.nodeToPalette,
     required this.back,
     required this.self,
-    required this.palettes,
+    this.palettes,
+    this.messageList,
     Key? key,
   }) : super(key: key);
 
@@ -1532,61 +2082,179 @@ class NodePage extends StatefulWidget {
 }
 
 class _NodePageState extends State<NodePage> {
-  Map<String, Map<Identifier, Palette>> _fetchablePalettes = {
-    "Admins": {},
-    "Followers": {},
-    "Following": {},
-    "Parents": {},
-  };
-
-  Map<String, List<String>> _stupidMap = {};
-  List<String> _modes = ["Childs"];
-  int _i = 0;
+  Widget? _view;
 
   @override
   void initState() {
     super.initState();
-    // setUpProfileImage();
     final node = widget.palette.node;
-    // if (node.posts.isNotEmpty) { // TODO: posts
-    //   _modes.add("Posts");
-    //   _stupidMap["Posts"] = node.posts;
-    // }
-    if ((node.parents ?? []).isNotEmpty) {
-      _modes.add("Parents");
-      _stupidMap["Parents"] = node.parents!;
+    final title =
+        node.name + (node.lastName != null ? " " + node.lastName! : "");
+    switch (node.type) {
+      case Nodes.user:
+        _view = Jeff(pages: [
+          Page(
+            title: title,
+            console: userPaletteConsole,
+            topDownColumnWidgets: [
+              ProfileWidget(node: node),
+              ...?widget.palettes
+            ],
+          ),
+        ]);
+        break;
+      case Nodes.friend:
+        _view = Jeff(pages: [
+          Page(
+            title: title,
+            console: userPaletteConsole,
+            topDownColumnWidgets: [
+              ProfileWidget(node: node),
+              ...?widget.palettes
+            ],
+          ),
+        ]);
+        break;
+      case Nodes.nonFriend:
+        _view = Jeff(pages: [
+          Page(
+            title: title,
+            console: userPaletteConsole,
+            topDownColumnWidgets: [
+              ProfileWidget(node: node),
+              ...?widget.palettes
+            ],
+          ),
+        ]);
+        break;
+      case Nodes.hyperchat:
+        print("You broke my app");
+        break;
+      case Nodes.group:
+        print("You broke my app");
+        break;
+      case Nodes.root:
+        _view = Jeff(pages: [
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            palettes: widget.palettes,
+          ),
+        ]);
+        break;
+      case Nodes.market:
+        _view = Jeff(initialPageIndex: 1, pages: [
+          Page(
+            title: "Admins",
+            console: basicPaletteConsole,
+            futureNodes: FutureNodes(
+              nodeIDs: node.admins!,
+              at: node.id,
+              nodeToPalette: widget.nodeToPalette,
+            ),
+          ),
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            palettes: widget.palettes,
+          ),
+        ]);
+        break;
+      case Nodes.checkpoint:
+        _view = Jeff(initialPageIndex: 0, pages: [
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            palettes: widget.palettes,
+          ),
+        ]);
+        // TODO: Handle this case.
+        break;
+      case Nodes.journal:
+        _view = Jeff(initialPageIndex: 1, pages: [
+          Page(
+            title: "From",
+            console: basicPaletteConsole,
+            futureNodes: FutureNodes(
+              nodeIDs: node.parents!,
+              at: node.id,
+              nodeToPalette: widget.nodeToPalette,
+            ),
+          ),
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            messageList: widget.messageList,
+          ),
+        ]);
+        break;
+      case Nodes.item:
+        _view = Jeff(initialPageIndex: 1, pages: [
+          Page(
+            title: "From",
+            console: basicPaletteConsole,
+            futureNodes: FutureNodes(
+              nodeIDs: node.parents!,
+              at: node.id,
+              nodeToPalette: widget.nodeToPalette,
+            ),
+          ),
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            messageList: widget.messageList,
+          ),
+        ]);
+        break;
+      case Nodes.event:
+        _view = Jeff(initialPageIndex: 1, pages: [
+          Page(
+            title: "Admins",
+            console: basicPaletteConsole,
+            futureNodes: FutureNodes(
+              nodeIDs: node.admins!,
+              at: node.id,
+              nodeToPalette: widget.nodeToPalette,
+            ),
+          ),
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            palettes: widget.palettes,
+          ),
+        ]);
+        break;
+      case Nodes.ticket:
+        _view = Jeff(initialPageIndex: 1, pages: [
+          Page(
+            title: "From",
+            console: basicPaletteConsole,
+            futureNodes: FutureNodes(
+              nodeIDs: node.parents!,
+              at: node.id,
+              nodeToPalette: widget.nodeToPalette,
+            ),
+          ),
+          Page(
+            title: title,
+            console: basicPaletteConsole,
+            messageList: widget.messageList,
+          ),
+        ]);
+        break;
     }
-    if ((node.admins ?? []).isNotEmpty) {
-      _modes.add("Admins");
-      _stupidMap["Admins"] = node.admins!;
-    }
-    if ((node.friends ?? []).isNotEmpty) {
-      _modes.add("Friends");
-      _stupidMap["Friends"] = node.friends!;
-    }
-  }
-
-  String get currentMode => _modes[_i];
-
-  List<Palette> get currentPalettes {
-    if (currentMode == "Childs") {
-      return widget.palettes;
-    }
-    return _fetchablePalettes[currentMode]!.values.toList();
   }
 
   Console get basicPaletteConsole => Console(
         topButtons: [
-          ConsoleButton(name: "Forward", onPress: () => print("TODO")),
+          ConsoleButton(
+            name: "Parent Depending Button TODO",
+            onPress: () => print("TODO"),
+          ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.back),
-          ConsoleButton(
-            isActivated: _modes.length != 1,
-            isMode: true,
-            name: currentMode,
-            onPress: rotate,
-          ),
+          ConsoleButton(name: "Forward", onPress: () => print("TODO")),
         ],
       );
 
@@ -1609,84 +2277,9 @@ class _NodePageState extends State<NodePage> {
         ],
       );
 
-  Future<void> rotate() async {
-    _i = (_i + 1) % _modes.length;
-    if (currentMode == "Childs") {
-      setState(() {});
-      return;
-    }
-    if (_fetchablePalettes[currentMode]!.isEmpty) {
-      final nodes = await r.getNodes(_stupidMap[currentMode]!);
-      for (final node in nodes ?? []) {
-        final p = widget.nodeToPalette(node, widget.palette.node.id);
-        if (p != null) {
-          _fetchablePalettes[currentMode] = {p.node.id: p};
-        }
-      }
-    }
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
-    final title = widget.palette.node.name +
-        (widget.palette.node.lastName != null
-            ? widget.palette.node.lastName!
-            : "");
-    switch (currentMode) {
-      case "Childs":
-        return [Nodes.user, Nodes.friend, Nodes.nonFriend]
-                .contains(widget.palette.node.type)
-            ? Down4Page2(
-                title: title,
-                columnWidgets: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 27),
-                    child: ProfileWidget(
-                      node: widget.palette.node
-                        ..description =
-                            "Hello, this is a temporary description, used first of all for one purpose only, and that purpose is testing",
-                    ),
-                  ),
-                  PaletteList(palettes: currentPalettes),
-                ],
-                console: userPaletteConsole,
-              )
-            : Down4Page2(
-                title: title,
-                palettes: currentPalettes,
-                console: basicPaletteConsole,
-              );
-
-      case "Parents":
-        return Down4Page2(
-          title: title,
-          palettes: currentPalettes,
-          console: basicPaletteConsole,
-        );
-
-      case "Admins":
-        return Down4Page2(
-          title: title,
-          palettes: currentPalettes,
-          console: basicPaletteConsole,
-        );
-
-      case "Followers":
-        return Down4Page2(
-          title: title,
-          palettes: currentPalettes,
-          console: basicPaletteConsole,
-        );
-
-      case "Following":
-        return Down4Page2(
-          title: title,
-          palettes: currentPalettes,
-          console: basicPaletteConsole,
-        );
-    }
-    return const SizedBox.shrink();
+    return _view ?? const SizedBox.shrink();
   }
 }
 
@@ -1694,8 +2287,9 @@ class ChatPage extends StatefulWidget {
   final Map<Identifier, Node> senders;
   final Node self, node;
   final List<CameraDescription> cameras;
-  final Future<bool> Function(MessageRequest req) send;
+  final Future<bool> Function(ChatRequest) send;
   final void Function() back;
+  final Palette? Function(Node, String) nodeToPalette;
 
   const ChatPage({
     required this.senders,
@@ -1704,6 +2298,7 @@ class ChatPage extends StatefulWidget {
     required this.self,
     required this.back,
     required this.cameras,
+    required this.nodeToPalette,
     Key? key,
   }) : super(key: key);
 
@@ -1765,14 +2360,13 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void saveSelectedMessages() {
+  void saveSelectedMessages() async {
     for (final msg in _chachedMessages.values) {
-      if (msg.selected) {
-        if (msg.media != null) {
-          msg.media!.save(toPersonal: true);
-        }
-        _chachedMessages[msg.message.id!] = msg.invertedSelection();
+      if (msg.selected && msg.message.mediaID != null) {
+        final media = await getMessageMediaFromEverywhere(msg.message.mediaID!);
+        if (media != null) media.save(toPersonal: true);
       }
+      _chachedMessages[msg.message.id!] = msg.invertedSelection();
     }
     setState(() {});
   }
@@ -1791,8 +2385,9 @@ class _ChatPageState extends State<ChatPage> {
         text: textInput,
       );
 
-      Boxes.instance.saveMessage(msg);
-      widget.send(MessageRequest(targets: targets, msg: msg));
+      var req = ChatRequest(msg: msg, targets: targets);
+
+      widget.send(req);
       tec.clear();
     }
   }
@@ -1832,9 +2427,12 @@ class _ChatPageState extends State<ChatPage> {
 
     ctrl?.setFlashMode(flashMode);
 
-    void nextCam() => cameraIdx == 0
-        ? camConsole(ctrl, 1, resolution, FlashMode.off, true)
-        : camConsole(ctrl, 0, resolution, FlashMode.off, true);
+    void nextCam() =>
+        camConsole(ctrl, (cameraIdx + 1) % 2, resolution, FlashMode.off, true);
+
+    // void nextCam() => cameraIdx == 0
+    //     ? camConsole(ctrl, 1, resolution, FlashMode.off, true)
+    //     : camConsole(ctrl, 0, resolution, FlashMode.off, true);
 
     void nextRes() async {
       switch (resolution) {
@@ -2029,10 +2627,27 @@ class _ChatPageState extends State<ChatPage> {
     final title = widget.node.name +
         (widget.node.lastName != null ? " " + widget.node.lastName! : "");
     if (_console == null) baseConsole();
-    return Down4Page2(
-      title: title,
-      messageList: messageList,
-      console: _console!,
+
+    List<Page> pages = (widget.node.group ?? []).isNotEmpty
+        ? [
+            Page(
+              title: "People",
+              console: _console!,
+              futureNodes: FutureNodes(
+                at: widget.node.id,
+                nodeToPalette: widget.nodeToPalette,
+                nodeIDs: widget.node.group!,
+              ),
+            ),
+            Page(title: title, console: _console!, messageList: messageList),
+          ]
+        : [
+            Page(title: title, console: _console!, messageList: messageList),
+          ];
+
+    return Jeff(
+      initialPageIndex: (widget.node.group ?? []).isNotEmpty ? 1 : 0,
+      pages: pages,
     );
   }
 }
@@ -2045,45 +2660,9 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Down4Navigator2(
-      firstPage: 0,
-      pages: [
-        Page(
-          pageBody: PageBody(title: "Home", palettes: palettes),
-          pageConsole: PageConsole(console: console),
-        ),
-        Page(
-          pageBody: PageBody(title: "Friends", palettes: palettes),
-          pageConsole: PageConsole(
-            console: Console(
-              inputs: [
-                ConsoleInput(
-                  placeHolder: "Nice",
-                  tec: TextEditingController(),
-                )
-              ],
-              bottomButtons: [
-                ConsoleButton(name: "Nigga", onPress: () => print("LOL")),
-                ConsoleButton(name: "What", onPress: () => print("LOL")),
-                ConsoleButton(name: "Lol", onPress: () => print("LOL")),
-              ],
-              topButtons: [
-                ConsoleButton(name: "Apple", onPress: () => print("LOL")),
-                ConsoleButton(name: "Orange", onPress: () => print("LOL")),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-
-    // [
-    //   Down4Page(
-    //     title: "Home",
-    //     palettes: palettes,
-    //     console: console,
-    //   ),
-    // ]);
+    return Jeff(pages: [
+      Page(title: "Home", palettes: palettes, console: console),
+    ]);
   }
 }
 
@@ -2209,7 +2788,7 @@ class _HomeState extends State<Home> {
                 ..save());
             } else {
               // root node is not in home
-              final newNode = await getNode(msg.root!);
+              final newNode = await getSingleNode(msg.root!);
               if (newNode == null) return;
               (newNode.messages ??= []).add(msg.id!);
               writePalette(newNode
@@ -2231,7 +2810,7 @@ class _HomeState extends State<Home> {
                 ..save());
             } else {
               // userNode is not in home
-              final newUserNode = await getNode(msg.senderID);
+              final newUserNode = await getSingleNode(msg.senderID);
               if (newUserNode == null) return;
               (newUserNode.messages ??= []).add(msg.id!);
               writePalette(newUserNode
@@ -2266,7 +2845,7 @@ class _HomeState extends State<Home> {
             var nodeRoot = nodeAt(msg.root!);
             if (nodeRoot == null) {
               // nodeRoot is not in home, need to download it
-              final newRootNode = await getNode(msg.root!);
+              final newRootNode = await getSingleNode(msg.root!);
               if (newRootNode == null) return;
               (newRootNode.snips ??= []).add(msg.mediaID!);
               writePalette(newRootNode
@@ -2290,7 +2869,7 @@ class _HomeState extends State<Home> {
                 ..save());
             } else {
               // user is not in home
-              var userNode = await getNode(msg.senderID);
+              var userNode = await getSingleNode(msg.senderID);
               if (userNode == null) return;
               (userNode.snips ??= []).add(msg.mediaID!);
               writePalette(userNode
@@ -2553,7 +3132,7 @@ class _HomeState extends State<Home> {
     searchPage();
   }
 
-  Future<bool> ping() async {
+  Future<bool> ping(ChatRequest request) async {
     // TODO
     return true;
   }
@@ -2587,7 +3166,44 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<void> chatRequest(Node node, Down4Message msg) async {}
+  Future<bool> chatRequest(ChatRequest req) async {
+    final targetNode = req.msg.root ?? req.targets.first;
+    var node = nodeAt(targetNode);
+    if (node == null) return false;
+    (node.messages ??= []).add(req.msg.id!);
+    req.msg.save();
+    req.media?.save();
+    if (view is ChatPage && locations.last["id"] == targetNode) {
+      chatPage(node);
+    }
+    return r.chatRequest(req);
+  }
+
+  Future<bool> hyperchatRequest(HyperchatRequest req) async {
+    var node = await r.hyperchatRequest(req);
+    if (node == null) return false;
+    (node.messages ??= []).add(req.msg.id!);
+    req.msg.save();
+    req.media?.save();
+    writePalette(node);
+    homePage();
+    return true;
+  }
+
+  Future<bool> groupRequest(GroupRequest req) async {
+    var node = await r.groupRequest(req);
+    if (node == null) return false;
+    (node.messages ??= []).add(req.msg.id!);
+    req.msg.save();
+    req.media?.save();
+    writePalette(node);
+    chatPage(node);
+    return true;
+  }
+
+  Future<bool> paymentRequest(PaymentRequest req) async {
+    return await r.paymentRequest(req);
+  }
 
   void back([bool remove = true]) {
     if (remove) locations.removeLast();
@@ -2778,15 +3394,19 @@ class _HomeState extends State<Home> {
             placeHolder: ":)",
           ),
         ],
+        topButtons: [
+          ConsoleButton(name: "Hyperchat", onPress: hyperchatPage),
+          ConsoleButton(name: "Money", onPress: moneyPage),
+        ],
         bottomButtons: [
           ConsoleButton(
               showExtra: extra,
-              name: "Delete",
-              onPress: () => extra ? homePage(!extra) : delete,
+              name: "Group",
+              onPress: () => extra ? homePage(!extra) : groupPage(),
               isSpecial: true,
               onLongPress: () => homePage(!extra),
               extraButtons: [
-                ConsoleButton(name: "Nigger", onPress: () => homePage(!extra)),
+                ConsoleButton(name: "Delete", onPress: delete),
                 ConsoleButton(name: "Shit", onPress: () => homePage(!extra)),
                 ConsoleButton(name: "Wacko", onPress: () => homePage(!extra)),
               ]),
@@ -2799,14 +3419,26 @@ class _HomeState extends State<Home> {
           ),
           ConsoleButton(
             name: "Ping",
-            onPress: ping,
+            onPress: () async {
+              if (tec.value.text.isEmpty) return;
+              final msg = Down4Message(
+                senderID: widget.self.id,
+                timestamp: u.timeStamp(),
+                text: tec.value.text,
+              );
+              final targets = selectedHomeUserPaletteDeactivated.asIds();
+              final r = ChatRequest(msg: msg, targets: targets);
+              final success = ping(r);
+              tec.clear();
+              if (await success) {
+                // TODO
+              } else {
+                // TODO
+              }
+            },
             onLongPress: snipPage,
             isSpecial: true,
           ),
-        ],
-        topButtons: [
-          ConsoleButton(name: "Chat", onPress: hyperchatPage),
-          ConsoleButton(name: "Money", onPress: moneyPage),
         ],
       ),
     );
@@ -2856,19 +3488,28 @@ class _HomeState extends State<Home> {
   }
 
   void hyperchatPage() {
-    view = GroupPage(
-      isHyperchat: true,
+    view = HyperchatPage(
       self: widget.self,
-      afterMessageCallback: (node) {
-        // TODO
-        writePalette(node);
-        locations.add({"at": "Home", "id": node.id, "type": "Chat"});
-        chatPage(node);
-      },
+      palettes: selectedHomeUserPaletteDeactivated,
+      hyperchatRequest: hyperchatRequest,
+      cameras: widget.cameras,
       back: homePage,
+      ping: ping,
+    );
+
+    setState(() {});
+  }
+
+  void groupPage() {
+    view = GroupPage(
+      self: widget.self,
+      afterMessageCallback: (node) => writePalette(node),
+      back: homePage,
+      groupRequest: groupRequest,
       palettes: selectedHomeUserPaletteDeactivated,
       cameras: widget.cameras,
     );
+
     setState(() {});
   }
 
@@ -2888,6 +3529,51 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
+  Future<void> snipPage({
+    CameraController? ctrl,
+    int camera = 0,
+    ResolutionPreset res = ResolutionPreset.medium,
+    bool reload = false,
+  }) async {
+
+    void nextRes() {
+      snipPage(
+        ctrl: ctrl,
+        camera: camera,
+        reload: true,
+        res: res == ResolutionPreset.low
+            ? ResolutionPreset.medium
+            : res == ResolutionPreset.medium
+                ? ResolutionPreset.high
+                : ResolutionPreset.low,
+      );
+    }
+
+    void nextCam() {
+      snipPage(ctrl: ctrl, camera: (camera + 1) % 2, reload: true, res: res);
+    }
+
+    void snip() async {
+      view = SnipCamera(
+        maxZoom: await ctrl!.getMaxZoomLevel(),
+        minZoom: await ctrl.getMinZoomLevel(),
+        camNum: camera,
+        cameraBack: homePage,
+        cameraCallBack: sendSnip,
+        ctrl: ctrl,
+        nextRes: nextRes,
+        flip: nextCam,
+      );
+      setState(() {});
+    }
+
+    if (ctrl == null || reload) {
+      ctrl = CameraController(widget.cameras[camera], res);
+      await ctrl.initialize();
+      snip();
+    }
+  }
+
   void nodePage(Node node) {
     view = NodePage(
       cameras: widget.cameras,
@@ -2900,51 +3586,6 @@ class _HomeState extends State<Home> {
       back: back,
     );
     setState(() {});
-  }
-
-  Future<void> snipPage({
-    CameraController? ctrl,
-    int camera = 0,
-    ResolutionPreset res = ResolutionPreset.medium,
-    bool reload = false,
-  }) async {
-    ResolutionPreset nextRes() => res == ResolutionPreset.low
-        ? ResolutionPreset.medium
-        : res == ResolutionPreset.medium
-            ? ResolutionPreset.high
-            : ResolutionPreset.low;
-
-    int nextCam() => camera == 0 ? 1 : 0;
-
-    void snip() async {
-      view = SnipCamera(
-        maxZoom: await ctrl!.getMaxZoomLevel(),
-        minZoom: await ctrl.getMinZoomLevel(),
-        camNum: camera,
-        cameraBack: homePage,
-        cameraCallBack: sendSnip,
-        ctrl: ctrl,
-        nextRes: () => snipPage(
-          ctrl: ctrl,
-          res: nextRes(),
-          camera: camera,
-          reload: true,
-        ),
-        flip: () => snipPage(
-          ctrl: ctrl,
-          res: res,
-          camera: nextCam(),
-          reload: true,
-        ),
-      );
-      setState(() {});
-    }
-
-    if (ctrl == null || reload) {
-      ctrl = CameraController(widget.cameras[camera], res);
-      await ctrl.initialize();
-      snip();
-    }
   }
 
   void chatPage(Node node) async {
@@ -2974,6 +3615,7 @@ class _HomeState extends State<Home> {
     }
 
     view = ChatPage(
+      nodeToPalette: nodeToPalette,
       senders: senders,
       send: send,
       self: widget.self,
@@ -3014,48 +3656,47 @@ class _HomeState extends State<Home> {
         await ctrl.initialize();
         await ctrl.setLooping(true);
         await ctrl.play();
-        view = Down4Page2(
-          title: "TODO",
-          stackWidgets: [
-            SizedBox(
-              height: mediaSize.height,
-              width: mediaSize.width,
-              child: Transform.scale(
-                scaleX: 1 / scale,
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform:
-                      Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
-                  child: VideoPlayer(ctrl),
-                ),
+        view = Stack(children: [
+          SizedBox(
+            height: mediaSize.height,
+            width: mediaSize.width,
+            child: Transform.scale(
+              scaleX: 1 / scale,
+              child: Transform(
+                alignment: Alignment.center,
+                transform:
+                    Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+                child: VideoPlayer(ctrl),
               ),
             ),
-            media.metadata.text != "" && media.metadata.text != null
-                ? Center(
-                    child: Container(
-                      width: mediaSize.width,
-                      decoration: const BoxDecoration(
-                        // border: Border.symmetric(
-                        //   horizontal: BorderSide(color: Colors.black38),
-                        // ),
-                        color: Colors.black38,
-                        // color: PinkTheme.snipRibbon,
-                      ),
-                      constraints: BoxConstraints(
-                        minHeight: 16,
-                        maxHeight: mediaSize.height,
-                      ),
-                      child: Text(
-                        media.metadata.text!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white),
-                      ),
+          ),
+          media.metadata.text != "" && media.metadata.text != null
+              ? Center(
+                  child: Container(
+                    width: mediaSize.width,
+                    decoration: const BoxDecoration(
+                      // border: Border.symmetric(
+                      //   horizontal: BorderSide(color: Colors.black38),
+                      // ),
+                      color: Colors.black38,
+                      // color: PinkTheme.snipRibbon,
                     ),
-                  )
-                : const SizedBox.shrink()
-          ],
-          console: Console(
-            bottomButtons: [
+                    constraints: BoxConstraints(
+                      minHeight: 16,
+                      maxHeight: mediaSize.height,
+                    ),
+                    child: Text(
+                      media.metadata.text!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            child: Console(bottomButtons: [
               ConsoleButton(
                 name: "Back",
                 onPress: () async {
@@ -3073,64 +3714,62 @@ class _HomeState extends State<Home> {
                   snipView(node);
                 },
               ),
-            ],
+            ]),
           ),
-        );
+        ]);
       } else {
         await precacheImage(MemoryImage(media.data), context);
-        view = Down4Page2(
-          title: "TODO",
-          stackWidgets: [
-            SizedBox(
-              height: mediaSize.height,
-              width: mediaSize.width,
-              child: Transform(
-                alignment: Alignment.center,
-                transform:
-                    Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
-                child: Image.memory(
-                  media.data,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                ),
+        view = Stack(children: [
+          SizedBox(
+            height: mediaSize.height,
+            width: mediaSize.width,
+            child: Transform(
+              alignment: Alignment.center,
+              transform:
+                  Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+              child: Image.memory(
+                media.data,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
               ),
             ),
-            media.metadata.text != "" && media.metadata.text != null
-                ? Center(
-                    child: Container(
-                      width: mediaSize.width,
-                      decoration: const BoxDecoration(
-                        // border: Border.symmetric(
-                        //   horizontal: BorderSide(color: Colors.black38),
-                        // ),
-                        color: Colors.black38,
-                        // color: PinkTheme.snipRibbon,
-                      ),
-                      constraints: BoxConstraints(
-                        minHeight: 16,
-                        maxHeight: mediaSize.height,
-                      ),
-                      child: Text(
-                        media.metadata.text!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink()
-          ],
-          console: Console(
-            bottomButtons: [
-              ConsoleButton(
-                  name: "Back",
-                  onPress: () {
-                    writePalette(node);
-                    homePage();
-                  }),
-              ConsoleButton(name: "Next", onPress: () => snipView(node)),
-            ],
           ),
-        );
+          media.metadata.text != "" && media.metadata.text != null
+              ? Center(
+                  child: Container(
+                    width: mediaSize.width,
+                    decoration: const BoxDecoration(
+                      // border: Border.symmetric(
+                      //   horizontal: BorderSide(color: Colors.black38),
+                      // ),
+                      color: Colors.black38,
+                      // color: PinkTheme.snipRibbon,
+                    ),
+                    constraints: BoxConstraints(
+                      minHeight: 16,
+                      maxHeight: mediaSize.height,
+                    ),
+                    child: Text(
+                      media.metadata.text!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+          Positioned(
+              bottom: 0,
+              left: 0,
+              child: Console(bottomButtons: [
+                ConsoleButton(
+                    name: "Back",
+                    onPress: () {
+                      writePalette(node);
+                      homePage();
+                    }),
+                ConsoleButton(name: "Next", onPress: () => snipView(node)),
+              ]))
+        ]);
       }
       setState(() {});
     }

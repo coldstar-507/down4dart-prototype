@@ -117,7 +117,7 @@ Future<bool> snipRequest(MessageRequest req) async {
   return res.statusCode == 200;
 }
 
-Future<bool> groupRequest(GroupRequest req, [withMedia = false]) async {
+Future<Node?> groupRequest(GroupRequest req, [withMedia = false]) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
   );
@@ -125,10 +125,17 @@ Future<bool> groupRequest(GroupRequest req, [withMedia = false]) async {
   if (res.statusCode == HttpStatus.noContent) {
     return groupRequest(req, true);
   }
-  return res.statusCode == 200;
+  if (res.statusCode == 200) {
+    return Node.fromJson(jsonDecode(res.body));
+  } else {
+    return null;
+  }
 }
 
-Future<bool> hyperchatRequest(HyperchatRequest req, [withMedia = false]) async {
+Future<Node?> hyperchatRequest(
+  HyperchatRequest req, [
+  bool withMedia = false,
+]) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
   );
@@ -136,6 +143,18 @@ Future<bool> hyperchatRequest(HyperchatRequest req, [withMedia = false]) async {
   if (res.statusCode == HttpStatus.noContent) {
     return hyperchatRequest(req, true);
   }
+  if (res.statusCode == 200) {
+    return Node.fromJson(jsonDecode(res.body));
+  } else {
+    return null;
+  }
+}
+
+Future<bool> paymentRequest(PaymentRequest req) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
+  );
+  final res = await http.post(url, body: jsonEncode(req));
   return res.statusCode == 200;
 }
 

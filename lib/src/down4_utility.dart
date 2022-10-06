@@ -4,8 +4,18 @@ import 'package:pointycastle/digests/sha1.dart' as sha1;
 import 'data_objects.dart';
 import 'package:collection/collection.dart';
 import 'package:fast_base58/fast_base58.dart' as b58;
+import 'dart:io';
 
 final listEqual = const ListEquality().equals;
+
+Future<bool> hasNetwork() async {
+  try {
+    final result = await InternetAddress.lookup('amazon.com');
+    return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+  } on SocketException catch (_) {
+    return false;
+  }
+}
 
 extension IsTypes on Node {
   bool get isFriendOrGroup => const [Nodes.friend, Nodes.group].contains(type);

@@ -253,7 +253,7 @@ class SnipCamera extends StatefulWidget {
     double aspectRatio,
   ) cameraCallBack;
   final bool enableVideo;
-  
+
   const SnipCamera({
     required this.maxZoom,
     required this.minZoom,
@@ -335,74 +335,157 @@ class _SnipCameraState extends State<SnipCamera> {
   Widget capturingPage([bool extra = false]) {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
-    return Down4Page2(
-      title: "TODO",
-      stackWidgets: [
-        GestureDetector(
-          onTap: () => print("LALALALALAL"),
-          onScaleStart: (details) => _baseScale = _scale,
-          onScaleUpdate: (details) {
-            if (_baseScale * details.scale < widget.minZoom) {
-              _scale = widget.minZoom;
-            } else if (_baseScale * details.scale > widget.maxZoom) {
-              _scale = widget.maxZoom;
-            } else {
-              _scale = _baseScale * details.scale;
-            }
-            if (_scale >= widget.minZoom && _scale <= widget.maxZoom) {
-              widget.ctrl.setZoomLevel(_scale);
-            }
-          },
-          child: SizedBox(
-            height: mediaSize.height,
-            width: mediaSize.width,
-            child: Transform.scale(
-              scaleX: scale,
-              alignment: Alignment.center,
-              child: CameraPreview(widget.ctrl),
-            ),
+    return Stack(children: [
+      GestureDetector(
+        onTap: () => print("LALALALALAL"),
+        onScaleStart: (details) => _baseScale = _scale,
+        onScaleUpdate: (details) {
+          if (_baseScale * details.scale < widget.minZoom) {
+            _scale = widget.minZoom;
+          } else if (_baseScale * details.scale > widget.maxZoom) {
+            _scale = widget.maxZoom;
+          } else {
+            _scale = _baseScale * details.scale;
+          }
+          if (_scale >= widget.minZoom && _scale <= widget.maxZoom) {
+            widget.ctrl.setZoomLevel(_scale);
+          }
+        },
+        child: SizedBox(
+          height: mediaSize.height,
+          width: mediaSize.width,
+          child: Transform.scale(
+            scaleX: scale,
+            alignment: Alignment.center,
+            child: CameraPreview(widget.ctrl),
           ),
         ),
-      ],
-      console: Console(
-        topButtons: [
-          ConsoleButton(
-            shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
-            name: "Capture",
-            isSpecial: widget.enableVideo,
-            onPress: _takePicture,
-            onLongPress: widget.enableVideo ? _startRecording : null,
-            onLongPressUp: widget.enableVideo ? _stopRecording : null,
-          ),
-        ],
-        bottomButtons: [
-          ConsoleButton(
-            name: "Back",
-            onPress: () => !extra ? widget.cameraBack() : capturingPage(!extra),
-            onLongPress: () => capturingPage(!extra),
-            isSpecial: true,
-            extraButtons: [
+      ),
+      Positioned(
+        bottom: 0,
+        left: 0,
+        child: SizedBox(
+          width: mediaSize.width,
+          child: Console(
+            topButtons: [
               ConsoleButton(
-                isMode: true,
-                name: widget.ctrl.resolutionPreset.name.capitalize(),
-                onPress: widget.nextRes,
-              ),
-              ConsoleButton(
-                isMode: true,
-                name: widget.ctrl.value.flashMode.name.capitalize(),
-                onPress: _nextFlashMode,
+                shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
+                name: "Capture",
+                isSpecial: widget.enableVideo,
+                onPress: _takePicture,
+                onLongPress: widget.enableVideo ? _startRecording : null,
+                onLongPressUp: widget.enableVideo ? _stopRecording : null,
               ),
             ],
-            showExtra: extra,
+            bottomButtons: [
+              ConsoleButton(
+                name: "Back",
+                onPress: () =>
+                    !extra ? widget.cameraBack() : capturingPage(!extra),
+                onLongPress: () => capturingPage(!extra),
+                isSpecial: true,
+                showExtra: extra,
+                extraButtons: [
+                  ConsoleButton(
+                    isMode: true,
+                    name: widget.ctrl.resolutionPreset.name.capitalize(),
+                    onPress: widget.nextRes,
+                  ),
+                  ConsoleButton(
+                    isMode: true,
+                    name: widget.ctrl.value.flashMode.name.capitalize(),
+                    onPress: _nextFlashMode,
+                  ),
+                ],
+              ),
+              ConsoleButton(
+                isMode: true,
+                name: widget.camNum == 0 ? "Rear" : "Front",
+                onPress: widget.flip,
+              ),
+            ],
           ),
-          ConsoleButton(
-            isMode: true,
-            name: widget.camNum == 0 ? "Rear" : "Front",
-            onPress: widget.flip,
-          ),
-        ],
+        ),
       ),
-    );
+    ]);
+    // return Jeff(
+    //   index: 0,
+    //   titles: ["TODO"],
+    //   bodies: [
+    //     PageBody(
+    //       stackWidgets: [
+    //         GestureDetector(
+    //           onTap: () => print("LALALALALAL"),
+    //           onScaleStart: (details) => _baseScale = _scale,
+    //           onScaleUpdate: (details) {
+    //             if (_baseScale * details.scale < widget.minZoom) {
+    //               _scale = widget.minZoom;
+    //             } else if (_baseScale * details.scale > widget.maxZoom) {
+    //               _scale = widget.maxZoom;
+    //             } else {
+    //               _scale = _baseScale * details.scale;
+    //             }
+    //             if (_scale >= widget.minZoom && _scale <= widget.maxZoom) {
+    //               widget.ctrl.setZoomLevel(_scale);
+    //             }
+    //           },
+    //           child: SizedBox(
+    //             height: mediaSize.height,
+    //             width: mediaSize.width,
+    //             child: Transform.scale(
+    //               scaleX: scale,
+    //               alignment: Alignment.center,
+    //               child: CameraPreview(widget.ctrl),
+    //             ),
+    //           ),
+    //         ),
+    //       ],
+    //     ),
+    //   ],
+    //   consoles: [
+    //     PageConsole(
+    //       console: Console(
+    //         topButtons: [
+    //           ConsoleButton(
+    //             shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
+    //             name: "Capture",
+    //             isSpecial: widget.enableVideo,
+    //             onPress: _takePicture,
+    //             onLongPress: widget.enableVideo ? _startRecording : null,
+    //             onLongPressUp: widget.enableVideo ? _stopRecording : null,
+    //           ),
+    //         ],
+    //         bottomButtons: [
+    //           ConsoleButton(
+    //             name: "Back",
+    //             onPress: () =>
+    //                 !extra ? widget.cameraBack() : capturingPage(!extra),
+    //             onLongPress: () => capturingPage(!extra),
+    //             isSpecial: true,
+    //             extraButtons: [
+    //               ConsoleButton(
+    //                 isMode: true,
+    //                 name: widget.ctrl.resolutionPreset.name.capitalize(),
+    //                 onPress: widget.nextRes,
+    //               ),
+    //               ConsoleButton(
+    //                 isMode: true,
+    //                 name: widget.ctrl.value.flashMode.name.capitalize(),
+    //                 onPress: _nextFlashMode,
+    //               ),
+    //             ],
+    //             showExtra: extra,
+    //           ),
+    //           ConsoleButton(
+    //             isMode: true,
+    //             name: widget.camNum == 0 ? "Rear" : "Front",
+    //             onPress: widget.flip,
+    //           ),
+    //         ],
+    //       ),
+    //     ),
+    //   ],
+    // );
   }
 
   void videoPreview(
@@ -415,93 +498,199 @@ class _SnipCameraState extends State<SnipCamera> {
   ]) {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
-    _preview = Down4Page2(
-      title: "TODO",
-      stackWidgets: [
-        SizedBox(
-          height: mediaSize.height,
-          width: mediaSize.width,
-          child: Transform.scale(
-            scaleX: scale,
-            child: Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-              child: VideoPlayer(vpc),
-            ),
+    _preview = Stack(children: [
+      SizedBox(
+        height: mediaSize.height,
+        width: mediaSize.width,
+        child: Transform.scale(
+          scaleX: scale,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+            child: VideoPlayer(vpc),
           ),
         ),
-        input
-            ? Center(
-                child: Container(
-                  width: mediaSize.width,
-                  decoration: const BoxDecoration(
-                    // border: Border.symmetric(
-                    //   horizontal: BorderSide(color: Colors.black38),
-                    // ),
-                    color: Colors.black38,
-                    // color: PinkTheme.snipRibbon,
-                  ),
-                  constraints: BoxConstraints(
-                    minHeight: 16,
-                    maxHeight: mediaSize.height,
-                  ),
-                  child: TextField(
-                    autofocus: input,
-                    textInputAction: TextInputAction.done,
-                    cursorColor: Colors.white,
-                    controller: tec,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      isCollapsed: true,
-                    ),
-                    maxLines: 15,
-                    minLines: 1,
-                    style: const TextStyle(color: Colors.white),
-                    // style: const TextStyle(color: PinkTheme.black),
-                  ),
+      ),
+      input
+          ? Center(
+              child: Container(
+                width: mediaSize.width,
+                decoration: const BoxDecoration(
+                  // border: Border.symmetric(
+                  //   horizontal: BorderSide(color: Colors.black38),
+                  // ),
+                  color: Colors.black38,
+                  // color: PinkTheme.snipRibbon,
                 ),
-              )
-            : const SizedBox.shrink(),
-      ],
-      console: Console(topButtons: [
-        ConsoleButton(
-          name: "Accept",
-          onPress: () async {
-            await vpc.dispose();
-            widget.cameraCallBack(
-              filePath,
-              isVideo,
-              toReverse,
-              tec.value.text,
-              widget.ctrl.value.aspectRatio,
-            );
-          },
-        ),
-      ], bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: () {
-            _preview = null;
-            vpc.dispose();
-            setState(() {});
-          },
-        ),
-        ConsoleButton(
-          name: "Text",
-          onPress: () => videoPreview(
-            vpc,
-            filePath,
-            isVideo,
-            toReverse,
-            text,
-            !input,
+                constraints: BoxConstraints(
+                  minHeight: 16,
+                  maxHeight: mediaSize.height,
+                ),
+                child: TextField(
+                  autofocus: input,
+                  textInputAction: TextInputAction.done,
+                  cursorColor: Colors.white,
+                  controller: tec,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    isCollapsed: true,
+                  ),
+                  maxLines: 15,
+                  minLines: 1,
+                  style: const TextStyle(color: Colors.white),
+                  // style: const TextStyle(color: PinkTheme.black),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
+      Positioned(
+        bottom: 0,
+        left: 0,
+        child: SizedBox(
+          width: mediaSize.width,
+          // height: mediaSize.height,
+          child: Console(
+            topButtons: [
+              ConsoleButton(
+                name: "Accept",
+                onPress: () async {
+                  await vpc.dispose();
+                  widget.cameraCallBack(
+                    filePath,
+                    isVideo,
+                    toReverse,
+                    tec.value.text,
+                    widget.ctrl.value.aspectRatio,
+                  );
+                },
+              ),
+            ],
+            bottomButtons: [
+              ConsoleButton(
+                name: "Back",
+                onPress: () {
+                  _preview = null;
+                  vpc.dispose();
+                  setState(() {});
+                },
+              ),
+              ConsoleButton(
+                name: "Text",
+                onPress: () => videoPreview(
+                  vpc,
+                  filePath,
+                  isVideo,
+                  toReverse,
+                  text,
+                  !input,
+                ),
+              ),
+            ],
           ),
         ),
-      ]),
-    );
+      ),
+    ]);
 
+    // _preview = Jeff(
+    //   index: 0,
+    //   titles: ["TODO"],
+    //   bodies: [
+    //     PageBody(
+    //       stackWidgets: [
+    //         SizedBox(
+    //           height: mediaSize.height,
+    //           width: mediaSize.width,
+    //           child: Transform.scale(
+    //             scaleX: scale,
+    //             child: Transform(
+    //               alignment: Alignment.center,
+    //               transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+    //               child: VideoPlayer(vpc),
+    //             ),
+    //           ),
+    //         ),
+    //         input
+    //             ? Center(
+    //                 child: Container(
+    //                   width: mediaSize.width,
+    //                   decoration: const BoxDecoration(
+    //                     // border: Border.symmetric(
+    //                     //   horizontal: BorderSide(color: Colors.black38),
+    //                     // ),
+    //                     color: Colors.black38,
+    //                     // color: PinkTheme.snipRibbon,
+    //                   ),
+    //                   constraints: BoxConstraints(
+    //                     minHeight: 16,
+    //                     maxHeight: mediaSize.height,
+    //                   ),
+    //                   child: TextField(
+    //                     autofocus: input,
+    //                     textInputAction: TextInputAction.done,
+    //                     cursorColor: Colors.white,
+    //                     controller: tec,
+    //                     textAlign: TextAlign.center,
+    //                     decoration: const InputDecoration(
+    //                       border: InputBorder.none,
+    //                       isDense: true,
+    //                       isCollapsed: true,
+    //                     ),
+    //                     maxLines: 15,
+    //                     minLines: 1,
+    //                     style: const TextStyle(color: Colors.white),
+    //                     // style: const TextStyle(color: PinkTheme.black),
+    //                   ),
+    //                 ),
+    //               )
+    //             : const SizedBox.shrink(),
+    //       ],
+    //     ),
+    //   ],
+    //   consoles: [
+    //     PageConsole(
+    //       console: Console(
+    //         topButtons: [
+    //           ConsoleButton(
+    //             name: "Accept",
+    //             onPress: () async {
+    //               await vpc.dispose();
+    //               widget.cameraCallBack(
+    //                 filePath,
+    //                 isVideo,
+    //                 toReverse,
+    //                 tec.value.text,
+    //                 widget.ctrl.value.aspectRatio,
+    //               );
+    //             },
+    //           ),
+    //         ],
+    //         bottomButtons: [
+    //           ConsoleButton(
+    //             name: "Back",
+    //             onPress: () {
+    //               _preview = null;
+    //               vpc.dispose();
+    //               setState(() {});
+    //             },
+    //           ),
+    //           ConsoleButton(
+    //             name: "Text",
+    //             onPress: () => videoPreview(
+    //               vpc,
+    //               filePath,
+    //               isVideo,
+    //               toReverse,
+    //               text,
+    //               !input,
+    //             ),
+    //           ),
+    //         ],
+    //       ),
+    //     ),
+    //   ],
+    // );
     setState(() {});
   }
 
@@ -514,81 +703,170 @@ class _SnipCameraState extends State<SnipCamera> {
   ]) {
     final mediaSize = MediaQuery.of(context).size;
     final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
-    _preview = Down4Page2(
-      title: "TODO",
-      stackWidgets: [
-        SizedBox(
-          height: mediaSize.height,
-          width: mediaSize.width,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-            child: Image.file(File(filePath), fit: BoxFit.cover),
-          ),
+    _preview = Stack(children: [
+      SizedBox(
+        height: mediaSize.height,
+        width: mediaSize.width,
+        child: Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+          child: Image.file(File(filePath), fit: BoxFit.cover),
         ),
-        input
-            ? Center(
-                child: Container(
-                  width: mediaSize.width,
-                  decoration: const BoxDecoration(
-                    color: Colors.black38,
-                    // color: PinkTheme.snipRibbon,
+      ),
+      input
+          ? Center(
+              child: Container(
+                width: mediaSize.width,
+                decoration: const BoxDecoration(
+                  color: Colors.black38,
+                  // color: PinkTheme.snipRibbon,
+                ),
+                constraints: BoxConstraints(
+                  minHeight: 16,
+                  maxHeight: mediaSize.height,
+                ),
+                child: TextField(
+                  autofocus: input,
+                  textInputAction: TextInputAction.done,
+                  cursorColor: Colors.white,
+                  controller: tec,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    isCollapsed: true,
                   ),
-                  constraints: BoxConstraints(
-                    minHeight: 16,
-                    maxHeight: mediaSize.height,
-                  ),
-                  child: TextField(
-                    autofocus: input,
-                    textInputAction: TextInputAction.done,
-                    cursorColor: Colors.white,
-                    controller: tec,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      isCollapsed: true,
-                    ),
-                    maxLines: 15,
-                    minLines: 1,
-                    style: const TextStyle(color: Colors.white),
+                  maxLines: 15,
+                  minLines: 1,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            )
+          : const SizedBox.shrink(),
+      Positioned(
+        bottom: 0,
+        left: 0,
+        child: SizedBox(
+            // height: mediaSize.height,
+            width: mediaSize.width,
+            child: Console(
+              topButtons: [
+                ConsoleButton(
+                  name: "Accept",
+                  onPress: () => widget.cameraCallBack(
+                    filePath,
+                    isVideo,
+                    toReverse,
+                    tec.value.text,
+                    widget.ctrl.value.aspectRatio,
                   ),
                 ),
-              )
-            : const SizedBox.shrink(),
-      ],
-      console: Console(
-        topButtons: [
-          ConsoleButton(
-            name: "Accept",
-            onPress: () => widget.cameraCallBack(
-              filePath,
-              isVideo,
-              toReverse,
-              tec.value.text,
-              widget.ctrl.value.aspectRatio,
-            ),
-          ),
-        ],
-        bottomButtons: [
-          ConsoleButton(
-            name: "Back",
-            onPress: () => setState(() => _preview = null),
-          ),
-          ConsoleButton(
-            name: "Text",
-            isMode: false,
-            onPress: () => imagePreview(
-              filePath,
-              isVideo,
-              toReverse,
-              text,
-              !input,
-            ),
-          ),
-        ],
+              ],
+              bottomButtons: [
+                ConsoleButton(
+                  name: "Back",
+                  onPress: () => setState(() => _preview = null),
+                ),
+                ConsoleButton(
+                  name: "Text",
+                  isMode: false,
+                  onPress: () => imagePreview(
+                    filePath,
+                    isVideo,
+                    toReverse,
+                    text,
+                    !input,
+                  ),
+                ),
+              ],
+            )),
       ),
-    );
+    ]);
+
+    // _preview = Jeff(
+    //   index: 0,
+    //   titles: ["TODO"],
+    //   bodies: [
+    //     PageBody(
+    //       stackWidgets: [
+    //         SizedBox(
+    //           height: mediaSize.height,
+    //           width: mediaSize.width,
+    //           child: Transform(
+    //             alignment: Alignment.center,
+    //             transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+    //             child: Image.file(File(filePath), fit: BoxFit.cover),
+    //           ),
+    //         ),
+    //         input
+    //             ? Center(
+    //                 child: Container(
+    //                   width: mediaSize.width,
+    //                   decoration: const BoxDecoration(
+    //                     color: Colors.black38,
+    //                     // color: PinkTheme.snipRibbon,
+    //                   ),
+    //                   constraints: BoxConstraints(
+    //                     minHeight: 16,
+    //                     maxHeight: mediaSize.height,
+    //                   ),
+    //                   child: TextField(
+    //                     autofocus: input,
+    //                     textInputAction: TextInputAction.done,
+    //                     cursorColor: Colors.white,
+    //                     controller: tec,
+    //                     textAlign: TextAlign.center,
+    //                     decoration: const InputDecoration(
+    //                       border: InputBorder.none,
+    //                       isDense: true,
+    //                       isCollapsed: true,
+    //                     ),
+    //                     maxLines: 15,
+    //                     minLines: 1,
+    //                     style: const TextStyle(color: Colors.white),
+    //                   ),
+    //                 ),
+    //               )
+    //             : const SizedBox.shrink(),
+    //       ],
+    //     )
+    //   ],
+    //   consoles: [
+    //     PageConsole(
+    //       console: Console(
+    //         topButtons: [
+    //           ConsoleButton(
+    //             name: "Accept",
+    //             onPress: () => widget.cameraCallBack(
+    //               filePath,
+    //               isVideo,
+    //               toReverse,
+    //               tec.value.text,
+    //               widget.ctrl.value.aspectRatio,
+    //             ),
+    //           ),
+    //         ],
+    //         bottomButtons: [
+    //           ConsoleButton(
+    //             name: "Back",
+    //             onPress: () => setState(() => _preview = null),
+    //           ),
+    //           ConsoleButton(
+    //             name: "Text",
+    //             isMode: false,
+    //             onPress: () => imagePreview(
+    //               filePath,
+    //               isVideo,
+    //               toReverse,
+    //               text,
+    //               !input,
+    //             ),
+    //           ),
+    //         ],
+    //       ),
+    //     ),
+    //   ],
+    // );
 
     setState(() {});
   }

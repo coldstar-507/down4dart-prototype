@@ -332,8 +332,10 @@ class HyperchatRequest extends ChatRequest {
 
 class GroupRequest extends ChatRequest {
   String name;
+  bool private;
   Down4Media groupImage;
   GroupRequest({
+    required this.private,
     required this.name,
     required this.groupImage,
     required Down4Message msg,
@@ -344,6 +346,7 @@ class GroupRequest extends ChatRequest {
   @override
   Map<String, dynamic> toJson([bool withMedia = false]) => {
         "msg": msg.toJson(),
+        "pv": private,
         "nm": name,
         "im": groupImage.toJson(),
         "trgts": targets,

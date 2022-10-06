@@ -13,6 +13,7 @@ import 'data_objects.dart';
 import 'render_utility.dart';
 import 'boxes.dart';
 import 'themes.dart';
+import 'web_requests.dart' as r;
 
 class BasicActionButton extends StatelessWidget {
   final void Function(String, String) goPress;
@@ -79,10 +80,15 @@ class ProfileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final squareImageSize = Sizes.w - 88;
+    final squareImageSize = Sizes.w * 0.84;
     return Container(
       clipBehavior: Clip.hardEdge,
       width: squareImageSize,
+      margin: EdgeInsets.only(
+        left: Sizes.w * 0.08,
+        right: Sizes.w * 0.08,
+        top: (Sizes.w * 0.08) - (Sizes.w * 0.02),
+      ),
       decoration: const BoxDecoration(
         boxShadow: [
           BoxShadow(
@@ -114,10 +120,13 @@ class ProfileWidget extends StatelessWidget {
           const SizedBox(height: 8.0),
           Container(
               padding: const EdgeInsets.all(8.0),
-              child: node.description != null
+              child: node.description != null &&
+                      (node.description ?? "").isNotEmpty
                   ? Text(node.description!, textAlign: TextAlign.justify)
                   : const SizedBox.shrink()),
-          const SizedBox(height: 8.0),
+          node.description != null && (node.description ?? "").isNotEmpty
+              ? const SizedBox(height: 8.0)
+              : const SizedBox.shrink(),
         ],
       ),
     );
@@ -569,14 +578,14 @@ class Console extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // both margin (16+16=32) + 1 = 0.5x1 for the Main container border
     final double mirror = toMirror == true ? math.pi : 0;
-    var camWidthAndHeight = Sizes.w - (Sizes.h * 0.04);
+    final camWidthAndHeight = Sizes.w - (Sizes.h * 0.023 * 2);
     return Container(
       margin: EdgeInsets.only(
-          left: Sizes.h * 0.023,
-          right: Sizes.h * 0.023,
-          bottom: Sizes.h * 0.021),
+        left: Sizes.h * 0.023,
+        right: Sizes.h * 0.023,
+        bottom: Sizes.h * 0.021,
+      ),
       decoration: BoxDecoration(
         border: Border.all(width: 0.5, color: Colors.black),
       ),
@@ -642,8 +651,8 @@ class Console extends StatelessWidget {
                           if ((medias?.length ?? 0) > i) {
                             return medias?[i].metadata.isVideo == true
                                 ? SizedBox(
-                                    height: (camWidthAndHeight / 4) - 0.25,
-                                    width: (camWidthAndHeight / 4) - 0.25,
+                                    height: (camWidthAndHeight - 2) / 5,
+                                    width: (camWidthAndHeight  - 2) / 5,
                                     child: Down4VideoPlayer(
                                       vid: medias![i].file!,
                                     ),
@@ -651,8 +660,8 @@ class Console extends StatelessWidget {
                                 : GestureDetector(
                                     onTap: () => selectMedia?.call(medias![i]),
                                     child: SizedBox(
-                                      height: ((camWidthAndHeight - 2) / 5),
-                                      width: ((camWidthAndHeight - 2) / 5),
+                                      height: (camWidthAndHeight - 2) / 5,
+                                      width: (camWidthAndHeight - 2) / 5,
                                       child: Image.memory(
                                         medias![i].data,
                                         fit: BoxFit.cover,
@@ -763,7 +772,6 @@ class ChatMessage extends StatelessWidget {
   static const double headerHeight = 24.0;
   final String at;
   final Down4Message message;
-  final Down4Media? media;
   final bool myMessage, selected, hasHeader, isPost;
   final void Function(Identifier, Identifier)? select;
   const ChatMessage({
@@ -772,7 +780,6 @@ class ChatMessage extends StatelessWidget {
     required this.myMessage,
     required this.at,
     required this.hasHeader,
-    this.media,
     this.isPost = false,
     this.selected = false,
     this.select,
@@ -785,16 +792,17 @@ class ChatMessage extends StatelessWidget {
       hasHeader: hasHeader,
       message: message,
       myMessage: myMessage,
-      media: media,
       at: at,
       select: select,
       selected: !selected,
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final maxWidth = Sizes.w * 0.76;
+  Future<Widget> getMessage(double maxWidth) async {
+    Down4Media? media;
+    if (message.mediaID != null) {
+      media = await getMessageMediaFromEverywhere(message.mediaID!);
+    }
     return Align(
       alignment: isPost == false
           ? Alignment.topCenter
@@ -910,7 +918,7 @@ class ChatMessage extends StatelessWidget {
                       ),
                     ),
               media != null
-                  ? media!.metadata.isVideo
+                  ? media.metadata.isVideo
                       ? Container(
                           clipBehavior: Clip.hardEdge,
                           height: maxWidth,
@@ -925,7 +933,7 @@ class ChatMessage extends StatelessWidget {
                                 : const BorderRadius.all(Radius.circular(4.0)),
                           ),
                           child: Down4VideoPlayer(
-                            vid: media!.file!,
+                            vid: media.file!,
                             key: GlobalKey(),
                           ))
                       : GestureDetector(
@@ -944,7 +952,7 @@ class ChatMessage extends StatelessWidget {
                                       Radius.circular(4.0)),
                             ),
                             child: Image.memory(
-                              media!.data,
+                              media.data,
                               fit: BoxFit.cover,
                               gaplessPlayback: true,
                             ),
@@ -955,6 +963,18 @@ class ChatMessage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxWidth = Sizes.w * 0.76;
+    return FutureBuilder<Widget>(
+      builder: (_, wdgt) =>
+          wdgt.connectionState == ConnectionState.done && wdgt.hasData
+              ? wdgt.data!
+              : const SizedBox.shrink(),
+      future: getMessage(maxWidth),
     );
   }
 }
@@ -1052,41 +1072,39 @@ class MessageList4 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Down4Message? prevMsgCache;
-    return Expanded(
-      child: ScrollConfiguration(
-        behavior: NoGlow(),
-        child: ListView.separated(
-          reverse: true,
-          itemBuilder: (c, i) {
-            if (i == 0 || i == messages.length + 2 - 1) {
-              return const SizedBox.shrink();
+    return ScrollConfiguration(
+      behavior: NoGlow(),
+      child: ListView.separated(
+        reverse: true,
+        itemBuilder: (c, i) {
+          if (i == 0 || i == messages.length + 2 - 1) {
+            return const SizedBox.shrink();
+          }
+          if (messageMap[messages[i - 1]] != null) {
+            return messageMap[messages[i - 1]]!;
+          } else {
+            Down4Message? prevMsg;
+            if (i < messages.length) {
+              prevMsg = messageMap[messages[i]]?.message ??
+                  Boxes.instance.loadMessage(messages[i]);
             }
-            if (messageMap[messages[i - 1]] != null) {
-              return messageMap[messages[i - 1]]!;
-            } else {
-              Down4Message? prevMsg;
-              if (i < messages.length) {
-                prevMsg = messageMap[messages[i]]?.message ??
-                    Boxes.instance.loadMessage(messages[i]);
-              }
-              final msg =
-                  prevMsgCache ?? Boxes.instance.loadMessage(messages[i - 1]);
-              final chat = ChatMessage(
-                sender: senders[msg.senderID]!,
-                message: msg,
-                myMessage: msg.senderID == self.id,
-                at: "",
-                hasHeader: msg.senderID != prevMsg?.senderID,
-                select: select,
-              );
-              cache(chat);
-              prevMsgCache = prevMsg;
-              return chat;
-            }
-          },
-          separatorBuilder: (c, i) => Container(height: 4.0),
-          itemCount: messages.length + 2,
-        ),
+            final msg =
+                prevMsgCache ?? Boxes.instance.loadMessage(messages[i - 1]);
+            final chat = ChatMessage(
+              sender: senders[msg.senderID]!,
+              message: msg,
+              myMessage: msg.senderID == self.id,
+              at: "",
+              hasHeader: msg.senderID != prevMsg?.senderID,
+              select: select,
+            );
+            cache(chat);
+            prevMsgCache = prevMsg;
+            return chat;
+          }
+        },
+        separatorBuilder: (c, i) => Container(height: 4.0),
+        itemCount: messages.length + 2,
       ),
     );
   }
@@ -1094,7 +1112,12 @@ class MessageList4 extends StatelessWidget {
 
 class DynamicList extends StatelessWidget {
   final List<dynamic> list;
-  const DynamicList({required this.list, Key? key}) : super(key: key);
+  final bool reversed;
+  const DynamicList({
+    required this.list,
+    this.reversed = true,
+    Key? key,
+  }) : super(key: key);
   @override
   Widget build(BuildContext context) {
     final gapSize = Sizes.h * 0.02;
@@ -1102,7 +1125,7 @@ class DynamicList extends StatelessWidget {
       behavior: NoGlow(),
       child: ListView.separated(
           padding: const EdgeInsets.only(top: 0),
-          reverse: true,
+          reverse: reversed,
           itemBuilder: (c, i) => i == 0
               ? const SizedBox.shrink()
               : i == list.length + 2 - 1
@@ -1111,6 +1134,35 @@ class DynamicList extends StatelessWidget {
           separatorBuilder: (c, i) => Container(height: gapSize),
           itemCount: list.length + 2),
     );
+  }
+}
+
+class FutureNodes extends StatelessWidget {
+  final String at;
+  final Palette? Function(Node node, String at) nodeToPalette;
+  final List<Identifier> nodeIDs;
+  const FutureNodes({
+    required this.at,
+    required this.nodeToPalette,
+    required this.nodeIDs,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+        future: r.getNodes(nodeIDs),
+        builder: (context, asyncSnapshot) {
+          if (asyncSnapshot.connectionState == ConnectionState.done &&
+              asyncSnapshot.hasData) {
+            final palettes = (asyncSnapshot as List<Node>)
+                .map((e) => nodeToPalette(e, at))
+                .whereType<Palette>()
+                .toList();
+            return PaletteList(palettes: palettes);
+          }
+          return const SizedBox.shrink();
+        });
   }
 }
 

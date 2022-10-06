@@ -16,7 +16,21 @@ var st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
 String messagePushId() => db.child("Messages").push().key!;
 
-Future<Node?> getNode(Identifier nodeID) async {
+Future<Down4Media?> getMessageMediaFromEverywhere(Identifier mediaID) async {
+  if (b.messageMedias.containsKey(mediaID)) {
+    return Down4Media.fromJson(jsonDecode(b.messageMedias.get(mediaID)));
+  } else if (b.images.containsKey(mediaID)) {
+    return Down4Media.fromJson(jsonDecode(b.images.get(mediaID)));
+  } else if (b.videos.containsKey(mediaID)) {
+    return Down4Media.fromJson(jsonDecode(b.videos.get(mediaID)));
+  } else {
+    final media = await getMessageMediaFromDB(mediaID);
+    if (media != null) media.save();
+    return media;
+  }
+}
+
+Future<Node?> getSingleNode(Identifier nodeID) async {
   var doc = await fs.collection("Nodes").doc(nodeID).get();
   var jsonNode = doc.data();
   if (jsonNode == null) return null;
@@ -43,7 +57,7 @@ Future<Node?> getNode(Identifier nodeID) async {
   return node;
 }
 
-Future<Down4Media?> getMessageMedia(Identifier mediaID) async {
+Future<Down4Media?> getMessageMediaFromDB(Identifier mediaID) async {
   var ref = st.ref(mediaID);
   var fmd = ref.getMetadata();
   var fd = ref.getData();

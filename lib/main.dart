@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/src/down4_utility.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'src/kernel.dart';
@@ -25,17 +26,16 @@ Future<void> _initBox() async {
   await Hive.openBox("SavedMessages");
   await Hive.openBox("Snips");
   await Hive.openBox("MessageMedias");
-
 }
 
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // If you're going to use other Firebase services in the background, such as Firestore,
-  // make sure you call `initializeApp` before using other Firebase services.
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  var messageQueue = await Hive.openBox("MessageQueue");
-  messageQueue.add(message.data);
-  messageQueue.close();
-}
+// Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+//   // If you're going to use other Firebase services in the background, such as Firestore,
+//   // make sure you call `initializeApp` before using other Firebase services.
+//   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+//   var messageQueue = await Hive.openBox("MessageQueue");
+//   messageQueue.add(message.data);
+//   messageQueue.close();
+// }
 
 late AndroidNotificationChannel channel;
 late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
@@ -79,7 +79,7 @@ Future<void> main() async {
   Hive.init(docDirPath);
   await _initBox();
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   List<CameraDescription> cameras = [];
   try {
@@ -88,7 +88,9 @@ Future<void> main() async {
     print("Available cameras error $err");
   }
 
-  // await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+  if (await hasNetwork()) {
+    await FirebaseAuth.instance.signInAnonymously();
+  }
   runApp(
     MaterialApp(
       theme: ThemeData(fontFamily: "Alice"),

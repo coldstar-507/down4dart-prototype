@@ -62,7 +62,7 @@ dependencies:
   # elliptic: ^0.3.8
   dart_ecpair: ^1.0.2
   dart_bip32: ^2.0.5
-  # firebase_auth: ^3.3.17
+  firebase_auth: ^3.3.17
   flutter_local_notifications: ^9.5.0
   bip32: ^2.0.0
   # tuple: ^2.0.0
