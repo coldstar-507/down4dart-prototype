@@ -3063,6 +3063,7 @@ class _HomeState extends State<Home> {
   ) async {
     if (path != null) {
       final timestamp = u.timeStamp();
+
       var media = Down4Media.fromCamera(
         path,
         MediaMetadata(
@@ -3074,11 +3075,14 @@ class _HomeState extends State<Home> {
           aspectRatio: aspectRatio,
         ),
       );
+
       var userTargets = <Identifier>[];
+
       for (final p in palettes().selected()) {
         if (p.node.isGroup) {
-          final mr = MessageRequest(
+          final sr = SnipRequest(
             msg: Down4Message(
+              id: messagePushId(),
               root: p.node.id,
               timestamp: timestamp,
               mediaID: media.id,
@@ -3088,13 +3092,15 @@ class _HomeState extends State<Home> {
               ..removeWhere((userID) => widget.self.id == userID),
             media: media,
           );
-          r.snipRequest(mr);
+
+          r.snipRequest(sr);
         } else {
           userTargets.add(p.node.id);
         }
       }
-      r.snipRequest(MessageRequest(
+      r.snipRequest(SnipRequest(
         msg: Down4Message(
+          id: messagePushId(),
           timestamp: timestamp,
           mediaID: media.id,
           senderID: widget.self.id,
@@ -3422,6 +3428,7 @@ class _HomeState extends State<Home> {
             onPress: () async {
               if (tec.value.text.isEmpty) return;
               final msg = Down4Message(
+                id: "",
                 senderID: widget.self.id,
                 timestamp: u.timeStamp(),
                 text: tec.value.text,

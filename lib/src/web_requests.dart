@@ -101,7 +101,7 @@ Future<double?> getExchangeRate() async {
   return double.parse(jsonDecode(res.body)["rate"]);
 }
 
-Future<bool> pingRequest(MessageRequest req) async {
+Future<bool> pingRequest(PingRequest req) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
   );
@@ -109,7 +109,7 @@ Future<bool> pingRequest(MessageRequest req) async {
   return res.statusCode == 200;
 }
 
-Future<bool> snipRequest(MessageRequest req) async {
+Future<bool> snipRequest(SnipRequest req) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
   );
