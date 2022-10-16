@@ -66,10 +66,11 @@ dependencies:
   flutter_local_notifications: ^9.5.0
   bip32: ^2.0.0
   # tuple: ^2.0.0
-  # pointycastle: ^3.6.0
+  pointycastle: ^3.6.0
   # secp256k1: ^0.3.0
   firebase_database: ^9.0.14
   cloud_firestore: ^3.1.15
+  dart_bs58check: ^3.0.2
 
 
 dev_dependencies:

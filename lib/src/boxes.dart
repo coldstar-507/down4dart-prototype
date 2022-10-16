@@ -1,4 +1,3 @@
-import 'package:flutter_testproject/src/simple_bsv.dart';
 import 'package:hive/hive.dart';
 import '../main.dart' as main;
 import 'dart:convert';
@@ -7,6 +6,9 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'data_objects.dart';
+import 'web_requests.dart' as r;
+import 'bsv/types.dart';
+import 'bsv/wallet.dart';
 
 var b = Boxes.instance;
 var db = FirebaseDatabase.instance.ref();
@@ -24,10 +26,21 @@ Future<Down4Media?> getMessageMediaFromEverywhere(Identifier mediaID) async {
   } else if (b.videos.containsKey(mediaID)) {
     return Down4Media.fromJson(jsonDecode(b.videos.get(mediaID)));
   } else {
-    final media = await getMessageMediaFromDB(mediaID);
+    final media = await r.getMessageMedia(mediaID);
     if (media != null) media.save();
     return media;
   }
+}
+
+Future<List<Node>> getNodesFromEverywhere(List<Identifier> ids) async {
+  final locals = ids.where((id) => b.home.containsKey(id)).toList();
+  final externals = ids.toSet().difference(locals.toSet()).toList();
+  var externalNodes = r.getNodes(externals);
+  List<Node> localNodes = [];
+  for (final localNodeID in locals) {
+    localNodes.add(b.loadNode(localNodeID));
+  }
+  return localNodes + (await externalNodes ?? <Node>[]);
 }
 
 Future<Node?> getSingleNode(Identifier nodeID) async {
@@ -166,13 +179,13 @@ class Boxes {
     return Down4Media.fromJson(jsonDecode(videos.get(id)));
   }
 
-  Map<String, dynamic>? loadExchangeRate() {
+  ExchangeRate? loadExchangeRate() {
     final rate = user.get("exchangeRate");
     if (rate == null) return null;
-    return jsonDecode(rate);
+    return ExchangeRate.fromJson(jsonDecode(rate));
   }
 
-  void saveExchangeRate(Map<String, dynamic> exchangeRate) {
+  void saveExchangeRate(ExchangeRate exchangeRate) {
     user.put("exchangeRate", jsonEncode(exchangeRate));
   }
 
@@ -230,11 +243,6 @@ class Boxes {
 
   Down4Message loadMessage(Identifier id) {
     var msgJson = jsonDecode(messages.get(id));
-    String? mediaID = msgJson["m"]?["id"];
-    if (mediaID != null) {
-      final mediaJson = jsonDecode(messageMedias.get(mediaID));
-      msgJson["m"] = mediaJson;
-    }
     return Down4Message.fromJson(msgJson);
   }
 

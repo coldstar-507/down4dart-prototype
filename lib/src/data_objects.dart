@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:bip32/bip32.dart';
+// import 'package:bip32/bip32.dart';
 import 'down4_utility.dart' as d4utils;
-import 'simple_bsv.dart';
+import 'bsv/types.dart';
 
 typedef Identifier = String;
 
@@ -87,7 +87,7 @@ class MessageNotification {
 }
 
 class Down4Message {
-  Messages type;
+  final Messages type;
   final Identifier id;
   final Identifier senderID;
   final Identifier? root, forwarderID, paymentID, mediaID;
@@ -97,7 +97,7 @@ class Down4Message {
 
   Down4Message({
     required this.senderID,
-    this.type = Messages.chat,
+    required this.type,
     required this.timestamp,
     required this.id,
     this.root,
@@ -125,6 +125,7 @@ class Down4Message {
   }
 
   factory Down4Message.fromJson(Map<String, dynamic> decodedJson) {
+    print("decodedJson message: $decodedJson");
     return Down4Message(
       type: Messages.values.byName(decodedJson["t"]),
       id: decodedJson["id"],
@@ -134,18 +135,20 @@ class Down4Message {
       mediaID: decodedJson["m"],
       paymentID: decodedJson["p"],
       timestamp: decodedJson["ts"],
-      replies: ((decodedJson["r"] as String?) ?? "").isNotEmpty
+      root: decodedJson["rt"],
+      replies: (decodedJson["r"] ?? "").isNotEmpty
           ? List<String>.from(decodedJson["r"].split(" "))
           : null,
-      nodes: ((decodedJson["n"] as String?) ?? "").isNotEmpty
+      nodes: (decodedJson["n"] ?? "").isNotEmpty
           ? List<String>.from(decodedJson["n"].split(" "))
           : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        't': type.toString(),
+        't': type.name,
         'id': id,
+        if (root != null) 'rt': root!,
         if (text != null) 'txt': text,
         's': senderID,
         'ts': timestamp,
@@ -159,7 +162,7 @@ class Down4Message {
 
 class Node {
   final Identifier id;
-  final BIP32? neuter;
+  final Down4Keys? neuter;
 
   String name;
   String? lastName;
@@ -267,12 +270,13 @@ class Node {
 class PingRequest {
   final String senderID, text;
   final List<Identifier> targets;
-  PingRequest({required this.senderID, required this.text, required this.targets});
+  PingRequest(
+      {required this.senderID, required this.text, required this.targets});
   Map<String, dynamic> toJson() => {
-    "s": senderID,
-    "txt": text,
-    "tr": targets,
-  };
+        "s": senderID,
+        "txt": text,
+        "tr": targets,
+      };
 }
 
 class ChatRequest {
@@ -298,14 +302,14 @@ class SnipRequest extends ChatRequest {
     required Down4Media media,
     required Down4Message msg,
     required List<Identifier> targets,
-  }): super(msg: msg, targets: targets, media: media);
+  }) : super(msg: msg, targets: targets, media: media);
 
   @override
   Map<String, dynamic> toJson([bool withMedia = true]) => {
-    "msg": msg.toJson(),
-    "tr": targets,
-    "m": media!.toJson(),
-  };
+        "msg": msg.toJson(),
+        "tr": targets,
+        "m": media!.toJson(),
+      };
 }
 
 class HyperchatRequest extends ChatRequest {
@@ -415,3 +419,34 @@ class MediaMetadata {
   }
 }
 
+class Location {
+  final String id;
+  final String? at, type;
+  int pageIndex;
+  double? scroll;
+  Location({
+    required this.id,
+    this.at,
+    this.type,
+    this.pageIndex = 0,
+    this.scroll,
+  });
+}
+
+class ExchangeRate {
+  int lastUpdate;
+  double rate;
+  ExchangeRate({required this.lastUpdate, required this.rate});
+
+  factory ExchangeRate.fromJson(dynamic decodedJson) {
+    return ExchangeRate(
+      lastUpdate: decodedJson["rate"],
+      rate: decodedJson["lastUpdate"],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        "rate": rate,
+        "lastUpdate": lastUpdate,
+      };
+}

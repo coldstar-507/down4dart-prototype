@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_testproject/src/down4_utility.dart';
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
-import 'simple_bsv.dart' as w;
+import 'bsv/types.dart';
 // import 'package:firebase_database/firebase_database.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -71,7 +71,7 @@ Future<Down4Media?> getMessageMedia(String id) async {
   return null;
 }
 
-Future<w.BatchResponse?> broadcastTxs(List<w.Down4TX> txs) async {
+Future<BatchResponse?> broadcastTxs(List<Down4TX> txs) async {
   final uri = Uri.parse("https://api.taal.com/api/v1/batchBroadcast");
   var rawTxs = [];
   for (final tx in txs) {
@@ -87,7 +87,7 @@ Future<w.BatchResponse?> broadcastTxs(List<w.Down4TX> txs) async {
   );
   if (res.statusCode == 200) {
     final decodedJson = jsonDecode(res.body);
-    return w.BatchResponse.fromJson(decodedJson);
+    return BatchResponse.fromJson(decodedJson);
   }
   return null;
 }
@@ -98,7 +98,7 @@ Future<double?> getExchangeRate() async {
   );
   final res = await http.get(url);
   if (res.statusCode != 200) return null;
-  return double.parse(jsonDecode(res.body)["rate"]);
+  return jsonDecode(res.body)["rate"];
 }
 
 Future<bool> pingRequest(PingRequest req) async {
@@ -182,7 +182,7 @@ Future<List<Down4Message>?> getPosts(List<String> ids) async {
   return null;
 }
 
-Future<bool> sendInternetPayment(w.Down4InternetPayment payment) async {
+Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePayment",
   );

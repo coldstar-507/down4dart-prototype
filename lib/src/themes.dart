@@ -1,7 +1,5 @@
 import 'data_objects.dart';
 import 'package:flutter/material.dart';
-import 'render_objects.dart';
-import 'render_pages.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);

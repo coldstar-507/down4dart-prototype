@@ -15,10 +15,15 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'web_requests.dart' as r;
 import 'boxes.dart';
 import 'down4_utility.dart' as d4utils;
-import 'simple_bsv.dart';
-import 'render_pages.dart';
+import 'home.dart';
 import 'data_objects.dart';
 import 'themes.dart';
+import 'bsv/wallet.dart';
+import 'bsv/utils.dart';
+
+import 'pages/welcome_page.dart';
+import 'pages/init_page.dart';
+import 'pages/loading_page.dart';
 
 class Down4 extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -98,7 +103,7 @@ class _Down4State extends State<Down4> {
     final down4priv = master.derivePath("m/4'/0'/0'");
     final neuter = down4priv.neutered();
 
-    final secret = sha256d(secretData.asUint8List());
+    final secret = hash256(secretData.asUint8List());
 
     final imageID = d4utils.generateMediaID(imData);
     Down4Media image = Down4Media(
@@ -153,7 +158,7 @@ class _Down4State extends State<Down4> {
       snips: [],
     );
 
-    _wallet = Wallet(mnemonic: mnemonic);
+    _wallet = Wallet.fromSeed(seed, seed);
 
     Boxes.instance.user.put('token', token);
     Boxes.instance.user.put('user', jsonEncode(_user));
@@ -203,3 +208,4 @@ class _Down4State extends State<Down4> {
     return SafeArea(child: _view ?? const LoadingPage());
   }
 }
+
