@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/src/bsv/utils.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:video_player/video_player.dart';
 
@@ -57,10 +58,11 @@ class _HomeState extends State<Home> {
   // Home -> home palettes
   // paletteID -> child palettes
 
-  Map<Identifier, Map<Identifier, Palette>> paletteMap = {
+  Map<Identifier, Map<Identifier, Palette>> _paletteMap = {
     "Home": {},
     "Search": {},
     "Forward": {},
+    "Payments": {},
   };
 
   // similar to the palettes, used for local data and caching messages
@@ -90,6 +92,7 @@ class _HomeState extends State<Home> {
     updateExchangeRate();
     loadLocalHomePalettes();
     connectToMessages();
+    loadPayments();
     homePage();
   }
 
@@ -127,9 +130,18 @@ class _HomeState extends State<Home> {
 
     messageListener = msgQueue.onChildAdded.listen((event) async {
       print("New message!");
-      var msgID = event.snapshot.key;
+      final msgID = event.snapshot.key;
+      final payload = event.snapshot.value as String;
       if (msgID == null) return;
       msgQueue.child(msgID).remove(); // consume it
+
+      if (payload == "p") {
+        final payment = await r.getPayment(msgID);
+        if (payment == null) return;
+        widget.wallet.parsePayment(widget.self, payment);
+        loadPayments();
+        return;
+      }
 
       final snapshot = await messagesRef.child(msgID).get();
       if (!snapshot.exists) return;
@@ -139,6 +151,7 @@ class _HomeState extends State<Home> {
       switch (msg.type) {
         case Messages.chat:
           msg.save();
+          final theRoot = msg.root ?? msg.senderID;
           print("Message is chat");
           if (msg.root != null) {
             print("There is a root in that message: ${msg.root}");
@@ -191,9 +204,8 @@ class _HomeState extends State<Home> {
           }
           if (page is HomePage) {
             homePage();
-          } else if (page is ChatPage &&
-              locations.last == (msg.root ?? msg.senderID)) {
-            var n = nodeAt(msg.root ?? msg.senderID);
+          } else if (page is ChatPage && curLoc.id == theRoot) {
+            var n = nodeAt(theRoot);
             if (n != null) chatPage(n);
           }
           break;
@@ -256,6 +268,52 @@ class _HomeState extends State<Home> {
     });
   }
 
+  void parsePayment(Down4Payment payment) async {
+    widget.wallet.parsePayment(widget.self, payment);
+    var releventTx = payment.txs.last;
+    final txID = releventTx.txID!.asHex;
+    final status = releventTx.confirmations;
+    final type = status < 3
+        ? Nodes.unsafeTx
+        : status < 6
+            ? Nodes.mediumTx
+            : Nodes.safeTx;
+    var asNode = Node(
+      type: type,
+      id: txID,
+      name: sha1(releventTx.txID!.data).toBase58(),
+    );
+    // TODO: Node to palettes for payments
+    // BUT?? payment is not a node lul
+    paletteMap("Payments")[txID] = Palette(
+      node: asNode,
+      at: "Payments",
+      messagePreview: "Confirmations: $status",
+      imPress: select,
+      bodyPress: select,
+      buttonsInfo: [
+        ButtonsInfo(
+          assetPath: 'lib/src/assets/rightBlackArrow.png',
+          pressFunc: (id, at) {
+            locations.add(Location(id: "Payment"));
+            paymentPage(payment);
+          },
+          rightMost: true,
+        )
+      ],
+    );
+    if (page is MoneyPage) moneyPage();
+  }
+
+  void loadPayments() async {
+    await widget.wallet.updateAllStatus();
+    widget.wallet.settlementRoutine();
+    for (final payment in widget.wallet.payments) {
+      parsePayment(payment);
+    }
+    if (page is MoneyPage) moneyPage();
+  }
+
   // ======================================================= UTILS ============================================================ //
 
   void unselectSelectedPalettes([
@@ -265,16 +323,16 @@ class _HomeState extends State<Home> {
     if (updateActivity) {
       for (final p in palettes(at)) {
         if (p.selected) {
-          paletteMap[at]
-              ?[p.node.id] = paletteMap[at]![p.node.id]!.invertedSelection()
+          _paletteMap[at]
+              ?[p.node.id] = _paletteMap[at]![p.node.id]!.invertedSelection()
             ..node.updateActivity();
         }
       }
     } else {
       for (final p in palettes(at)) {
         if (p.selected) {
-          paletteMap[at]?[p.node.id] =
-              paletteMap[at]![p.node.id]!.invertedSelection();
+          _paletteMap[at]?[p.node.id] =
+              _paletteMap[at]![p.node.id]!.invertedSelection();
         }
       }
     }
@@ -311,7 +369,7 @@ class _HomeState extends State<Home> {
         String? lastMessagePreview;
         if ((node.messages ??= []).isNotEmpty) {
           var msg = b.loadMessage(node.messages!.last);
-          lastMessagePreview = msg.text ?? "&attachment";
+          lastMessagePreview = msg?.text ?? "&attachment";
         }
         return Palette(
           node: node,
@@ -344,13 +402,13 @@ class _HomeState extends State<Home> {
         } else {
           final lastMessageID = node.messages!.last;
           final msg = b.loadMessage(lastMessageID);
-          if (msg.timestamp.isExpired) {
+          if (msg?.timestamp.isExpired ?? true) {
             // put false for test
             print("Last message is expired, deleting hyperchat!");
             b.deleteNode(node.id);
             return null;
           }
-          lastMessagePreview = msg.text ?? "&attachment";
+          lastMessagePreview = msg?.text ?? "&attachment";
         }
         return Palette(
           node: node,
@@ -401,7 +459,7 @@ class _HomeState extends State<Home> {
         String? lastMessagePreview;
         if ((node.messages ??= []).isNotEmpty) {
           var msg = b.loadMessage(node.messages!.last);
-          lastMessagePreview = msg.text ?? "&attachment";
+          lastMessagePreview = msg?.text ?? "&attachment";
         }
         return Palette(
           messagePreview: lastMessagePreview,
@@ -430,7 +488,7 @@ class _HomeState extends State<Home> {
         String? lastMessagePreview;
         if ((node.messages ??= []).isNotEmpty) {
           var msg = b.loadMessage(node.messages!.last);
-          lastMessagePreview = msg.text ?? "&attachment";
+          lastMessagePreview = msg?.text ?? "&attachment";
         }
         return Palette(
           node: node,
@@ -542,7 +600,7 @@ class _HomeState extends State<Home> {
   void delete([String at = "Home"]) {
     for (final p in palettes(at).selected()) {
       b.deleteNode(p.node.id);
-      paletteMap[at]?.remove(p.node.id);
+      _paletteMap[at]?.remove(p.node.id);
     }
     // TODO for other places than home
     if (page is HomePage) homePage();
@@ -564,7 +622,7 @@ class _HomeState extends State<Home> {
   void putNodeOffLine(Node node) {
     final p = nodeToPalette(node, "Search");
     if (p != null) {
-      paletteMap["Search"]?.putIfAbsent(node.id, () => p);
+      _paletteMap["Search"]?.putIfAbsent(node.id, () => p);
       searchPage();
     }
   }
@@ -622,6 +680,7 @@ class _HomeState extends State<Home> {
   }
 
   Future<bool> paymentRequest(PaymentRequest req) async {
+    parsePayment(req.payment);
     return await r.paymentRequest(req);
   }
 
@@ -635,18 +694,21 @@ class _HomeState extends State<Home> {
       nodePage(nodeAt(locations.last.id, locations.last.at!)!);
     } else if (locations.last.type == "Chat") {
       chatPage(nodeAt(locations.last.id, locations.last.at!)!);
+    } else if (locations.last.id == "Money") {
+      moneyPage();
     }
   }
 
   void forward(List<Node> nodes) {
+    locations.add(Location(id: "Forward"));
     forwardingNodes = nodes;
     forwardPage();
   }
 
-  // ======================================================== NODE ACTIONS ============================================================== //
+  // ======================================================== PALETTE ACTIONS ============================================================== //
 
   Future<void> openNode(String id, String at) async {
-    if (paletteMap[id] == null) {
+    if (_paletteMap[id] == null) {
       Node node;
       if (at == "Home") {
         final nodes = await r.getNodes([id]);
@@ -661,7 +723,7 @@ class _HomeState extends State<Home> {
       if (childNodes != null) {
         for (final node in childNodes) {
           var p = nodeToPalette(node, id);
-          if (p != null) paletteMap[id]!.putIfAbsent(node.id, () => p);
+          if (p != null) _paletteMap[id]!.putIfAbsent(node.id, () => p);
         }
       }
     }
@@ -681,6 +743,8 @@ class _HomeState extends State<Home> {
       nodePage(nodeAt(id, at)!);
     } else if (page is AddFriendPage) {
       searchPage();
+    } else if (page is MoneyPage) {
+      moneyPage();
     }
   }
 
@@ -696,11 +760,15 @@ class _HomeState extends State<Home> {
   // ======================================================== COMPLEXITY REDUCING GETTERS ? =============================================== //
 
   Palette? palette(String id, [String at = "Home"]) {
-    return paletteMap[at]?[id];
+    return _paletteMap[at]?[id];
+  }
+
+  Map<String, Palette> paletteMap([String at = "Home"]) {
+    return _paletteMap[at]!;
   }
 
   Node? nodeAt(String id, [String at = "Home"]) {
-    return paletteMap[at]?[id]?.node;
+    return _paletteMap[at]?[id]?.node;
   }
 
   void writePalette(
@@ -708,19 +776,19 @@ class _HomeState extends State<Home> {
     String at = "Home",
     bool onlyIfAbsent = false,
   }) {
-    if (paletteMap[at] == null) paletteMap[at] = {};
+    if (_paletteMap[at] == null) _paletteMap[at] = {};
     final p = nodeToPalette(node, at);
     if (p != null) {
       if (onlyIfAbsent) {
-        paletteMap[at]?.putIfAbsent(node.id, () => p);
+        _paletteMap[at]?.putIfAbsent(node.id, () => p);
       } else {
-        paletteMap[at]?[node.id] = p;
+        _paletteMap[at]?[node.id] = p;
       }
     }
   }
 
   void selectPalette(String id, [String at = "Home"]) {
-    paletteMap[at]![id] = paletteMap[at]![id]!.invertedSelection();
+    _paletteMap[at]![id] = _paletteMap[at]![id]!.invertedSelection();
   }
 
   List<Palette> get selectedFriendPalettesDeactivated {
@@ -788,7 +856,7 @@ class _HomeState extends State<Home> {
   }
 
   List<Palette> palettes([String at = "Home"]) {
-    return paletteMap[at]?.values.toList(growable: false) ?? <Palette>[];
+    return _paletteMap[at]?.values.toList(growable: false) ?? <Palette>[];
   }
 
   List<Palette> get formattedHomePalettes {
@@ -817,7 +885,12 @@ class _HomeState extends State<Home> {
         ],
         topButtons: [
           ConsoleButton(name: "Hyperchat", onPress: hyperchatPage),
-          ConsoleButton(name: "Money", onPress: moneyPage),
+          ConsoleButton(
+              name: "Money",
+              onPress: () {
+                locations.add(Location(id: "Money"));
+                moneyPage();
+              }),
         ],
         bottomButtons: [
           ConsoleButton(
@@ -831,6 +904,12 @@ class _HomeState extends State<Home> {
               onLongPress: () => homePage(!extra),
               extraButtons: [
                 ConsoleButton(name: "Delete", onPress: delete),
+                ConsoleButton(
+                  name: "Forward",
+                  onPress: () => forward(
+                    formattedHomePalettes.selected().asNodes(),
+                  ),
+                ),
                 ConsoleButton(name: "Shit", onPress: () => homePage(!extra)),
                 ConsoleButton(name: "Wacko", onPress: () => homePage(!extra)),
               ]),
@@ -854,19 +933,22 @@ class _HomeState extends State<Home> {
   }
 
   void forwardPage() {
-    for (final p in palettes().chatables()) {
-      writePalette(p.node, at: "Forward");
+    if (palettes("Forward").length !=
+        formattedHomePalettes.chatables().length) {
+      for (final p in formattedHomePalettes.chatables()) {
+        writePalette(p.node, at: "Forward");
+      }
     }
 
     page = ForwardingPage(
-      homeUsers: paletteMap["Forward"]!.values.toList(),
+      homeUsers: palettes("Forward"),
       console: Console(
         forwardingNodes: forwardingNodes,
         topButtons: [
           ConsoleButton(name: "Forward", onPress: () => print("TODO")),
         ],
         bottomButtons: [
-          ConsoleButton(name: "Back", onPress: () => back(false)),
+          ConsoleButton(name: "Back", onPress: back),
           ConsoleButton(name: "Hyper", onPress: () => print("TODO")),
         ],
       ),
@@ -874,15 +956,26 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
+  void paymentPage(Down4Payment payment) {
+    page = PaymentPage(back: back, payment: payment);
+    setState(() {});
+  }
+
   void moneyPage() {
     updateExchangeRate();
-    print(exchangeRate);
     page = MoneyPage(
       self: widget.self,
       wallet: widget.wallet,
       exchangeRate: exchangeRate.rate,
       palettes: selectedHomeUserPaletteDeactivated,
-      back: homePage,
+      paymentAsPalettes: palettes("Payments").reversed.toList(),
+      parsePayment: parsePayment,
+      back: back,
+      pageIndex: curLoc.pageIndex,
+      onPageChange: (idx) {
+        curLoc.pageIndex = idx;
+        moneyPage();
+      },
     );
     setState(() {});
   }
@@ -918,10 +1011,10 @@ class _HomeState extends State<Home> {
       putNodeOffline: putNodeOffLine,
       self: widget.self,
       search: search,
-      palettes: paletteMap["Search"]?.values.toList().reversed.toList() ?? [],
+      palettes: _paletteMap["Search"]?.values.toList().reversed.toList() ?? [],
       addCallback: addUsers,
       backCallback: () {
-        paletteMap["Search"]?.clear();
+        _paletteMap["Search"]?.clear();
         back();
       },
     );
@@ -982,8 +1075,8 @@ class _HomeState extends State<Home> {
       cameras: widget.cameras,
       self: widget.self,
       openChat: openChat,
-      palette: paletteMap[locations.last.at]![node.id]!,
-      palettes: paletteMap[node.id]?.values.toList() ?? <Palette>[],
+      palette: _paletteMap[locations.last.at]![node.id]!,
+      palettes: _paletteMap[node.id]?.values.toList() ?? <Palette>[],
       openNode: openNode,
       nodeToPalette: nodeToPalette,
       back: back,
@@ -1182,7 +1275,7 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
+    print(widget.wallet.payments.length);
     return page ?? const LoadingPage();
   }
 }
-

@@ -1,10 +1,11 @@
 import 'package:convert/convert.dart';
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:pointycastle/digests/sha1.dart' as sha1;
 import 'data_objects.dart';
 import 'package:collection/collection.dart';
-import 'package:fast_base58/fast_base58.dart' as b58;
 import 'dart:io';
+import 'package:bs58/bs58.dart';
 
 final listEqual = const ListEquality().equals;
 
@@ -66,7 +67,7 @@ extension AsUint8List on List<int> {
 
 extension ByteEncoding on List<int> {
   String toHex() => hex.encode(this);
-  String toBase58() => b58.Base58Encode(this);
+  String toBase58() => base58.encode(asUint8List());
 }
 
 extension StringExtension on String {

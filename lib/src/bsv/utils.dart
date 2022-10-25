@@ -2,21 +2,28 @@ import 'dart:typed_data';
 import 'dart:math';
 import 'dart:async';
 import 'dart:convert';
-import 'package:convert/convert.dart';
-
-import 'package:dart_bs58check/dart_bs58check.dart';
-import 'package:pointycastle/export.dart';
 
 import 'types.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:pointycastle/digests/sha256.dart' as s256;
 import 'package:pointycastle/digests/ripemd160.dart' as r160;
-
-import 'package:bs58check/bs58check.dart';
+import 'package:bs58/bs58.dart';
+import 'package:convert/convert.dart';
+import 'package:pointycastle/export.dart';
 
 import '../down4_utility.dart';
 import '../data_objects.dart';
+
+int randomSats() {
+  return Random().nextInt(50);
+}
+
+Uint8List unsafeSeed(int len) {
+  var random = Random();
+  var seed = List<int>.generate(len, (_) => random.nextInt(256));
+  return Uint8List.fromList(seed);
+}
 
 List<Down4TX> topologicalSort(List<Down4TX> txs) {
   var sorted = <Down4TX>[];
@@ -35,16 +42,23 @@ List<Down4TX> topologicalSort(List<Down4TX> txs) {
   return sorted;
 }
 
-Future<List<Down4TXOUT>?> getUtxos(String address) async {
+Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
   final url = Uri.parse(
-    "https://api.whatsonchain.com/v1/bsv/main/address/$address/unspent",
+    "https://api.whatsonchain.com/v1/bsv/test/address/$checkAddress/unspent",
   );
+
+  final decodedAddress = base58.decode(checkAddress);
+  final rawAddress = strippedCheck(decodedAddress);
+  if (rawAddress == null) {
+    print("Address doesn't pass check");
+    return null;
+  }
 
   final res = await http.get(url);
 
   if (res.statusCode != 200) return null;
 
-  final utxos = List<dynamic>.from(jsonDecode(res.body));
+  final utxos = List.from(jsonDecode(res.body));
 
   var d4utxos = <Down4TXOUT>[];
   for (final utxo in utxos) {
@@ -52,6 +66,7 @@ Future<List<Down4TXOUT>?> getUtxos(String address) async {
       txid: TXID.fromHex(utxo["tx_hash"]),
       sats: Sats(utxo["value"]),
       outIndex: utxo["tx_pos"],
+      scriptPubKey: p2pkh(rawAddress),
     );
     d4utxos.add(d4txout);
   }
@@ -59,26 +74,13 @@ Future<List<Down4TXOUT>?> getUtxos(String address) async {
 }
 
 Future<List<Down4TXOUT>?> checkPrivateKey(String base58PrivateKey) async {
-  List<int> raw;
-  final asByte = bs58check.decode(base58PrivateKey);
-  if (asByte.lengthInBytes > 32) {
-    final check = asByte.sublist(asByte.length - 4);
-    final trimmed = asByte.sublist(0, asByte.length - 4);
-    raw = trimmed.sublist(1);
-
-    final hash = hash256(trimmed);
-    final check_ = hash.sublist(0, 4);
-    if (check != check_) return null;
-  } else {
-    raw = asByte;
-  }
-
-  final big = BigInt.parse(raw.toHex(), radix: 16);
+  final asByte = base58.decode(base58PrivateKey);
+  final big = BigInt.parse(asByte.toHex(), radix: 16);
 
   final pub = secp256k1.G * big;
   if (pub == null) return null;
 
-  final address = checkAddress(pub.getEncoded());
+  final address = testnetAddress(pub.getEncoded());
 
   return getUtxos(address.toBase58());
 }
@@ -100,9 +102,13 @@ List<int> p2pkh(List<int> rawAddress) => [
       OP.CHECKSIG,
     ];
 
-List<int> makeDER2(ECSignature sig) {
-  var rBuf = hex.decode(sig.r.toRadixString(16));
-  var sBuf = hex.decode(sig.s.toRadixString(16));
+List<int> makeDER2(ECSignature sig, int sh) {
+  var rString = sig.r.toRadixString(16);
+  if (rString.length % 2 != 0) rString = '0' + rString;
+  var rBuf = hex.decode(rString);
+  var sString = sig.s.toRadixString(16);
+  if (sString.length % 2 != 0) sString = '0' + sString;
+  var sBuf = hex.decode(sString);
   if (rBuf[0] > 0x7f) rBuf = [0x00, ...rBuf];
   if (sBuf[0] > 0x7f) sBuf = [0x00, ...sBuf];
 
@@ -110,12 +116,7 @@ List<int> makeDER2(ECSignature sig) {
   final sLen = sBuf.length;
   final len = 4 + rLen + sLen;
 
-  return [0x30, len, 0x02, rLen, ...rBuf, 0x02, sLen, ...sBuf];
-}
-
-List<int> makeDER(Uint8List r, Uint8List s) {
-  const len = 1 + 1 + 32 + 1 + 1 + 32;
-  return [0x30, len, 0x02, r.length, ...r, 0x02, s.length, ...s];
+  return [0x30, len, 0x02, rLen, ...rBuf, 0x02, sLen, ...sBuf, sh];
 }
 
 List<int>? p2pkhSig(Down4Keys keys, Down4TX tx, int nIn, [int sh = SIG.ALL]) {
@@ -123,7 +124,14 @@ List<int>? p2pkhSig(Down4Keys keys, Down4TX tx, int nIn, [int sh = SIG.ALL]) {
   if (sigData == null) return null;
   final sig = keys.sha256Sign(sha256(sigData).asUint8List());
   if (sig == null) return null;
-  return [...makeDER2(sig), sh, ...keys.publicKey.Q!.getEncoded()];
+  return [
+    ...OP.PUSHDATA(makeDER2(sig, sh)),
+    ...OP.PUSHDATA(keys.publicKey.Q!.getEncoded()),
+  ];
+}
+
+List<int> sha1(List<int> data) {
+  return Digest('SHA-1').process(data.asUint8List());
 }
 
 List<int> sha256(List<int> data) {
@@ -138,14 +146,21 @@ List<int> ripemd160(List<int> data) {
   return r160.RIPEMD160Digest().process(data.asUint8List());
 }
 
-List<int> checkAddress(List<int> pubKey) {
+List<int> mainetAddress(List<int> pubKey) {
   final hash = ripemd160(sha256(pubKey));
   final extended = [0x00, ...hash];
   final checkSum = hash256(extended).sublist(0, 4);
   return [...extended, ...checkSum];
 }
 
-List<int>? strippedAddress(List<int> checkAddress) {
+List<int> testnetAddress(List<int> pubKey) {
+  final hash = ripemd160(sha256(pubKey));
+  final extended = [0x6f, ...hash];
+  final checkSum = hash256(extended).sublist(0, 4);
+  return [...extended, ...checkSum];
+}
+
+List<int>? strippedCheck(List<int> checkAddress) {
   final check = checkAddress.sublist(checkAddress.length - 4);
   final pre = checkAddress.sublist(0, checkAddress.length - 4);
   final sum = hash256(pre).sublist(0, 4);
@@ -153,12 +168,12 @@ List<int>? strippedAddress(List<int> checkAddress) {
   return pre.sublist(1);
 }
 
-List<int> hash160(List<int> pubKey) => ripemd160(sha256(pubKey));
-
-int randomWalletIndex() {
-  final maxUint32 = int.parse("FFFFFFFF", radix: 16);
-  return Random().nextInt(maxUint32);
+List<int> stripped(List<int> checkAddress) {
+  final pre = checkAddress.sublist(0, checkAddress.length - 4);
+  return pre.sublist(1);
 }
+
+List<int> hash160(List<int> pubKey) => ripemd160(sha256(pubKey));
 
 List<int> makeUint32(int i) =>
     Uint8List(4)..buffer.asByteData().setUint32(0, i);
@@ -167,27 +182,4 @@ ECPublicKey uncompressPublicKey(Uint8List publicKey) {
   final bigX = BigInt.parse(publicKey.sublist(1).toHex(), radix: 16);
   final point = secp256k1.curve.decompressPoint(publicKey[0] & 1, bigX);
   return ECPublicKey(point, secp256k1);
-}
-
-// need deterministicWalletIndex to be able to crawl back transactions and
-// utxos on a recovery, the only problem is that it is based on the mobile
-// clock. Most mobiles will be fine, some clock might be off, so might need to
-// add a mechanism and save mobile start time on user creation
-int deterministicWalletIndex() {
-  // The divisor is the time required to be sending to different addresses
-  // const oneDayInMilliseconds = 86400000;
-  const fourHoursInMilliseconds = 14400000;
-  final number = timeStamp() / fourHoursInMilliseconds;
-  return number.ceil();
-}
-
-List<int>? down4FeeAddress(Node self, int ix) {
-  final down4Pub = DOWN4_NEUTER.derive(makeUint32(ix))?.publicKey;
-  if (down4Pub == null) return null;
-
-  final selfData = utf8.encode(self.id).asUint8List();
-  final hash = ripemd160(sha256(down4Pub.Q!.getEncoded() + selfData));
-  final extended = [0x00, ...hash];
-  final checkSum = hash256(extended).sublist(0, 4);
-  return [...extended, ...checkSum];
 }

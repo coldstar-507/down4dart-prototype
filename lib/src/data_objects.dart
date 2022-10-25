@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 // import 'package:bip32/bip32.dart';
+import 'package:flutter_testproject/src/bsv/utils.dart';
+
 import 'down4_utility.dart' as d4utils;
 import 'bsv/types.dart';
 
@@ -27,6 +29,9 @@ enum Nodes {
   item,
   event,
   ticket,
+  safeTx,
+  mediumTx,
+  unsafeTx,
 }
 
 class Down4Media {
@@ -217,6 +222,9 @@ class Node {
     return Node(
       id: decodedJson["id"],
       name: decodedJson["nm"],
+      neuter: decodedJson["nt"] != null
+          ? Down4Keys.fromYouKnow(decodedJson["nt"])
+          : null,
       lastName: decodedJson["ln"],
       activity: decodedJson["a"] ?? 0,
       image: decodedJson["im"] != null
@@ -255,6 +263,7 @@ class Node {
         "t": type.name,
         "a": activity,
         "nm": name,
+        if (neuter != null) "nt": neuter!.toYouKnow(),
         if (lastName != null) "ln": lastName,
         if (image != null) "im": withMedia ? image!.toJson() : image!.id,
         if (messages != null) "msg": messages,
@@ -265,6 +274,13 @@ class Node {
         if (group != null) "grp": group,
         if (snips != null) "snp": snips,
       };
+}
+
+abstract class MessageRequest {
+  List<Identifier> targets;
+  MessageRequest({required this.targets});
+
+  Map<String, dynamic> toJson();
 }
 
 class PingRequest {
@@ -351,6 +367,26 @@ class GroupRequest extends ChatRequest {
         "gm": groupImage.toJson(),
         "tr": targets,
         if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class PaymentRequest2 extends MessageRequest {
+  final String payment;
+  final String sender;
+  String get id => sha256(utf8.encode(payment)).toHex();
+
+  PaymentRequest2({
+    required List<Identifier> targets,
+    required this.payment,
+    required this.sender,
+  }) : super(targets: targets);
+
+  @override
+  Map<String, dynamic> toJson() => {
+        "s": sender,
+        "id": id,
+        "tr": targets,
+        "pay": payment,
       };
 }
 

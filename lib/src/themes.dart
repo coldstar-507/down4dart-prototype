@@ -25,5 +25,8 @@ class PinkTheme {
     Nodes.friend: Color.fromARGB(255, 230, 174, 193),
     Nodes.group: Color.fromARGB(255, 175, 134, 209),
     Nodes.nonFriend: Color.fromARGB(255, 158, 92, 114),
+    Nodes.unsafeTx: Colors.red,
+    Nodes.mediumTx: Colors.yellow,
+    Nodes.safeTx: Colors.green,
   };
 }

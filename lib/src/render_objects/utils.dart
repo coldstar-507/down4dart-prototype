@@ -118,6 +118,14 @@ extension PaletteExtensions on List<Palette> {
     Nodes.user,
     Nodes.hyperchat
   ].contains(p.node.type)).toList(growable: false);
+
+  // TODO: public, private
+  List<Palette> forwardables() => where((p) => const [
+    Nodes.group,
+    Nodes.friend,
+    Nodes.nonFriend,
+    Nodes.user,
+  ].contains(p.node.type)).toList(growable: false);
 }
 
 class NoGlow extends ScrollBehavior {

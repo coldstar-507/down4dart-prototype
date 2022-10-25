@@ -93,6 +93,7 @@ extension MessageSave on Down4Message {
 
 extension NodeSave on Node {
   void save() => b.home.put(id, jsonEncode(this));
+  void saveUser() => b.user.put(id, jsonEncode(this));
 }
 
 extension MediaSave on Down4Media {
@@ -119,6 +120,10 @@ extension MediaSave on Down4Media {
 
 extension PaymentSave on Down4Payment {
   void save() => b.payments.put(id, jsonEncode(this));
+}
+
+extension WalletSave on Wallet {
+  void save() => b.user.put("wallet", jsonEncode(this));
 }
 
 class Boxes {
@@ -241,8 +246,9 @@ class Boxes {
     messages.put(msg.id, jsonEncode(msg));
   }
 
-  Down4Message loadMessage(Identifier id) {
+  Down4Message? loadMessage(Identifier id) {
     var msgJson = jsonDecode(messages.get(id));
+    if (msgJson == null) return null;
     return Down4Message.fromJson(msgJson);
   }
 

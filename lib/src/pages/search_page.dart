@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:bip32/bip32.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/src/bsv/types.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -12,7 +12,6 @@ import '../themes.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
-
 
 class AddFriendPage extends StatefulWidget {
   final Node self;
@@ -72,7 +71,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         id: data[0],
         name: data[1],
         lastName: data[2],
-        // neuter: data[3] != "" ? BIP32.fromBase58(data[3]) : null,
+        neuter: Down4Keys.fromYouKnow(data[3]),
       );
       widget.putNodeOffline(node);
     }
@@ -119,20 +118,20 @@ class _AddFriendPageState extends State<AddFriendPage> {
   }
 
   Widget get qr => Container(
-    padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
-    child: Align(
-      alignment: AlignmentDirectional.topCenter,
-      child: QrImage(
-        foregroundColor: PinkTheme.qrColor,
-        data: [
-          widget.self.id,
-          widget.self.name,
-          widget.self.lastName,
-          // widget.self.neuter?.toBase58() ?? "",
-        ].join("~"),
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
+        child: Align(
+          alignment: AlignmentDirectional.topCenter,
+          child: QrImage(
+            foregroundColor: PinkTheme.qrColor,
+            data: [
+              widget.self.id,
+              widget.self.name,
+              widget.self.lastName,
+              widget.self.neuter!.toYouKnow(),
+            ].join("~"),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {

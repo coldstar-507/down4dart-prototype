@@ -38,8 +38,8 @@ class PageBody extends StatelessWidget {
             ((palettes != null || messages != null || columnWidgets != null)
                 ? DynamicList(list: palettes ?? messages ?? columnWidgets!)
                 : topDownColumnWidget != null
-                ? DynamicList(list: topDownColumnWidget!, reversed: false)
-                : const SizedBox.shrink()),
+                    ? DynamicList(list: topDownColumnWidget!, reversed: false)
+                    : const SizedBox.shrink()),
       ],
     );
   }
@@ -54,7 +54,7 @@ class PageConsole extends StatelessWidget {
     final consoleHorizontalGap = Sizes.h * 0.023;
     final consoleVerticalGap = Sizes.h * 0.021;
     final buttonWidth = ((Sizes.w - (consoleHorizontalGap * 2.0)) /
-        (console.bottomButtons.length.toDouble())) +
+            (console.bottomButtons.length.toDouble())) +
         1.0; // 1.0 for borders
     List<Widget> extras = [];
     int i = 0;
@@ -167,23 +167,22 @@ class _JeffState extends State<Jeff> {
 
   @override
   Widget build(BuildContext context) {
-    final titles = widget.pages.map((e) => e.title).toList(growable: false);
     final bodies = widget.pages
         .map((e) => PageBody(
-      topDownColumnWidget: e.topDownColumnWidgets,
-      futureNodes: e.futureNodes,
-      palettes: e.palettes,
-      messageList: e.messageList,
-      messages: e.messages,
-      stackWidgets: e.stackWidgets,
-      columnWidgets: e.columnWidgets,
-    ))
+              topDownColumnWidget: e.topDownColumnWidgets,
+              futureNodes: e.futureNodes,
+              palettes: e.palettes,
+              messageList: e.messageList,
+              messages: e.messages,
+              stackWidgets: e.stackWidgets,
+              columnWidgets: e.columnWidgets,
+            ))
         .toList(growable: false);
+    final titles = widget.pages.map((e) => e.title).toList(growable: false);
     final consoles = widget.pages
         .map((e) => PageConsole(console: e.console))
         .toList(growable: false);
 
-    var w = MediaQuery.of(context).size.width;
     return Stack(
       children: [
         Scaffold(
@@ -209,14 +208,14 @@ class _JeffState extends State<Jeff> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: titles
                         .map((e) => Text(" " + e + " ",
-                        style: TextStyle(
-                          color: e == titles[widget.initialPageIndex]
-                              ? Colors.white
-                              : Colors.white38,
-                          fontSize: e == titles[widget.initialPageIndex]
-                              ? 18
-                              : 14,
-                        )))
+                            style: TextStyle(
+                              color: e == titles[widget.initialPageIndex]
+                                  ? Colors.white
+                                  : Colors.white38,
+                              fontSize: e == titles[widget.initialPageIndex]
+                                  ? 18
+                                  : 14,
+                            )))
                         .toList(growable: false),
                   ),
                 ),

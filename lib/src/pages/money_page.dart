@@ -2,10 +2,14 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/main.dart';
+import 'package:flutter_testproject/src/down4_utility.dart';
+import 'package:flutter_testproject/src/render_objects/utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../data_objects.dart';
+import '../web_requests.dart' as r;
 import '../bsv/wallet.dart';
 import '../bsv/types.dart';
 import '../bsv/utils.dart';
@@ -15,19 +19,93 @@ import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 
+void printWrapped(String text) {
+  final pattern = RegExp('.{1,800}'); // 800 is the size of each chunk
+  pattern.allMatches(text).forEach((match) => print(match.group(0)));
+}
+
+class PaymentPage extends StatefulWidget {
+  final void Function() back;
+  final Down4Payment payment;
+  final List<String> paymentList;
+
+  PaymentPage({required this.back, required this.payment, Key? key})
+      : paymentList = payment.toJsonList(),
+        super(key: key);
+
+  @override
+  _PaymentPageState createState() => _PaymentPageState();
+}
+
+class _PaymentPageState extends State<PaymentPage> {
+  Timer? timer;
+  int listIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
+      listIndex = (listIndex + 1) % (widget.paymentList.length);
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  Widget qr() => Container(
+        padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
+        child: Align(
+          alignment: AlignmentDirectional.topCenter,
+          child: QrImage(
+            foregroundColor: PinkTheme.qrColor,
+            data: widget.paymentList[listIndex],
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return Jeff(pages: [
+      Down4Page(
+        title: sha1(widget.payment.txs.last.txID!.data).toBase58(),
+        stackWidgets: [qr()],
+        console: Console(
+          bottomButtons: [
+            ConsoleButton(
+              name: "Back",
+              onPress: widget.back,
+            ),
+          ],
+        ),
+      ),
+    ]);
+  }
+}
+
 class MoneyPage extends StatefulWidget {
   final double exchangeRate;
   final Wallet wallet;
-  final List<Palette> palettes;
+  final List<Palette> palettes, paymentAsPalettes;
   final Node self;
   final void Function() back;
+  final void Function(Down4Payment) parsePayment;
+  final int pageIndex;
+  final void Function(int) onPageChange;
 
   const MoneyPage({
     required this.wallet,
     required this.exchangeRate,
     required this.palettes,
+    required this.paymentAsPalettes,
     required this.back,
     required this.self,
+    required this.pageIndex,
+    required this.onPageChange,
+    required this.parsePayment,
     Key? key,
   }) : super(key: key);
 
@@ -38,15 +116,32 @@ class MoneyPage extends StatefulWidget {
 class _MoneyPageState extends State<MoneyPage> {
   var tec = TextEditingController();
   var importTec = TextEditingController();
+  MobileScannerController? scanner;
+  Console? _console;
+  Map<int, String> scannedData = {};
+  int scannedDataLength = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    mainViewInput(true);
+    if (widget.palettes.isEmpty) {
+      emptyViewConsole();
+    } else {
+      mainViewConsole();
+    }
+  }
 
   @override
   void dispose() {
     tec.dispose();
     importTec.dispose();
+    scanner?.dispose();
     super.dispose();
   }
 
-  Widget? _view;
+  void startScan() {}
+
   ConsoleInput? _cachedMainViewInput;
   final Map<String, dynamic> _currencies = {
     "l": ["USD", "Satoshis"],
@@ -77,7 +172,7 @@ class _MoneyPageState extends State<MoneyPage> {
       .values
       .reduce((value, element) => [...element, ...value]));
 
-  String get usds => satoshisToUSD(widget.wallet.balance).toString();
+  String get usds => satoshisToUSD(widget.wallet.balance).toStringAsFixed(4);
 
   String get currency => _currencies["l"][_currencies["i"]] as String;
 
@@ -98,107 +193,37 @@ class _MoneyPageState extends State<MoneyPage> {
     return amount;
   }
 
-  ConsoleInput get mainViewInput => _cachedMainViewInput = ConsoleInput(
-        type: TextInputType.number,
-        placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
-        tec: tec,
-      );
-
-  void rotateMethod() {
-    _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
-        (_paymentMethod["l"] as List<String>).length;
-  }
-
-  void rotateCurrency() {
-    _currencies["i"] =
-        (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
-  }
-
-  void importView([List<Down4TXOUT>? utxos]) {
-    ConsoleInput input;
-    if (utxos == null) {
-      input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
-    } else {
-      final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
-      final ph = "Found " + formattedSats(sats) + " sat";
-      input = ConsoleInput(placeHolder: ph, tec: importTec, activated: false);
-    }
-
-    final importViewConsole = Console(
-      inputs: [input],
-      topButtons: [
-        ConsoleButton(
-            name: "Import",
-            onPress: () async {
-              // final pay = await widget.wallet
-              //     .importMoney(widget.self, importTec.value.text);
-              // if (pay != null) {
-              //   widget.wallet.parsePayment(widget.self, pay);
-              // }
-            })
-      ],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: () => widget.palettes.isEmpty ? emptyMainView() : mainView(),
-        ),
-        ConsoleButton(
-          name: "Check",
-          onPress: () async => importView(await checkPrivateKey(importTec.value.text)),
-        ),
-      ],
+  void mainViewInput([bool reload = false]) {
+    _cachedMainViewInput = ConsoleInput(
+      type: TextInputType.number,
+      placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
+      tec: tec,
     );
-
-    _view = Jeff(pages: [
-      Down4Page(
-        title: "Money",
-        console: importViewConsole,
-        palettes: widget.palettes,
-      )
-    ]);
-
-    setState(() {});
+    if (reload) setState(() {});
   }
 
-  void emptyMainView([
+  void emptyViewConsole([
     bool scanning = false,
-    bool reloadInput = false,
     bool extraBack = false,
+    bool reloadInput = false,
   ]) {
-    var len = 0;
-    var safe = false;
-    var txBuf = <Down4TX>[];
-    MobileScannerController? ctrl;
-    if (scanning) ctrl = MobileScannerController();
-    dynamic onScan(Barcode bc, MobileScannerArguments? args) {
-      final raw = bc.rawValue;
-      if (raw != null) {
-        final decodedJsoni = jsonDecode(raw);
-        if (decodedJsoni["len"] != null && decodedJsoni["safe"] != null) {
-          len = decodedJsoni["len"];
-          safe = decodedJsoni["safe"];
-          var tx = Down4TX.fromJson(decodedJsoni["tx"]);
-          if (!txBuf.contains(tx)) txBuf.add(tx);
-          if (txBuf.length == len) {
-            widget.wallet.parsePayment(widget.self, Down4Payment(txBuf, safe));
-            emptyMainView(false, true);
-          }
-        }
-      }
+    if (scanning) {
+      scanner = MobileScannerController();
+    } else {
+      scanner?.dispose();
+      scanner = null;
     }
 
-    final emptyViewConsole = Console(
-      scanCallBack: onScan,
-      scanController: ctrl,
-      inputs: scanning
-          ? null
-          : [
-              reloadInput
-                  ? mainViewInput
-                  : _cachedMainViewInput ?? mainViewInput,
-            ],
+    mainViewInput(reloadInput);
+    _console = Console(
+      scanCallBack: scanning ? onScan : null,
+      scanController: scanning ? scanner : null,
+      inputs: scanning ? null : [_cachedMainViewInput!],
       topButtons: [
-        ConsoleButton(name: "Scan", onPress: () => emptyMainView(!scanning))
+        ConsoleButton(
+          name: "Scan",
+          onPress: () => emptyViewConsole(!scanning),
+        )
       ],
       bottomButtons: [
         ConsoleButton(
@@ -209,13 +234,14 @@ class _MoneyPageState extends State<MoneyPage> {
           bottomEpsilon: -0.5,
           showExtra: extraBack,
           onPress: () => extraBack
-              ? emptyMainView(scanning, reloadInput, !extraBack)
+              ? emptyViewConsole(scanning, !extraBack, reloadInput)
               : widget.back(),
-          onLongPress: () => emptyMainView(scanning, reloadInput, !extraBack),
+          onLongPress: () =>
+              emptyViewConsole(scanning, !extraBack, reloadInput),
           extraButtons: [
             ConsoleButton(
               name: "Import",
-              onPress: () => importView(),
+              onPress: importConsole,
             )
           ],
         ),
@@ -224,32 +250,28 @@ class _MoneyPageState extends State<MoneyPage> {
           name: currency,
           onPress: () {
             rotateCurrency();
-            emptyMainView(scanning, true);
+            emptyViewConsole(scanning, extraBack, true);
           },
         ),
       ],
     );
-
-    _view = Jeff(pages: [Down4Page(title: "Money", console: emptyViewConsole)]);
-
     setState(() {});
   }
 
-  void mainView([bool reloadInput = false, bool extraBack = false]) {
-    final mainViewConsole = Console(
-      inputs: [
-        reloadInput ? mainViewInput : _cachedMainViewInput ?? mainViewInput,
-      ],
+  void mainViewConsole([bool reloadInput = false, bool extra = false]) {
+    mainViewInput(reloadInput);
+    _console = Console(
+      inputs: [_cachedMainViewInput!],
       bottomButtons: [
         ConsoleButton(
           name: "Back",
           isSpecial: true,
-          showExtra: extraBack,
+          showExtra: extra,
           onPress: () =>
-              extraBack ? mainView(reloadInput, !extraBack) : widget.back(),
-          onLongPress: () => mainView(reloadInput, !extraBack),
+              extra ? mainViewConsole(reloadInput, !extra) : widget.back(),
+          onLongPress: () => mainViewConsole(reloadInput, !extra),
           extraButtons: [
-            ConsoleButton(name: "Import", onPress: importView),
+            ConsoleButton(name: "Import", onPress: importConsole),
           ],
         ),
         ConsoleButton(
@@ -257,34 +279,27 @@ class _MoneyPageState extends State<MoneyPage> {
             isMode: true,
             onPress: () {
               rotateMethod();
-              mainView();
+              mainViewConsole();
             }),
         ConsoleButton(
             name: currency,
             isMode: true,
             onPress: () {
               rotateCurrency();
-              mainView(tec.value.text.isEmpty ? true : false);
+              mainViewConsole(tec.value.text.isEmpty ? true : false);
             }),
       ],
       topButtons: [
         ConsoleButton(name: "Bill", onPress: () => print("TODO")),
-        ConsoleButton(name: "Pay", onPress: () => confirmationView(currency)),
+        ConsoleButton(
+            name: "Pay", onPress: () => confirmationConsole(currency)),
       ],
     );
-
-    _view = Jeff(pages: [
-      Down4Page(
-        title: "Money",
-        palettes: widget.palettes,
-        console: mainViewConsole,
-      )
-    ]);
 
     setState(() {});
   }
 
-  void confirmationView(String inputCurrency, [bool reload = true]) {
+  void confirmationConsole(String inputCurrency) {
     double asUSD;
     int asSats;
     if (inputCurrency == "USD") {
@@ -296,20 +311,10 @@ class _MoneyPageState extends State<MoneyPage> {
           (method == "Split" ? 1 : widget.palettes.length);
       asUSD = satoshisToUSD(asSats);
     }
-    // puts commas for every power of 1000 for the sats amount
-    var satsString = String.fromCharCodes(asSats
-        .toString()
-        .codeUnits
-        .reversed
-        .toList()
-        .asMap()
-        .map((key, value) => key % 3 == 0 && key != 0
-            ? MapEntry(key, [value, 0x002C])
-            : MapEntry(key, [value]))
-        .values
-        .reduce((value, element) => [...element, ...value]));
 
-    final confirmationViewConsole = Console(
+    final satsString = formattedSats(asSats);
+
+    _console = Console(
       inputs: [
         ConsoleInput(
           placeHolder: currency == "USD"
@@ -323,77 +328,145 @@ class _MoneyPageState extends State<MoneyPage> {
         ConsoleButton(
             name: "Confirm",
             onPress: () {
-              // final pay = widget.wallet.payUsers(
-              //   widget.palettes.map((p) => p.node).toList(),
-              //   widget.self,
-              //   Sats(inputAsSatoshis),
-              // );
-              // if (pay != null) {
-              //   widget.wallet.trySettlement();
-              //   transactedView(pay);
-              // }
+              final pay = widget.wallet.payUsers(
+                widget.palettes.asNodes(),
+                widget.self,
+                Sats(inputAsSatoshis),
+              );
+              if (pay != null) {
+                for (final tx in pay.txs) {
+                  printWrapped("=================");
+                  printWrapped(tx.fullRawHex);
+                  printWrapped("=================");
+                  printWrapped(tx.txID!.asHex);
+                  printWrapped("=================");
+                 }
+                widget.parsePayment(pay);
+                printWrapped("pay: ${pay.toYouKnow()}###\n###");
+                print("ID: ${sha256(utf8.encode(pay.toYouKnow())).toHex()}");
+                print("txid: ${pay.txs.last.txID!.asHex}");
+                if (widget.palettes.isEmpty) {
+                  emptyViewConsole(false, false, true);
+                } else {
+                  mainViewConsole(true);
+                }
+              }
             }),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: mainView),
+        ConsoleButton(name: "Back", onPress: mainViewConsole),
         ConsoleButton(
           name: currency,
           isMode: true,
           onPress: () {
             rotateCurrency();
-            confirmationView(inputCurrency);
+            confirmationConsole(inputCurrency);
           },
         ),
       ],
     );
 
-    _view = Jeff(pages: [
-      Down4Page(
-        title: "Money",
-        console: confirmationViewConsole,
-        palettes: widget.palettes,
-      )
-    ]);
-
-    if (reload) setState(() {});
+    setState(() {});
   }
 
-  void transactedView(Down4Payment pay, [int i = 0, bool reload = true]) {
-    Timer.periodic(
-      const Duration(milliseconds: 800),
-      (_) => transactedView(pay, (i + 1) % pay.txs.length),
-    );
+  void importConsole([List<Down4TXOUT>? utxos]) {
+    ConsoleInput input;
+    if (utxos == null) {
+      input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
+    } else {
+      final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
+      final ph = "Found " + formattedSats(sats) + " sat";
+      input = ConsoleInput(placeHolder: ph, tec: importTec, activated: false);
+    }
 
-    final paymentWidget = Positioned(
-      top: 0,
-      left: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: QrImage(
-          data: jsonEncode(pay.toJsoni(i)),
-          foregroundColor: PinkTheme.qrColor,
-          backgroundColor: Colors.transparent,
+    void import() async {
+      final payment =
+          await widget.wallet.importMoney(importTec.value.text, widget.self);
+
+      if (payment == null) return;
+
+      widget.parsePayment(payment);
+      if (widget.palettes.isEmpty) {
+        emptyViewConsole(false, false, true);
+      } else {
+        mainViewConsole(true);
+      }
+    }
+
+    _console = Console(
+      inputs: [input],
+      topButtons: [
+        ConsoleButton(name: "Import", onPress: import),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () =>
+              widget.palettes.isEmpty ? emptyViewConsole() : mainViewConsole(),
         ),
-      ),
+        ConsoleButton(
+          name: "Check",
+          onPress: () async =>
+              importConsole(await checkPrivateKey(importTec.value.text)),
+        ),
+      ],
     );
 
-    final transactedViewConsole = Console(bottomButtons: [
-      ConsoleButton(name: "Done", onPress: widget.back),
-    ]);
+    setState(() {});
+  }
 
-    _view = Jeff(pages: [
-      Down4Page(
-          title: "Money",
-          console: transactedViewConsole,
-          stackWidgets: [paymentWidget]),
-    ]);
+  void rotateMethod() {
+    _paymentMethod["i"] = (_paymentMethod["i"] + 1) %
+        (_paymentMethod["l"] as List<String>).length;
+  }
 
-    if (reload) setState(() {});
+  dynamic onScan(Barcode bc, MobileScannerArguments? args) async {
+    final raw = bc.rawValue;
+    if (raw != null) {
+      final decodedRaw = jsonDecode(raw);
+      scannedDataLength = decodedRaw["tot"];
+      scannedData.putIfAbsent(decodedRaw["index"], () => decodedRaw["data"]);
+      if (scannedData.length == scannedDataLength) {
+        // we have all the data
+        await scanner?.stop();
+        var sortedData = <String>[];
+        final sortedKeys = scannedData.keys.toList()..sort();
+        for (final key in sortedKeys) {
+          sortedData.add(scannedData[key]!);
+        }
+        final payment = Down4Payment.fromJsonList(sortedData);
+        widget.wallet.parsePayment(widget.self, payment);
+        emptyViewConsole(false, false, true);
+      }
+    }
+  }
+
+  void rotateCurrency() {
+    _currencies["i"] =
+        (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_view == null) widget.palettes.isEmpty ? emptyMainView() : mainView();
-    return _view!;
+    print("Initial page:${widget.pageIndex}");
+    return Jeff(
+      initialPageIndex: widget.pageIndex,
+      onPageChange: widget.onPageChange,
+      pages: [
+        Down4Page(
+          title: "Money",
+          palettes: widget.palettes,
+          console: _console!,
+        ),
+        Down4Page(
+          title: "Status",
+          palettes: widget.paymentAsPalettes,
+          console: _console!,
+        ),
+      ],
+    );
+
+    // if (_view == null) widget.palettes.isEmpty ? emptyMainView() : mainView();
+    // return _view!;
   }
 }

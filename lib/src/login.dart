@@ -3,8 +3,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
-import 'package:bip39/bip39.dart' as b39;
-import 'package:bip32/bip32.dart' as b32;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -60,10 +58,10 @@ class _Down4State extends State<Down4> {
   }
 
   Future<void> loadUser() async {
-    final userData = Boxes.instance.user.get('user');
+    final userData = b.user.get('user');
     if (userData != null) {
       _user = Node.fromJson(jsonDecode(userData));
-      final moneyData = Boxes.instance.user.get('money');
+      final moneyData = b.user.get('wallet');
       _wallet = Wallet.fromJson(jsonDecode(moneyData)); // if this crashes gg
       home();
     } else {
@@ -79,31 +77,17 @@ class _Down4State extends State<Down4> {
     Uint8List imData,
     bool toReverse,
   ) async {
-    final mnemonic = await r.generateMnemonic();
-
-    if (mnemonic == null) {
-      print("error generating mnemonic generateMnemonic");
-      return false;
-    }
-
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
       print("error getting firebase messaging token");
       return false;
     }
 
-    final concatMnemonic = mnemonic.replaceAll(" ", "");
-    print("concatenated mnemonic: $concatMnemonic");
-    final concatMnemonicCodes = concatMnemonic.codeUnits;
-    final idCodeUnits = id.codeUnits;
-    final secretData = concatMnemonicCodes + idCodeUnits;
-
-    final seed = b39.mnemonicToSeed(mnemonic);
-    final master = b32.BIP32.fromSeed(seed);
-    final down4priv = master.derivePath("m/4'/0'/0'");
-    final neuter = down4priv.neutered();
-
-    final secret = hash256(secretData.asUint8List());
+    final seed1 = unsafeSeed(32);
+    final seed2 = unsafeSeed(32);
+    final secret = hash256(seed1 + seed2);
+    _wallet = Wallet.fromSeed(seed1, seed2);
+    final neutered = _wallet!.keys.neutered();
 
     final imageID = d4utils.generateMediaID(imData);
     Down4Media image = Down4Media(
@@ -122,7 +106,7 @@ class _Down4State extends State<Down4> {
       'ln': lastName,
       'sh': secret.toHex(),
       'tkn': token,
-      'nt': neuter.toBase58(),
+      'nt': neutered.toYouKnow(),
       'im': image,
     };
 
@@ -144,25 +128,22 @@ class _Down4State extends State<Down4> {
 
     _user = Node(
       type: Nodes.user,
+      neuter: neutered,
       id: id,
       image: image,
       name: name,
       lastName: lastName,
       parents: [],
       childs: [],
-      admins: [],
-      friends: [],
-      group: [],
-      posts: [],
       messages: [],
       snips: [],
     );
 
-    _wallet = Wallet.fromSeed(seed, seed);
-
-    Boxes.instance.user.put('token', token);
-    Boxes.instance.user.put('user', jsonEncode(_user));
-    Boxes.instance.user.put('money', jsonEncode(_wallet));
+    b.user.putAll({
+      'token': token,
+      'user': jsonEncode(_user),
+      'wallet': jsonEncode(_wallet),
+    });
 
     return true;
   }
@@ -208,4 +189,3 @@ class _Down4State extends State<Down4> {
     return SafeArea(child: _view ?? const LoadingPage());
   }
 }
-

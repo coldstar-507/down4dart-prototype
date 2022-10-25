@@ -23,8 +23,8 @@ class PaletteList extends StatelessWidget {
           itemBuilder: (c, i) => i == 0
               ? const SizedBox.shrink()
               : i == palettes.length + 2 - 1
-              ? const SizedBox.shrink()
-              : palettes[i - 1],
+                  ? const SizedBox.shrink()
+                  : palettes[i - 1],
           separatorBuilder: (c, i) => Container(height: gapSize),
           itemCount: palettes.length + 2,
         ),
@@ -72,7 +72,27 @@ class MessageList4 extends StatelessWidget {
                   b.loadMessage(messages[i]);
             }
             final msg = prevMsgCache ?? b.loadMessage(messages[i - 1]);
+            if (msg == null) return const SizedBox.shrink();
+
+            List<ReplyData> replies = [];
+            if (msg.replies != null) {
+              for (final reply in msg.replies!) {
+                var theMessage =
+                    messageMap[reply]?.message ?? b.loadMessage(reply);
+                if (theMessage != null) {
+                  final replyData = ReplyData(
+                    messageRefID: reply,
+                    thumbnail: senders[theMessage.senderID]!.image!,
+                    body: theMessage.text ?? "&attachment",
+                    type: senders[theMessage.senderID]!.type,
+                  );
+                  replies.add(replyData);
+                }
+              }
+            }
+
             final chat = ChatMessage(
+              repliesData: replies,
               sender: senders[msg.senderID]!,
               message: msg,
               myMessage: msg.senderID == self.id,
@@ -112,8 +132,8 @@ class DynamicList extends StatelessWidget {
           itemBuilder: (c, i) => i == 0
               ? const SizedBox.shrink()
               : i == list.length + 2 - 1
-              ? const SizedBox.shrink()
-              : list[i - 1],
+                  ? const SizedBox.shrink()
+                  : list[i - 1],
           separatorBuilder: (c, i) => Container(height: gapSize),
           itemCount: list.length + 2),
     );
@@ -162,8 +182,8 @@ class PaletteMakerList extends StatelessWidget {
                 itemBuilder: (c, i) => i == 0
                     ? const SizedBox.shrink()
                     : i == palettes.length + 2 - 1
-                    ? const SizedBox.shrink()
-                    : palettes[i - 1],
+                        ? const SizedBox.shrink()
+                        : palettes[i - 1],
                 separatorBuilder: (c, i) => Container(height: 16.0),
                 itemCount: palettes.length + 2)));
   }

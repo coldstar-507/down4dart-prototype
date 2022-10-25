@@ -180,7 +180,9 @@ class Palette extends StatelessWidget {
                     children: [
                       Text(
                         node.name + " " + (node.lastName ?? ""),
+                        maxLines: 1,
                         style: TextStyle(
+                          overflow: TextOverflow.ellipsis,
                           fontSize: 14,
                           fontWeight:
                           selected ? FontWeight.bold : FontWeight.normal,

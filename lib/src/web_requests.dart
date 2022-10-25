@@ -71,25 +71,47 @@ Future<Down4Media?> getMessageMedia(String id) async {
   return null;
 }
 
-Future<BatchResponse?> broadcastTxs(List<Down4TX> txs) async {
-  final uri = Uri.parse("https://api.taal.com/api/v1/batchBroadcast");
-  var rawTxs = [];
+Future<List<int>> broadcastTxs(List<Down4TX> txs) async {
+  final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
+  List<Future<http.Response>> responses = [];
   for (final tx in txs) {
-    rawTxs.add({"rawTx": tx.fullRawHex});
+    print("Full raw =============\n${tx.fullRawHex}\n==================");
+    responses.add(http.post(url, body: jsonEncode({"txhex": tx.fullRawHex})));
   }
-  final res = await http.post(
-    uri,
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "mainnet_ea21eb661e59bc5733cbbfe945de3a7b",
-    },
-    body: jsonEncode(rawTxs),
+
+  var failedBroadcast = <int>[];
+  for (int i = 0; i < txs.length; i++) {
+    var res = await responses[i];
+    if (res.statusCode != 200) failedBroadcast.add(i);
+    print("Response: ${jsonDecode(res.body)}");
+  }
+  return failedBroadcast;
+}
+
+Future<List<int>?> confirmations(List<String> txsID) async {
+  if (txsID.isEmpty) return null;
+  final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/txs/status");
+  var res = await http.post(url, body: jsonEncode({"txids": txsID}));
+  if (res.statusCode != 200) {
+    print("Error getting status of transactions");
+    return null;
+  }
+  var answers = jsonDecode(res.body);
+  return List.from(answers)
+      .map((e) => (e["confirmations"] ?? 0) as int)
+      .toList();
+}
+
+Future<Down4Payment?> getPayment(String paymentID) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/GetPayment",
   );
-  if (res.statusCode == 200) {
-    final decodedJson = jsonDecode(res.body);
-    return BatchResponse.fromJson(decodedJson);
+  final req = await http.post(url, body: paymentID);
+  if (req.statusCode != 200) {
+    print("error getting payment, id: $paymentID\n");
+    return null;
   }
-  return null;
+  return Down4Payment.fromYouKnow(req.body);
 }
 
 Future<double?> getExchangeRate() async {

@@ -343,7 +343,7 @@ class _GroupPageState extends State<GroupPage> {
 
   @override
   void dispose() async {
-    await ctrl?.dispose();
+    ctrl?.dispose();
     super.dispose();
   }
 
