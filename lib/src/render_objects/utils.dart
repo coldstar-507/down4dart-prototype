@@ -1,5 +1,6 @@
 import 'dart:io' as io;
 
+import 'package:flutter_testproject/src/down4_utility.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 
@@ -107,25 +108,15 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   }
 }
 
-extension PaletteExtensions on List<Palette> {
-  List<Node> asNodes() => map((e) => e.node).toList(growable: false);
-  List<Palette> selected() => where((p) => p.selected).toList(growable: false);
-  List<Identifier> asIds() => map((e) => e.node.id).toList(growable: false);
-  List<Palette> chatables() => where((p) => const [
-    Nodes.group,
-    Nodes.friend,
-    Nodes.nonFriend,
-    Nodes.user,
-    Nodes.hyperchat
-  ].contains(p.node.type)).toList(growable: false);
-
-  // TODO: public, private
-  List<Palette> forwardables() => where((p) => const [
-    Nodes.group,
-    Nodes.friend,
-    Nodes.nonFriend,
-    Nodes.user,
-  ].contains(p.node.type)).toList(growable: false);
+extension PaletteExtensions on Iterable<Palette> {
+  Iterable<BaseNode> asNodes() => map((e) => e.node);
+  Iterable<Palette> selected() => where((p) => p.selected);
+  Iterable<Identifier> asIds() => map((e) => e.node.id);
+  Iterable<Palette> chatables() => where((p) => p.node is ChatableNode);
+  Iterable<Palette> users() => where((p) => p.node is User);
+  Iterable<Palette> groups() => where((p) => p.node is GroupNode);
+  Iterable<Palette> forwardables() =>
+      where((p) => p.node.isPublicGroup || p.node is User);
 }
 
 class NoGlow extends ScrollBehavior {
@@ -147,11 +138,11 @@ class TouchableOpacity extends StatefulWidget {
 
   const TouchableOpacity(
       {required this.child,
-        required this.onPress,
-        this.shouldBeDownButIsnt = false,
-        this.onLongPress,
-        this.onLongPressUp,
-        Key? key})
+      required this.onPress,
+      this.shouldBeDownButIsnt = false,
+      this.onLongPress,
+      this.onLongPressUp,
+      Key? key})
       : super(key: key);
 
   @override

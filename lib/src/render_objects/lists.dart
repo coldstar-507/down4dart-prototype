@@ -14,33 +14,31 @@ class PaletteList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gapSize = Sizes.h * 0.02; // 2%
-    return Expanded(
-      child: ScrollConfiguration(
-        behavior: NoGlow(),
-        child: ListView.separated(
-          padding: const EdgeInsets.only(top: 0),
-          reverse: true,
-          itemBuilder: (c, i) => i == 0
-              ? const SizedBox.shrink()
-              : i == palettes.length + 2 - 1
-                  ? const SizedBox.shrink()
-                  : palettes[i - 1],
-          separatorBuilder: (c, i) => Container(height: gapSize),
-          itemCount: palettes.length + 2,
-        ),
+    return ScrollConfiguration(
+      behavior: NoGlow(),
+      child: ListView.separated(
+        padding: const EdgeInsets.only(top: 0),
+        reverse: true,
+        itemBuilder: (c, i) => i == 0
+            ? const SizedBox.shrink()
+            : i == palettes.length + 2 - 1
+                ? const SizedBox.shrink()
+                : palettes[i - 1],
+        separatorBuilder: (c, i) => Container(height: gapSize),
+        itemCount: palettes.length + 2,
       ),
     );
   }
 }
 
 class MessageList4 extends StatelessWidget {
-  final Map<Identifier, Node> senders;
+  final Map<Identifier, Palette> senders;
   final Map<Identifier, ChatMessage> messageMap;
   final void Function(String, String) select;
   final void Function(ChatMessage) cache;
   final void Function(String, String) getTheMedia;
   final List<Identifier> messages;
-  final Node self;
+  final User self;
   const MessageList4({
     required this.senders,
     required this.messages,
@@ -80,11 +78,12 @@ class MessageList4 extends StatelessWidget {
                 var theMessage =
                     messageMap[reply]?.message ?? b.loadMessage(reply);
                 if (theMessage != null) {
+                  var sender = senders[theMessage.senderID]!.node as User;
                   final replyData = ReplyData(
                     messageRefID: reply,
-                    thumbnail: senders[theMessage.senderID]!.image!,
+                    thumbnail: sender.media!,
                     body: theMessage.text ?? "&attachment",
-                    type: senders[theMessage.senderID]!.type,
+                    type: sender.colorCode,
                   );
                   replies.add(replyData);
                 }
@@ -142,7 +141,7 @@ class DynamicList extends StatelessWidget {
 
 class FutureNodesList extends StatelessWidget {
   final String at;
-  final Palette? Function(Node node, String at) nodeToPalette;
+  final Palette? Function(BaseNode node, String at) nodeToPalette;
   final List<Identifier> nodeIDs;
   const FutureNodesList({
     required this.at,
@@ -158,7 +157,7 @@ class FutureNodesList extends StatelessWidget {
         builder: (context, asyncSnapshot) {
           if (asyncSnapshot.connectionState == ConnectionState.done &&
               asyncSnapshot.hasData) {
-            final palettes = (asyncSnapshot.data as List<Node>)
+            final palettes = (asyncSnapshot.data as List<BaseNode>)
                 .map((e) => nodeToPalette(e, at))
                 .whereType<Palette>()
                 .toList();

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_testproject/src/down4_utility.dart';
+import 'bsv/utils.dart' show sha256;
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
-import 'bsv/types.dart';
+import 'bsv/types.dart' show Down4Payment, Down4TX, Down4InternetPayment;
 // import 'package:firebase_database/firebase_database.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -38,13 +39,13 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<Node>?> getNodes(List<String> ids) async {
+Future<List<BaseNode>?> getNodes(List<String> ids) async {
   final url =
       Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes");
   final res = await http.post(url, body: ids.join(" "));
   final jsonLists = List<Map<String, dynamic>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
-    return jsonLists.map((e) => Node.fromJson(e)).toList();
+    return jsonLists.map((e) => BaseNode.fromJson(e)).toList();
   }
   return null;
 }
@@ -139,7 +140,7 @@ Future<bool> snipRequest(SnipRequest req) async {
   return res.statusCode == 200;
 }
 
-Future<Node?> groupRequest(GroupRequest req, [withMedia = false]) async {
+Future<Group?> groupRequest(GroupRequest req, [withMedia = false]) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
   );
@@ -148,13 +149,13 @@ Future<Node?> groupRequest(GroupRequest req, [withMedia = false]) async {
     return groupRequest(req, true);
   }
   if (res.statusCode == 200) {
-    return Node.fromJson(jsonDecode(res.body));
+    return BaseNode.fromJson(jsonDecode(res.body)) as Group;
   } else {
     return null;
   }
 }
 
-Future<Node?> hyperchatRequest(
+Future<Hyperchat?> hyperchatRequest(
   HyperchatRequest req, [
   bool withMedia = false,
 ]) async {
@@ -166,7 +167,7 @@ Future<Node?> hyperchatRequest(
     return hyperchatRequest(req, true);
   }
   if (res.statusCode == 200) {
-    return Node.fromJson(jsonDecode(res.body));
+    return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
   } else {
     return null;
   }
@@ -212,18 +213,126 @@ Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
   return res.statusCode == 200;
 }
 
-// Future<bool> messageRequest(MessageRequest req, [retried = false]) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req));
-//   if (res.statusCode == HttpStatus.noContent && retried == false) {
-//     return messageRequest(
-//       req
-//         ..withUpload = true
-//         ..msg.media?.metadata.timestamp = DateTime.now().millisecondsSinceEpoch,
-//       true,
-//     );
-//   }
-//   return res.statusCode == 200;
-// }
+abstract class Request {
+  final List<Identifier> targets;
+  Request({required this.targets});
+  Map<String, dynamic> toJson();
+}
+
+class ChatRequest implements Request {
+  final Down4Message message;
+  final Down4Media? media;
+  ChatRequest({
+    required this.message,
+    required this.targets,
+    this.media,
+  });
+  @override
+  final List<Identifier> targets;
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": message.toJson(),
+        "tr": targets,
+        if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class PingRequest implements Request {
+  final String senderID, text;
+  PingRequest({
+    required this.senderID,
+    required this.text,
+    required this.targets,
+  });
+
+  @override
+  final List<Identifier> targets;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        "s": senderID,
+        "txt": text,
+        "tr": targets,
+      };
+}
+
+class SnipRequest extends ChatRequest {
+  SnipRequest({
+    required Down4Media media,
+    required Down4Message message,
+    required List<Identifier> targets,
+  }) : super(targets: targets, message: message, media: media);
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = true]) => {
+        "msg": message.toJson(),
+        "tr": targets,
+        "m": media!.toJson(),
+      };
+}
+
+class HyperchatRequest extends ChatRequest {
+  List<String> wordPairs;
+  HyperchatRequest({
+    required Down4Message message,
+    required List<Identifier> targets,
+    Down4Media? media,
+    required this.wordPairs,
+  }) : super(message: message, targets: targets, media: media);
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": message.toJson(),
+        "wp": wordPairs,
+        "tr": targets,
+        if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class GroupRequest extends ChatRequest {
+  String name;
+  bool private;
+  Down4Media groupImage;
+  GroupRequest({
+    required this.private,
+    required this.name,
+    required this.groupImage,
+    required Down4Message message,
+    Down4Media? media,
+    required List<Identifier> targets,
+  }) : super(targets: targets, message: message, media: media);
+
+  @override
+  Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "msg": message.toJson(),
+        "pv": private,
+        "gn": name,
+        "gm": groupImage.toJson(),
+        "tr": targets,
+        if (withMedia && media != null) "m": media!.toJson(),
+      };
+}
+
+class PaymentRequest implements Request {
+  final Down4Payment payment;
+  final String sender;
+  String get id => payment.id;
+
+  PaymentRequest({
+    required this.targets,
+    required this.payment,
+    required this.sender,
+  });
+
+  @override
+  final List<Identifier> targets;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        "s": sender,
+        "id": id,
+        "tr": targets,
+        "pay": payment.toYouKnow(),
+      };
+}

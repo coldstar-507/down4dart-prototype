@@ -56,21 +56,21 @@ class UserPaletteMaker extends StatelessWidget {
               clipBehavior: Clip.hardEdge,
               decoration: const BoxDecoration(
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(4.0),
-                    bottomLeft: Radius.circular(4.0),
-                  )),
+                topLeft: Radius.circular(4.0),
+                bottomLeft: Radius.circular(4.0),
+              )),
               width: Palette.height - 2.0, // borderWidth x2
               child: info['image'] == null || info['image'] == ""
                   ? Image.asset(
-                'lib/src/assets/picture_place_holder_2.png',
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              )
+                      'lib/src/assets/picture_place_holder_2.png',
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    )
                   : Image.memory(
-                base64Decode(info['image']!),
-                gaplessPlayback: true,
-                fit: BoxFit.cover,
-              ),
+                      base64Decode(info['image']!),
+                      gaplessPlayback: true,
+                      fit: BoxFit.cover,
+                    ),
             ),
           ),
           Expanded(
@@ -94,7 +94,7 @@ class UserPaletteMaker extends StatelessWidget {
                   hintText: "@username",
                   border: InputBorder.none,
                   contentPadding:
-                  const EdgeInsets.only(bottom: Palette.height / 2),
+                      const EdgeInsets.only(bottom: Palette.height / 2),
                 ),
                 textDirection: TextDirection.ltr,
                 onChanged: ((value) {
@@ -159,14 +159,14 @@ class UserMakerPalette extends StatelessWidget {
               width: Palette.height - 2.0, // borderWidth x2
               child: image.isNotEmpty
                   ? Image.memory(
-                Uint8List.fromList(image),
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              )
+                      Uint8List.fromList(image),
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    )
                   : Image.asset(
-                'lib/src/assets/picture_place_holder_2.png',
-                fit: BoxFit.cover,
-              ),
+                      'lib/src/assets/picture_place_holder_2.png',
+                      fit: BoxFit.cover,
+                    ),
             ),
           ),
           Expanded(
@@ -223,10 +223,12 @@ class PaletteMaker extends StatelessWidget {
   final String hintText;
   final Uint8List image;
   final void Function(Identifier)? go;
+  final NodesColor colorCode;
   final Nodes type;
   final Nodes? parentType;
   final TextEditingController tec;
   const PaletteMaker({
+    required this.colorCode,
     required this.tec,
     required this.id,
     required this.name,
@@ -274,43 +276,34 @@ class PaletteMaker extends StatelessWidget {
                   clipBehavior: Clip.hardEdge,
                   decoration: const BoxDecoration(
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(4.0),
-                        bottomLeft: Radius.circular(4.0),
-                      )),
+                    topLeft: Radius.circular(4.0),
+                    bottomLeft: Radius.circular(4.0),
+                  )),
                   width: Palette.height - 2.0, // borderWidth x2
                   child: image.isEmpty
                       ? Image.asset(
-                    'lib/src/assets/picture_place_holder_2.png',
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                  )
+                          'lib/src/assets/picture_place_holder_2.png',
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        )
                       : Image.memory(
-                    image,
-                    gaplessPlayback: true,
-                    fit: BoxFit.cover,
-                  ),
+                          image,
+                          gaplessPlayback: true,
+                          fit: BoxFit.cover,
+                        ),
                 ),
               ),
               Expanded(
                 child: Container(
-                    padding: const EdgeInsets.only(left: 10.0, top: 10.0),
-                    color: PinkTheme.nodeColors[type], //PinkTheme.headerColor,
-                    child: Down4Input(
-                      tec: tec,
-                      inputCallBack: nameCallBack,
-                      placeHolder: hintText,
-                      padding:
-                      const EdgeInsets.only(bottom: Palette.height / 2),
-                    ) // TextField(
-                  //   textAlignVertical: TextAlignVertical.top,
-                  //   decoration: InputDecoration(
-                  //       hintText: hintText,
-                  //       border: InputBorder.none,
-                  //       contentPadding: const EdgeInsets.only(
-                  //           bottom: (SingleActionPalette.height) / 2)),
-                  //   textDirection: TextDirection.ltr,
-                  //   onChanged: nameCallBack,
-                  // ),
+                  padding: const EdgeInsets.only(left: 10.0, top: 10.0),
+                  color:
+                      PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
+                  child: Down4Input(
+                    tec: tec,
+                    inputCallBack: nameCallBack,
+                    placeHolder: hintText,
+                    padding: const EdgeInsets.only(bottom: Palette.height / 2),
+                  ),
                 ),
               ),
               GestureDetector(
@@ -325,7 +318,7 @@ class PaletteMaker extends StatelessWidget {
                       width: type != Nodes.user ? Palette.height - 2.0 : 4.0,
                       decoration: BoxDecoration(
                           color: PinkTheme
-                              .nodeColors[type], //PinkTheme.headerColor,
+                              .nodeColors[colorCode], //PinkTheme.headerColor,
                           borderRadius: const BorderRadius.only(
                               topRight: Radius.circular(4.0),
                               bottomRight: Radius.circular(4.0))),

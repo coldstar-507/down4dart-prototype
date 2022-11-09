@@ -1,6 +1,5 @@
 import 'package:convert/convert.dart';
 import 'dart:typed_data';
-import 'dart:math';
 import 'package:pointycastle/digests/sha1.dart' as sha1;
 import 'data_objects.dart';
 import 'package:collection/collection.dart';
@@ -53,12 +52,15 @@ String generateMediaID(Uint8List mediaData) {
 
 int timeStamp() => DateTime.now().millisecondsSinceEpoch;
 
-extension IsTypes on Node {
-  bool get isFriendOrGroup => const [Nodes.friend, Nodes.group].contains(type);
-  bool get isFriend => Nodes.friend == type;
-  bool get isUser =>
-      const [Nodes.nonFriend, Nodes.friend, Nodes.user].contains(type);
-  bool get isGroup => const [Nodes.hyperchat, Nodes.group].contains(type);
+extension IterableNodes on Iterable<BaseNode> {
+  Iterable<String> asIds() => map((node) => node.id);
+}
+
+extension IsTypes on BaseNode {
+  bool get isFriendOrGroup => isFriendUser || this is GroupNode;
+  bool get isUserOrGroup => this is User || this is GroupNode;
+  bool get isFriendUser => this is User ? (this as User).isFriend : false;
+  bool get isPublicGroup => this is Group ? !(this as Group).isPrivate : false;
 }
 
 extension AsUint8List on List<int> {

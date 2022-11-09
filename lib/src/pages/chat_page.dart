@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
+import '../web_requests.dart' as r;
 
 import '../render_objects/console.dart';
 import '../render_objects/chat_message.dart';
@@ -16,16 +17,15 @@ import '../render_objects/palette.dart';
 import '../render_objects/lists.dart';
 import '../render_objects/navigator.dart';
 
-
-
 class ChatPage extends StatefulWidget {
-  final Map<Identifier, Node> senders;
-  final Node self, node;
+  final Map<Identifier, Palette> senders;
+  final User self;
+  final ChatableNode node;
   final List<Palette> group;
   final List<CameraDescription> cameras;
-  final Future<bool> Function(ChatRequest) send;
+  final void Function(r.ChatRequest) send;
   final void Function() back;
-  final Palette? Function(Node, String) nodeToPalette;
+  final Palette? Function(BaseNode, String) nodeToPalette;
   final int pageIndex;
   final Function(int)? onPageChange;
 
@@ -85,10 +85,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
-    tec: tec,
-    inputCallBack: (t) => null,
-    placeHolder: ":)",
-  );
+        tec: tec,
+        inputCallBack: (t) => null,
+        placeHolder: ":)",
+      );
 
   Future<void> handleImport() async {
     FilePickerResult? r = await FilePicker.platform.pickFiles(
@@ -134,8 +134,7 @@ class _ChatPageState extends State<ChatPage> {
   void send2() {
     if (tec.value.text != "" || _mediaInput != null || _cameraInput != null) {
       final ts = DateTime.now().millisecondsSinceEpoch;
-      final targets = (widget.node.group ?? [widget.node.id])
-        ..removeWhere((element) => element == widget.self.id);
+      final targets = widget.node.targets(widget.self.id);
 
       var msg = Down4Message(
         type: Messages.chat,
@@ -146,8 +145,8 @@ class _ChatPageState extends State<ChatPage> {
         text: tec.value.text,
       );
 
-      var req = ChatRequest(
-        msg: msg,
+      var req = r.ChatRequest(
+        message: msg,
         targets: targets,
         media: _mediaInput ?? _cameraInput,
       );
@@ -165,17 +164,17 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   MessageList4 get messageList => MessageList4(
-    senders: widget.senders,
-    messages: (widget.node.messages ?? <String>[]).reversed.toList(),
-    self: widget.self,
-    messageMap: _cachedMessages,
-    cache: (msg) => _cachedMessages[msg.message.id] = msg,
-    getTheMedia: getTheMedia,
-    select: (id, _) {
-      _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
-      setState(() {});
-    },
-  );
+        senders: widget.senders,
+        messages: (widget.node.messages ?? <String>[]).reversed.toList(),
+        self: widget.self,
+        messageMap: _cachedMessages,
+        cache: (msg) => _cachedMessages[msg.message.id] = msg,
+        getTheMedia: getTheMedia,
+        select: (id, _) {
+          _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
+          setState(() {});
+        },
+      );
 
   Future<void> camConsole([
     CameraController? ctrl,
@@ -218,13 +217,13 @@ class _ChatPageState extends State<ChatPage> {
           return camConsole(
               ctrl, cameraIdx, ResolutionPreset.low, flashMode, true);
         case ResolutionPreset.veryHigh:
-        // TODO: Handle this case.
+          // TODO: Handle this case.
           break;
         case ResolutionPreset.ultraHigh:
-        // TODO: Handle this case.
+          // TODO: Handle this case.
           break;
         case ResolutionPreset.max:
-        // TODO: Handle this case.
+          // TODO: Handle this case.
           break;
       }
     }
@@ -392,8 +391,6 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.node.name +
-        (widget.node.lastName != null ? " " + widget.node.lastName! : "");
     if (_console == null) baseConsole();
 
     if (widget.group.isNotEmpty) {
@@ -402,12 +399,21 @@ class _ChatPageState extends State<ChatPage> {
 
     List<Down4Page> pages = widget.group.isEmpty
         ? [
-      Down4Page(title: title, console: _console!, messageList: messageList),
-    ]
+            Down4Page(
+              title: widget.node.name,
+              console: _console!,
+              messageList: messageList,
+            ),
+          ]
         : [
-      Down4Page(title: title, console: _console!, messageList: messageList),
-      Down4Page(title: "People", console: _console!, palettes: widget.group),
-    ];
+            Down4Page(
+              title: widget.node.name,
+              console: _console!,
+              messageList: messageList,
+            ),
+            Down4Page(
+                title: "People", console: _console!, palettes: widget.group),
+          ];
 
     return Jeff(
       initialPageIndex: widget.pageIndex,

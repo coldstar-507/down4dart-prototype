@@ -3,16 +3,18 @@ import 'package:flutter/material.dart';
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
+import 'palette.dart';
 
 class ProfileWidget extends StatelessWidget {
-  final Node node;
+  final Palette palette;
   const ProfileWidget({
-    required this.node,
+    required this.palette,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    var node = palette.node as User;
     final squareImageSize = Sizes.w * 0.84;
     return Container(
       clipBehavior: Clip.hardEdge,
@@ -38,27 +40,22 @@ class ProfileWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Image.memory(
-            node.image!.data,
-            fit: BoxFit.cover,
+          SizedBox(
             width: squareImageSize,
             height: squareImageSize,
+            child: palette.nodeImage,
           ),
           const SizedBox(height: 8.0),
           Text(
-            node.name + (node.lastName != null ? " " + node.lastName! : ""),
+            node.name,
             style: const TextStyle(fontSize: 22.0, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8.0),
-          Container(
-              padding: const EdgeInsets.all(8.0),
-              child: node.description != null &&
-                  (node.description ?? "").isNotEmpty
-                  ? Text(node.description!, textAlign: TextAlign.justify)
-                  : const SizedBox.shrink()),
-          node.description != null && (node.description ?? "").isNotEmpty
-              ? const SizedBox(height: 8.0)
+          node.description.isNotEmpty
+              ? Container(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(node.description, textAlign: TextAlign.justify))
               : const SizedBox.shrink(),
         ],
       ),

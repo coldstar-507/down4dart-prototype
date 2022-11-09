@@ -10,11 +10,11 @@ import '../render_objects/navigator.dart';
 class WelcomePage extends StatelessWidget {
   final void Function() _understood;
   final String _mnemonic;
-  final Node _userInfo;
+  final User _userInfo;
 
   const WelcomePage({
     required String mnemonic,
-    required Node userInfo,
+    required User userInfo,
     required void Function() understood,
     Key? key,
   })  : _mnemonic = mnemonic,

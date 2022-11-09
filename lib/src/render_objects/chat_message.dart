@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
+import 'palette.dart';
 
 import 'utils.dart';
 
@@ -10,7 +11,7 @@ class ReplyData {
   final String messageRefID;
   final Down4Media thumbnail;
   final String body;
-  final Nodes type;
+  final NodesColor type;
   const ReplyData({
     required this.messageRefID,
     required this.thumbnail,
@@ -20,7 +21,7 @@ class ReplyData {
 }
 
 class ChatMessage extends StatelessWidget {
-  final Node sender;
+  final Palette sender;
   static const double headerHeight = 24.0;
   final String at;
   final Down4Message message;
@@ -124,11 +125,7 @@ class ChatMessage extends StatelessWidget {
               ),
               height: ChatMessage.headerHeight,
               width: ChatMessage.headerHeight,
-              child: Image.memory(
-                sender.image!.data,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
+              child: sender.image,
             ),
           ),
           Expanded(
@@ -147,7 +144,7 @@ class ChatMessage extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 2.0, top: 2.0, right: 2.0),
                 height: ChatMessage.headerHeight,
                 child: Text(
-                  sender.name,
+                  sender.node.name,
                   textDirection: TextDirection.ltr,
                 ),
               ),

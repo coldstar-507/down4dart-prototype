@@ -12,8 +12,18 @@ import 'package:bs58/bs58.dart';
 import 'package:convert/convert.dart';
 import 'package:pointycastle/export.dart';
 
-import '../down4_utility.dart';
-import '../data_objects.dart';
+// import '../down4_utility.dart';
+import 'package:collection/collection.dart';
+
+import 'dart:io' as io;
+
+final listEqual_ = const ListEquality().equals;
+
+extension on List<int> {
+  Uint8List asUint8List() => Uint8List.fromList(this);
+  String toBase58() => base58.encode(this.asUint8List());
+  String toHex() => hex.encode(this);
+}
 
 int randomSats() {
   return Random().nextInt(50);
@@ -21,6 +31,12 @@ int randomSats() {
 
 Uint8List unsafeSeed(int len) {
   var random = Random();
+  var seed = List<int>.generate(len, (_) => random.nextInt(256));
+  return Uint8List.fromList(seed);
+}
+
+Uint8List safeSeed(int len) {
+  var random = Random.secure();
   var seed = List<int>.generate(len, (_) => random.nextInt(256));
   return Uint8List.fromList(seed);
 }
@@ -164,7 +180,7 @@ List<int>? strippedCheck(List<int> checkAddress) {
   final check = checkAddress.sublist(checkAddress.length - 4);
   final pre = checkAddress.sublist(0, checkAddress.length - 4);
   final sum = hash256(pre).sublist(0, 4);
-  if (!listEqual(check, sum)) return null;
+  if (!listEqual_(check, sum)) return null;
   return pre.sublist(1);
 }
 
@@ -182,4 +198,28 @@ ECPublicKey uncompressPublicKey(Uint8List publicKey) {
   final bigX = BigInt.parse(publicKey.sublist(1).toHex(), radix: 16);
   final point = secp256k1.curve.decompressPoint(publicKey[0] & 1, bigX);
   return ECPublicKey(point, secp256k1);
+}
+
+void main() {
+  final seed1 = safeSeed(32);
+  final seed2 = safeSeed(32);
+
+  var pair0_ = Down4Keys.fromRandom(seed1, seed2);
+
+  io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
+
+  // var pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
+  // var pair1 = pair0.derive(makeUint32(1))!;
+  // var pair2 = pair0.derive(makeUint32(2))!;
+  // var pair3 = pair0.derive(makeUint32(3))!;
+  //
+  // print("TEST0: ${testnetAddress(pair0.rawCompressedPub).toBase58()}");
+  // print("TEST1: ${testnetAddress(pair1.rawCompressedPub).toBase58()}");
+  // print("TEST2: ${testnetAddress(pair2.rawCompressedPub).toBase58()}");
+  // print("TEST3: ${testnetAddress(pair3.rawCompressedPub).toBase58()}");
+  //
+  // print("TEST0PK: ${pair0.privKeyBase58}");
+  // print("TEST1PK: ${pair1.privKeyBase58}");
+  // print("TEST2PK: ${pair2.privKeyBase58}");
+  // print("TEST3PK: ${pair3.privKeyBase58}");
 }

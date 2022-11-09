@@ -32,43 +32,43 @@ Future<Down4Media?> getMessageMediaFromEverywhere(Identifier mediaID) async {
   }
 }
 
-Future<List<Node>> getNodesFromEverywhere(List<Identifier> ids) async {
+Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
   final locals = ids.where((id) => b.home.containsKey(id)).toList();
   final externals = ids.toSet().difference(locals.toSet()).toList();
   var externalNodes = r.getNodes(externals);
-  List<Node> localNodes = [];
+  List<BaseNode> localNodes = [];
   for (final localNodeID in locals) {
     localNodes.add(b.loadNode(localNodeID));
   }
-  return localNodes + (await externalNodes ?? <Node>[]);
+  return localNodes + (await externalNodes ?? <BaseNode>[]);
 }
 
-Future<Node?> getSingleNode(Identifier nodeID) async {
-  var doc = await fs.collection("Nodes").doc(nodeID).get();
-  var jsonNode = doc.data();
-  if (jsonNode == null) return null;
-
-  var node = Node.fromJson(jsonNode);
-
-  Down4Media? nodeMedia;
-  final imageID = jsonNode["im"];
-  if (imageID != null) {
-    var imRef = st_node.ref(imageID);
-    final fData = imRef.getData();
-    final fMD = imRef.getMetadata();
-
-    final jsonMetadata = (await fMD).customMetadata;
-    if (jsonMetadata != null) {
-      final md = MediaMetadata.fromJson(jsonMetadata);
-      final imData = await fData;
-      if (imData != null) {
-        nodeMedia = Down4Media(id: imageID, data: imData, metadata: md);
-      }
-    }
-  }
-  node.image = nodeMedia;
-  return node;
-}
+// Future<BaseNode?> getSingleNode(Identifier nodeID) async {
+//   var doc = await fs.collection("Nodes").doc(nodeID).get();
+//   var jsonNode = doc.data();
+//   if (jsonNode == null) return null;
+//
+//   var node = Node.fromJson(jsonNode);
+//
+//   Down4Media? nodeMedia;
+//   final imageID = jsonNode["im"];
+//   if (imageID != null) {
+//     var imRef = st_node.ref(imageID);
+//     final fData = imRef.getData();
+//     final fMD = imRef.getMetadata();
+//
+//     final jsonMetadata = (await fMD).customMetadata;
+//     if (jsonMetadata != null) {
+//       final md = MediaMetadata.fromJson(jsonMetadata);
+//       final imData = await fData;
+//       if (imData != null) {
+//         nodeMedia = Down4Media(id: imageID, data: imData, metadata: md);
+//       }
+//     }
+//   }
+//   node.image = nodeMedia;
+//   return node;
+// }
 
 Future<Down4Media?> getMessageMediaFromDB(Identifier mediaID) async {
   var ref = st.ref(mediaID);
@@ -91,7 +91,7 @@ extension MessageSave on Down4Message {
   void save() => b.messages.put(id, jsonEncode(this));
 }
 
-extension NodeSave on Node {
+extension NodeSave on BaseNode {
   void save() => b.home.put(id, jsonEncode(this));
   void saveUser() => b.user.put(id, jsonEncode(this));
 }
@@ -210,12 +210,12 @@ class Boxes {
     snips.delete(id);
   }
 
-  void saveUser(Node u) {
+  void saveUser(User u) {
     user.put("user", jsonEncode(u));
   }
 
-  Node loadUser() {
-    return Node.fromJson(jsonDecode(user.get("user")));
+  User loadUser() {
+    return BaseNode.fromJson(jsonDecode(user.get("user"))) as User;
   }
 
   void saveWallet(Wallet w) {
@@ -226,18 +226,20 @@ class Boxes {
     return Wallet.fromJson(jsonDecode(user.get("wallet")));
   }
 
-  void saveNode(Node p) {
+  void saveNode(BaseNode p) {
     home.put(p.id, jsonEncode(p));
   }
 
-  Node loadNode(Identifier id) {
-    return Node.fromJson(jsonDecode(home.get(id)));
+  BaseNode loadNode(Identifier id) {
+    return BaseNode.fromJson(jsonDecode(home.get(id)));
   }
 
   void deleteNode(Identifier id) {
     final node = loadNode(id);
-    for (final msgID in node.messages ?? <String>[]) {
-      messages.delete(msgID);
+    if (node is ChatableNode) {
+      for (final msgID in node.messages) {
+        messages.delete(msgID);
+      }
     }
     home.delete(id);
   }

@@ -6,8 +6,6 @@ import 'package:pointycastle/export.dart';
 import '../down4_utility.dart';
 import '../data_objects.dart';
 import 'utils.dart';
-import 'dart:math';
-import 'dart:io';
 
 final secp256k1 = ECCurve_secp256k1();
 const SATS_PER_BYTE = 0.05;
@@ -35,6 +33,34 @@ class Down4Payment {
   List<Down4TX> txs;
   bool safe;
   Down4Payment(this.txs, this.safe);
+
+  int get independentGets {
+    final tx = txs.last;
+    return tx.txsOut
+        .firstWhere((txOut) => !(txOut.isFee || txOut.isChange))
+        .sats
+        .asInt;
+  }
+
+  String get formattedName {
+    final tx = txs.last;
+    final spender = txs.last.txsIn.first.spender ?? "";
+    String receivers = "";
+    int singularGets = tx.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
+    int count = 0;
+    for (final txOut in txs.last.txsOut) {
+      if (txOut.isGets) {
+        receivers += txOut.receiver! + " ";
+        count += 1;
+      }
+    }
+
+    if (count > 1) {
+      return spender + " --$count x $singularGets--> " + receivers;
+    } else {
+      return spender + " --$singularGets--> " + receivers;
+    }
+  }
 
   String get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID!.data);
@@ -278,8 +304,12 @@ class Down4TXOUT {
   Sats sats;
   VarInt? scriptPubKeyLen;
   List<int>? scriptPubKey;
+  final bool isChange;
+  final bool isFee;
 
   Down4TXOUT({
+    this.isChange = false,
+    this.isFee = false,
     this.receiver,
     this.secret,
     this.txid,
@@ -296,6 +326,10 @@ class Down4TXOUT {
         outIndex: decodedJson["oi"],
         txid: TXID.fromHex(decodedJson["id"]),
         sats: Sats(decodedJson["s"]),
+        isChange:
+            decodedJson["ic"] ?? false, // TODO the ?? false should be removed
+        isFee:
+            decodedJson["if"] ?? false, // TODO the ?? false should be removed
         scriptPubKey: hex.decode(decodedJson["sc"]),
       );
 
@@ -303,6 +337,8 @@ class Down4TXOUT {
 
   String get id =>
       sha256((txid!.data + FourByteInt(outIndex!).data).asUint8List()).toHex();
+
+  bool get isGets => !(isFee || isChange);
 
   @override
   int get hashCode {
@@ -321,6 +357,8 @@ class Down4TXOUT {
       ];
 
   Map<String, dynamic> toJson() => {
+        "if": isFee,
+        "ic": isChange,
         "rc": receiver,
         "st": secret,
         "oi": outIndex,
@@ -692,7 +730,6 @@ class Down4Keys {
 
     final big = BigInt.parse(right.toHex(), radix: 16);
 
-
     final bigPoint = secp256k1.G * big;
     if (bigPoint == null) return null;
     final newPoint = bigPoint + publicKey.Q!;
@@ -782,6 +819,9 @@ class Down4Keys {
 }
 
 void main() {
+
+  print("What the fuck is going on");
+
   var lol = 0x41;
   var jk = 0x01 | 0x40;
   print(lol == jk);

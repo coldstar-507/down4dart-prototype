@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/bsv/types.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
+import 'package:flutter_testproject/src/render_objects/utils.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -14,11 +15,11 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 
 class AddFriendPage extends StatefulWidget {
-  final Node self;
+  final User self;
   final List<Palette> palettes;
   final Future<bool> Function(List<String>) search;
-  final void Function(Node node) putNodeOffline;
-  final void Function(List<Node>) addCallback, forwardNodes;
+  final void Function(User node) putNodeOffline;
+  final void Function(List<Palette>) addCallback, forwardNodes;
   final void Function() backCallback;
 
   const AddFriendPage({
@@ -66,12 +67,14 @@ class _AddFriendPageState extends State<AddFriendPage> {
     if (bc.rawValue != null) {
       final data = bc.rawValue!.split("~");
       if (data.length != 4) return;
-      var node = Node(
-        type: Nodes.user,
+      var node = User(
         id: data[0],
-        name: data[1],
+        firstName: data[1],
         lastName: data[2],
         neuter: Down4Keys.fromYouKnow(data[3]),
+        messages: [],
+        snips: [],
+        children: [],
       );
       widget.putNodeOffline(node);
     }
@@ -88,10 +91,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         ConsoleButton(
           name: "Add",
           onPress: () => widget.addCallback(
-            widget.palettes
-                .where((element) => element.selected)
-                .map((e) => e.node)
-                .toList(),
+            widget.palettes.selected().toList(growable: false),
           ),
         ),
         ConsoleButton(
@@ -106,10 +106,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         ConsoleButton(
           name: "Forward",
           onPress: () => widget.forwardNodes(
-            widget.palettes
-                .where((p) => p.selected)
-                .map((p) => p.node)
-                .toList(),
+            widget.palettes.selected().toList(growable: false),
           ),
         ),
       ],
@@ -127,7 +124,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
               widget.self.id,
               widget.self.name,
               widget.self.lastName,
-              widget.self.neuter!.toYouKnow(),
+              widget.self.neuter.toYouKnow(),
             ].join("~"),
           ),
         ),
@@ -135,7 +132,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Jeff(pages: [
+    return Andrew(pages: [
       Down4Page(
         title: "Search",
         console: _console!,

@@ -9,10 +9,9 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
+import 'palette.dart';
 
 import 'utils.dart';
-
-
 
 class ConsoleButton extends StatelessWidget {
   static const double height = 26.0;
@@ -54,39 +53,39 @@ class ConsoleButton extends StatelessWidget {
             border: Border.all(color: Colors.black, width: 0.5)),
         child: isActivated
             ? TouchableOpacity(
-          shouldBeDownButIsnt: shouldBeDownButIsnt,
-          onPress: onPress,
-          onLongPress: onLongPress,
-          onLongPressUp: onLongPressUp,
-          child: Container(
-            color: PinkTheme.buttonColor,
-            child: Center(
-              child: Text(
-                name,
-                style: TextStyle(
-                  decoration: isSpecial ? TextDecoration.underline : null,
-                  decorationStyle: TextDecorationStyle.solid,
-                  fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                  fontWeight: FontWeight.bold,
+                shouldBeDownButIsnt: shouldBeDownButIsnt,
+                onPress: onPress,
+                onLongPress: onLongPress,
+                onLongPressUp: onLongPressUp,
+                child: Container(
+                  color: PinkTheme.buttonColor,
+                  child: Center(
+                    child: Text(
+                      name,
+                      style: TextStyle(
+                        decoration: isSpecial ? TextDecoration.underline : null,
+                        decorationStyle: TextDecorationStyle.solid,
+                        fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : Container(
+                color: PinkTheme.inactivatedButtonColor,
+                child: Center(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      decoration: isSpecial ? TextDecoration.underline : null,
+                      decorationStyle: TextDecorationStyle.solid,
+                      fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        )
-            : Container(
-          color: PinkTheme.inactivatedButtonColor,
-          child: Center(
-            child: Text(
-              name,
-              style: TextStyle(
-                decoration: isSpecial ? TextDecoration.underline : null,
-                decorationStyle: TextDecorationStyle.solid,
-                fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -136,33 +135,33 @@ class _ConsoleInputState extends State<ConsoleInput> {
         ),
         child: widget.activated
             ? TextField(
-          controller: widget.tec,
-          cursorColor: PinkTheme.black,
-          key: widget.k,
-          maxLines: null,
-          keyboardType: widget.type,
-          textAlignVertical: TextAlignVertical.center,
-          textAlign: TextAlign.center,
-          decoration: InputDecoration(
-            isDense: true,
-            isCollapsed: true,
-            contentPadding: const EdgeInsets.all(2.0),
-            hintText: widget.placeHolder,
-            border: InputBorder.none,
-            prefixIcon: Text(widget.prefix),
-            prefixIconConstraints: const BoxConstraints(
-              minHeight: 0,
-              minWidth: 0,
-            ),
-            suffixIcon: Text(widget.suffix),
-            suffixIconConstraints: const BoxConstraints(
-              minHeight: 0,
-              minWidth: 0,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-          onChanged: widget.inputCallBack,
-        )
+                controller: widget.tec,
+                cursorColor: PinkTheme.black,
+                key: widget.k,
+                maxLines: null,
+                keyboardType: widget.type,
+                textAlignVertical: TextAlignVertical.center,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  isDense: true,
+                  isCollapsed: true,
+                  contentPadding: const EdgeInsets.all(2.0),
+                  hintText: widget.placeHolder,
+                  border: InputBorder.none,
+                  prefixIcon: Text(widget.prefix),
+                  prefixIconConstraints: const BoxConstraints(
+                    minHeight: 0,
+                    minWidth: 0,
+                  ),
+                  suffixIcon: Text(widget.suffix),
+                  suffixIconConstraints: const BoxConstraints(
+                    minHeight: 0,
+                    minWidth: 0,
+                  ),
+                ),
+                textDirection: TextDirection.ltr,
+                onChanged: widget.inputCallBack,
+              )
             : Center(child: Text(widget.placeHolder)),
       ),
     );
@@ -182,10 +181,10 @@ class Console extends StatelessWidget {
   final List<ConsoleInput>? inputs, topInputs;
   final MobileScannerController? scanController;
   final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
-  final List<Node>? forwardingNodes;
+  final List<Palette>? forwardingPalette;
   const Console({
     required this.bottomButtons,
-    this.forwardingNodes,
+    this.forwardingPalette,
     this.selectMedia,
     this.images,
     this.medias,
@@ -213,172 +212,175 @@ class Console extends StatelessWidget {
         bottom: Sizes.h * 0.021,
       ),
       decoration: BoxDecoration(
-        border: Border.all(width: 0.5, color: Colors.black),
+        border: Border.all(
+          width: 0.5,
+          color: Colors.black,
+        ), // Color.fromRGBO(0, 0, 0, 0.05)),
       ),
+      // child: Container(
+      //   decoration: BoxDecoration(
+      //     border: Border.all(width: 0.5, color: Colors.black),
+      //   ),
       child: Column(
         children: [
-          forwardingNodes != null
+          forwardingPalette != null
               ? SizedBox(
-            height: ConsoleButton.height,
-            width: camWidthAndHeight,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              textDirection: TextDirection.ltr,
-              children: forwardingNodes!
-                  .map((node) => Flexible(
-                child: DecoratedBox(
-                  position: DecorationPosition.foreground,
-                  decoration: BoxDecoration(
-                    border: Border.all(width: 0.5),
-                  ),
+                  height: ConsoleButton.height,
+                  width: camWidthAndHeight,
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     textDirection: TextDirection.ltr,
-                    crossAxisAlignment:
-                    CrossAxisAlignment.stretch,
-                    children: [
-                      Image.memory(
-                        node.image!.data,
-                        fit: BoxFit.cover,
-                        width: ConsoleButton.height,
-                        height: ConsoleButton.height,
-                      ),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(2.0),
-                          color: PinkTheme.nodeColors[node.type],
-                          child: Text(
-                            node.name,
-                            overflow: TextOverflow.clip,
-                          ),
-                        ),
-                      ),
-                    ],
+                    children: forwardingPalette!
+                        .map((palette) => Flexible(
+                              child: DecoratedBox(
+                                position: DecorationPosition.foreground,
+                                decoration: BoxDecoration(
+                                  border: Border.all(width: 0.5),
+                                ),
+                                child: Row(
+                                  textDirection: TextDirection.ltr,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    palette.image,
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2.0),
+                                        color: PinkTheme
+                                            .nodeColors[palette.node.colorCode],
+                                        child: Text(
+                                          palette.node.name,
+                                          overflow: TextOverflow.clip,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ))
+                        .toList(),
                   ),
-                ),
-              ))
-                  .toList(),
-            ),
-          )
+                )
               : const SizedBox.shrink(),
           Row(textDirection: TextDirection.ltr, children: topInputs ?? []),
           Row(textDirection: TextDirection.ltr, children: inputs ?? []),
           images == true
               ? Container(
-            width: camWidthAndHeight - 1,
-            height: camWidthAndHeight - 1,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.black, width: 0.5),
-              color: PinkTheme.buttonColor,
-            ),
-            child: (ListView.builder(
-                itemCount: (medias?.length ?? 0 / 4.0).ceil(),
-                itemBuilder: ((context, index) {
-                  Widget f(int i) {
-                    if ((medias?.length ?? 0) > i) {
-                      return medias?[i].metadata.isVideo == true
-                          ? SizedBox(
-                        height: (camWidthAndHeight - 2) / 5,
-                        width: (camWidthAndHeight - 2) / 5,
-                        child: Down4VideoPlayer(
-                          vid: medias![i].file!,
-                        ),
-                      )
-                          : GestureDetector(
-                        onTap: () => selectMedia?.call(medias![i]),
-                        child: SizedBox(
-                          height: (camWidthAndHeight - 2) / 5,
-                          width: (camWidthAndHeight - 2) / 5,
-                          child: Image.memory(
-                            medias![i].data,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      );
-                    } else {
-                      return const SizedBox.shrink();
-                    }
-                  }
+                  width: camWidthAndHeight - 1,
+                  height: camWidthAndHeight - 1,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black, width: 0.5),
+                    color: PinkTheme.buttonColor,
+                  ),
+                  child: (ListView.builder(
+                      itemCount: (medias?.length ?? 0 / 4.0).ceil(),
+                      itemBuilder: ((context, index) {
+                        Widget f(int i) {
+                          if ((medias?.length ?? 0) > i) {
+                            return medias?[i].metadata.isVideo == true
+                                ? SizedBox(
+                                    height: (camWidthAndHeight - 2) / 5,
+                                    width: (camWidthAndHeight - 2) / 5,
+                                    child: Down4VideoPlayer(
+                                      vid: medias![i].file!,
+                                    ),
+                                  )
+                                : GestureDetector(
+                                    onTap: () => selectMedia?.call(medias![i]),
+                                    child: SizedBox(
+                                      height: (camWidthAndHeight - 2) / 5,
+                                      width: (camWidthAndHeight - 2) / 5,
+                                      child: Image.memory(
+                                        medias![i].data,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  );
+                          } else {
+                            return const SizedBox.shrink();
+                          }
+                        }
 
-                  return Row(
-                    children: [
-                      f((index * 5)),
-                      f((index * 5) + 1),
-                      f((index * 5) + 2),
-                      f((index * 5) + 3),
-                      f((index * 5) + 4)
-                    ],
-                  );
-                }))),
-          )
+                        return Row(
+                          children: [
+                            f((index * 5)),
+                            f((index * 5) + 1),
+                            f((index * 5) + 2),
+                            f((index * 5) + 3),
+                            f((index * 5) + 4)
+                          ],
+                        );
+                      }))),
+                )
               : cameraController != null
-              ? Container(
-            width: camWidthAndHeight,
-            height: camWidthAndHeight,
-            clipBehavior: Clip.hardEdge,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.black, width: .5),
-            ),
-            child: Transform.scale(
-              alignment: Alignment.center,
-              scaleY: aspectRatio,
-              child: AspectRatio(
-                aspectRatio: aspectRatio!,
-                child: CameraPreview(cameraController!),
-              ),
-            ),
-          )
-              : imagePreviewPath != null
-              ? Container(
-              width: camWidthAndHeight,
-              height: camWidthAndHeight,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 0.5),
-              ),
-              child: Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.rotationY(mirror),
-                  child: Image.file(
-                    io.File(imagePreviewPath!),
-                    fit: BoxFit.cover,
-                  )))
-              : videoPlayerController != null
-              ? Container(
-            clipBehavior: Clip.hardEdge,
-            width: camWidthAndHeight,
-            height: camWidthAndHeight,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.black,
-                width: 0.5,
-              ),
-            ),
-            child: Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.rotationY(mirror),
-              child: Transform.scale(
-                scaleY: aspectRatio,
-                child: VideoPlayer(videoPlayerController!),
-              ),
-            ),
-          )
-              : scanController != null
-              ? Container(
-            width: camWidthAndHeight - 1,
-            height: camWidthAndHeight - 1,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Colors.black,
-                width: 0.5,
-              ),
-              color: PinkTheme.buttonColor,
-            ),
-            child: MobileScanner(
-              controller: scanController,
-              onDetect: scanCallBack!,
-              allowDuplicates: false,
-            ),
-          )
-              : const SizedBox.shrink(),
+                  ? Container(
+                      width: camWidthAndHeight,
+                      height: camWidthAndHeight,
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.black, width: .5),
+                      ),
+                      child: Transform.scale(
+                        alignment: Alignment.center,
+                        scaleY: aspectRatio,
+                        child: AspectRatio(
+                          aspectRatio: aspectRatio!,
+                          child: CameraPreview(cameraController!),
+                        ),
+                      ),
+                    )
+                  : imagePreviewPath != null
+                      ? Container(
+                          width: camWidthAndHeight,
+                          height: camWidthAndHeight,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black, width: 0.5),
+                          ),
+                          child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.rotationY(mirror),
+                              child: Image.file(
+                                io.File(imagePreviewPath!),
+                                fit: BoxFit.cover,
+                              )))
+                      : videoPlayerController != null
+                          ? Container(
+                              clipBehavior: Clip.hardEdge,
+                              width: camWidthAndHeight,
+                              height: camWidthAndHeight,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.rotationY(mirror),
+                                child: Transform.scale(
+                                  scaleY: aspectRatio,
+                                  child: VideoPlayer(videoPlayerController!),
+                                ),
+                              ),
+                            )
+                          : scanController != null
+                              ? Container(
+                                  width: camWidthAndHeight - 1,
+                                  height: camWidthAndHeight - 1,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.black,
+                                      width: 0.5,
+                                    ),
+                                    color: PinkTheme.buttonColor,
+                                  ),
+                                  child: MobileScanner(
+                                    controller: scanController,
+                                    onDetect: scanCallBack!,
+                                    allowDuplicates: false,
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
           Row(
             children: topButtons ?? [],
             textDirection: TextDirection.ltr,

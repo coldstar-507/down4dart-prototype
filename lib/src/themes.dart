@@ -12,21 +12,20 @@ class PinkTheme {
   static const qrColor = Color.fromARGB(255, 56, 3, 17);
   static const black = Colors.black;
   static const snipRibbon = Color.fromARGB(153, 255, 241, 242);
-  static const Map<Nodes, Color> nodeColors = {
-    Nodes.root: Color.fromARGB(255, 53, 3, 20),
-    Nodes.hyperchat: Color.fromARGB(255, 212, 168, 182),
-    Nodes.checkpoint: Color.fromARGB(255, 22, 94, 161),
-    Nodes.event: Color.fromARGB(255, 95, 28, 219),
-    Nodes.item: Color.fromARGB(255, 187, 108, 34),
-    Nodes.journal: Color.fromARGB(255, 90, 62, 134),
-    Nodes.market: Color.fromARGB(255, 34, 134, 64),
-    Nodes.ticket: Color.fromARGB(255, 233, 220, 30),
-    Nodes.user: Color.fromARGB(255, 230, 174, 193),
-    Nodes.friend: Color.fromARGB(255, 230, 174, 193),
-    Nodes.group: Color.fromARGB(255, 175, 134, 209),
-    Nodes.nonFriend: Color.fromARGB(255, 158, 92, 114),
-    Nodes.unsafeTx: Colors.red,
-    Nodes.mediumTx: Colors.yellow,
-    Nodes.safeTx: Colors.green,
+  static const Map<NodesColor, Color> nodeColors = {
+    NodesColor.root: Color.fromARGB(255, 53, 3, 20),
+    NodesColor.hyperchat: Color.fromARGB(255, 212, 168, 182),
+    NodesColor.checkpoint: Color.fromARGB(255, 22, 94, 161),
+    NodesColor.event: Color.fromARGB(255, 95, 28, 219),
+    NodesColor.item: Color.fromARGB(255, 187, 108, 34),
+    NodesColor.journal: Color.fromARGB(255, 90, 62, 134),
+    NodesColor.market: Color.fromARGB(255, 34, 134, 64),
+    NodesColor.ticket: Color.fromARGB(255, 233, 220, 30),
+    NodesColor.friend: Color.fromARGB(255, 230, 174, 193),
+    NodesColor.group: Color.fromARGB(255, 175, 134, 209),
+    NodesColor.nonFriend: Color.fromARGB(255, 158, 92, 114),
+    NodesColor.unsafeTx: Colors.red,
+    NodesColor.mediumTx: Colors.yellow,
+    NodesColor.safeTx: Colors.green,
   };
 }

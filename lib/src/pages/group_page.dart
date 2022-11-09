@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
+import '../web_requests.dart' as r;
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -17,14 +18,13 @@ import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
 import '../render_objects/utils.dart';
 
-
 class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final Node self;
+  final User self;
   final List<Palette> palettes;
-  final void Function(Node) afterMessageCallback;
+  final void Function(Group) afterMessageCallback;
   final void Function() back;
-  final Future<bool> Function(GroupRequest) groupRequest;
+  final void Function(r.GroupRequest) groupRequest;
 
   const GroupPage({
     required this.self,
@@ -90,28 +90,29 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   PaletteMaker groupMaker() => PaletteMaker(
-    tec: tec2,
-    id: "",
-    // will calculate the ID on hyperchat creation for hyperchats
-    name: groupName,
-    hintText: "Group Name",
-    image: groupImage?.data ?? Uint8List(0),
-    nameCallBack: (name) => setState(() => groupName = name),
-    type: Nodes.group,
-    imageCallBack: (data) {
-      final dataForID = widget.self.id.codeUnits + data.toList();
-      final imageID = u.generateMediaID(dataForID.asUint8List());
-      groupImage = Down4Media(
-        data: data,
-        id: imageID,
-        metadata: MediaMetadata(
-          owner: widget.self.id,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-        ),
+        colorCode: NodesColor.group,
+        tec: tec2,
+        id: "",
+        // will calculate the ID on hyperchat creation for hyperchats
+        name: groupName,
+        hintText: "Group Name",
+        image: groupImage?.data ?? Uint8List(0),
+        nameCallBack: (name) => setState(() => groupName = name),
+        type: Nodes.group,
+        imageCallBack: (data) {
+          final dataForID = widget.self.id.codeUnits + data.toList();
+          final imageID = u.generateMediaID(dataForID.asUint8List());
+          groupImage = Down4Media(
+            data: data,
+            id: imageID,
+            metadata: MediaMetadata(
+              owner: widget.self.id,
+              timestamp: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
+          loadPalettes();
+        },
       );
-      loadPalettes();
-    },
-  );
 
   void loadPalettes() {
     items.clear();
@@ -125,7 +126,7 @@ class _GroupPageState extends State<GroupPage> {
     if (groupImage == null || groupName.isEmpty) return;
 
     final selfID = widget.self.id;
-    final targets = widget.palettes.asIds();
+    final targets = widget.palettes.asIds().toList(growable: false);
 
     final msg = Down4Message(
       type: Messages.chat,
@@ -136,10 +137,10 @@ class _GroupPageState extends State<GroupPage> {
       text: tec.value.text,
     );
 
-    final grpReq = GroupRequest(
+    final grpReq = r.GroupRequest(
       name: groupName,
       groupImage: groupImage!,
-      msg: msg,
+      message: msg,
       private: private,
       targets: targets,
       media: mediaInput,

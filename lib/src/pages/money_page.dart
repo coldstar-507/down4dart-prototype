@@ -29,8 +29,11 @@ class PaymentPage extends StatefulWidget {
   final Down4Payment payment;
   final List<String> paymentList;
 
-  PaymentPage({required this.back, required this.payment, Key? key})
-      : paymentList = payment.toJsonList(),
+  PaymentPage({
+    required this.back,
+    required this.payment,
+    Key? key,
+  })  : paymentList = payment.toJsonList(),
         super(key: key);
 
   @override
@@ -90,9 +93,10 @@ class MoneyPage extends StatefulWidget {
   final double exchangeRate;
   final Wallet wallet;
   final List<Palette> palettes, paymentAsPalettes;
-  final Node self;
+  final User self;
   final void Function() back;
   final void Function(Down4Payment) parsePayment;
+  final void Function(r.Request req) paymentRequest;
   final int pageIndex;
   final void Function(int) onPageChange;
 
@@ -106,6 +110,7 @@ class MoneyPage extends StatefulWidget {
     required this.pageIndex,
     required this.onPageChange,
     required this.parsePayment,
+    required this.paymentRequest,
     Key? key,
   }) : super(key: key);
 
@@ -329,7 +334,7 @@ class _MoneyPageState extends State<MoneyPage> {
             name: "Confirm",
             onPress: () {
               final pay = widget.wallet.payUsers(
-                widget.palettes.asNodes(),
+                widget.palettes.asNodes().toList(growable: false) as List<User>,
                 widget.self,
                 Sats(inputAsSatoshis),
               );
@@ -340,7 +345,7 @@ class _MoneyPageState extends State<MoneyPage> {
                   printWrapped("=================");
                   printWrapped(tx.txID!.asHex);
                   printWrapped("=================");
-                 }
+                }
                 widget.parsePayment(pay);
                 printWrapped("pay: ${pay.toYouKnow()}###\n###");
                 print("ID: ${sha256(utf8.encode(pay.toYouKnow())).toHex()}");
@@ -449,7 +454,7 @@ class _MoneyPageState extends State<MoneyPage> {
   @override
   Widget build(BuildContext context) {
     print("Initial page:${widget.pageIndex}");
-    return Jeff(
+    return Andrew(
       initialPageIndex: widget.pageIndex,
       onPageChange: widget.onPageChange,
       pages: [

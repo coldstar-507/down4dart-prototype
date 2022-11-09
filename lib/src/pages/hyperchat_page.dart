@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
+import '../web_requests.dart' as r;
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -18,10 +19,10 @@ import '../render_objects/navigator.dart';
 class HyperchatPage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final List<Palette> palettes;
-  final void Function(HyperchatRequest) hyperchatRequest;
-  final Future<bool> Function(ChatRequest) ping;
+  final void Function(r.HyperchatRequest) hyperchatRequest;
+  final void Function(r.ChatRequest) ping;
   final void Function() back;
-  final Node self;
+  final User self;
 
   const HyperchatPage({
     required this.self,
@@ -97,8 +98,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
         .map((e) => e.first + " " + e.second)
         .toList(growable: false);
 
-    final hcReq = HyperchatRequest(
-      msg: msg,
+    final hcReq = r.HyperchatRequest(
+      message: msg,
       targets: targets,
       wordPairs: pairs,
       media: mediaInput,
@@ -306,7 +307,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
   @override
   Widget build(BuildContext context) {
     return Jeff(pages: [
-      Down4Page(title: "Hyperchat", console: console!, palettes: widget.palettes),
+      Down4Page(
+          title: "Hyperchat", console: console!, palettes: widget.palettes),
     ]);
   }
 }

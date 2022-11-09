@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animated_text_kit/animated_text_kit.dart';
 
 import '../boxes.dart';
 import '../themes.dart';
@@ -132,6 +133,13 @@ class Down4Page {
     this.topDownColumnWidgets,
     required this.console,
   });
+
+  List<Widget> get listItems =>
+      palettes ??
+      messages ??
+      columnWidgets ??
+      topDownColumnWidgets ??
+      stackWidgets!;
 }
 
 class Jeff extends StatefulWidget {
@@ -227,6 +235,152 @@ class _JeffState extends State<Jeff> {
                   ),
                 ),
                 consoles[widget.initialPageIndex],
+              ],
+            ),
+          ),
+        ),
+        ...consoles[widget.initialPageIndex].getExtraTopButtons(),
+        ...consoles[widget.initialPageIndex].getExtraBottomButtons(),
+      ],
+    );
+  }
+}
+
+class Andrew extends StatefulWidget {
+  final List<Down4Page> pages;
+  final int initialPageIndex;
+  final Function(int)? onPageChange;
+
+  const Andrew({
+    required this.pages,
+    this.onPageChange,
+    this.initialPageIndex = 0,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  _AndrewState createState() => _AndrewState();
+}
+
+class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
+  int curPos = 0;
+
+  // late final AnimationController scaleCtrl = AnimationController(
+  //   vsync: this,
+  //   duration: const Duration(milliseconds: 600),
+  // );
+  // late final Animation<double> _animation = CurvedAnimation(
+  //   parent: scaleCtrl,
+  //   curve: Curves.easeOut,
+  // );
+
+  void goRight() {
+    if (curPos < widget.pages.length - 1) {
+      curPos++;
+      setState(() {});
+    }
+  }
+
+  void goLeft() {
+    if (curPos > 0) {
+      curPos--;
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final titles = widget.pages.map((e) => e.title).toList(growable: false);
+    final consoles = widget.pages
+        .map((e) => PageConsole(console: e.console))
+        .toList(growable: false);
+
+    return Stack(
+      children: [
+        Scaffold(
+          body: Container(
+            color: PinkTheme.backGroundColor,
+            child: Column(
+              // crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  decoration: const BoxDecoration(
+                    color: PinkTheme.qrColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black38,
+                        blurRadius: 3.0,
+                        spreadRadius: 3.0,
+                      ),
+                    ],
+                  ),
+                  height: 32,
+                  child: Row(
+                    textDirection: TextDirection.ltr,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: titles
+                        .asMap()
+                        .entries
+                        .map((e) => AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 600),
+                            style: TextStyle(
+                              fontFamily: "Alice",
+                              color: Colors.white
+                                  .withOpacity(curPos == e.key ? 1 : 0.3),
+                              fontSize: 18,
+                            ),
+                            child: Text(
+                              " ${e.value} ",
+                              softWrap: true,
+                            )))
+                        .toList(growable: false),
+                  ),
+                ),
+                Expanded(
+                  child: Stack(children: [
+                    ...widget.pages[curPos].stackWidgets ?? [],
+                    GestureDetector(
+                      onHorizontalDragUpdate: (DragUpdateDetails details) {
+                        if ((details.primaryDelta ?? 0) > 0) {
+                          goLeft();
+                        } else if ((details.primaryDelta ?? 0) < 0) {
+                          goRight();
+                        }
+                      },
+                      child: Row(
+                        children: widget.pages
+                            .asMap()
+                            .entries
+                            .map((page) => AnimatedContainer(
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.easeOut,
+                                width: curPos == page.key ? Sizes.w : 0,
+                                child: PaletteList(
+                                    palettes: page.value.palettes!.map((p) {
+                                  if (curPos == page.key) {
+                                    print(
+                                      "######## showing ${p.node.name} ########",
+                                    );
+                                  }
+                                  return p.animated(
+                                      page.key == curPos,
+                                      curPos < page.key
+                                          ? true
+                                          : curPos > page.key
+                                              ? false
+                                              : null);
+                                }).toList())))
+                            .toList(),
+                      ),
+                    ),
+                  ]),
+                ),
+                consoles[curPos],
               ],
             ),
           ),
