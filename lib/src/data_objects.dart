@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-// import 'package:bip32/bip32.dart';
-import 'package:flutter_testproject/src/bsv/utils.dart';
 
 import 'down4_utility.dart' as d4utils;
 import 'bsv/types.dart';
@@ -18,6 +16,19 @@ enum Messages {
 
 enum Nodes {
   user,
+  hyperchat,
+  group,
+  root,
+  market,
+  checkpoint,
+  journal,
+  item,
+  event,
+  ticket,
+  payment,
+}
+
+enum NodesColor {
   friend,
   nonFriend,
   hyperchat,
@@ -114,7 +125,7 @@ class Down4Message {
     this.replies,
   });
 
-  Down4Message forwarded(Node self) {
+  Down4Message forwarded(BaseNode self) {
     return Down4Message(
       type: type,
       id: id,
@@ -165,246 +176,378 @@ class Down4Message {
       };
 }
 
-class Node {
-  final Identifier id;
-  final Down4Keys? neuter;
+// class Node {
+//   final Identifier id;
+//   final Down4Keys? neuter;
+//
+//   final Down4Payment? payment;
+//
+//   String name;
+//   String? lastName;
+//   Down4Media? image;
+//   String? description;
+//   Nodes type;
+//   int activity;
+//   List<Identifier>? admins;
+//   List<Identifier>? childs;
+//   List<Identifier>? parents;
+//   List<Identifier>? friends;
+//   List<Identifier>? snips;
+//   List<Identifier>? group;
+//   List<Identifier>? messages;
+//   List<Identifier>? posts; // messages / either post or chat
+//   Node({
+//     required this.type,
+//     required this.id,
+//     required this.name,
+//     this.image,
+//     this.neuter,
+//     this.payment,
+//     this.description,
+//     this.activity = 0,
+//     this.lastName,
+//     this.posts,
+//     this.messages,
+//     this.admins,
+//     this.childs,
+//     this.group,
+//     this.parents,
+//     this.friends,
+//     this.snips,
+//   });
+//
+//   void mutateType(Nodes t) => type = t;
+//
+//   void updateActivity() => activity = d4utils.timeStamp();
+//
+//   void merge(Node mergeNode) {
+//     childs = mergeNode.childs;
+//     parents = mergeNode.parents;
+//     admins = mergeNode.admins;
+//     friends = mergeNode.friends;
+//     posts = mergeNode.posts;
+//     description = mergeNode.description;
+//     image = mergeNode.image;
+//     name = mergeNode.name;
+//     lastName = mergeNode.lastName;
+//   }
+//
+//   factory Node.fromJson(Map<String, dynamic> decodedJson) {
+//     return Node(
+//       id: decodedJson["id"],
+//       name: decodedJson["nm"],
+//       neuter: decodedJson["nt"] != null
+//           ? Down4Keys.fromYouKnow(decodedJson["nt"])
+//           : null,
+//       lastName: decodedJson["ln"],
+//       activity: decodedJson["a"] ?? 0,
+//       image: decodedJson["im"] != null
+//           ? Down4Media.fromJson(decodedJson["im"])
+//           : null,
+//       type: Nodes.values.byName(decodedJson["t"]),
+//       messages: decodedJson["msg"] != null
+//           ? List<String>.from(decodedJson["msg"])
+//           : null,
+//       admins: decodedJson["adm"] != null
+//           ? List<String>.from(decodedJson["adm"])
+//           : null,
+//       childs: decodedJson["chl"] != null
+//           ? List<String>.from(decodedJson["chl"])
+//           : null,
+//       parents: decodedJson["prt"] != null
+//           ? List<String>.from(decodedJson["prt"])
+//           : null,
+//       posts: decodedJson["pst"] != null
+//           ? List<String>.from(decodedJson["pst"])
+//           : null,
+//       group: decodedJson["grp"] != null
+//           ? List<String>.from(decodedJson["grp"])
+//           : null,
+//       friends: decodedJson["frd"] != null
+//           ? List<String>.from(decodedJson["frd"])
+//           : null,
+//       snips: decodedJson["snp"] != null
+//           ? List<String>.from(decodedJson["snp"])
+//           : null,
+//     );
+//   }
+//
+//   Map<String, dynamic> toJson([bool withMedia = true]) => {
+//         "id": id,
+//         "t": type.name,
+//         "a": activity,
+//         "nm": name,
+//         if (neuter != null) "nt": neuter!.toYouKnow(),
+//         if (lastName != null) "ln": lastName,
+//         if (image != null) "im": withMedia ? image!.toJson() : image!.id,
+//         if (messages != null) "msg": messages,
+//         if (admins != null) "adm": admins,
+//         if (childs != null) "chl": childs,
+//         if (parents != null) "prt": parents,
+//         if (posts != null) "pst": posts,
+//         if (group != null) "grp": group,
+//         if (snips != null) "snp": snips,
+//       };
+// }
 
-  String name;
-  String? lastName;
-  Down4Media? image;
-  String? description;
-  Nodes type;
+abstract class BaseNode {
+  NodesColor get colorCode;
+  Identifier get id;
+  String get name;
+  String get displayID;
+  // Image get image;
+  Map toJson();
   int activity;
-  List<Identifier>? admins;
-  List<Identifier>? childs;
-  List<Identifier>? parents;
-  List<Identifier>? friends;
-  List<Identifier>? snips;
-  List<Identifier>? group;
-  List<Identifier>? messages;
-  List<Identifier>? posts; // messages / either post or chat
-  Node({
-    required this.type,
-    required this.id,
-    required this.name,
-    this.image,
-    this.neuter,
-    this.description,
-    this.activity = 0,
-    this.lastName,
-    this.posts,
-    this.messages,
-    this.admins,
-    this.childs,
-    this.group,
-    this.parents,
-    this.friends,
-    this.snips,
-  });
-
-  void mutateType(Nodes t) => type = t;
-
+  BaseNode({int? activity}) : activity = activity ?? 0;
   void updateActivity() => activity = d4utils.timeStamp();
+  factory BaseNode.fromJson(dynamic decodedJson) {
+    final type = Nodes.values.byName(decodedJson["t"]);
+    final id = decodedJson["id"];
+    switch (type) {
+      case Nodes.user:
+        return User(
+          id: id,
+          firstName: decodedJson["nm"],
+          isFriend: decodedJson["if"] ?? false,
+          neuter: Down4Keys.fromYouKnow(decodedJson["nt"]),
+          messages: List<Identifier>.from(decodedJson["msg"] ?? []),
+          snips: List<Identifier>.from(decodedJson["snp"] ?? []),
+          children: List<Identifier>.from(decodedJson["chl"] ?? []),
+          lastName: decodedJson["ln"],
+          activity: decodedJson["a"],
+          media: decodedJson["im"]?["d"] != null
+              ? Down4Media.fromJson(decodedJson["im"])
+              : null,
+        );
 
-  void merge(Node mergeNode) {
-    childs = mergeNode.childs;
-    parents = mergeNode.parents;
-    admins = mergeNode.admins;
-    friends = mergeNode.friends;
-    posts = mergeNode.posts;
-    description = mergeNode.description;
-    image = mergeNode.image;
-    name = mergeNode.name;
-    lastName = mergeNode.lastName;
+      case Nodes.hyperchat:
+        // TODO: Handle this case.
+        break;
+      case Nodes.group:
+        // TODO: Handle this case.
+        break;
+      case Nodes.root:
+        // TODO: Handle this case.
+        break;
+      case Nodes.market:
+        // TODO: Handle this case.
+        break;
+      case Nodes.checkpoint:
+        // TODO: Handle this case.
+        break;
+      case Nodes.journal:
+        // TODO: Handle this case.
+        break;
+      case Nodes.item:
+        // TODO: Handle this case.
+        break;
+      case Nodes.event:
+        // TODO: Handle this case.
+        break;
+      case Nodes.ticket:
+        // TODO: Handle this case.
+        break;
+      case Nodes.payment:
+        // TODO: Handle this case.
+        break;
+    }
+    throw 'invalid node type: $type';
   }
+}
 
-  factory Node.fromJson(Map<String, dynamic> decodedJson) {
-    return Node(
-      id: decodedJson["id"],
-      name: decodedJson["nm"],
-      neuter: decodedJson["nt"] != null
-          ? Down4Keys.fromYouKnow(decodedJson["nt"])
-          : null,
-      lastName: decodedJson["ln"],
-      activity: decodedJson["a"] ?? 0,
-      image: decodedJson["im"] != null
-          ? Down4Media.fromJson(decodedJson["im"])
-          : null,
-      type: Nodes.values.byName(decodedJson["t"]),
-      messages: decodedJson["msg"] != null
-          ? List<String>.from(decodedJson["msg"])
-          : null,
-      admins: decodedJson["adm"] != null
-          ? List<String>.from(decodedJson["adm"])
-          : null,
-      childs: decodedJson["chl"] != null
-          ? List<String>.from(decodedJson["chl"])
-          : null,
-      parents: decodedJson["prt"] != null
-          ? List<String>.from(decodedJson["prt"])
-          : null,
-      posts: decodedJson["pst"] != null
-          ? List<String>.from(decodedJson["pst"])
-          : null,
-      group: decodedJson["grp"] != null
-          ? List<String>.from(decodedJson["grp"])
-          : null,
-      friends: decodedJson["frd"] != null
-          ? List<String>.from(decodedJson["frd"])
-          : null,
-      snips: decodedJson["snp"] != null
-          ? List<String>.from(decodedJson["snp"])
-          : null,
-    );
+abstract class ChatableNode extends BaseNode {
+  List<Identifier> messages, snips;
+  ChatableNode({int? activity, required this.messages, required this.snips})
+      : super(activity: activity);
+
+  List<Identifier> targets(Identifier selfID) {
+    if (this is GroupNode) {
+      return (this as GroupNode).group..remove(selfID);
+    }
+    return [id];
   }
-
-  Map<String, dynamic> toJson([bool withMedia = true]) => {
-        "id": id,
-        "t": type.name,
-        "a": activity,
-        "nm": name,
-        if (neuter != null) "nt": neuter!.toYouKnow(),
-        if (lastName != null) "ln": lastName,
-        if (image != null) "im": withMedia ? image!.toJson() : image!.id,
-        if (messages != null) "msg": messages,
-        if (admins != null) "adm": admins,
-        if (childs != null) "chl": childs,
-        if (parents != null) "prt": parents,
-        if (posts != null) "pst": posts,
-        if (group != null) "grp": group,
-        if (snips != null) "snp": snips,
-      };
 }
 
-abstract class MessageRequest {
-  List<Identifier> targets;
-  MessageRequest({required this.targets});
+abstract class GroupNode extends ChatableNode {
+  List<Identifier> get group;
+  set group(List<Identifier> group);
+  Down4Media get media;
+  // Image get image => Image.memory(
+  //       media.data,
+  //       fit: BoxFit.cover,
+  //       gaplessPlayback: true,
+  //     );
+  GroupNode({
+    int? activity,
+    required List<Identifier> messages,
+    required List<Identifier> snips,
+  }) : super(activity: activity, messages: messages, snips: snips);
+} // interface
 
-  Map<String, dynamic> toJson();
-}
+abstract class BranchNode extends BaseNode {
+  List<Identifier> get children;
+  set children(List<Identifier> children);
+} // interface
 
-class PingRequest {
-  final String senderID, text;
-  final List<Identifier> targets;
-  PingRequest(
-      {required this.senderID, required this.text, required this.targets});
-  Map<String, dynamic> toJson() => {
-        "s": senderID,
-        "txt": text,
-        "tr": targets,
-      };
-}
-
-class ChatRequest {
-  Down4Message msg;
-  List<Identifier> targets;
+class User extends ChatableNode implements BranchNode {
+  final Identifier id;
+  final Down4Keys neuter;
+  String firstName;
+  List<Identifier> children;
   Down4Media? media;
+  String? lastName;
+  bool isFriend;
+  String description;
 
-  ChatRequest({
-    required this.msg,
-    required this.targets,
+  User({
+    this.isFriend = false,
+    required this.id,
+    required this.firstName,
     this.media,
-  });
+    this.lastName,
+    required this.neuter,
+    required List<Identifier> messages,
+    required List<Identifier> snips,
+    required this.children,
+    String? description,
+    int? activity,
+  })  : description = description ?? "",
+        super(activity: activity, messages: messages, snips: snips);
 
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
-        "msg": msg.toJson(),
-        "tr": targets,
-        if (withMedia && media != null) "m": media!.toJson(),
-      };
-}
+  String get displayID => "@" + id;
 
-class SnipRequest extends ChatRequest {
-  SnipRequest({
-    required Down4Media media,
-    required Down4Message msg,
-    required List<Identifier> targets,
-  }) : super(msg: msg, targets: targets, media: media);
+  String get name => firstName + ((lastName != null) ? lastName! : "");
 
-  @override
-  Map<String, dynamic> toJson([bool withMedia = true]) => {
-        "msg": msg.toJson(),
-        "tr": targets,
-        "m": media!.toJson(),
-      };
-}
+  // Image get image => media != null
+  //     ? Image.memory(media!.data, fit: BoxFit.cover)
+  //     : Image.asset('lib/src/assets/hashirama.jpg', fit: BoxFit.cover);
 
-class HyperchatRequest extends ChatRequest {
-  List<String> wordPairs;
-  HyperchatRequest({
-    required Down4Message msg,
-    required List<Identifier> targets,
-    Down4Media? media,
-    required this.wordPairs,
-  }) : super(msg: msg, targets: targets, media: media);
+  NodesColor get colorCode =>
+      isFriend ? NodesColor.friend : NodesColor.nonFriend;
 
-  @override
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
-        "msg": msg.toJson(),
-        "wp": wordPairs,
-        "tr": targets,
-        if (withMedia && media != null) "m": media!.toJson(),
-      };
-}
-
-class GroupRequest extends ChatRequest {
-  String name;
-  bool private;
-  Down4Media groupImage;
-  GroupRequest({
-    required this.private,
-    required this.name,
-    required this.groupImage,
-    required Down4Message msg,
-    Down4Media? media,
-    required List<Identifier> targets,
-  }) : super(msg: msg, media: media, targets: targets);
-
-  @override
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
-        "msg": msg.toJson(),
-        "pv": private,
-        "gn": name,
-        "gm": groupImage.toJson(),
-        "tr": targets,
-        if (withMedia && media != null) "m": media!.toJson(),
-      };
-}
-
-class PaymentRequest2 extends MessageRequest {
-  final String payment;
-  final String sender;
-  String get id => sha256(utf8.encode(payment)).toHex();
-
-  PaymentRequest2({
-    required List<Identifier> targets,
-    required this.payment,
-    required this.sender,
-  }) : super(targets: targets);
-
-  @override
-  Map<String, dynamic> toJson() => {
-        "s": sender,
+  Map toJson({bool toLocal = true, bool withMedia = true}) => {
+        "t": Nodes.user.name,
         "id": id,
-        "tr": targets,
-        "pay": payment,
+        if (toLocal) "if": isFriend,
+        "nm": firstName,
+        "nt": neuter.toYouKnow(),
+        if (toLocal) "msg": messages,
+        "chl": children,
+        if (toLocal) "snp": snips,
+        if (toLocal) "a": activity,
+        if (lastName != null) "ln": lastName,
+        if (media != null)
+          "im": withMedia ? media!.toJson() : {"id": media!.id},
       };
 }
 
-class PaymentRequest extends ChatRequest {
-  Down4Payment payment;
-  PaymentRequest({
-    required this.payment,
-    required Down4Message msg,
-    required List<Identifier> targets,
-  }) : super(msg: msg, targets: targets);
+class Group extends GroupNode {
+  Identifier id;
+  bool isPrivate;
+  Down4Media media;
+  String name;
+  List<Identifier> group;
+  Group({
+    required this.isPrivate,
+    required this.name,
+    required this.id,
+    required this.media,
+    required this.group,
+    required List<Identifier> messages,
+    required List<Identifier> snips,
+    int? activity,
+  }) : super(activity: activity, messages: messages, snips: snips);
 
-  @override
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
-        "msg": msg.toJson(),
-        "tr": targets,
-        "p": payment.toJson(),
+  String get displayID => group.map((id) => "@" + id).join(" ");
+
+  NodesColor get colorCode => NodesColor.group;
+
+  Map toJson({bool withMedia = true, bool toLocal = true}) => {
+        "t": Nodes.group.name,
+        "pv": isPrivate,
+        "m": withMedia ? media.toJson() : media.id,
+        "nm": name,
+        "id": id,
+        "grp": group,
+        if (toLocal) "msg": messages,
+        if (toLocal) "snp": snips,
+        "a": activity,
       };
 }
+
+class Hyperchat extends GroupNode {
+  final Identifier id;
+  final String firstWord, secondWord;
+  final Down4Media media;
+  List<Identifier> group;
+  Hyperchat({
+    required this.id,
+    required this.firstWord,
+    required this.secondWord,
+    required this.group,
+    required List<Identifier> messages,
+    required List<Identifier> snips,
+    required this.media,
+    int? activity,
+  }) : super(activity: activity, messages: messages, snips: snips);
+
+  String get displayID => group.map((id) => "@" + id).join(" ");
+
+  String get name => firstWord + " " + secondWord;
+
+  NodesColor get colorCode => NodesColor.hyperchat;
+
+  Map toJson() => {
+        "t": Nodes.hyperchat.name,
+        "id": id,
+        "fw": firstWord,
+        "sw": secondWord,
+        "im": media.toJson(),
+        "a": activity,
+        "grp": group,
+        "msg": messages,
+        "snp": snips,
+      };
+}
+
+class Payment extends BaseNode {
+  final Down4Payment payment;
+  final Identifier id;
+  final String name;
+  Payment({required Down4Payment payment})
+      : payment = payment,
+        id = payment.id,
+        name = payment.formattedName;
+
+  String get displayID => "Confirmations: ${payment.lastConfirmations}";
+
+  // Image get image => payment.independentGets < 2000000
+  //     ? Image.asset('lib/src/assets/Dollar_Sign_1.png', fit: BoxFit.cover)
+  //     : payment.independentGets < 10000000
+  //         ? Image.asset('lib/src/assets/Dollar_Sign_2.png', fit: BoxFit.cover)
+  //         : Image.asset('lib/src/assets/Dollar_Sign_3.png', fit: BoxFit.cover);
+
+  NodesColor get colorCode => payment.lastConfirmations < 3
+      ? NodesColor.unsafeTx
+      : payment.lastConfirmations < 6
+          ? NodesColor.mediumTx
+          : NodesColor.safeTx;
+
+  Map toJson() => {
+        "t": Nodes.payment.name,
+        "pay": payment.toYouKnow(),
+      };
+}
+
+// class UserNode implements BaseNode {
+//   String name;
+//   String? lastName, description;
+//   final Down4Keys neuter;
+//   Down4Media media;
+//   int activity;
+//   List<Identifier> childs, snips,
+//
+// }
 
 class MediaMetadata {
   final bool toReverse, shareable, payToView, isVideo, payToOwn;
