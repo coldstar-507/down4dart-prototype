@@ -48,7 +48,6 @@ dependencies:
   camera: ^0.10.0+4
   video_player: ^2.4.2
 #  bip39: ^1.0.6
-  animated_text_kit: ^4.2.2
   firebase_core: 2.1.0
   flutter_image_compress: ^1.1.0
   firebase_messaging: 14.0.2
