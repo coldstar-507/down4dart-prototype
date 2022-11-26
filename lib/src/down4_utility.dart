@@ -8,6 +8,24 @@ import 'package:bs58/bs58.dart';
 
 final listEqual = const ListEquality().equals;
 
+// class XList<E> {
+//   List<E> list;
+//   XList(this.list);
+//   E? operator [](int position) {
+//     try {
+//       return list[position];
+//     } on RangeError {
+//       return null;
+//     }
+//   }
+// }
+
+class Pair<E, F> {
+  final E first;
+  final F second;
+  Pair(this.first, this.second);
+}
+
 Future<bool> hasNetwork() async {
   try {
     final result = await InternetAddress.lookup('amazon.com');
@@ -53,7 +71,23 @@ String generateMediaID(Uint8List mediaData) {
 int timeStamp() => DateTime.now().millisecondsSinceEpoch;
 
 extension IterableNodes on Iterable<BaseNode> {
+  List<BaseNode> formatted() =>
+      toList(growable: false)..sort((a, b) => b.activity.compareTo(a.activity));
   Iterable<String> asIds() => map((node) => node.id);
+  Iterable<BaseNode> those(List<Identifier> ids) =>
+      where((node) => ids.contains(node.id));
+  Iterable<GroupNode> groups() => whereType<GroupNode>();
+  Iterable<User> users() => whereType<User>();
+  // Iterable<BaseNode> hiddenUsers(List<Identifier> friendIds) {
+  //       var usersInGroupsIds = groups()
+  //           .map((group) => group.group)
+  //           .flattened
+  //           .toSet()
+  //           .where((element) => false)
+  //           .toList(growable: false);
+  //
+  //       return those(usersInGroupsIds);
+  //     }
 }
 
 extension IsTypes on BaseNode {

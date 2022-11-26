@@ -13,7 +13,6 @@ import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
 
-
 class UserMakerPage extends StatefulWidget {
   final Future<bool> Function(String, String, String, Uint8List, bool) initUser;
   final void Function() success;
@@ -27,7 +26,7 @@ class UserMakerPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _UserMakerPageState createState() => _UserMakerPageState();
+  State<UserMakerPage> createState() => _UserMakerPageState();
 }
 
 class _UserMakerPageState extends State<UserMakerPage> {
@@ -62,7 +61,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         inputCallBack: (id) async {
           _isValidUsername = await r.usernameIsValid(id);
           _id = id.toLowerCase();
-          baseConsole();
+          setState(() {});
         },
         placeHolder: "@username",
         value: _id == '' ? '' : '@' + _id,
@@ -70,8 +69,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
       ConsoleInput(
         tec: tec2,
         inputCallBack: (firstName) {
-          _name = firstName;
-          baseConsole();
+          setState(() => _name = firstName);
         },
         placeHolder: 'First Name',
         value: _name,
@@ -156,13 +154,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
           camConsole(ctrl, cameraIdx, ResolutionPreset.low, flashMode, true);
           break;
         case ResolutionPreset.veryHigh:
-        // TODO: Handle this case.
+          // TODO: Handle this case.
           break;
         case ResolutionPreset.ultraHigh:
-        // TODO: Handle this case.
+          // TODO: Handle this case.
           break;
         case ResolutionPreset.max:
-        // TODO: Handle this case.
+          // TODO: Handle this case.
           break;
       }
     }
@@ -279,15 +277,15 @@ class _UserMakerPageState extends State<UserMakerPage> {
       ),
       _errorTryAgain
           ? Container(
-          margin: const EdgeInsets.symmetric(horizontal: 22.0),
-          child: const Text(
-            "Rare error, someone might have just taken that username, please try again",
-            textAlign: TextAlign.center,
-          ))
+              margin: const EdgeInsets.symmetric(horizontal: 22.0),
+              child: const Text(
+                "Rare error, someone might have just taken that username, please try again",
+                textAlign: TextAlign.center,
+              ))
           : const SizedBox.shrink(),
     ];
 
-    return Jeff(pages: [
+    return Andrew(pages: [
       Down4Page(
         title: "Initialization",
         console: _console!,

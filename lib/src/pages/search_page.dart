@@ -4,11 +4,12 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/bsv/types.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
-import 'package:flutter_testproject/src/render_objects/utils.dart';
+import 'package:flutter_testproject/src/render_objects/render_utils.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../themes.dart';
+import '../boxes.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -86,7 +87,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     _console = Console(
       scanController: scannerController,
       scanCallBack: scanCallBack,
-      inputs: !scanning ? [_consoleInputRef ?? consoleInput] : null,
+      inputs: [_consoleInputRef ?? consoleInput],
       topButtons: [
         ConsoleButton(
           name: "Add",
@@ -114,11 +115,14 @@ class _AddFriendPageState extends State<AddFriendPage> {
     setState(() {});
   }
 
-  Widget get qr => Container(
-        padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
-        child: Align(
-          alignment: AlignmentDirectional.topCenter,
+  Widget get qr => Align(
+        alignment: AlignmentDirectional.topCenter,
+        child: Container(
+          padding: EdgeInsets.only(
+            top: ((Sizes.w - (Sizes.w * (1 / golden))) / 2) * (1 / golden),
+          ),
           child: QrImage(
+            size: Sizes.w * (1 / golden),
             foregroundColor: PinkTheme.qrColor,
             data: [
               widget.self.id,

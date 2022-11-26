@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_testproject/src/down4_utility.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
@@ -91,6 +92,11 @@ Future<void> main() async {
   if (await hasNetwork()) {
     await FirebaseAuth.instance.signInAnonymously();
   }
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
+  );
+
   runApp(
     MaterialApp(
       theme: ThemeData(fontFamily: "Alice"),

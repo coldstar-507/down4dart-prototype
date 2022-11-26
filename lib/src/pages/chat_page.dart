@@ -21,11 +21,11 @@ class ChatPage extends StatefulWidget {
   final Map<Identifier, Palette> senders;
   final User self;
   final ChatableNode node;
-  final List<Palette> group;
+  // final List<Palette> group;
   final List<CameraDescription> cameras;
   final void Function(r.ChatRequest) send;
   final void Function() back;
-  final Palette? Function(BaseNode, String) nodeToPalette;
+  final Palette? Function(BaseNode, {String at}) nodeToPalette;
   final int pageIndex;
   final Function(int)? onPageChange;
 
@@ -37,14 +37,14 @@ class ChatPage extends StatefulWidget {
     required this.back,
     required this.cameras,
     required this.nodeToPalette,
-    required this.group,
+    // required this.group,
     this.pageIndex = 0,
     this.onPageChange,
     Key? key,
   }) : super(key: key);
 
   @override
-  _ChatPageState createState() => _ChatPageState();
+  State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
@@ -55,40 +55,230 @@ class _ChatPageState extends State<ChatPage> {
   Map<Identifier, Down4Media> _cachedMedias = {};
   Map<Identifier, ChatMessage> _cachedMessages = {};
 
-  Map<Identifier, Down4Media> _cachedImages = {};
-  Map<Identifier, Down4Media> _cachedVideos = {};
+  Map<Identifier, Down4Media> cachedImages = {};
+  Map<Identifier, Down4Media> cachedVideos = {};
 
-  List<Down4Media> get savedImages {
-    if (_cachedImages.isEmpty && b.images.keys.isEmpty) {
-      return <Down4Media>[];
-    } else if (_cachedImages.values.isEmpty && b.images.keys.isNotEmpty) {
-      for (final mediaID in b.images.keys) {
-        _cachedImages[mediaID] = b.loadSavedImage(mediaID);
-      }
-      return _cachedImages.values.toList();
-    } else {
-      return _cachedImages.values.toList();
-    }
+  @override
+  void initState() {
+    super.initState();
+    asyncImageLoad();
+    loadMessages();
+    baseConsole();
   }
 
-  List<Down4Media> get savedVideos {
-    if (_cachedVideos.isEmpty && b.videos.keys.isEmpty) {
-      return <Down4Media>[];
-    } else if (_cachedVideos.values.isEmpty && b.videos.keys.isNotEmpty) {
-      for (final mediaID in b.videos.keys) {
-        _cachedVideos[mediaID] = b.loadSavedVideo(mediaID);
-      }
-      return _cachedVideos.values.toList();
-    } else {
-      return _cachedVideos.values.toList();
-    }
+  @override
+  void didUpdateWidget(ChatPage cp) {
+    super.didUpdateWidget(cp);
+    loadMessages(isUpdate: true);
+    print("Did update the chat page widget!");
   }
+
+  Future<void> asyncImageLoad() async {
+    Future(() {
+      final keys = b.images.keys;
+      final nImages = keys.length;
+      final nImagesToLoad = nImages <= 25 ? nImages : 25;
+      for (int i = 0; i < nImagesToLoad; i++) {
+        final mediaID = keys.elementAt(i);
+        cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        print("load media id=$mediaID");
+      }
+    }).then((value) {
+      Future(() {
+        print("loaded all images");
+        for (final image in cachedImages.values) {
+          print("precached image id=${image.id}");
+          precacheImage(MemoryImage(image.data), context);
+        }
+      }).then((value) => print("precached all images"));
+    });
+  }
+
+  Iterable<Down4Media> get savedImages => b.images.keys
+      .map((mediaID) => cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+
+  Iterable<Down4Media> get savedVideos => b.videos.keys
+      .map((mediaID) => cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
         tec: tec,
         inputCallBack: (t) => null,
         placeHolder: ":)",
       );
+
+  Future<void> loadMessages({bool isUpdate = false}) async {
+    final loadedMessagesKeys = _cachedMessages.keys.toSet();
+    final allMessagesKeys = widget.node.messages.toSet();
+    final messageToLoad = allMessagesKeys.difference(loadedMessagesKeys);
+    print("Messages to load $messageToLoad");
+
+    final maxWidth = Sizes.w * 0.76;
+    const textPadding = 12;
+    const messageBorder = 4;
+    for (var msgID in messageToLoad.toList(growable: false).reversed) {
+      double oneTextLineHeight = 0;
+      double mediaHeight = 0;
+      double mediaWidth = 0;
+
+      var down4Message = b.loadMessage(msgID);
+      if (down4Message == null) return;
+      Down4Media? media;
+      if (down4Message.mediaID != null) {
+        media = await getMessageMediaFromEverywhere(down4Message.mediaID!);
+        if (media != null) {
+          mediaWidth = maxWidth - messageBorder;
+          mediaHeight = mediaWidth * (media.metadata.aspectRatio ?? 1.0);
+        }
+      }
+
+      String? prevMsgSender = _cachedMessages.isEmpty
+          ? null
+          : _cachedMessages.values.last.message.senderID;
+
+      List<dynamic>? textAsStringList() {
+        List<String>? specialDisplayText;
+        double? neededWidth;
+
+        if (down4Message.text?.isEmpty ?? true) return null;
+
+        specialDisplayText = [];
+        neededWidth = 0.0;
+
+        final text = down4Message.text!;
+        final transform1 = text.split("\n");
+        final transform2 = transform1.join(" \n ");
+
+        // var words = down4Message.text!.split(" ");
+        final words = transform2.split(" ");
+        var previousString = "";
+
+        // pervious string should always be < max
+        for (final word in words) {
+          if (word == "\n") {
+            specialDisplayText.add(previousString);
+            final specialTp = TextPainter(
+              text: TextSpan(text: previousString),
+              textDirection: TextDirection.ltr,
+            )..layout();
+            if (specialTp.width + 5 > neededWidth!) {
+              neededWidth = specialTp.width + 5;
+            }
+            previousString = "";
+          } else if (word.isNotEmpty) {
+            final currentString =
+                previousString.isEmpty ? word : "$previousString $word";
+
+            final previousTp = TextPainter(
+              text: TextSpan(text: previousString),
+              textDirection: TextDirection.ltr,
+            )..layout();
+
+            final currentTp = TextPainter(
+              text: TextSpan(text: currentString),
+              textDirection: TextDirection.ltr,
+            )..layout();
+
+            oneTextLineHeight = currentTp.height;
+
+            // if the current text is larger than the available width
+            if (currentTp.width + 5 >= maxWidth - 16) {
+              // we add the previousString to the list of display text
+              specialDisplayText.add(previousString);
+              // if the previous layout is bigger than our current biggest width,
+              // it because the new biggest width
+              if (previousTp.width + 5 > neededWidth!) {
+                neededWidth = previousTp.width + 5;
+              }
+              // now we set the previous string as the word
+              previousString = word;
+            } else {
+              // if the current text is not larger than available width
+              // we simply update it
+              previousString = currentString;
+            }
+          }
+        }
+
+        // don't leave out the last string
+        if (previousString.isNotEmpty && previousString != "\n") {
+          final lastLiner = TextPainter(
+            text: TextSpan(text: previousString),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          if (lastLiner.width + 5 > neededWidth!) {
+            neededWidth = lastLiner.width + 5;
+          }
+          print("last String = $previousString");
+          specialDisplayText.add(previousString);
+        }
+
+        return [specialDisplayText, neededWidth];
+      }
+
+      final bool hasHeader =
+          isUpdate ? true : prevMsgSender != down4Message.senderID;
+      final textData = textAsStringList();
+      final lineStrings = textData?[0] as List<String>?;
+      final textWidth = textData?[1] as double?;
+      final headerSize = hasHeader ? 18 : 0;
+      final messageHeight = lineStrings != null
+          ? (lineStrings.length * oneTextLineHeight + textPadding) +
+              mediaHeight +
+              messageBorder +
+              headerSize
+          : mediaHeight + messageBorder + headerSize;
+      final messageWidth = media != null
+          ? maxWidth
+          : lineStrings != null
+              ? textWidth! + textPadding + messageBorder
+              : 0.0; // TODO, will be forwarding nodes, or messages
+
+      print("Textwidth=$textWidth");
+      print("Number of lines=${lineStrings?.length}");
+      final precalculatedSize = Size(messageWidth, messageHeight);
+      print("PrecalculatedSize=$precalculatedSize");
+      print("MaxWidth=$maxWidth");
+
+      var chatMessage = ChatMessage(
+        key: GlobalKey(),
+        sender: widget.senders[down4Message.senderID]!,
+        message: down4Message,
+        myMessage: widget.self.id == down4Message.senderID,
+        at: "",
+        precalculatedSize: Size(messageWidth, messageHeight),
+        precalculatedMediaSize:
+            media != null ? Size(mediaWidth, mediaHeight) : null,
+        specialDisplayTexts: lineStrings,
+        // if is update, means it's a single new message with a header
+        hasHeader: hasHeader,
+        media: media,
+        select: (id, _) => setState(() {
+          _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
+        }),
+      );
+
+      if (isUpdate) {
+        if (_cachedMessages.isNotEmpty) {
+          // last message receive is the first in the list
+          final lastMessage = _cachedMessages.values.first;
+          if (lastMessage.message.senderID == down4Message.senderID) {
+            // we need to remove its header
+            // and update it's size
+            final lastMessageSize = lastMessage.precalculatedSize;
+            final newSize = Size(
+                lastMessageSize.width, lastMessageSize.height - headerSize);
+            _cachedMessages[lastMessage.message.id] =
+                lastMessage.withHeader(withHeader: false, newSize: newSize);
+          }
+        }
+        _cachedMessages = {down4Message.id: chatMessage, ..._cachedMessages};
+        setState(() {});
+      } else {
+        _cachedMessages[down4Message.id] = chatMessage;
+        setState(() {});
+      }
+    }
+  }
 
   Future<void> handleImport() async {
     FilePickerResult? r = await FilePicker.platform.pickFiles(
@@ -114,7 +304,7 @@ class _ChatPageState extends State<ChatPage> {
         Boxes.instance.saveImage(_cachedMedias[mediaID]!);
       }
     }
-    setState(() {});
+    mediasConsole();
   }
 
   void saveSelectedMessages() async {
@@ -156,25 +346,25 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  void getTheMedia(Identifier mediaID, Identifier msgID) async {
-    var media = await getMessageMediaFromEverywhere(mediaID);
-    if (media == null) return;
-    _cachedMessages[msgID] = _cachedMessages[msgID]!.withMedia(media);
-    setState(() {});
-  }
+  // void getTheMedia(Identifier mediaID, Identifier msgID) async {
+  //   var media = await getMessageMediaFromEverywhere(mediaID);
+  //   if (media == null) return;
+  //   _cachedMessages[msgID] = _cachedMessages[msgID]!.withMedia(media);
+  //   setState(() {});
+  // }
 
-  MessageList4 get messageList => MessageList4(
-        senders: widget.senders,
-        messages: (widget.node.messages ?? <String>[]).reversed.toList(),
-        self: widget.self,
-        messageMap: _cachedMessages,
-        cache: (msg) => _cachedMessages[msg.message.id] = msg,
-        getTheMedia: getTheMedia,
-        select: (id, _) {
-          _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
-          setState(() {});
-        },
-      );
+  // MessageList4 get messageList => MessageList4(
+  //       senders: widget.senders,
+  //       messages: widget.node.messages.reversed.toList(),
+  //       self: widget.self,
+  //       messageMap: _cachedMessages,
+  //       cache: (msg) => _cachedMessages[msg.message.id] = msg,
+  //       getTheMedia: getTheMedia,
+  //       select: (id, _) {
+  //         _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
+  //         setState(() {});
+  //       },
+  //     );
 
   Future<void> camConsole([
     CameraController? ctrl,
@@ -234,6 +424,7 @@ class _ChatPageState extends State<ChatPage> {
 
     if (_cameraInput == null) {
       _console = Console(
+        inputs: [_consoleInput ?? consoleInput],
         cameraController: ctrl,
         aspectRatio: ctrl?.value.aspectRatio,
         topButtons: [
@@ -304,6 +495,7 @@ class _ChatPageState extends State<ChatPage> {
         imPrev = _cameraInput!.path;
       }
       _console = Console(
+        inputs: [_consoleInput ?? consoleInput],
         imagePreviewPath: imPrev,
         videoPlayerController: videoCtrl,
         topButtons: [
@@ -369,7 +561,8 @@ class _ChatPageState extends State<ChatPage> {
   void mediasConsole([bool images = true]) {
     _console = Console(
       images: true,
-      medias: images ? savedImages : savedVideos,
+      inputs: [_consoleInput ?? consoleInput],
+      medias: images ? savedImages.toList() : savedVideos.toList(),
       selectMedia: (media) {
         _mediaInput = media;
         send2();
@@ -391,31 +584,30 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_console == null) baseConsole();
-
-    if (widget.group.isNotEmpty) {
-      print("IT'S A FUCKING GROUP YOU FUCKING FAGGOT, STOP FUCKING AROUND!");
-    }
-
-    List<Down4Page> pages = widget.group.isEmpty
+    List<Down4Page> pages = widget.node is GroupNode
         ? [
             Down4Page(
+              isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              messageList: messageList,
+              messages: _cachedMessages.values.toList(),
+            ),
+            Down4Page(
+              title: "People",
+              console: _console!,
+              palettes: widget.senders.values.toList(),
             ),
           ]
         : [
             Down4Page(
+              isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              messageList: messageList,
+              messages: _cachedMessages.values.toList(),
             ),
-            Down4Page(
-                title: "People", console: _console!, palettes: widget.group),
           ];
 
-    return Jeff(
+    return Andrew(
       initialPageIndex: widget.pageIndex,
       pages: pages,
       onPageChange: widget.onPageChange,

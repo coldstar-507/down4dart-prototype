@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import '../down4_utility.dart';
 import '../render_objects/console.dart';
+import '../boxes.dart';
 
 // class CameraConsole extends StatefulWidget {
 //   final List<CameraDescription> cameras;
@@ -246,12 +247,12 @@ class SnipCamera extends StatefulWidget {
   final int camNum;
   final void Function() cameraBack, nextRes, flip;
   final void Function(
-      String? filePath,
-      bool? isVideo,
-      bool? toReverse,
-      String? text,
-      double aspectRatio,
-      ) cameraCallBack;
+    String? filePath,
+    bool? isVideo,
+    bool? toReverse,
+    String? text,
+    double aspectRatio,
+  ) cameraCallBack;
   final bool enableVideo;
 
   const SnipCamera({
@@ -276,10 +277,12 @@ class _SnipCameraState extends State<SnipCamera> {
   double _scale = 1.0;
   double _baseScale = 1.0;
   var tec = TextEditingController();
+  // late Size mediaSize = MediaQuery.of(context).size;
 
   @override
   void initState() {
     super.initState();
+    capturingPage();
     widget.ctrl.setFlashMode(FlashMode.off);
   }
 
@@ -332,10 +335,14 @@ class _SnipCameraState extends State<SnipCamera> {
     return vpc;
   }
 
-  Widget capturingPage([bool extra = false]) {
-    final mediaSize = MediaQuery.of(context).size;
-    final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
-    return Stack(children: [
+  void capturingPage([bool extra = false]) {
+    // final aspectRatio = Sizes.w / (Sizes.h + 32);
+    // final mediaSize = MediaQuery.of(context).size;
+    print("Full aspectRatio= ${Sizes.fullAspectRatio}");
+    print("Full height= ${Sizes.fullHeight}");
+    // print(Sizes.fullHeight);
+    final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
+    _preview = Stack(children: [
       GestureDetector(
         onTap: () => print("LALALALALAL"),
         onScaleStart: (details) => _baseScale = _scale,
@@ -352,8 +359,8 @@ class _SnipCameraState extends State<SnipCamera> {
           }
         },
         child: SizedBox(
-          height: mediaSize.height,
-          width: mediaSize.width,
+          height: Sizes.fullHeight,
+          width: Sizes.w,
           child: Transform.scale(
             scaleX: scale,
             alignment: Alignment.center,
@@ -365,8 +372,9 @@ class _SnipCameraState extends State<SnipCamera> {
         bottom: 0,
         left: 0,
         child: SizedBox(
-          width: mediaSize.width,
+          width: Sizes.w,
           child: Console(
+            invertedColors: true,
             topButtons: [
               ConsoleButton(
                 shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
@@ -381,7 +389,7 @@ class _SnipCameraState extends State<SnipCamera> {
               ConsoleButton(
                 name: "Back",
                 onPress: () =>
-                !extra ? widget.cameraBack() : capturingPage(!extra),
+                    !extra ? widget.cameraBack() : capturingPage(!extra),
                 onLongPress: () => capturingPage(!extra),
                 isSpecial: true,
                 showExtra: extra,
@@ -489,19 +497,19 @@ class _SnipCameraState extends State<SnipCamera> {
   }
 
   void videoPreview(
-      VideoPlayerController vpc,
-      String filePath,
-      bool isVideo,
-      bool toReverse, [
-        String? text,
-        bool input = false,
-      ]) {
-    final mediaSize = MediaQuery.of(context).size;
-    final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
+    VideoPlayerController vpc,
+    String filePath,
+    bool isVideo,
+    bool toReverse, [
+    String? text,
+    bool input = false,
+  ]) {
+    // final mediaSize = MediaQuery.of(context).size;
+    final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
     _preview = Stack(children: [
       SizedBox(
-        height: mediaSize.height,
-        width: mediaSize.width,
+        height: Sizes.fullHeight,
+        width: Sizes.w,
         child: Transform.scale(
           scaleX: scale,
           child: Transform(
@@ -513,45 +521,46 @@ class _SnipCameraState extends State<SnipCamera> {
       ),
       input
           ? Center(
-        child: Container(
-          width: mediaSize.width,
-          decoration: const BoxDecoration(
-            // border: Border.symmetric(
-            //   horizontal: BorderSide(color: Colors.black38),
-            // ),
-            color: Colors.black38,
-            // color: PinkTheme.snipRibbon,
-          ),
-          constraints: BoxConstraints(
-            minHeight: 16,
-            maxHeight: mediaSize.height,
-          ),
-          child: TextField(
-            autofocus: input,
-            textInputAction: TextInputAction.done,
-            cursorColor: Colors.white,
-            controller: tec,
-            textAlign: TextAlign.center,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              isDense: true,
-              isCollapsed: true,
-            ),
-            maxLines: 15,
-            minLines: 1,
-            style: const TextStyle(color: Colors.white),
-            // style: const TextStyle(color: PinkTheme.black),
-          ),
-        ),
-      )
+              child: Container(
+                width: Sizes.w,
+                decoration: const BoxDecoration(
+                  // border: Border.symmetric(
+                  //   horizontal: BorderSide(color: Colors.black38),
+                  // ),
+                  color: Colors.black38,
+                  // color: PinkTheme.snipRibbon,
+                ),
+                constraints: BoxConstraints(
+                  minHeight: 16,
+                  maxHeight: Sizes.fullHeight,
+                ),
+                child: TextField(
+                  autofocus: input,
+                  textInputAction: TextInputAction.done,
+                  cursorColor: Colors.white,
+                  controller: tec,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    isCollapsed: true,
+                  ),
+                  maxLines: 15,
+                  minLines: 1,
+                  style: const TextStyle(color: Colors.white),
+                  // style: const TextStyle(color: PinkTheme.black),
+                ),
+              ),
+            )
           : const SizedBox.shrink(),
       Positioned(
         bottom: 0,
         left: 0,
         child: SizedBox(
-          width: mediaSize.width,
+          width: Sizes.w,
           // height: mediaSize.height,
           child: Console(
+            invertedColors: true,
             topButtons: [
               ConsoleButton(
                 name: "Accept",
@@ -570,11 +579,11 @@ class _SnipCameraState extends State<SnipCamera> {
             bottomButtons: [
               ConsoleButton(
                 name: "Back",
-                onPress: () {
-                  _preview = null;
+                onPress: () => setState(() {
+                  tec.clear();
                   vpc.dispose();
-                  setState(() {});
-                },
+                  capturingPage();
+                }),
               ),
               ConsoleButton(
                 name: "Text",
@@ -695,18 +704,18 @@ class _SnipCameraState extends State<SnipCamera> {
   }
 
   void imagePreview(
-      String filePath,
-      bool isVideo,
-      bool toReverse, [
-        String? text,
-        bool input = false,
-      ]) {
-    final mediaSize = MediaQuery.of(context).size;
-    final scale = 1 / (widget.ctrl.value.aspectRatio * mediaSize.aspectRatio);
+    String filePath,
+    bool isVideo,
+    bool toReverse, [
+    String? text,
+    bool input = false,
+  ]) {
+    // final mediaSize = MediaQuery.of(context).size;
+    final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
     _preview = Stack(children: [
       SizedBox(
-        height: mediaSize.height,
-        width: mediaSize.width,
+        height: Sizes.fullHeight,
+        width: Sizes.w,
         child: Transform(
           alignment: Alignment.center,
           transform: Matrix4.rotationY(toReverse ? math.pi : 0),
@@ -715,41 +724,42 @@ class _SnipCameraState extends State<SnipCamera> {
       ),
       input
           ? Center(
-        child: Container(
-          width: mediaSize.width,
-          decoration: const BoxDecoration(
-            color: Colors.black38,
-            // color: PinkTheme.snipRibbon,
-          ),
-          constraints: BoxConstraints(
-            minHeight: 16,
-            maxHeight: mediaSize.height,
-          ),
-          child: TextField(
-            autofocus: input,
-            textInputAction: TextInputAction.done,
-            cursorColor: Colors.white,
-            controller: tec,
-            textAlign: TextAlign.center,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              isDense: true,
-              isCollapsed: true,
-            ),
-            maxLines: 15,
-            minLines: 1,
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-      )
+              child: Container(
+                // width: ,
+                decoration: const BoxDecoration(
+                  color: Colors.black38,
+                  // color: PinkTheme.snipRibbon,
+                ),
+                constraints: BoxConstraints(
+                  minHeight: 16,
+                  maxHeight: Sizes.fullHeight,
+                ),
+                child: TextField(
+                  autofocus: input,
+                  textInputAction: TextInputAction.done,
+                  cursorColor: Colors.white,
+                  controller: tec,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    isCollapsed: true,
+                  ),
+                  maxLines: 15,
+                  minLines: 1,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            )
           : const SizedBox.shrink(),
       Positioned(
         bottom: 0,
         left: 0,
         child: SizedBox(
-          // height: mediaSize.height,
-            width: mediaSize.width,
+            // height: mediaSize.height,
+            width: Sizes.w,
             child: Console(
+              invertedColors: true,
               topButtons: [
                 ConsoleButton(
                   name: "Accept",
@@ -765,7 +775,10 @@ class _SnipCameraState extends State<SnipCamera> {
               bottomButtons: [
                 ConsoleButton(
                   name: "Back",
-                  onPress: () => setState(() => _preview = null),
+                  onPress: () => setState(() {
+                    tec.clear();
+                    capturingPage();
+                  }),
                 ),
                 ConsoleButton(
                   name: "Text",
@@ -879,6 +892,6 @@ class _SnipCameraState extends State<SnipCamera> {
 
   @override
   Widget build(BuildContext context) {
-    return _preview ?? capturingPage();
+    return _preview!;
   }
 }

@@ -4,15 +4,19 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_testproject/src/bsv/utils.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
+import 'package:flutter_testproject/src/render_objects/navigator.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
 
 import 'boxes.dart';
 import 'web_requests.dart' as r;
-import 'down4_utility.dart' as u;
+import 'down4_utility.dart';
 import 'bsv/wallet.dart';
 import 'bsv/types.dart';
+import 'themes.dart';
 
 import 'pages/chat_page.dart';
 import 'pages/forwarding_page.dart';
@@ -27,10 +31,11 @@ import 'pages/node_page.dart';
 import 'pages/search_page.dart';
 import 'pages/welcome_page.dart';
 import 'pages/camera_page.dart';
+import 'pages/snipview_page.dart';
 
 import 'render_objects/palette.dart';
 import 'render_objects/chat_message.dart';
-import 'render_objects/utils.dart';
+import 'render_objects/render_utils.dart';
 import 'render_objects/console.dart';
 
 class Home extends StatefulWidget {
@@ -51,7 +56,11 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   Widget? _page;
-  var _exchangeRate = ExchangeRate(lastUpdate: 0, rate: 0.0);
+  var _exchangeRate = b.loadExchangeRate();
+  //
+  // List<String> currencies = ["Satoshis", "USD"]; //, "CAD"];
+
+  ScrollController _homeScrollController = ScrollController();
 
   List<r.Request> _requests = [];
 
@@ -60,6 +69,7 @@ class _HomeState extends State<Home> {
     "Search": {},
     "Forward": {},
     "Payments": {},
+    "Hidden": {},
   };
 
   StreamSubscription? _messageListener;
@@ -69,6 +79,10 @@ class _HomeState extends State<Home> {
   List<Palette> _forwardingPalettes = [];
 
   var _tec = TextEditingController();
+  // var cashTec = TextEditingController();
+  // var importTec = TextEditingController();
+
+  // late List<Palette> curPals = formattedHomePalettes;
 
   // ======================================================= INITIALIZATION ============================================================ //
 
@@ -76,9 +90,10 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     loadExchangeRate();
-    loadLocalHomePalettes();
+    loadHomePalettes();
     loadPayments();
     connectToMessages();
+    processWebRequests();
     homePage();
   }
 
@@ -94,11 +109,20 @@ class _HomeState extends State<Home> {
     updateExchangeRate();
   }
 
-  void loadLocalHomePalettes() {
+  Future<void> loadHomePalettes() async {
     final jsonEncodedHomeNodes = b.home.values;
+    var groupPeopleIDs = Set<Identifier>.identity();
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = BaseNode.fromJson(jsonDecode(jsonEncodedHomeNode));
+      if (node is GroupNode) groupPeopleIDs.addAll(node.group);
       writePalette(node);
+    }
+
+    final homeUsers = palettes().users().asIds().toSet();
+    final toFetchIDs = groupPeopleIDs.difference(homeUsers);
+    final fetchedNodes = await r.getNodes(toFetchIDs);
+    for (final fetchedNode in fetchedNodes ?? <BaseNode>[]) {
+      writePalette(fetchedNode, fold: true, fade: true, at: "Hidden");
     }
   }
 
@@ -269,9 +293,15 @@ class _HomeState extends State<Home> {
 
   // ======================================================= UTILS ============================================================ //
 
+  // String nextCurrency(String currency) {
+  //   final idx = currencies.indexOf(currency);
+  //   final nextIdx = (idx + 1) % currencies.length;
+  //   return currencies[nextIdx];
+  // }
+
   Future<void> updateExchangeRate() async {
     final lastUpdate = _exchangeRate.lastUpdate;
-    final rightNow = u.timeStamp();
+    final rightNow = timeStamp();
     if (rightNow - lastUpdate > const Duration(minutes: 10).inMilliseconds) {
       final rate = await r.getExchangeRate();
       if (rate != null) {
@@ -288,14 +318,14 @@ class _HomeState extends State<Home> {
     bool updateActivity = false,
   }) {
     if (updateActivity) {
-      for (final p in palettes(at)) {
+      for (final p in palettes(at: at)) {
         if (p.selected) {
           p.node.updateActivity();
           selectPalette(p.node.id, at);
         }
       }
     } else {
-      for (final p in palettes(at)) {
+      for (final p in palettes(at: at)) {
         if (p.selected) {
           selectPalette(p.node.id, at);
         }
@@ -303,7 +333,8 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Palette? nodeToPalette(BaseNode node, [String at = "Home"]) {
+  Palette? nodeToPalette(BaseNode node,
+      {String at = "Home", bool fold = false, bool fade = false}) {
     if (node is User) {
       String? lastMessagePreview;
       if (node.messages.isNotEmpty) {
@@ -311,26 +342,27 @@ class _HomeState extends State<Home> {
         lastMessagePreview = msg?.text ?? "&attachment";
       }
       return Palette(
-        node: node,
-        at: at,
-        messagePreview: lastMessagePreview,
-        imPress: select,
-        bodyPress: select,
-        buttonsInfo: [
-          ButtonsInfo(
-            assetPath: at == "Home" && node.snips.isNotEmpty
-                ? "lib/src/assets/rightRedArrow.png"
-                : "lib/src/assets/rightBlackArrow.png",
-            pressFunc: at == "Home"
-                ? node.snips.isNotEmpty
-                    ? checkSnips
-                    : openChat
-                : openNode,
-            longPressFunc: openNode,
-            rightMost: true,
-          )
-        ],
-      );
+          node: node,
+          at: at,
+          fold: fold,
+          fade: fade,
+          messagePreview: lastMessagePreview,
+          imPress: select,
+          bodyPress: select,
+          buttonsInfo: [
+            ButtonsInfo(
+              assetPath: at == "Home" && node.snips.isNotEmpty
+                  ? "lib/src/assets/rightRedArrow.png"
+                  : "lib/src/assets/rightBlackArrow.png",
+              pressFunc: at == "Home"
+                  ? node.snips.isNotEmpty
+                      ? checkSnips
+                      : openChat
+                  : openNode,
+              longPressFunc: openNode,
+              rightMost: true,
+            )
+          ]);
     } else if (node is Hyperchat) {
       print("Trying to create a hyperchat!");
       String? lastMessagePreview;
@@ -370,6 +402,7 @@ class _HomeState extends State<Home> {
         var msg = b.loadMessage(node.messages.last);
         lastMessagePreview = msg?.text ?? "&attachment";
       }
+      print(node.snips);
       return Palette(
         node: node,
         messagePreview: lastMessagePreview,
@@ -390,8 +423,6 @@ class _HomeState extends State<Home> {
       return Palette(
         node: node,
         at: "Payments",
-        imPress: select,
-        bodyPress: select,
         buttonsInfo: [
           ButtonsInfo(
             assetPath: 'lib/src/assets/rightBlackArrow.png',
@@ -427,6 +458,7 @@ class _HomeState extends State<Home> {
         req.message.save();
         req.media?.save();
         writePalette(node);
+        node.save();
         chatPage(node);
         return true;
       } else if (req is r.HyperchatRequest) {
@@ -457,11 +489,6 @@ class _HomeState extends State<Home> {
     }
   }
 
-  void handleWebRequest(r.Request req) {
-    _requests.add(req);
-    processWebRequests();
-  }
-
   Future<void> sendSnip(
     String? path,
     bool? isVideo,
@@ -469,44 +496,45 @@ class _HomeState extends State<Home> {
     String? text,
     double aspectRatio,
   ) async {
-    if (path != null) {
-      final timestamp = u.timeStamp();
+    if (path == null) return;
+    final timestamp = timeStamp();
 
-      var media = Down4Media.fromCamera(
-        path,
-        MediaMetadata(
-          owner: widget.self.id,
-          timestamp: timestamp,
-          toReverse: toReverse ?? false,
-          isVideo: isVideo ?? false,
-          text: text,
-          aspectRatio: aspectRatio,
-        ),
-      );
+    var media = Down4Media.fromCamera(
+      path,
+      MediaMetadata(
+        owner: widget.self.id,
+        timestamp: timestamp,
+        toReverse: toReverse ?? false,
+        isVideo: isVideo ?? false,
+        text: text,
+        aspectRatio: aspectRatio,
+      ),
+    );
 
-      var userTargets = <Identifier>[];
+    var userTargets = <Identifier>[];
+    var snipRequests = <r.SnipRequest>[];
 
-      for (final node in palettes().selected().asNodes()) {
-        if (node is GroupNode) {
-          final sr = r.SnipRequest(
-            message: Down4Message(
-              type: Messages.snip,
-              id: messagePushId(),
-              root: node.id,
-              timestamp: timestamp,
-              mediaID: media.id,
-              senderID: widget.self.id,
-            ),
-            targets: node.group
-              ..removeWhere((userID) => widget.self.id == userID),
-            media: media,
-          );
-          handleWebRequest(sr);
-        } else {
-          userTargets.add(node.id);
-        }
+    for (final node in palettes().selected().asNodes()) {
+      if (node is GroupNode) {
+        final sr = r.SnipRequest(
+          message: Down4Message(
+            type: Messages.snip,
+            id: messagePushId(),
+            root: node.id,
+            timestamp: timestamp,
+            mediaID: media.id,
+            senderID: widget.self.id,
+          ),
+          targets: node.group..remove(widget.self.id),
+          media: media,
+        );
+        snipRequests.add(sr);
+      } else {
+        userTargets.add(node.id);
       }
+    }
 
+    if (userTargets.isNotEmpty) {
       final sr = r.SnipRequest(
         message: Down4Message(
           type: Messages.snip,
@@ -515,12 +543,19 @@ class _HomeState extends State<Home> {
           mediaID: media.id,
           senderID: widget.self.id,
         ),
-        targets: selectedHomeUserPaletteDeactivated.asIds().toList(),
+        targets: palettes().selected().users().asIds().toList(growable: false),
         media: media,
       );
-      handleWebRequest(sr);
-      unselectSelectedPalettes(updateActivity: true);
+      snipRequests.add(sr);
     }
+
+    for (int i = 0; i < snipRequests.length; i++) {
+      if (i != 0) snipRequests[i].media = null;
+    }
+
+    _requests.addAll(snipRequests);
+    processWebRequests();
+    unselectSelectedPalettes(updateActivity: true);
     homePage();
   }
 
@@ -550,8 +585,8 @@ class _HomeState extends State<Home> {
     searchPage();
   }
 
-  void delete([String at = "Home"]) {
-    for (final p in palettes(at).selected()) {
+  void delete({String at = "Home"}) {
+    for (final p in palettes(at: at).selected()) {
       b.deleteNode(p.node.id);
       _paletteMap[at]?.remove(p.node.id);
     }
@@ -560,7 +595,7 @@ class _HomeState extends State<Home> {
   }
 
   Future<bool> search(List<String> ids) async {
-    final friendIds = palettes_()
+    final friendIds = palettes()
         .asNodes()
         .whereType<User>()
         .where((user) => user.isFriend)
@@ -584,7 +619,7 @@ class _HomeState extends State<Home> {
   }
 
   void putNodeOffLine(User node) {
-    final p = nodeToPalette(node, "Search");
+    final p = nodeToPalette(node, at: "Search");
     if (p != null) {
       _paletteMap["Search"]?.putIfAbsent(node.id, () => p);
       searchPage();
@@ -593,18 +628,21 @@ class _HomeState extends State<Home> {
 
   void back([bool remove = true]) {
     if (remove) _locations.removeLast();
-    if (_locations.last.id == "Home") {
+    if (curLoc.id == "Home") {
       homePage();
-    } else if (_locations.last.id == "Search") {
+    } else if (curLoc.id == "Search") {
       searchPage();
-    } else if (_locations.last.type == "Node") {
-      nodePage(nodeAt(_locations.last.id, _locations.last.at!)!);
-    } else if (_locations.last.type == "Chat") {
+    } else if (curLoc.type == "Node") {
+      nodePage(nodeAt(curLoc.id, curLoc.at!)!);
+    } else if (curLoc.type == "Chat") {
       chatPage(
-        nodeAt(_locations.last.id, _locations.last.at!)! as ChatableNode,
+        nodeAt(curLoc.id, curLoc.at!)! as ChatableNode,
       );
-    } else if (_locations.last.id == "Money") {
-      moneyPage();
+    } else if (curLoc.id == "Money") {
+      // can't back to money from home, by default going into money checks
+      // the homeScrollController for transition, we need an extra flag to
+      // tell money page not to use homeScrollController, it would throw error
+      moneyPage(fromHome: false);
     }
   }
 
@@ -642,6 +680,7 @@ class _HomeState extends State<Home> {
 
   void select(String id, String at) {
     selectPalette(id, at);
+    // if (curLoc.id == "Home") homePages();
     if (_page is ForwardingPage) {
       forwardPage();
     } else if (_page is HomePage) {
@@ -684,9 +723,11 @@ class _HomeState extends State<Home> {
     BaseNode node, {
     String at = "Home",
     bool onlyIfAbsent = false,
+    bool fold = false,
+    bool fade = false,
   }) {
     if (_paletteMap[at] == null) _paletteMap[at] = {};
-    final p = nodeToPalette(node, at);
+    final p = nodeToPalette(node, at: at, fold: fold, fade: fade);
     if (p != null) {
       if (onlyIfAbsent) {
         _paletteMap[at]?.putIfAbsent(node.id, () => p);
@@ -719,42 +760,99 @@ class _HomeState extends State<Home> {
   //   return palettes_;
   // }
 
-  List<Palette> get selectedHomeUserPaletteDeactivated {
-    final selectedGroupIds = formattedHomePalettes
-        .selected()
-        .asNodes()
-        .whereType<GroupNode>()
-        .map((groupNode) => groupNode.group)
+  // List<Palette> get selectedHomeUserPaletteDeactivated {
+  //   final selectedGroupIds = formattedHomePalettes
+  //       .selected()
+  //       .asNodes()
+  //       .whereType<GroupNode>()
+  //       .map((groupNode) => groupNode.group)
+  //       .expand((id) => id)
+  //       .toSet()
+  //       .toList(growable: false);
+  //
+  //   final selectedUserIds = formattedHomePalettes
+  //       .selected()
+  //       .asNodes()
+  //       .whereType<User>()
+  //       .asIds()
+  //       .toList(growable: false);
+  //
+  //   return (selectedGroupIds + selectedUserIds)
+  //       .toSet()
+  //       .map((id) => nodeToPalette(nodeAt(id)!)!.deactivated())
+  //       .toList(growable: false);
+  // }
+
+  Pair<List<Palette>, Iterable<User>>
+      homeToMoneyOrHyperchatOrGroupTransition() {
+    final allHomePalettes = formattedHomePalettes;
+    final originalOrder = allHomePalettes.asIds();
+    final visibleHomePalettes = allHomePalettes.unfolded();
+    final hidden = allHomePalettes.folded();
+    final selected = visibleHomePalettes.selected();
+    final unselected = visibleHomePalettes.notSelected();
+    final idsInGroups = selected
+        .asNodes<GroupNode>()
+        .map((g) => g.group)
         .expand((id) => id)
-        .toSet()
-        .toList(growable: false);
+        .toSet();
+    final selectedUsers = selected.users();
+    final selectedGroups = selected.groups();
+    final unselectedGroups = unselected.groups();
+    final unselectedUsers = unselected.users();
+    final unHide = hidden.those(idsInGroups);
+    final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
+    final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
+    // groups are folded
+    // unHide should get a left to right show transition
+    // not selected should get a fold transition
+    // selected are unselected
+    // all are deactivated
+    final pals = <Palette>{
+      ...selectedUsers
+          .map((e) => e.animated(selected: false, fadeButton: true)),
+      ...unselectedUserInGroups.map((e) => e.animated(fadeButton: true)),
+      ...unselectedGroups
+          .map((e) => e.animated(fadeButton: true, fade: true, fold: true)),
+      ...selectedGroups
+          .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
+      ...unselectedUsersNotInGroups
+          .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
+      ...unHide
+          .map((e) => e.animated(fold: false, fade: false).withoutButton()),
+    };
 
-    final selectedUserIds = formattedHomePalettes
-        .selected()
-        .asNodes()
-        .whereType<User>()
-        .asIds()
-        .toList(growable: false);
-
-    return (selectedGroupIds + selectedUserIds)
-        .toSet()
-        .map((id) => nodeToPalette(nodeAt(id)!)!.deactivated())
-        .toList(growable: false);
+    print("pals=${pals.map((e) => e.node.name).toList()}");
+    return Pair(
+        pals.inThatOrder(originalOrder), pals.unfolded().asNodes<User>());
   }
 
   Location get curLoc => _locations.last;
 
-  List<Palette> palettes([String at = "Home"]) {
-    return _paletteMap[at]?.values.toList(growable: false) ?? <Palette>[];
-  }
+  // List<Palette> palettes([String at = "Home"]) {
+  //   return _paletteMap[at]?.values.toList(growable: false) ?? <Palette>[];
+  // }
 
-  Iterable<Palette> palettes_({at = "Home"}) {
+  Iterable<Palette> palettes({at = "Home"}) {
     return _paletteMap[at]?.values ?? const Iterable<Palette>.empty();
   }
 
+  //
+  // Iterable<Palette> allPalettes({at = "Home"}) {
+  //   return _paletteMap[at]?.values ?? const Iterable<Palette>.empty();
+  // }
+
+  // Iterable<Palette> showingPalettes({at = "Home"}) {
+  //   return _paletteMap[at]?.values.unfolded() ??
+  //       const Iterable<Palette>.empty();
+  // }
+  //
+  // Iterable<Palette> hiddenPalette({at = "Home"}) {
+  //   return _paletteMap[at]?.values.folded() ?? const Iterable<Palette>.empty();
+  // }
+
   List<Palette> get formattedHomePalettes {
-    return palettes()
-      ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+    return palettes().followedBy(palettes(at: "Hidden")).formatted();
   }
 
   Location get prevLoc {
@@ -767,7 +865,12 @@ class _HomeState extends State<Home> {
   // ============================================================== BUILD ================================================================ //
 
   void homePage([bool extra = false]) {
+    // _page = HomePage(
+    //   groupUsersAndHiddenUsers: formattedHomePalettes,
+    //   // key: ObjectKey(_counter.next()),
+    // );
     _page = HomePage(
+      scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
       console: Console(
         inputs: [
@@ -819,12 +922,11 @@ class _HomeState extends State<Home> {
               if (_tec.value.text.isNotEmpty) {
                 final pr = r.PingRequest(
                   text: _tec.value.text,
-                  targets: selectedHomeUserPaletteDeactivated
-                      .asIds()
-                      .toList(growable: false),
+                  targets: palettes().users().asIds().toList(growable: false),
                   senderID: widget.self.id,
                 );
-                handleWebRequest(pr);
+                _requests.add(pr);
+                processWebRequests();
                 _tec.clear();
               }
             },
@@ -838,15 +940,16 @@ class _HomeState extends State<Home> {
   }
 
   void forwardPage() {
-    if (palettes("Forward").length !=
-        formattedHomePalettes.chatables().length) {
-      for (final p in formattedHomePalettes.chatables()) {
-        writePalette(p.node, at: "Forward");
+    final homeChatables = palettes().asNodes<ChatableNode>().formatted();
+
+    if (palettes(at: "Forward").length != homeChatables.length) {
+      for (final n in homeChatables) {
+        writePalette(n, at: "Forward");
       }
     }
 
     _page = ForwardingPage(
-      homeUsers: palettes("Forward"),
+      homeUsers: palettes(at: "Forward").toList(growable: false),
       console: Console(
         forwardingPalette: _forwardingPalettes,
         topButtons: [
@@ -869,45 +972,71 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
-  void moneyPage() {
-    updateExchangeRate();
+  void moneyPage({bool fromHome = true}) {
+    final transition = homeToMoneyOrHyperchatOrGroupTransition();
+    // updateExchangeRate();
     _page = MoneyPage(
+      initialOffset: fromHome ? _homeScrollController.offset : 0.0,
       self: widget.self,
       wallet: widget.wallet,
+      transitioned: transition.first,
+      trueTargets: transition.second,
       exchangeRate: _exchangeRate.rate,
-      palettes: selectedHomeUserPaletteDeactivated,
-      paymentAsPalettes: palettes("Payments").reversed.toList(),
-      paymentRequest: handleWebRequest,
+      homePalettes: formattedHomePalettes,
+      paymentAsPalettes: palettes(at: "Payments")
+          .toList(growable: false)
+          .reversed
+          .toList(growable: false),
+      paymentRequest: (paymentRequest) {
+        _requests.add(paymentRequest);
+        processWebRequests();
+      },
       parsePayment: parsePayment,
       back: back,
       pageIndex: curLoc.pageIndex,
-      onPageChange: (idx) {
-        curLoc.pageIndex = idx;
-        moneyPage();
-      },
+      onPageChange: (idx) => curLoc.pageIndex = idx,
     );
     setState(() {});
   }
 
   void hyperchatPage() {
+    final transition = homeToMoneyOrHyperchatOrGroupTransition();
     _page = HyperchatPage(
+      initialOffset: _homeScrollController.offset,
       self: widget.self,
-      palettes: selectedHomeUserPaletteDeactivated,
-      hyperchatRequest: handleWebRequest,
+      palettes: formattedHomePalettes,
+      transitioned: transition.first,
+      userTargets: transition.second,
+      // transition: homeToMoneyOrHyperchatOrGroupTransition,
+      hyperchatRequest: (hyperchatRequest) {
+        _requests.add(hyperchatRequest);
+        processWebRequests();
+      },
       cameras: widget.cameras,
       back: homePage,
-      ping: handleWebRequest,
+      ping: (pingRequest) {
+        _requests.add(pingRequest);
+        processWebRequests();
+      },
     );
     setState(() {});
   }
 
   void groupPage() {
+    final transition = homeToMoneyOrHyperchatOrGroupTransition();
     _page = GroupPage(
+      initialOffset: _homeScrollController.offset,
       self: widget.self,
       afterMessageCallback: (node) => writePalette(node),
       back: homePage,
-      groupRequest: handleWebRequest,
-      palettes: selectedHomeUserPaletteDeactivated,
+      groupRequest: (groupRequest) {
+        _requests.add(groupRequest);
+        processWebRequests();
+      },
+      transitioned: transition.first,
+      userTargets: transition.second,
+      // transition: homeToMoneyOrHyperchatOrGroupTransition,
+      palettes: formattedHomePalettes,
       cameras: widget.cameras,
     );
 
@@ -977,10 +1106,7 @@ class _HomeState extends State<Home> {
   void nodePage(BaseNode node) {
     _page = NodePage(
       pageIndex: curLoc.pageIndex,
-      onPageChange: (pageIdx) {
-        curLoc.pageIndex = pageIdx;
-        nodePage(node);
-      },
+      onPageChange: (pageIdx) => curLoc.pageIndex = pageIdx,
       cameras: widget.cameras,
       self: widget.self,
       openChat: openChat,
@@ -994,198 +1120,654 @@ class _HomeState extends State<Home> {
   }
 
   void chatPage(ChatableNode node) async {
-    var senders = <Identifier, Palette>{};
-    if (node is GroupNode) {
-      final _cached = palettes(node.id);
-      var toFetch = (node as GroupNode)
-          .group
-          .toSet()
-          .difference(_cached.asIds().toSet())
-          .toList();
+    // var senders = <Identifier, Palette>{};
+    // if (node is GroupNode) {
+    //   final cached = palettes(at: node.id);
+    //   var toFetch = node.group
+    //       .toSet()
+    //       .difference(cached.asIds().toSet())
+    //       .toList(growable: false);
+    //
+    //   if (toFetch.isNotEmpty) {
+    //     var fetchedNodes = await getNodesFromEverywhere(toFetch);
+    //     for (var fetchedNode in fetchedNodes) {
+    //       writePalette(fetchedNode, at: node.id);
+    //     }
+    //   }
+    //
+    //   for (var palette in palettes(at: node.id)) {
+    //     senders[palette.node.id] = palette;
+    //   }
+    // } else {
+    //   senders[widget.self.id] = nodeToPalette(widget.self)!;
+    //   senders[node.id] = nodeToPalette(node)!;
+    // }
 
-      if (toFetch.isNotEmpty) {
-        var fetchedNodes = await getNodesFromEverywhere(toFetch);
-        for (var fetchedNode in fetchedNodes) {
-          writePalette(fetchedNode, at: node.id);
-        }
+    final senders = node is Group ? node.group : [widget.self.id, node.id];
+    if (palettes(at: node.id).length != senders.length) {
+      for (final sender in senders) {
+        var userNode = nodeAt(sender);
+        userNode ??= nodeAt(sender, "Hidden");
+        if (userNode != null) writePalette(userNode, at: node.id);
       }
-
-      for (var palette in palettes(node.id)) {
-        senders[palette.node.id] = palette;
-      }
-    } else {
-      senders[widget.self.id] = nodeToPalette(widget.self)!;
-      senders[node.id] = nodeToPalette(node)!;
     }
+
     _page = ChatPage(
       nodeToPalette: nodeToPalette,
-      senders: senders,
-      send: handleWebRequest,
+      senders: paletteMap(node.id).those(senders),
+      send: (messageRequest) {
+        _requests.add(messageRequest);
+        processWebRequests();
+      },
       self: widget.self,
-      group: palettes(node.id),
       node: node,
       cameras: widget.cameras,
       pageIndex: curLoc.pageIndex,
-      onPageChange: (idx) {
-        curLoc.pageIndex = idx;
-        chatPage(node);
-      },
+      onPageChange: (idx) => curLoc.pageIndex = idx,
       back: back,
     );
     setState(() {});
   }
 
   Future<void> snipView(ChatableNode node) async {
-    final mediaSize = MediaQuery.of(context).size; // full screen
-    if (node.snips!.isEmpty) {
+    if (node.snips.isEmpty) {
       writePalette(node);
-      homePage();
+      return homePage();
+    }
+    final snip = node.snips.first;
+    node.snips.remove(snip); // consume it
+    b.saveNode(node);
+    Down4Media? media;
+    dynamic jsonEncodedMedia;
+    if ((jsonEncodedMedia = b.snips.get(snip)) == null) {
+      media = await r.getMessageMedia(snip);
     } else {
-      final snip = node.snips!.first;
-      node.snips!.remove(snip); // consume it
-      b.saveNode(node);
-      Down4Media? media;
-      dynamic jsonEncodedMedia;
-      if ((jsonEncodedMedia = b.snips.get(snip)) == null) {
-        media = await r.getMessageMedia(snip);
-      } else {
-        media = Down4Media.fromJson(jsonDecode(jsonEncodedMedia));
-        b.snips.delete(snip); // consume it
-      }
-      if (media == null) {
+      media = Down4Media.fromJson(jsonDecode(jsonEncodedMedia));
+      b.snips.delete(snip); // consume it
+    }
+    if (media == null) {
+      writePalette(node);
+      return homePage();
+    }
+    final scale =
+        1 / (media.metadata.aspectRatio ?? 1.0 * Sizes.fullAspectRatio);
+
+    Widget displayMedia;
+    String? text = media.metadata.text;
+    void Function() back;
+    void Function() next;
+    if (media.metadata.isVideo) {
+      var f = b.writeMediaToFile(media);
+      var ctrl = VideoPlayerController.file(f);
+      await ctrl.initialize();
+      await ctrl.setLooping(true);
+      await ctrl.play();
+      displayMedia = Transform.scale(
+        scaleX: 1 / scale,
+        child: Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+          child: VideoPlayer(ctrl),
+        ),
+      );
+
+      back = () async {
+        await ctrl.dispose();
+        f.delete();
         writePalette(node);
         homePage();
-      }
-      final scale =
-          1 / (media!.metadata.aspectRatio ?? 1.0 * mediaSize.aspectRatio);
-      if (media.metadata.isVideo) {
-        var f = b.writeMediaToFile(media);
-        var ctrl = VideoPlayerController.file(f);
-        await ctrl.initialize();
-        await ctrl.setLooping(true);
-        await ctrl.play();
-        _page = Stack(children: [
-          SizedBox(
-            height: mediaSize.height,
-            width: mediaSize.width,
-            child: Transform.scale(
-              scaleX: 1 / scale,
-              child: Transform(
-                alignment: Alignment.center,
-                transform:
-                    Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
-                child: VideoPlayer(ctrl),
-              ),
-            ),
-          ),
-          media.metadata.text != "" && media.metadata.text != null
-              ? Center(
-                  child: Container(
-                    width: mediaSize.width,
-                    decoration: const BoxDecoration(
-                      // border: Border.symmetric(
-                      //   horizontal: BorderSide(color: Colors.black38),
-                      // ),
-                      color: Colors.black38,
-                      // color: PinkTheme.snipRibbon,
-                    ),
-                    constraints: BoxConstraints(
-                      minHeight: 16,
-                      maxHeight: mediaSize.height,
-                    ),
-                    child: Text(
-                      media.metadata.text!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            child: Console(bottomButtons: [
-              ConsoleButton(
-                name: "Back",
-                onPress: () async {
-                  await ctrl.dispose();
-                  f.delete();
-                  writePalette(node);
-                  homePage();
-                },
-              ),
-              ConsoleButton(
-                name: "Next",
-                onPress: () async {
-                  await ctrl.dispose();
-                  f.delete();
-                  snipView(node);
-                },
-              ),
-            ]),
-          ),
-        ]);
-      } else {
-        await precacheImage(MemoryImage(media.data), context);
-        _page = Stack(children: [
-          SizedBox(
-            height: mediaSize.height,
-            width: mediaSize.width,
+      };
+
+      next = () async {
+        await ctrl.dispose();
+        f.delete();
+        snipView(node);
+      };
+
+      _page = Stack(children: [
+        SizedBox(
+          height: Sizes.fullHeight,
+          width: Sizes.w,
+          child: Transform.scale(
+            scaleX: 1 / scale,
             child: Transform(
               alignment: Alignment.center,
               transform:
                   Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
-              child: Image.memory(
-                media.data,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-              ),
+              child: VideoPlayer(ctrl),
             ),
           ),
-          media.metadata.text != "" && media.metadata.text != null
-              ? Center(
-                  child: Container(
-                    width: mediaSize.width,
-                    decoration: const BoxDecoration(
-                      // border: Border.symmetric(
-                      //   horizontal: BorderSide(color: Colors.black38),
-                      // ),
-                      color: Colors.black38,
-                      // color: PinkTheme.snipRibbon,
-                    ),
-                    constraints: BoxConstraints(
-                      minHeight: 16,
-                      maxHeight: mediaSize.height,
-                    ),
-                    child: Text(
-                      media.metadata.text!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white),
-                    ),
+        ),
+        media.metadata.text != "" && media.metadata.text != null
+            ? Center(
+                child: Container(
+                  width: Sizes.w,
+                  decoration: const BoxDecoration(
+                    // border: Border.symmetric(
+                    //   horizontal: BorderSide(color: Colors.black38),
+                    // ),
+                    color: Colors.black38,
+                    // color: PinkTheme.snipRibbon,
                   ),
-                )
-              : const SizedBox.shrink(),
-          Positioned(
-              bottom: 0,
-              left: 0,
-              child: Console(bottomButtons: [
-                ConsoleButton(
-                    name: "Back",
-                    onPress: () {
-                      writePalette(node);
-                      homePage();
-                    }),
-                ConsoleButton(name: "Next", onPress: () => snipView(node)),
-              ]))
-        ]);
-      }
-      setState(() {});
+                  constraints: BoxConstraints(
+                    minHeight: 16,
+                    maxHeight: Sizes.fullHeight,
+                  ),
+                  child: Text(
+                    media.metadata.text!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              )
+            : const SizedBox.shrink(),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          child: Console(bottomButtons: [
+            ConsoleButton(
+              name: "Back",
+              onPress: () async {
+                await ctrl.dispose();
+                f.delete();
+                writePalette(node);
+                homePage();
+              },
+            ),
+            ConsoleButton(
+              name: "Next",
+              onPress: () async {
+                await ctrl.dispose();
+                f.delete();
+                snipView(node);
+              },
+            ),
+          ]),
+        ),
+      ]);
+    } else {
+      await precacheImage(MemoryImage(media.data), context);
+      displayMedia = Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+        child: Image.memory(
+          media.data,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+        ),
+      );
+
+      back = () {
+        writePalette(node);
+        homePage();
+      };
+
+      next = () => snipView(node);
     }
+
+    _page = SnipViewPage(
+      displayMedia: displayMedia,
+      text: text,
+      back: back,
+      next: next,
+    );
+
+    setState(() {});
   }
+
+  /////////////////////////////////////////////////////////////////
+
+  // Andrew? andrew;
+
+  // void homePages({bool extra = false}) {
+  //   Console2 homeConsole() => Console2(
+  //         inputs: [
+  //           ConsoleInput(
+  //             tec: _tec,
+  //             placeHolder: ":)",
+  //           ),
+  //         ],
+  //         topButtons: [
+  //           ConsoleButton2(name: "Hyperchat", onPress: hyperchatPage),
+  //           ConsoleButton2(
+  //               name: "Money",
+  //               onPress: () {
+  //                 _locations.add(Location(id: "Money"));
+  //                 moneyPages(method: "Split", currency: "Satoshis");
+  //                 setState(() {});
+  //                 // moneyPage();
+  //               }),
+  //         ],
+  //         bottomButtons: [
+  //           ConsoleButton2(
+  //               showExtra: extra,
+  //               name: "Group",
+  //               bottomEpsilon: -0.3,
+  //               widthEpsilon: 0.7,
+  //               heightEpsilon: -1.0,
+  //               onPress: () => extra ? homePages(extra: extra) : groupPage(),
+  //               isSpecial: true,
+  //               onLongPress: () => homePages(extra: !extra),
+  //               extraButtons: [
+  //                 ConsoleButton2(name: "Delete", onPress: delete),
+  //                 ConsoleButton2(
+  //                   name: "Forward",
+  //                   onPress: () => forward(
+  //                     formattedHomePalettes.selected().toList(growable: false),
+  //                   ),
+  //                 ),
+  //                 ConsoleButton2(name: "Shit", onPress: () => homePage(!extra)),
+  //                 ConsoleButton2(name: "Wacko", onPress: () => homePage(!extra)),
+  //               ]),
+  //           ConsoleButton2(
+  //             name: "Search",
+  //             onPress: () {
+  //               _locations.add(Location(id: "Search"));
+  //               searchPage();
+  //             },
+  //           ),
+  //           ConsoleButton2(
+  //             name: "Ping",
+  //             onPress: () {
+  //               if (_tec.value.text.isNotEmpty) {
+  //                 final pr = r.PingRequest(
+  //                   text: _tec.value.text,
+  //                   targets: selectedHomeUserPaletteDeactivated
+  //                       .asIds()
+  //                       .toList(growable: false),
+  //                   senderID: widget.self.id,
+  //                 );
+  //                 handleWebRequest(pr);
+  //                 _tec.clear();
+  //               }
+  //             },
+  //             onLongPress: snipPage,
+  //             isSpecial: true,
+  //           ),
+  //         ],
+  //       );
+  //   andrew = Andrew(pages: [
+  //     Down4Page2(
+  //         title: "Home",
+  //         console: homeConsole(),
+  //         palettes: formattedHomePalettes),
+  //   ]);
+  //   setState(() {});
+  // }
+  //
+  // void moneyPages({
+  //   // should I make this shit static
+  //   // required are states that need to stay across reloads
+  //   // required List<User> targets,
+  //   required String method,
+  //   required String currency,
+  //   int page = 0,
+  //   Console2? console,
+  //   MobileScannerController? scanner,
+  //   bool extra = false,
+  //   bool scanning = false,
+  //   // required Map<String, dynamic> currencies,
+  // }) {
+  //   final targetsLen = selectedHomeUserPaletteDeactivated.length;
+  //   final bool empty = targetsLen == 0;
+  //   var scannedData = {};
+  //   var scannedDataLength = -1;
+  //
+  //   void moneyBack() {
+  //     cashTec.clear();
+  //     importTec.clear();
+  //     scanner?.dispose();
+  //     back();
+  //   }
+  //
+  //   dynamic onScan(Barcode bc, MobileScannerArguments? args) async {
+  //     final raw = bc.rawValue;
+  //     if (raw != null) {
+  //       final decodedRaw = jsonDecode(raw);
+  //       scannedDataLength = decodedRaw["tot"];
+  //       scannedData.putIfAbsent(decodedRaw["index"], () => decodedRaw["data"]);
+  //       if (scannedData.length == scannedDataLength) {
+  //         // we have all the data
+  //         await scanner?.stop();
+  //         var sortedData = <String>[];
+  //         final sortedKeys = scannedData.keys.toList()..sort();
+  //         for (final key in sortedKeys) {
+  //           sortedData.add(scannedData[key]!);
+  //         }
+  //         final payment = Down4Payment.fromJsonList(sortedData);
+  //         widget.wallet.parsePayment(widget.self, payment);
+  //         moneyPages(method: method, currency: currency);
+  //       }
+  //     }
+  //   }
+  //
+  //   int usdToSatoshis(double usds) =>
+  //       ((usds / _exchangeRate.rate) * 100000000).floor();
+  //
+  //   double satoshisToUSD(int satoshis) =>
+  //       (satoshis / 100000000) * _exchangeRate.rate;
+  //
+  //   String satoshis() => widget.wallet.balance.toString();
+  //
+  //   String formattedSats(int sats) => String.fromCharCodes(sats
+  //       .toString()
+  //       .codeUnits
+  //       .reversed
+  //       .toList()
+  //       .asMap()
+  //       .map((key, value) => key % 3 == 0 && key != 0
+  //           ? MapEntry(key, [value, 0x002C])
+  //           : MapEntry(key, [value]))
+  //       .values
+  //       .reduce((value, element) => [...element, ...value]));
+  //
+  //   String usds() => satoshisToUSD(widget.wallet.balance).toStringAsFixed(4);
+  //
+  //   int inputAsSatoshis() {
+  //     int amount;
+  //     final numInput = num.parse(cashTec.value.text);
+  //     if (currency == "Satoshis") {
+  //       amount = method == "Split"
+  //           ? numInput.round()
+  //           : (numInput * selectedHomeUserPaletteDeactivated.length)
+  //               .round(); // TODO
+  //     } else {
+  //       amount = method == "Split"
+  //           ? usdToSatoshis(numInput.toDouble())
+  //           : usdToSatoshis(numInput.toDouble() *
+  //               selectedHomeUserPaletteDeactivated.length);
+  //     }
+  //     return amount;
+  //   }
+  //
+  //   ConsoleInput mainViewInput() => ConsoleInput(
+  //         type: TextInputType.number,
+  //         placeHolder: currency == "USD" ? "${usds()}\$" : "${satoshis()} sat",
+  //         tec: cashTec,
+  //       );
+  //
+  //   Console2 importConsole([List<Down4TXOUT>? utxos]) {
+  //     ConsoleInput input;
+  //     if (utxos == null) {
+  //       input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
+  //     } else {
+  //       final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
+  //       final ph = "Found ${formattedSats(sats)} sat";
+  //       input = ConsoleInput(placeHolder: ph, tec: importTec, activated: false);
+  //     }
+  //
+  //     void import() async {
+  //       final payment =
+  //           await widget.wallet.importMoney(importTec.value.text, widget.self);
+  //
+  //       if (payment == null) return;
+  //
+  //       parsePayment(payment);
+  //       moneyPages(method: method, currency: currency);
+  //     }
+  //
+  //     return Console2(
+  //       inputs: [input],
+  //       topButtons: [
+  //         ConsoleButton2(name: "Import", onPress: import),
+  //       ],
+  //       bottomButtons: [
+  //         ConsoleButton2(
+  //           name: "Back",
+  //           onPress: () => moneyPages(method: method, currency: currency),
+  //         ),
+  //         ConsoleButton2(
+  //           name: "Check",
+  //           onPress: () async =>
+  //               importConsole(await checkPrivateKey(importTec.value.text)),
+  //         ),
+  //       ],
+  //     );
+  //   }
+  //
+  //   Console2 confirmationConsole(String inputCurrency) {
+  //     double asUSD;
+  //     int asSats;
+  //     if (inputCurrency == "USD") {
+  //       asUSD = num.parse(cashTec.value.text).toDouble() *
+  //           (method == "Split"
+  //               ? 1.0
+  //               : selectedHomeUserPaletteDeactivated.length);
+  //       asSats = usdToSatoshis(asUSD);
+  //     } else {
+  //       asSats = num.parse(cashTec.value.text).toInt() *
+  //           (method == "Split" ? 1 : targetsLen);
+  //       asUSD = satoshisToUSD(asSats);
+  //     }
+  //
+  //     final satsString = formattedSats(asSats);
+  //
+  //     return Console2(
+  //       inputs: [
+  //         ConsoleInput(
+  //           placeHolder: currency == "USD"
+  //               ? "${asUSD.toStringAsFixed(4)} \$"
+  //               : "$satsString sat",
+  //           tec: cashTec,
+  //           activated: false,
+  //         ),
+  //       ],
+  //       topButtons: [
+  //         ConsoleButton2(
+  //             name: "Confirm",
+  //             onPress: () {
+  //               final pay = widget.wallet.payUsers(
+  //                 selectedHomeUserPaletteDeactivated
+  //                     .asNodes()
+  //                     .toList(growable: false) as List<User>,
+  //                 widget.self,
+  //                 Sats(inputAsSatoshis()),
+  //               );
+  //               if (pay != null) {
+  //                 for (final tx in pay.txs) {
+  //                   printWrapped("=================");
+  //                   printWrapped(tx.fullRawHex);
+  //                   printWrapped("=================");
+  //                   printWrapped(tx.txID!.asHex);
+  //                   printWrapped("=================");
+  //                 }
+  //                 parsePayment(pay);
+  //                 printWrapped("pay: ${pay.toYouKnow()}###\n###");
+  //                 print("ID: ${sha256(utf8.encode(pay.toYouKnow())).toHex()}");
+  //                 print("txid: ${pay.txs.last.txID!.asHex}");
+  //                 moneyPages(method: method, currency: currency);
+  //               }
+  //             }),
+  //       ],
+  //       bottomButtons: [
+  //         ConsoleButton2(
+  //             name: "Back",
+  //             onPress: () => moneyPages(method: method, currency: currency)),
+  //         ConsoleButton2(
+  //           name: currency,
+  //           isMode: true,
+  //           onPress: () => moneyPages(
+  //             method: method,
+  //             currency: nextCurrency(currency),
+  //             console: confirmationConsole(inputCurrency),
+  //           ),
+  //         ),
+  //       ],
+  //     );
+  //   }
+  //
+  //   Console2 emptyViewConsole() => Console2(
+  //         scanCallBack: scanning ? onScan : null,
+  //         scanController: scanning ? scanner : null,
+  //         inputs: scanning ? null : [mainViewInput()],
+  //         topButtons: [
+  //           ConsoleButton2(
+  //             name: "Scan",
+  //             onPress: () {
+  //               if (!scanning) {
+  //                 moneyPages(
+  //                   scanner: MobileScannerController(),
+  //                   scanning: !scanning,
+  //                   currency: currency,
+  //                   method: method,
+  //                 );
+  //               } else {
+  //                 scanner?.dispose();
+  //                 moneyPages(
+  //                   method: method,
+  //                   currency: currency,
+  //                   scanning: !scanning,
+  //                 );
+  //               }
+  //             },
+  //           )
+  //         ],
+  //         bottomButtons: [
+  //           ConsoleButton2(
+  //             name: "Back",
+  //             isSpecial: true,
+  //             widthEpsilon: 0.5,
+  //             heightEpsilon: 0.5,
+  //             bottomEpsilon: -0.5,
+  //             showExtra: extra,
+  //             onPress: () {
+  //               if (extra) {
+  //                 moneyPages(currency: currency, method: method, extra: !extra);
+  //               } else {
+  //                 moneyBack();
+  //               }
+  //             },
+  //             onLongPress: () =>
+  //                 moneyPages(currency: currency, method: method, extra: !extra),
+  //             extraButtons: [
+  //               ConsoleButton2(
+  //                 name: "Import",
+  //                 onPress: () => moneyPages(
+  //                     console: importConsole(),
+  //                     currency: currency,
+  //                     method: method),
+  //               )
+  //             ],
+  //           ),
+  //           ConsoleButton2(
+  //             isMode: true,
+  //             name: currency,
+  //             onPress: () =>
+  //                 moneyPages(currency: nextCurrency(currency), method: method),
+  //           ),
+  //         ],
+  //       );
+  //
+  //   Console2 mainViewConsole() => Console2(
+  //         inputs: [mainViewInput()],
+  //         bottomButtons: [
+  //           ConsoleButton2(
+  //             name: "Back",
+  //             isSpecial: true,
+  //             showExtra: extra,
+  //             onPress: () {
+  //               if (extra) {
+  //                 moneyPages(method: method, currency: currency, extra: !extra);
+  //               } else {
+  //                 moneyBack();
+  //               }
+  //             },
+  //             onLongPress: () =>
+  //                 moneyPages(method: method, currency: currency, extra: !extra),
+  //             extraButtons: [
+  //               ConsoleButton2(name: "Import", onPress: importConsole),
+  //             ],
+  //           ),
+  //           ConsoleButton2(
+  //               name: method,
+  //               isMode: true,
+  //               onPress: () => moneyPages(
+  //                   method: method == "Split" ? "Each" : "Split",
+  //                   currency: currency)),
+  //           ConsoleButton2(
+  //               name: currency,
+  //               isMode: true,
+  //               onPress: () => moneyPages(
+  //                   method: method, currency: nextCurrency(currency))),
+  //         ],
+  //         topButtons: [
+  //           ConsoleButton2(name: "Bill", onPress: () => print("TODO")),
+  //           ConsoleButton2(
+  //               name: "Pay",
+  //               onPress: () => moneyPages(
+  //                   method: method,
+  //                   currency: currency,
+  //                   console: confirmationConsole(currency))),
+  //         ],
+  //       );
+  //
+  //   final defaultConsole = empty ? emptyViewConsole() : mainViewConsole();
+  //
+  //   andrew = Andrew(
+  //     onPageChange: (idx) => curLoc.pageIndex = idx,
+  //     pages: [
+  //       Down4Page2(
+  //           title: "Money",
+  //           console: console ?? defaultConsole,
+  //           palettes: homeToMoneyOrHyperchatTransition(formattedHomePalettes)),
+  //       Down4Page2(
+  //           title: "Status",
+  //           console: console ?? defaultConsole,
+  //           palettes: palettes(at: "Payments").toList(growable: false))
+  //     ],
+  //   );
+  //   setState(() {});
+  // }
+
+  // void hyperchatPages({required Console console, bool reload = false}) {}
+  //
+  // void groupPages({required Console console, bool reload = false}) {}
+  //
+  // void searchPages({bool scanning = false, bool reload = false}) {}
+  //
+  // void chatPages({
+  //   required ChatableNode node,
+  //   required Console console,
+  //   bool reload = false,
+  // }) {}
+
+  // void nodePages({required BaseNode node, })
+
+  // Console moneyConsole([bool reloadInput = false, bool extra = false]) =>
+  //     Console(
+  //       inputs: [ConsoleInput(placeHolder: "\$", tec: _tec)],
+  //       bottomButtons: [
+  //         ConsoleButton(
+  //           name: "Back",
+  //           isSpecial: true,
+  //           showExtra: extra,
+  //           onPress: back,
+  //           extraButtons: [
+  //             ConsoleButton(name: "Import", onPress: () => print("TODO")),
+  //           ],
+  //         ),
+  //         ConsoleButton(
+  //           name: "Each",
+  //           isMode: true,
+  //           onPress: () => print("TODO"),
+  //         ),
+  //         ConsoleButton(
+  //           name: "USD",
+  //           isMode: true,
+  //           onPress: () => print("TODO"),
+  //         ),
+  //       ],
+  //       topButtons: [
+  //         ConsoleButton(name: "Bill", onPress: () => print("TODO")),
+  //         ConsoleButton(name: "Pay", onPress: () => print("TODO")),
+  //       ],
+  //     );
 
   @override
   Widget build(BuildContext context) {
-    print(widget.wallet.payments.length);
-    return _page ?? const LoadingPage();
+    return _page!;
+
+    // print(widget.wallet.payments.length);
+    // return _page ?? const LoadingPage();
   }
 }

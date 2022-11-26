@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
 import 'palette.dart';
 
-import 'utils.dart';
+import 'render_utils.dart';
 
 class ReplyData {
   final String messageRefID;
@@ -22,40 +23,83 @@ class ReplyData {
 
 class ChatMessage extends StatelessWidget {
   final Palette sender;
-  static const double headerHeight = 24.0;
+  static const double headerHeight = 18.0;
   final String at;
   final Down4Message message;
-  final bool myMessage, selected, hasHeader, isPost, hasReplies;
+  final bool myMessage, selected, hasHeader, isPost;
   final void Function(Identifier, Identifier)? select;
   final void Function(Identifier)? pressReply;
-  final List<ReplyData> repliesData;
+  final List<ReplyData>? repliesData;
   final Down4Media? media;
-  ChatMessage({
+  final bool show, transitionFromRight;
+  // final double width;
+  final List<String>? specialDisplayTexts;
+  final Size precalculatedSize;
+  final Size? precalculatedMediaSize;
+
+  const ChatMessage({
+    required this.precalculatedSize,
     required this.sender,
     required this.message,
     required this.myMessage,
     required this.at,
     required this.hasHeader,
-    this.repliesData = const [],
+    this.precalculatedMediaSize,
+    this.specialDisplayTexts,
+    this.show = true,
+    this.transitionFromRight = false,
+    this.repliesData,
     this.pressReply,
     this.media,
     this.isPost = false,
     this.selected = false,
     this.select,
     Key? key,
-  })  : hasReplies = repliesData.isNotEmpty,
-        super(key: key);
+  }) : super(key: key);
 
-  ChatMessage withMedia(Down4Media media) {
+  double get maxWidth => Sizes.w * 0.76;
+
+  bool get hasText => message.text?.isNotEmpty ?? false;
+
+  bool get hasReplies => repliesData?.isNotEmpty ?? false;
+
+  // ChatMessage withMedia(Down4Media media) {
+  //   return ChatMessage(
+  //     precalculatedSize: precalculatedSize,
+  //     sender: sender,
+  //     message: message,
+  //     specialDisplayTexts: specialDisplayTexts,
+  //     pressReply: pressReply,
+  //     repliesData: repliesData,
+  //     precalculatedMediaSize: precalculatedMediaSize,
+  //     myMessage: myMessage,
+  //     select: select,
+  //     selected: selected,
+  //     show: show,
+  //     transitionFromRight: transitionFromRight,
+  //     isPost: isPost,
+  //     at: at,
+  //     hasHeader: hasHeader,
+  //     media: media,
+  //   );
+  // }
+
+  ChatMessage withHeader({required bool withHeader, Size? newSize}) {
     return ChatMessage(
       sender: sender,
+      hasHeader: withHeader,
       message: message,
       myMessage: myMessage,
-      select: select,
-      selected: selected,
-      isPost: isPost,
+      specialDisplayTexts: specialDisplayTexts,
+      precalculatedMediaSize: precalculatedMediaSize,
+      pressReply: pressReply,
+      precalculatedSize: newSize ?? precalculatedSize,
+      transitionFromRight: transitionFromRight,
+      repliesData: repliesData,
+      show: show,
       at: at,
-      hasHeader: hasHeader,
+      select: select,
+      selected: !selected,
       media: media,
     );
   }
@@ -66,9 +110,37 @@ class ChatMessage extends StatelessWidget {
       hasHeader: hasHeader,
       message: message,
       myMessage: myMessage,
+      specialDisplayTexts: specialDisplayTexts,
+      precalculatedMediaSize: precalculatedMediaSize,
+      pressReply: pressReply,
+      precalculatedSize: precalculatedSize,
+      transitionFromRight: transitionFromRight,
+      repliesData: repliesData,
+      show: show,
       at: at,
       select: select,
       selected: !selected,
+      media: media,
+    );
+  }
+
+  ChatMessage animated({required bool show, bool? transitionFromRight}) {
+    return ChatMessage(
+      precalculatedSize: precalculatedSize,
+      sender: sender,
+      message: message,
+      myMessage: myMessage,
+      select: select,
+      precalculatedMediaSize: precalculatedMediaSize,
+      pressReply: pressReply,
+      repliesData: repliesData,
+      specialDisplayTexts: specialDisplayTexts,
+      selected: selected,
+      show: show,
+      transitionFromRight: transitionFromRight ?? this.transitionFromRight,
+      isPost: isPost,
+      at: at,
+      hasHeader: hasHeader,
       media: media,
     );
   }
@@ -82,8 +154,11 @@ class ChatMessage extends StatelessWidget {
               child: Container(
                 color: PinkTheme.nodeColors[replyData.type],
                 height: ChatMessage.headerHeight,
-                child: Text(replyData.body,
-                    overflow: TextOverflow.ellipsis, maxLines: 1),
+                child: Text(
+                  replyData.body,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
               ),
             ),
             SizedBox(
@@ -98,73 +173,66 @@ class ChatMessage extends StatelessWidget {
   Widget replies(List<ReplyData> replies) => Container(
         clipBehavior: Clip.hardEdge,
         decoration: const BoxDecoration(
-            borderRadius: BorderRadius.only(
-          topRight: Radius.circular(4.0),
-          topLeft: Radius.circular(4.0),
-        )),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(4.0))),
         child: Column(
           textDirection: TextDirection.ltr,
           children: replies.map((r) => reply(r)).toList(),
         ),
       );
 
-  Widget header() => Row(
-        mainAxisSize: MainAxisSize.min,
-        textDirection: TextDirection.ltr,
-        children: [
-          GestureDetector(
-            onTap: () => select?.call(message.id, at),
-            child: Container(
-              clipBehavior: Clip.hardEdge,
-              decoration: BoxDecoration(
-                borderRadius: !hasReplies
-                    ? const BorderRadius.only(
-                        topLeft: Radius.circular(4.0),
-                      )
-                    : null,
-              ),
-              height: ChatMessage.headerHeight,
-              width: ChatMessage.headerHeight,
-              child: sender.image,
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
+  Widget get header => Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: const BoxDecoration(
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(4))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          textDirection: TextDirection.ltr,
+          children: [
+            GestureDetector(
               onTap: () => select?.call(message.id, at),
               child: Container(
-                clipBehavior: Clip.hardEdge,
                 decoration: BoxDecoration(
-                  color: PinkTheme.headerColor,
                   borderRadius: !hasReplies
                       ? const BorderRadius.only(
-                          topRight: Radius.circular(4.0),
+                          topLeft: Radius.circular(4.0),
                         )
                       : null,
                 ),
-                padding: const EdgeInsets.only(left: 2.0, top: 2.0, right: 2.0),
                 height: ChatMessage.headerHeight,
-                child: Text(
-                  sender.node.name,
-                  textDirection: TextDirection.ltr,
+                width: ChatMessage.headerHeight,
+                child: sender.image,
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => select?.call(message.id, at),
+                child: Container(
+                  // clipBehavior: Clip.hardEdge,
+                  color: PinkTheme.nodeColors[sender.node.colorCode],
+                  padding:
+                      const EdgeInsets.only(left: 2.0, top: 2.0, right: 2.0),
+                  height: ChatMessage.headerHeight,
+                  child: Text(
+                    sender.node.name,
+                    textDirection: TextDirection.ltr,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
 
-  Widget image() => GestureDetector(
+  Widget get image => GestureDetector(
         onTap: () => select?.call(message.id, at),
         child: Container(
           clipBehavior: Clip.hardEdge,
+          height: precalculatedMediaSize!.height,
+          width: precalculatedMediaSize!.width,
           decoration: BoxDecoration(
-            borderRadius: (hasHeader || hasReplies) ||
-                    (message.text != null && message.text != "")
-                ? const BorderRadius.only(
-                    bottomLeft: Radius.circular(4.0),
-                    bottomRight: Radius.circular(4.0),
-                  )
-                : const BorderRadius.all(Radius.circular(4.0)),
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(hasReplies ? 0 : 4),
+                bottom: Radius.circular((hasText || hasHeader) ? 0 : 4)),
           ),
           child: Image.memory(
             media!.data,
@@ -174,18 +242,14 @@ class ChatMessage extends StatelessWidget {
         ),
       );
 
-  Widget video(double maxWidth) => Container(
+  Widget get video => Container(
         clipBehavior: Clip.hardEdge,
-        height: maxWidth,
-        width: maxWidth,
+        height: precalculatedMediaSize!.height,
+        width: precalculatedMediaSize!.width,
         decoration: BoxDecoration(
-          borderRadius: (hasHeader || hasReplies) ||
-                  (message.text != null && message.text != "")
-              ? const BorderRadius.only(
-                  bottomLeft: Radius.circular(4.0),
-                  bottomRight: Radius.circular(4.0),
-                )
-              : const BorderRadius.all(Radius.circular(4.0)),
+          borderRadius: BorderRadius.vertical(
+              top: Radius.circular(hasReplies ? 0 : 4),
+              bottom: Radius.circular((hasText || hasHeader) ? 0 : 4)),
         ),
         child: Down4VideoPlayer(
           vid: media!.file!,
@@ -193,93 +257,136 @@ class ChatMessage extends StatelessWidget {
         ),
       );
 
-  Widget text() => GestureDetector(
+  Widget get text => GestureDetector(
         onTap: () => select?.call(message.id, at),
         child: Container(
+          // alignment: AlignmentDirectional.centerStart,
           padding: const EdgeInsets.all(6.0),
           clipBehavior: Clip.hardEdge,
-          decoration: media == null
-              ? BoxDecoration(
-                  color: PinkTheme.bodyColor,
-                  borderRadius: hasHeader || hasReplies
-                      ? const BorderRadius.only(
-                          bottomLeft: Radius.circular(4.0),
-                          bottomRight: Radius.circular(4.0),
-                        )
-                      : const BorderRadius.all(
-                          Radius.circular(4.0),
-                        ),
-                )
-              : BoxDecoration(
-                  color: PinkTheme.bodyColor,
-                  borderRadius: hasHeader || hasReplies
-                      ? null
-                      : const BorderRadius.only(
-                          topRight: Radius.circular(4.0),
-                          topLeft: Radius.circular(4.0),
-                        ),
-                ),
-          child: Text(
-            message.text!,
-            textDirection: TextDirection.ltr,
-            style: const TextStyle(color: Colors.black),
-            textAlign: TextAlign.left,
+          decoration: BoxDecoration(
+              color: PinkTheme.bodyColor,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(hasReplies || media != null ? 0 : 4),
+                bottom: Radius.circular(hasHeader ? 0 : 4),
+              )),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: specialDisplayTexts!
+                .map((str) => AnimatedDefaultTextStyle(
+                      duration: Duration(milliseconds: show ? 900 : 300),
+                      curve: show ? Curves.easeInQuad : Curves.easeOut,
+                      // str,
+                      maxLines: 1,
+                      // textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                          fontFamily: "Alice",
+                          color: Colors.black.withOpacity(show ? 1 : 0)),
+                      textAlign: TextAlign.left,
+                      overflow: TextOverflow.clip,
+                      child: Text(str),
+                    ))
+                .toList(growable: false),
+          ),
+          // child: size == null
+          //     ? Text(
+          //         message.text!,
+          //         textDirection: TextDirection.ltr,
+          //         style: const TextStyle(color: Colors.black),
+          //         textAlign: TextAlign.left,
+          //       )
+          //     : Column(
+          //         crossAxisAlignment: CrossAxisAlignment.start,
+          //         children: specialDisplayTexts!
+          //             .map((str) => Text(
+          //                   str,
+          //                   maxLines: 1,
+          //                   textDirection: TextDirection.ltr,
+          //                   style: const TextStyle(color: Colors.black),
+          //                   textAlign: TextAlign.left,
+          //                   overflow: TextOverflow.clip,
+          //                 ))
+          //             .toList(growable: false),
+          //       ),
+        ),
+      );
+
+  Widget animatedContainer({required Widget child}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 600),
+      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      transformAlignment:
+          transitionFromRight ? Alignment.centerRight : Alignment.centerLeft,
+      clipBehavior: Clip.hardEdge,
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+          borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+          boxShadow: [
+            BoxShadow(
+              color: show && !selected ? Colors.black54 : Colors.transparent,
+              blurRadius: show && !selected ? 4.0 : 0.0,
+              spreadRadius: -6.0,
+              offset: show && !selected
+                  ? const Offset(5.0, 5.0)
+                  : const Offset(0.0, 0.0),
+              blurStyle: BlurStyle.normal,
+            ),
+          ]),
+      child: child,
+    );
+  }
+
+  Widget get chatMessage => Align(
+        alignment: isPost
+            ? Alignment.center
+            : myMessage
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
+        child: animatedContainer(
+          child: Container(
+            height: precalculatedSize.height,
+            width: precalculatedSize.width,
+            decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+                border: Border.all(
+                    width: 2.0,
+                    color: selected ? Colors.black : Colors.transparent)),
+            child: Column(
+              textDirection: TextDirection.ltr,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                hasReplies ? replies(repliesData!) : const SizedBox.shrink(),
+                media != null
+                    ? media!.metadata.isVideo
+                        ? video
+                        : image
+                    : const SizedBox.shrink(),
+                message.text?.isEmpty ?? true ? const SizedBox.shrink() : text,
+                hasHeader ? header : const SizedBox.shrink(),
+              ],
+            ),
           ),
         ),
       );
 
-  Widget getMessage(double maxWidth) {
-    return Align(
-      alignment: isPost
-          ? Alignment.topCenter
-          : myMessage
-              ? Alignment.topRight
-              : Alignment.topLeft,
-      child: Container(
-        margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        decoration: BoxDecoration(
-            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-            boxShadow: !selected
-                ? [
-                    const BoxShadow(
-                      color: Colors.black54,
-                      blurRadius: 4.0,
-                      spreadRadius: -6.0,
-                      offset: Offset(5.0, 5.0),
-                      blurStyle: BlurStyle.normal,
-                    )
-                  ]
-                : null,
-            border: Border.all(
-                width: 2.0,
-                color: selected ? Colors.black : Colors.transparent)),
-        child: IntrinsicWidth(
-          child: Column(
-            textDirection: TextDirection.ltr,
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              hasReplies ? replies(repliesData) : const SizedBox.shrink(),
-              hasHeader ? header() : const SizedBox.shrink(),
-              message.text == null || message.text == ""
-                  ? const SizedBox.shrink()
-                  : text(),
-              media != null
-                  ? media!.metadata.isVideo
-                      ? video(maxWidth)
-                      : image()
-                  : const SizedBox.shrink()
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final maxWidth = Sizes.w * 0.76;
-    return getMessage(maxWidth);
+    print("show=$show");
+    // if (size == null) {
+    //   WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+    //     final key = super.key as GlobalKey;
+    //     final size = key.currentContext!.size!;
+    //     print(
+    //       "Drew the mothafuka, callingback the size: (h,w) = (${size.height},${size.width})",
+    //     );
+    //     sizeCallBack(size);
+    //   });
+    // }
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 600),
+      opacity: show ? 1 : 0,
+      curve: Curves.easeOut,
+      child: Column(children: [chatMessage, const SizedBox(height: 4)]),
+    );
   }
 }

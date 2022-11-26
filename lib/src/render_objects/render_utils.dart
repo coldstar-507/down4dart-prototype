@@ -108,13 +108,44 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   }
 }
 
+extension PaletteExtensionsMap on Map<Identifier, Palette> {
+  Map<Identifier, Palette> those(List<Identifier> ids) {
+    var map = <Identifier, Palette>{};
+    for (final id in ids) {
+      map[id] = this[id]!;
+    }
+    return map;
+  }
+}
+
 extension PaletteExtensions on Iterable<Palette> {
-  Iterable<BaseNode> asNodes() => map((e) => e.node);
+  List<Palette> inThatOrder(Iterable<Identifier> ids) {
+    var theList = <Palette>[];
+    var palIds = asIds();
+    for (final id in ids) {
+      if (palIds.contains(id)) {
+        theList.add(firstWhere((p) => p.node.id == id));
+      }
+    }
+    return theList;
+  }
+
+  List<Palette> formatted() => toList(growable: false)
+    ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+  Iterable<Palette> unfolded() => where((p) => !p.fold);
+  Iterable<Palette> folded() => where((p) => p.fold);
+  Iterable<Palette> deactivated() => map((p) => p.deactivated());
+  Iterable<E> asNodes<E>() => map((p) => p.node).whereType<E>();
   Iterable<Palette> selected() => where((p) => p.selected);
+  Iterable<Palette> notSelected() => where((p) => !p.selected);
   Iterable<Identifier> asIds() => map((e) => e.node.id);
   Iterable<Palette> chatables() => where((p) => p.node is ChatableNode);
   Iterable<Palette> users() => where((p) => p.node is User);
   Iterable<Palette> groups() => where((p) => p.node is GroupNode);
+  Iterable<Palette> those(Iterable<Identifier> ids) =>
+      where((p) => ids.contains(p.node.id));
+  Iterable<Palette> notThose(Iterable<Identifier> ids) =>
+      where((p) => !ids.contains(p.node.id));
   Iterable<Palette> forwardables() =>
       where((p) => p.node.isPublicGroup || p.node is User);
 }

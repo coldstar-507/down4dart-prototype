@@ -6,7 +6,7 @@ import '../boxes.dart';
 import 'palette.dart';
 import 'chat_message.dart';
 import 'palette_maker.dart';
-import 'utils.dart';
+import 'render_utils.dart';
 
 class PaletteList extends StatelessWidget {
   final List<Palette> palettes;
@@ -16,17 +16,23 @@ class PaletteList extends StatelessWidget {
     final gapSize = Sizes.h * 0.02; // 2%
     return ScrollConfiguration(
       behavior: NoGlow(),
-      child: ListView.separated(
-        padding: const EdgeInsets.only(top: 0),
+      child: ListView.builder(
         reverse: true,
-        itemBuilder: (c, i) => i == 0
-            ? const SizedBox.shrink()
-            : i == palettes.length + 2 - 1
-                ? const SizedBox.shrink()
-                : palettes[i - 1],
-        separatorBuilder: (c, i) => Container(height: gapSize),
-        itemCount: palettes.length + 2,
+        itemBuilder: (c, i) => palettes[i],
+        itemCount: palettes.length,
+        padding: EdgeInsets.only(top: gapSize),
       ),
+      // child: ListView.separated(
+      //   padding: const EdgeInsets.only(top: 0),
+      //   reverse: true,
+      //   itemBuilder: (c, i) => i == 0
+      //       ? const SizedBox.shrink()
+      //       : i == palettes.length + 2 - 1
+      //           ? const SizedBox.shrink()
+      //           : palettes[i - 1],
+      //   separatorBuilder: (c, i) => Container(height: gapSize),
+      //   itemCount: palettes.length + 2,
+      // ),
     );
   }
 }
@@ -39,7 +45,9 @@ class MessageList4 extends StatelessWidget {
   final void Function(String, String) getTheMedia;
   final List<Identifier> messages;
   final User self;
+  final bool staticHeight;
   const MessageList4({
+    this.staticHeight = false,
     required this.senders,
     required this.messages,
     required this.self,
@@ -49,6 +57,19 @@ class MessageList4 extends StatelessWidget {
     required this.cache,
     Key? key,
   }) : super(key: key);
+
+  MessageList4 withStaticHeight(bool withStaticHeight) {
+    return MessageList4(
+      senders: senders,
+      messages: messages,
+      self: self,
+      getTheMedia: getTheMedia,
+      messageMap: messageMap,
+      select: select,
+      cache: cache,
+      staticHeight: withStaticHeight,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +112,10 @@ class MessageList4 extends StatelessWidget {
             }
 
             final chat = ChatMessage(
+              key: GlobalKey(),
+              // sizeCallBack: (s) => s,
+              // width: Sizes.w * 0.76,
+              precalculatedSize: const Size(3, 3),
               repliesData: replies,
               sender: senders[msg.senderID]!,
               message: msg,
@@ -113,9 +138,13 @@ class MessageList4 extends StatelessWidget {
 }
 
 class DynamicList extends StatelessWidget {
+  final ScrollController? scrollController;
   final List<dynamic> list;
   final bool reversed;
+  final double? topPadding;
   const DynamicList({
+    this.scrollController,
+    this.topPadding,
     required this.list,
     this.reversed = true,
     Key? key,
@@ -125,16 +154,13 @@ class DynamicList extends StatelessWidget {
     final gapSize = Sizes.h * 0.02;
     return ScrollConfiguration(
       behavior: NoGlow(),
-      child: ListView.separated(
-          padding: const EdgeInsets.only(top: 0),
-          reverse: reversed,
-          itemBuilder: (c, i) => i == 0
-              ? const SizedBox.shrink()
-              : i == list.length + 2 - 1
-                  ? const SizedBox.shrink()
-                  : list[i - 1],
-          separatorBuilder: (c, i) => Container(height: gapSize),
-          itemCount: list.length + 2),
+      child: ListView.builder(
+        controller: scrollController,
+        padding: EdgeInsets.only(top: topPadding ?? gapSize),
+        reverse: reversed,
+        itemBuilder: (_, i) => list[i],
+        itemCount: list.length,
+      ),
     );
   }
 }

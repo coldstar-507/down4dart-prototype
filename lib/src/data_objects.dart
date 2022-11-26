@@ -299,8 +299,14 @@ abstract class BaseNode {
   Map toJson();
   int activity;
   BaseNode({int? activity}) : activity = activity ?? 0;
-  void updateActivity() => activity = d4utils.timeStamp();
+  void updateActivity([int? newActivity]) =>
+      activity = newActivity ?? d4utils.timeStamp();
   factory BaseNode.fromJson(dynamic decodedJson) {
+    print("""
+    ================================================
+    decodedJson: $decodedJson
+    ================================================
+    """);
     final type = Nodes.values.byName(decodedJson["t"]);
     final id = decodedJson["id"];
     switch (type) {
@@ -321,11 +327,28 @@ abstract class BaseNode {
         );
 
       case Nodes.hyperchat:
-        // TODO: Handle this case.
-        break;
+        return Hyperchat(
+          id: id,
+          firstWord: decodedJson["nm"],
+          secondWord: decodedJson["ln"],
+          group: List<Identifier>.from(decodedJson["grp"] ?? []),
+          messages: List<Identifier>.from(decodedJson["msg"] ?? []),
+          snips: List<Identifier>.from(decodedJson["snp"] ?? []),
+          media: Down4Media.fromJson(decodedJson["im"]),
+        );
+
       case Nodes.group:
-        // TODO: Handle this case.
-        break;
+        return Group(
+          isPrivate: decodedJson["pv"],
+          name: decodedJson["nm"],
+          id: id,
+          media: Down4Media.fromJson(decodedJson["im"]),
+          group: List<Identifier>.from(decodedJson["grp"]),
+          messages: List<Identifier>.from(decodedJson["msg"] ?? <Identifier>[]),
+          snips: List<Identifier>.from(decodedJson["snp"] ?? <Identifier>[]),
+          activity: decodedJson["a"],
+        );
+
       case Nodes.root:
         // TODO: Handle this case.
         break;
@@ -348,8 +371,7 @@ abstract class BaseNode {
         // TODO: Handle this case.
         break;
       case Nodes.payment:
-        // TODO: Handle this case.
-        break;
+        return Payment(payment: Down4Payment.fromYouKnow(decodedJson["pay"]));
     }
     throw 'invalid node type: $type';
   }
@@ -465,7 +487,7 @@ class Group extends GroupNode {
   Map toJson({bool withMedia = true, bool toLocal = true}) => {
         "t": Nodes.group.name,
         "pv": isPrivate,
-        "m": withMedia ? media.toJson() : media.id,
+        "im": withMedia ? media.toJson() : media.id,
         "nm": name,
         "id": id,
         "grp": group,
@@ -500,8 +522,8 @@ class Hyperchat extends GroupNode {
   Map toJson() => {
         "t": Nodes.hyperchat.name,
         "id": id,
-        "fw": firstWord,
-        "sw": secondWord,
+        "nm": firstWord,
+        "ln": secondWord,
         "im": media.toJson(),
         "a": activity,
         "grp": group,
@@ -538,16 +560,6 @@ class Payment extends BaseNode {
         "pay": payment.toYouKnow(),
       };
 }
-
-// class UserNode implements BaseNode {
-//   String name;
-//   String? lastName, description;
-//   final Down4Keys neuter;
-//   Down4Media media;
-//   int activity;
-//   List<Identifier> childs, snips,
-//
-// }
 
 class MediaMetadata {
   final bool toReverse, shareable, payToView, isVideo, payToOwn;
@@ -619,8 +631,8 @@ class ExchangeRate {
 
   factory ExchangeRate.fromJson(dynamic decodedJson) {
     return ExchangeRate(
-      lastUpdate: decodedJson["rate"],
-      rate: decodedJson["lastUpdate"],
+      lastUpdate: decodedJson["lastUpdate"],
+      rate: decodedJson["rate"],
     );
   }
 

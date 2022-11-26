@@ -333,16 +333,16 @@ class Wallet {
 }
 
 void main() {
-  // var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
-  // var pkHex = f.readAsStringSync();
+  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  var pkHex = f.readAsStringSync();
 
   // final seed1 = safeSeed(32);
   // final seed2 = safeSeed(32);
 
   // var pair0_ = Down4Keys.fromRandom(seed1, seed2);
 
-  final f = io.File("/home/scott/jeff.txt");
-  final pkHex = f.readAsStringSync();
+  // final f = io.File("/home/scott/jeff.txt");
+  // final pkHex = f.readAsStringSync();
 
   // io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
 

@@ -3,12 +3,13 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../boxes.dart';
 
 import '../data_objects.dart';
 import '../themes.dart';
 
 import 'palette.dart';
-import 'utils.dart';
+import 'render_utils.dart';
 
 class UserPaletteMaker extends StatelessWidget {
   final void Function(Map<String, String>) infoCallBack;
@@ -124,12 +125,77 @@ class UserMakerPalette extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
+  Widget get placeHolderImage => GestureDetector(
+        onTap: selectFile,
+        child: Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(
+            borderRadius: BorderRadius.horizontal(
+              left: Radius.circular(4.0),
+            ),
+          ),
+          height: Palette.height - 4.0,
+          width: Palette.height - 4.0, // borderWidth x2
+          child: image.isNotEmpty
+              ? Image.memory(
+                  Uint8List.fromList(image),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                )
+              : Image.asset(
+                  'lib/src/assets/picture_place_holder_2.png',
+                  fit: BoxFit.cover,
+                ),
+        ),
+      );
+
+  Widget get body => Expanded(
+        child: Container(
+          decoration: BoxDecoration(
+            color: PinkTheme.nodeColors[NodesColor.friend],
+            borderRadius: const BorderRadius.horizontal(
+              right: Radius.circular(4.0),
+            ),
+          ),
+          padding: const EdgeInsets.only(left: 6.0, top: 5.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "${name == "" ? "Name" : name} ${lastName == "" ? "" : lastName}",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              Text(
+                "@${id == '' ? "username" : id}",
+                style: const TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.normal),
+              )
+            ],
+          ),
+        ),
+      );
+
+  // Widget get end => Container(
+  //       padding: const EdgeInsets.all(2.0),
+  //       decoration: const BoxDecoration(
+  //         color: PinkTheme.headerColor,
+  //         borderRadius: BorderRadius.only(
+  //           topRight: Radius.circular(4.0),
+  //           bottomRight: Radius.circular(4.0),
+  //         ),
+  //       ),
+  //     );
+
+  Widget mainContainer({required Widget child}) => Container(
       height: Palette.height,
+      width: double.infinity,
       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
       decoration: BoxDecoration(
+        // borderRadius: BorderRadius.circular(4.0),
         boxShadow: const [
           BoxShadow(
             color: Colors.black54,
@@ -139,80 +205,38 @@ class UserMakerPalette extends StatelessWidget {
             blurStyle: BlurStyle.normal,
           ),
         ],
-        borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+        // borderRadius: const BorderRadius.all(Radius.circular(6.0)),
         border: Border.all(width: 2.0, color: Colors.transparent),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        textDirection: TextDirection.ltr,
-        children: [
-          GestureDetector(
-            onTap: selectFile,
-            child: Container(
-              clipBehavior: Clip.hardEdge,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4.0),
-                  bottomLeft: Radius.circular(4.0),
-                ),
+      child: child);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Container(
+          height: Palette.height,
+          // width: double.infinity,
+          margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+          decoration: BoxDecoration(
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black54,
+                blurRadius: 6.0,
+                spreadRadius: -6.0,
+                offset: Offset(8.0, 8.0),
+                blurStyle: BlurStyle.normal,
               ),
-              width: Palette.height - 2.0, // borderWidth x2
-              child: image.isNotEmpty
-                  ? Image.memory(
-                      Uint8List.fromList(image),
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                    )
-                  : Image.asset(
-                      'lib/src/assets/picture_place_holder_2.png',
-                      fit: BoxFit.cover,
-                    ),
-            ),
+            ],
+            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+            border: Border.all(width: 2.0, color: Colors.transparent),
           ),
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: PinkTheme.headerColor,
-                border: Border(
-                  left: BorderSide(color: PinkTheme.headerColor, width: 1.0),
-                ),
-              ),
-              padding: const EdgeInsets.only(left: 6.0, top: 5.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    (name == '' ? "Name" : name) +
-                        " " +
-                        (lastName == '' ? "" : lastName),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                  Text(
-                    "@" + (id == '' ? "username" : id),
-                    style: const TextStyle(
-                        fontSize: 10, fontWeight: FontWeight.normal),
-                  )
-                ],
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(2.0),
-            decoration: const BoxDecoration(
-              color: PinkTheme.headerColor,
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(4.0),
-                bottomRight: Radius.circular(4.0),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            textDirection: TextDirection.ltr,
+            children: [placeHolderImage, body], //end],
+          )),
+      const SizedBox(height: 8)
+    ]);
   }
 }
 
@@ -227,7 +251,9 @@ class PaletteMaker extends StatelessWidget {
   final Nodes type;
   final Nodes? parentType;
   final TextEditingController tec;
+  final bool fold;
   const PaletteMaker({
+    required this.fold,
     required this.colorCode,
     required this.tec,
     required this.id,
@@ -242,90 +268,103 @@ class PaletteMaker extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
+  Widget mainContainer({required List<Widget> children}) => AnimatedOpacity(
+        opacity: fold ? 0 : 1,
+        duration: const Duration(milliseconds: 600),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 600),
+          height: fold ? 0 : Palette.height,
+          margin: EdgeInsets.only(
+            left: 22.0,
+            right: 22.0,
+            bottom: fold ? 0 : Sizes.h * 0.02,
+          ),
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+              boxShadow: const [
+                BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 6.0,
+                    spreadRadius: -6.0,
+                    offset: Offset(8.0, 8.0),
+                    blurStyle: BlurStyle.normal)
+              ],
+              borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+              border: Border.all(width: 2.0, color: Colors.transparent)),
+          child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              textDirection: TextDirection.ltr,
+              children: children),
+        ),
+      );
+
+  Widget get paletteImage => GestureDetector(
+        onTap: () async {
+          FilePickerResult? r = await FilePicker.platform.pickFiles(
+              type: FileType.custom,
+              allowedExtensions: ['jpg', 'png', 'jpeg'],
+              withData: true);
+          if (r?.files.single.bytes != null) {
+            imageCallBack(r!.files.single.bytes!);
+          }
+        },
+        child: Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(
+              borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(4.0),
+            bottomLeft: Radius.circular(4.0),
+          )),
+          width: Palette.height - 2.0, // borderWidth x2
+          child: image.isEmpty
+              ? Image.asset(
+                  'lib/src/assets/picture_place_holder_2.png',
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                )
+              : Image.memory(
+                  image,
+                  gaplessPlayback: true,
+                  fit: BoxFit.cover,
+                ),
+        ),
+      );
+
+  Widget get paletteBody => Expanded(
+        child: Container(
+          padding: const EdgeInsets.only(left: 10.0, top: 10.0),
+          color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
+          child: Down4Input(
+            tec: tec,
+            inputCallBack: nameCallBack,
+            placeHolder: hintText,
+            padding: const EdgeInsets.only(bottom: Palette.height / 2),
+          ),
+        ),
+      );
+
+  Widget get paletteAction => GestureDetector(
+      onTap: () {
+        if (name.isNotEmpty && image.isNotEmpty) {
+          go?.call(id);
+        }
+      },
+      child: Container(
+          clipBehavior: Clip.hardEdge,
+          padding: const EdgeInsets.all(2.0),
+          width: type != Nodes.user ? Palette.height - 2.0 : 4.0,
+          decoration: BoxDecoration(
+              color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
+              borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(4.0),
+                  bottomRight: Radius.circular(4.0))),
+          child: go != null
+              ? Image.asset('lib/src/assets/rightBlackArrow.png')
+              : const SizedBox.shrink()));
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-        height: Palette.height,
-        margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-        decoration: BoxDecoration(
-            boxShadow: const [
-              BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 6.0,
-                  spreadRadius: -6.0,
-                  offset: Offset(8.0, 8.0),
-                  blurStyle: BlurStyle.normal)
-            ],
-            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-            border: Border.all(width: 2.0, color: Colors.transparent)),
-        child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            textDirection: TextDirection.ltr,
-            children: [
-              GestureDetector(
-                onTap: () async {
-                  FilePickerResult? r = await FilePicker.platform.pickFiles(
-                      type: FileType.custom,
-                      allowedExtensions: ['jpg', 'png', 'jpeg'],
-                      withData: true);
-                  if (r?.files.single.bytes != null) {
-                    imageCallBack(r!.files.single.bytes!);
-                  }
-                },
-                child: Container(
-                  clipBehavior: Clip.hardEdge,
-                  decoration: const BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(4.0),
-                    bottomLeft: Radius.circular(4.0),
-                  )),
-                  width: Palette.height - 2.0, // borderWidth x2
-                  child: image.isEmpty
-                      ? Image.asset(
-                          'lib/src/assets/picture_place_holder_2.png',
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                        )
-                      : Image.memory(
-                          image,
-                          gaplessPlayback: true,
-                          fit: BoxFit.cover,
-                        ),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.only(left: 10.0, top: 10.0),
-                  color:
-                      PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
-                  child: Down4Input(
-                    tec: tec,
-                    inputCallBack: nameCallBack,
-                    placeHolder: hintText,
-                    padding: const EdgeInsets.only(bottom: Palette.height / 2),
-                  ),
-                ),
-              ),
-              GestureDetector(
-                  onTap: () {
-                    if (name.isNotEmpty && image.isNotEmpty) {
-                      go?.call(id);
-                    }
-                  },
-                  child: Container(
-                      clipBehavior: Clip.hardEdge,
-                      padding: const EdgeInsets.all(2.0),
-                      width: type != Nodes.user ? Palette.height - 2.0 : 4.0,
-                      decoration: BoxDecoration(
-                          color: PinkTheme
-                              .nodeColors[colorCode], //PinkTheme.headerColor,
-                          borderRadius: const BorderRadius.only(
-                              topRight: Radius.circular(4.0),
-                              bottomRight: Radius.circular(4.0))),
-                      child: go != null
-                          ? Image.asset('lib/src/assets/rightBlackArrow.png')
-                          : const SizedBox.shrink()))
-            ]));
+    return mainContainer(children: [paletteImage, paletteBody, paletteAction]);
   }
 }
 

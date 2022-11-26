@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:isolate';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_testproject/src/render_objects/render_utils.dart';
 import 'package:video_player/video_player.dart';
 import 'package:english_words/english_words.dart' as rw;
 import 'package:file_picker/file_picker.dart';
@@ -17,14 +19,21 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 
 class HyperchatPage extends StatefulWidget {
+  final double initialOffset;
   final List<CameraDescription> cameras;
-  final List<Palette> palettes;
+  final List<Palette> palettes, transitioned;
+  final Iterable<User> userTargets;
+  // final List<Palette> Function() transition;
   final void Function(r.HyperchatRequest) hyperchatRequest;
   final void Function(r.ChatRequest) ping;
   final void Function() back;
   final User self;
 
   const HyperchatPage({
+    required this.initialOffset,
+    required this.userTargets,
+    required this.transitioned,
+    // required this.transition,
     required this.self,
     required this.palettes,
     required this.hyperchatRequest,
@@ -35,7 +44,7 @@ class HyperchatPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _HyperchatPageState createState() => _HyperchatPageState();
+  State<HyperchatPage> createState() => _HyperchatPageState();
 }
 
 class _HyperchatPageState extends State<HyperchatPage> {
@@ -45,48 +54,61 @@ class _HyperchatPageState extends State<HyperchatPage> {
   Console? console;
   Map<Identifier, Down4Media> cachedImages = {};
   Map<Identifier, Down4Media> cachedVideos = {};
+  late var palettes = widget.palettes;
+  late var scrollController =
+      ScrollController(initialScrollOffset: widget.initialOffset);
 
   @override
   void initState() {
     super.initState();
     loadBaseConsole();
+    asyncImageLoad();
+    delayed();
   }
 
-  List<Down4Media> get savedImages {
-    if (cachedImages.isEmpty && b.images.keys.isEmpty) {
-      return <Down4Media>[];
-    } else if (cachedImages.values.isEmpty && b.images.keys.isNotEmpty) {
-      for (final mediaID in b.images.keys) {
+  Future<void> delayed() async {
+    Future(() => setState(() {
+          palettes = widget.transitioned;
+          scrollController.animateTo(0,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut);
+        }));
+  }
+
+  Future<void> asyncImageLoad() async {
+    Future(() {
+      final keys = b.images.keys;
+      final nImages = keys.length;
+      final nImagesToLoad = nImages <= 25 ? nImages : 25;
+      for (int i = 0; i < nImagesToLoad; i++) {
+        final mediaID = keys.elementAt(i);
         cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        print("load media id=$mediaID");
       }
-      return cachedImages.values.toList();
-    } else {
-      return cachedImages.values.toList();
-    }
+    }).then((value) {
+      Future(() {
+        print("loaded all images");
+        for (final image in cachedImages.values) {
+          print("precached image id=${image.id}");
+          precacheImage(MemoryImage(image.data), context);
+        }
+      }).then((value) => print("precached all images"));
+    });
   }
 
-  List<Down4Media> get savedVideos {
-    if (cachedVideos.isEmpty && b.videos.keys.isEmpty) {
-      return <Down4Media>[];
-    } else if (cachedVideos.values.isEmpty && b.videos.keys.isNotEmpty) {
-      for (final mediaID in b.videos.keys) {
-        cachedVideos[mediaID] = b.loadSavedVideo(mediaID);
-      }
-      return cachedVideos.values.toList();
-    } else {
-      return cachedVideos.values.toList();
-    }
-  }
+  Iterable<Down4Media> get savedImages => b.images.keys
+      .map((mediaID) => cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+
+  Iterable<Down4Media> get savedVideos => b.videos.keys
+      .map((mediaID) => cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
 
   void send() {
     if (mediaInput == null && tec.value.text.isEmpty) return;
-    final selfID = widget.self.id;
-    final targets = widget.palettes.map((e) => e.node.id).toList() + [selfID];
 
     final msg = Down4Message(
       type: Messages.chat,
       id: messagePushId(),
-      senderID: selfID,
+      senderID: widget.self.id,
       timestamp: u.timeStamp(),
       mediaID: mediaInput?.id,
       text: tec.value.text,
@@ -95,12 +117,12 @@ class _HyperchatPageState extends State<HyperchatPage> {
     final pairs = rw
         .generateWordPairs(safeOnly: false)
         .take(10)
-        .map((e) => e.first + " " + e.second)
+        .map((e) => "${e.first} ${e.second}")
         .toList(growable: false);
 
     final hcReq = r.HyperchatRequest(
       message: msg,
-      targets: targets,
+      targets: widget.userTargets.asIds().toList(growable: false),
       wordPairs: pairs,
       media: mediaInput,
     );
@@ -136,17 +158,20 @@ class _HyperchatPageState extends State<HyperchatPage> {
         b.saveImage(cachedImages[mediaID]!);
       }
     }
-    setState(() {});
+    loadMediaConsole();
   }
+
+  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: tec);
 
   void loadMediaConsole([bool images = true]) {
     console = Console(
+      inputs: [consoleInput],
       selectMedia: (media) {
         mediaInput = media;
         send();
       },
       images: true,
-      medias: images ? savedImages : savedVideos,
+      medias: images ? savedImages.toList() : savedVideos.toList(),
       topButtons: [
         ConsoleButton(name: "Import", onPress: handleImport),
       ],
@@ -168,7 +193,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   void loadBaseConsole() {
     console = Console(
-      inputs: [ConsoleInput(placeHolder: ":)", tec: tec)],
+      inputs: [consoleInput],
       topButtons: [
         ConsoleButton(name: "Ping", onPress: ping),
         ConsoleButton(name: "Send", onPress: send),
@@ -197,6 +222,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
     }
 
     console = Console(
+      inputs: [consoleInput],
       videoPlayerController: vpc,
       imagePreviewPath: path,
       topButtons: [
@@ -236,6 +262,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
     }
     ctrl?.setFlashMode(fm);
     console = Console(
+      inputs: [consoleInput],
       cameraController: ctrl,
       aspectRatio: ctrl?.value.aspectRatio,
       topButtons: [
@@ -300,15 +327,19 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   @override
   void dispose() async {
-    await ctrl?.dispose();
+    if (ctrl != null) await ctrl!.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Jeff(pages: [
+    return Andrew(pages: [
       Down4Page(
-          title: "Hyperchat", console: console!, palettes: widget.palettes),
+        scrollController: scrollController,
+        title: "Hyperchat",
+        console: console!,
+        palettes: palettes,
+      ),
     ]);
   }
 }

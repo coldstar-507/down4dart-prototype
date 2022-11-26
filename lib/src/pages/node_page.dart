@@ -16,7 +16,7 @@ class NodePage extends StatefulWidget {
   final MessageList4? messageList;
   final Palette palette;
   final User self;
-  final Palette? Function(BaseNode, String) nodeToPalette;
+  final Palette? Function(BaseNode, {String at}) nodeToPalette;
   final void Function(String, String) openNode, openChat;
   final void Function() back;
 
@@ -46,7 +46,7 @@ class _NodePageState extends State<NodePage> {
     super.initState();
     final node = widget.palette.node;
     if (node is User) {
-      _view = Jeff(pages: [
+      _view = Andrew(pages: [
         Down4Page(
           title: node.name,
           console: userPaletteConsole,

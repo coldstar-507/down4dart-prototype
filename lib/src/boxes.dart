@@ -10,6 +10,8 @@ import 'web_requests.dart' as r;
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
 
+const golden = 1.618;
+
 var b = Boxes.instance;
 var db = FirebaseDatabase.instance.ref();
 var fs = FirebaseFirestore.instance;
@@ -184,9 +186,9 @@ class Boxes {
     return Down4Media.fromJson(jsonDecode(videos.get(id)));
   }
 
-  ExchangeRate? loadExchangeRate() {
+  ExchangeRate loadExchangeRate() {
     final rate = user.get("exchangeRate");
-    if (rate == null) return null;
+    if (rate == null) return ExchangeRate(lastUpdate: 0, rate: 0.0);
     return ExchangeRate.fromJson(jsonDecode(rate));
   }
 
@@ -268,12 +270,33 @@ class Boxes {
     return isSavedImage || isSavedVideo || isMessageMedia;
   }
 
+  Down4Media? loadMessageMediaFromLocal(Identifier mediaID) {
+    final isSavedImage = images.containsKey(mediaID);
+    if (isSavedImage) {
+      return Down4Media.fromJson(jsonDecode(images.get(mediaID)));
+    } else {
+      final isMessageMedia = messageMedias.containsKey(mediaID);
+      if (isMessageMedia) {
+        return Down4Media.fromJson(jsonDecode(messageMedias.get(mediaID)));
+      } else {
+        final isSavedVideo = videos.containsKey(mediaID);
+        if (isSavedVideo) {
+          return Down4Media.fromJson(jsonDecode(videos.get(mediaID)));
+        }
+      }
+    }
+    return null;
+  }
+
   static Boxes get instance => _instance ??= Boxes();
 }
 
 class Sizes {
   static double h = 0;
   static double w = 0;
+  static double fullHeight = 0;
+  static double get fullAspectRatio => w / fullHeight;
+  static double get paddedAspectRatio => w / h;
 }
 
 class Sizes2 {

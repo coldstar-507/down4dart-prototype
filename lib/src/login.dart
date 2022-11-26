@@ -177,13 +177,25 @@ class _Down4State extends State<Down4> {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
-    );
-    final size = MediaQuery.of(context).size;
-    final padding = MediaQuery.of(context).padding;
-    Sizes.h = size.height - padding.top - padding.bottom - 32;
-    Sizes.w = size.width - padding.left - padding.right;
-    return SafeArea(child: _view ?? const LoadingPage());
+    // SystemChrome.setSystemUIOverlayStyle(
+    //   const SystemUiOverlayStyle(statusBarColor: PinkTheme.qrColor),
+    // );
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
+    final truePadding = mediaQuery.viewPadding;
+    final fakePadding = mediaQuery.padding;
+    print("true padding top=${truePadding.top}");
+    print("true padding bot=${truePadding.bottom}");
+    print("true padding left=${truePadding.left}");
+    print("true padding right=${truePadding.right}");
+    print("fake padding top=${fakePadding.top}");
+    print("fake padding bot=${fakePadding.bottom}");
+    print("fake padding left=${fakePadding.left}");
+    print("fake padding right=${fakePadding.right}");
+    // final padding = MediaQuery.of(context).padding;
+    Sizes.fullHeight = size.height; // + truePadding.top;
+    Sizes.h = size.height - truePadding.top - truePadding.bottom - 32;
+    Sizes.w = size.width - truePadding.left - truePadding.right;
+    return _view ?? const LoadingPage();
   }
 }

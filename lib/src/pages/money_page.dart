@@ -2,9 +2,8 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/main.dart';
 import 'package:flutter_testproject/src/down4_utility.dart';
-import 'package:flutter_testproject/src/render_objects/utils.dart';
+import 'package:flutter_testproject/src/render_objects/render_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -72,7 +71,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Jeff(pages: [
+    return Andrew(pages: [
       Down4Page(
         title: sha1(widget.payment.txs.last.txID!.data).toBase58(),
         stackWidgets: [qr()],
@@ -92,18 +91,26 @@ class _PaymentPageState extends State<PaymentPage> {
 class MoneyPage extends StatefulWidget {
   final double exchangeRate;
   final Wallet wallet;
-  final List<Palette> palettes, paymentAsPalettes;
+  final List<Palette> paymentAsPalettes;
+  final Iterable<Palette> homePalettes;
+  final Iterable<User> trueTargets;
   final User self;
+  // final List<Palette> Function() transition;
+  final List<Palette> transitioned;
   final void Function() back;
   final void Function(Down4Payment) parsePayment;
   final void Function(r.Request req) paymentRequest;
   final int pageIndex;
   final void Function(int) onPageChange;
+  final double initialOffset;
 
   const MoneyPage({
+    // required this.transition,
+    required this.trueTargets,
+    required this.transitioned,
     required this.wallet,
     required this.exchangeRate,
-    required this.palettes,
+    required this.homePalettes,
     required this.paymentAsPalettes,
     required this.back,
     required this.self,
@@ -111,6 +118,7 @@ class MoneyPage extends StatefulWidget {
     required this.onPageChange,
     required this.parsePayment,
     required this.paymentRequest,
+    required this.initialOffset,
     Key? key,
   }) : super(key: key);
 
@@ -121,32 +129,11 @@ class MoneyPage extends StatefulWidget {
 class _MoneyPageState extends State<MoneyPage> {
   var tec = TextEditingController();
   var importTec = TextEditingController();
+  var emptyTec = TextEditingController();
   MobileScannerController? scanner;
   Console? _console;
   Map<int, String> scannedData = {};
   int scannedDataLength = -1;
-
-  @override
-  void initState() {
-    super.initState();
-    mainViewInput(true);
-    if (widget.palettes.isEmpty) {
-      emptyViewConsole();
-    } else {
-      mainViewConsole();
-    }
-  }
-
-  @override
-  void dispose() {
-    tec.dispose();
-    importTec.dispose();
-    scanner?.dispose();
-    super.dispose();
-  }
-
-  void startScan() {}
-
   ConsoleInput? _cachedMainViewInput;
   final Map<String, dynamic> _currencies = {
     "l": ["USD", "Satoshis"],
@@ -156,6 +143,44 @@ class _MoneyPageState extends State<MoneyPage> {
     "l": ["Each", "Split"],
     "i": 0,
   };
+  late var palettes = widget.homePalettes;
+  // late final transitioned = widget.transition();
+  late var scrollController =
+      ScrollController(initialScrollOffset: widget.initialOffset);
+
+  @override
+  void initState() {
+    super.initState();
+    mainViewInput(true);
+    if (widget.trueTargets.isEmpty) {
+      emptyViewConsole();
+    } else {
+      mainViewConsole();
+    }
+
+    delayed();
+  }
+
+  Future<void> delayed() async {
+    Future(() {
+      palettes = widget.transitioned;
+      scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 600), curve: Curves.easeOut);
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    tec.dispose();
+    importTec.dispose();
+    emptyTec.dispose();
+    scanner?.dispose();
+    scrollController.dispose();
+    super.dispose();
+  }
+
+  void startScan() {}
 
   int usdToSatoshis(double usds) =>
       ((usds / widget.exchangeRate) * 100000000).floor();
@@ -189,17 +214,18 @@ class _MoneyPageState extends State<MoneyPage> {
     if (currency == "Satoshis") {
       amount = method == "Split"
           ? numInput.round()
-          : (numInput * widget.palettes.length).round();
+          : (numInput * widget.trueTargets.length).round();
     } else {
       amount = method == "Split"
           ? usdToSatoshis(numInput.toDouble())
-          : usdToSatoshis(numInput.toDouble() * widget.palettes.length);
+          : usdToSatoshis(numInput.toDouble() * widget.trueTargets.length);
     }
     return amount;
   }
 
   void mainViewInput([bool reload = false]) {
     _cachedMainViewInput = ConsoleInput(
+      maxLines: 1,
       type: TextInputType.number,
       placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
       tec: tec,
@@ -223,7 +249,7 @@ class _MoneyPageState extends State<MoneyPage> {
     _console = Console(
       scanCallBack: scanning ? onScan : null,
       scanController: scanning ? scanner : null,
-      inputs: scanning ? null : [_cachedMainViewInput!],
+      inputs: [_cachedMainViewInput!],
       topButtons: [
         ConsoleButton(
           name: "Scan",
@@ -309,23 +335,23 @@ class _MoneyPageState extends State<MoneyPage> {
     int asSats;
     if (inputCurrency == "USD") {
       asUSD = num.parse(tec.value.text).toDouble() *
-          (method == "Split" ? 1.0 : widget.palettes.length);
+          (method == "Split" ? 1.0 : widget.trueTargets.length);
       asSats = usdToSatoshis(asUSD);
     } else {
       asSats = num.parse(tec.value.text).toInt() *
-          (method == "Split" ? 1 : widget.palettes.length);
+          (method == "Split" ? 1 : widget.trueTargets.length);
       asUSD = satoshisToUSD(asSats);
     }
 
     final satsString = formattedSats(asSats);
-
+    // tec.clear();
     _console = Console(
       inputs: [
         ConsoleInput(
           placeHolder: currency == "USD"
-              ? asUSD.toStringAsFixed(4) + " \$"
-              : satsString + " sat",
-          tec: tec,
+              ? "${asUSD.toStringAsFixed(4)} \$"
+              : "$satsString sat",
+          tec: emptyTec,
           activated: false,
         ),
       ],
@@ -334,7 +360,7 @@ class _MoneyPageState extends State<MoneyPage> {
             name: "Confirm",
             onPress: () {
               final pay = widget.wallet.payUsers(
-                widget.palettes.asNodes().toList(growable: false) as List<User>,
+                widget.trueTargets.toList(growable: false),
                 widget.self,
                 Sats(inputAsSatoshis),
               );
@@ -350,7 +376,7 @@ class _MoneyPageState extends State<MoneyPage> {
                 printWrapped("pay: ${pay.toYouKnow()}###\n###");
                 print("ID: ${sha256(utf8.encode(pay.toYouKnow())).toHex()}");
                 print("txid: ${pay.txs.last.txID!.asHex}");
-                if (widget.palettes.isEmpty) {
+                if (widget.trueTargets.isEmpty) {
                   emptyViewConsole(false, false, true);
                 } else {
                   mainViewConsole(true);
@@ -380,8 +406,8 @@ class _MoneyPageState extends State<MoneyPage> {
       input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
     } else {
       final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
-      final ph = "Found " + formattedSats(sats) + " sat";
-      input = ConsoleInput(placeHolder: ph, tec: importTec, activated: false);
+      final ph = "Found ${formattedSats(sats)} sat";
+      input = ConsoleInput(placeHolder: ph, tec: emptyTec, activated: false);
     }
 
     void import() async {
@@ -391,7 +417,7 @@ class _MoneyPageState extends State<MoneyPage> {
       if (payment == null) return;
 
       widget.parsePayment(payment);
-      if (widget.palettes.isEmpty) {
+      if (widget.trueTargets.isEmpty) {
         emptyViewConsole(false, false, true);
       } else {
         mainViewConsole(true);
@@ -406,8 +432,9 @@ class _MoneyPageState extends State<MoneyPage> {
       bottomButtons: [
         ConsoleButton(
           name: "Back",
-          onPress: () =>
-              widget.palettes.isEmpty ? emptyViewConsole() : mainViewConsole(),
+          onPress: () => widget.trueTargets.isEmpty
+              ? emptyViewConsole()
+              : mainViewConsole(),
         ),
         ConsoleButton(
           name: "Check",
@@ -459,8 +486,9 @@ class _MoneyPageState extends State<MoneyPage> {
       onPageChange: widget.onPageChange,
       pages: [
         Down4Page(
+          scrollController: scrollController,
           title: "Money",
-          palettes: widget.palettes,
+          palettes: palettes.toList(growable: false),
           console: _console!,
         ),
         Down4Page(

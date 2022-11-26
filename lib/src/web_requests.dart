@@ -39,7 +39,7 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<BaseNode>?> getNodes(List<String> ids) async {
+Future<List<BaseNode>?> getNodes(Iterable<String> ids) async {
   final url =
       Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes");
   final res = await http.post(url, body: ids.join(" "));
@@ -215,16 +215,18 @@ Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
 
 abstract class Request {
   final List<Identifier> targets;
-  Request({required this.targets});
+  const Request({required this.targets});
   Map<String, dynamic> toJson();
 }
 
 class ChatRequest implements Request {
+  final String? groupName;
   final Down4Message message;
-  final Down4Media? media;
+  Down4Media? media;
   ChatRequest({
     required this.message,
     required this.targets,
+    this.groupName,
     this.media,
   });
   @override
@@ -232,6 +234,7 @@ class ChatRequest implements Request {
 
   @override
   Map<String, dynamic> toJson([bool withMedia = false]) => {
+        if (groupName != null) "gn": groupName,
         "msg": message.toJson(),
         "tr": targets,
         if (withMedia && media != null) "m": media!.toJson(),
@@ -259,7 +262,7 @@ class PingRequest implements Request {
 
 class SnipRequest extends ChatRequest {
   SnipRequest({
-    required Down4Media media,
+    Down4Media? media,
     required Down4Message message,
     required List<Identifier> targets,
   }) : super(targets: targets, message: message, media: media);
@@ -268,7 +271,7 @@ class SnipRequest extends ChatRequest {
   Map<String, dynamic> toJson([bool withMedia = true]) => {
         "msg": message.toJson(),
         "tr": targets,
-        "m": media!.toJson(),
+        if (media != null) "m": media!.toJson(),
       };
 }
 
@@ -291,13 +294,15 @@ class HyperchatRequest extends ChatRequest {
 }
 
 class GroupRequest extends ChatRequest {
-  String name;
-  bool private;
-  Down4Media groupImage;
+  final Identifier groupID;
+  final String name;
+  final bool private;
+  final Down4Media groupMedia;
   GroupRequest({
+    required this.groupID,
     required this.private,
     required this.name,
-    required this.groupImage,
+    required this.groupMedia,
     required Down4Message message,
     Down4Media? media,
     required List<Identifier> targets,
@@ -305,10 +310,11 @@ class GroupRequest extends ChatRequest {
 
   @override
   Map<String, dynamic> toJson([bool withMedia = false]) => {
+        "id": groupID,
         "msg": message.toJson(),
         "pv": private,
         "gn": name,
-        "gm": groupImage.toJson(),
+        "gm": groupMedia.toJson(),
         "tr": targets,
         if (withMedia && media != null) "m": media!.toJson(),
       };

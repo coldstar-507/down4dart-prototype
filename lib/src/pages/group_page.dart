@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:convert' show utf8;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_testproject/src/bsv/utils.dart';
 import 'package:flutter_testproject/src/data_objects.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_player/video_player.dart';
@@ -16,23 +18,30 @@ import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
-import '../render_objects/utils.dart';
+import '../render_objects/render_utils.dart';
 
 class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final User self;
-  final List<Palette> palettes;
+  // final List<Palette> Function() transition;
+  final List<Palette> palettes, transitioned;
+  final Iterable<User> userTargets;
   final void Function(Group) afterMessageCallback;
   final void Function() back;
   final void Function(r.GroupRequest) groupRequest;
+  final double initialOffset;
 
   const GroupPage({
+    // required this.transition,
+    required this.userTargets,
+    required this.transitioned,
     required this.self,
     required this.afterMessageCallback,
     required this.back,
     required this.groupRequest,
     required this.palettes,
     required this.cameras,
+    required this.initialOffset,
     Key? key,
   }) : super(key: key);
 
@@ -42,41 +51,43 @@ class GroupPage extends StatefulWidget {
 
 class _GroupPageState extends State<GroupPage> {
   Console? console;
-  ConsoleInput? singleInput;
   CameraController? ctrl;
-  List<Widget> items = [];
+  late List<Widget> items = [groupMaker(fold: true), ...widget.palettes];
   var tec = TextEditingController();
   var tec2 = TextEditingController();
   bool private = true;
+  late var scrollController =
+      ScrollController(initialScrollOffset: widget.initialOffset);
 
   Map<Identifier, Down4Media> cachedImages = {};
   Map<Identifier, Down4Media> cachedVideos = {};
 
-  List<Down4Media> get savedImages {
-    if (cachedImages.isEmpty && b.images.keys.isEmpty) {
-      return <Down4Media>[];
-    } else if (cachedImages.values.isEmpty && b.images.keys.isNotEmpty) {
-      for (final mediaID in b.images.keys) {
+  Future<void> asyncImageLoad() async {
+    Future(() {
+      final keys = b.images.keys;
+      final nImages = keys.length;
+      final nImagesToLoad = nImages <= 25 ? nImages : 25;
+      for (int i = 0; i < nImagesToLoad; i++) {
+        final mediaID = keys.elementAt(i);
         cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        print("load media id=$mediaID");
       }
-      return cachedImages.values.toList();
-    } else {
-      return cachedImages.values.toList();
-    }
+    }).then((value) {
+      Future(() {
+        print("loaded all images");
+        for (final image in cachedImages.values) {
+          print("precached image id=${image.id}");
+          precacheImage(MemoryImage(image.data), context);
+        }
+      }).then((value) => print("precached all images"));
+    });
   }
 
-  List<Down4Media> get savedVideos {
-    if (cachedVideos.isEmpty && b.videos.keys.isEmpty) {
-      return <Down4Media>[];
-    } else if (cachedVideos.values.isEmpty && b.videos.keys.isNotEmpty) {
-      for (final mediaID in b.videos.keys) {
-        cachedVideos[mediaID] = b.loadSavedVideo(mediaID);
-      }
-      return cachedVideos.values.toList();
-    } else {
-      return cachedVideos.values.toList();
-    }
-  }
+  Iterable<Down4Media> get savedImages => b.images.keys
+      .map((mediaID) => cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+
+  Iterable<Down4Media> get savedVideos => b.videos.keys
+      .map((mediaID) => cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
 
   Down4Media? groupImage;
   Down4Media? mediaInput;
@@ -86,14 +97,24 @@ class _GroupPageState extends State<GroupPage> {
   void initState() {
     super.initState();
     loadBaseConsole();
-    loadPalettes();
+    animatedTransition();
+    asyncImageLoad();
   }
 
-  PaletteMaker groupMaker() => PaletteMaker(
+  Future<void> animatedTransition() async {
+    Future(() => setState(() {
+          items = [groupMaker(fold: false), ...widget.transitioned];
+          scrollController.animateTo(0,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut);
+        }));
+  }
+
+  PaletteMaker groupMaker({required bool fold}) => PaletteMaker(
+        fold: fold,
         colorCode: NodesColor.group,
         tec: tec2,
         id: "",
-        // will calculate the ID on hyperchat creation for hyperchats
         name: groupName,
         hintText: "Group Name",
         image: groupImage?.data ?? Uint8List(0),
@@ -110,47 +131,39 @@ class _GroupPageState extends State<GroupPage> {
               timestamp: DateTime.now().millisecondsSinceEpoch,
             ),
           );
-          loadPalettes();
+          items = [groupMaker(fold: false), ...widget.transitioned];
         },
       );
 
-  void loadPalettes() {
-    items.clear();
-    items.add(groupMaker());
-    items.addAll(widget.palettes);
-    setState(() {});
-  }
+  ConsoleInput get singleInput => ConsoleInput(placeHolder: ":)", tec: tec);
 
   void send() {
     if (mediaInput == null && tec.value.text.isEmpty) return;
     if (groupImage == null || groupName.isEmpty) return;
 
-    final selfID = widget.self.id;
-    final targets = widget.palettes.asIds().toList(growable: false);
-
     final msg = Down4Message(
       type: Messages.chat,
       id: messagePushId(),
-      senderID: selfID,
+      senderID: widget.self.id,
       timestamp: u.timeStamp(),
       mediaID: mediaInput?.id,
       text: tec.value.text,
     );
 
+    final groupID =
+        sha256(utf8.encode(groupName + groupImage!.id + msg.id)).toBase58();
+
     final grpReq = r.GroupRequest(
+      groupID: groupID,
       name: groupName,
-      groupImage: groupImage!,
+      groupMedia: groupImage!,
       message: msg,
       private: private,
-      targets: targets,
+      targets: widget.userTargets.asIds().toList(growable: false),
       media: mediaInput,
     );
 
     widget.groupRequest(grpReq);
-  }
-
-  void ping() {
-    // TODO
   }
 
   Future<void> handleImport() async {
@@ -177,17 +190,18 @@ class _GroupPageState extends State<GroupPage> {
         b.saveImage(cachedImages[mediaID]!);
       }
     }
-    setState(() {});
+    loadMediaConsole();
   }
 
   void loadMediaConsole([bool images = true]) {
     console = Console(
+      inputs: [singleInput],
       images: true,
       selectMedia: (media) {
         mediaInput = media;
         send();
       },
-      medias: images ? savedImages : savedVideos,
+      medias: images ? savedImages.toList() : savedVideos.toList(),
       topButtons: [
         ConsoleButton(name: "Import", onPress: handleImport),
       ],
@@ -209,7 +223,7 @@ class _GroupPageState extends State<GroupPage> {
 
   void loadBaseConsole() {
     console = Console(
-      inputs: [ConsoleInput(placeHolder: ":)", tec: tec)],
+      inputs: [singleInput],
       topButtons: [
         ConsoleButton(
           isMode: true,
@@ -245,6 +259,7 @@ class _GroupPageState extends State<GroupPage> {
     }
 
     console = Console(
+      inputs: [singleInput],
       videoPlayerController: vpc,
       imagePreviewPath: path,
       topButtons: [
@@ -284,6 +299,7 @@ class _GroupPageState extends State<GroupPage> {
     }
     ctrl?.setFlashMode(fm);
     console = Console(
+      inputs: [singleInput],
       aspectRatio: ctrl?.value.aspectRatio,
       cameraController: ctrl,
       topButtons: [
@@ -350,8 +366,13 @@ class _GroupPageState extends State<GroupPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Jeff(pages: [
-      Down4Page(title: "Group", columnWidgets: items, console: console!),
+    return Andrew(pages: [
+      Down4Page(
+        scrollController: scrollController,
+        title: "Group",
+        columnWidgets: items,
+        console: console!,
+      ),
     ]);
   }
 }
