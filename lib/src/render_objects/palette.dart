@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/down4_utility.dart';
+import 'package:down4/src/down4_utility.dart';
 import 'package:hive/hive.dart';
 
 import '../data_objects.dart';
@@ -52,7 +52,7 @@ class BasicActionButton extends StatelessWidget {
         ),
         child: Image.asset(
           assetPathFromLib,
-          fit: BoxFit.cover,
+          fit: BoxFit.contain,
           // gaplessPlayback: true,
         ),
       ),
@@ -80,7 +80,8 @@ class ButtonsInfo {
 }
 
 class Palette extends StatelessWidget {
-  final paletteHeight = Sizes.h * 0.08575;
+  double get paletteHeight => Sizes.h * 0.08575;
+  double get gapSize => Sizes.h * 0.02;
   static const double height = 60.0;
   final BaseNode node;
   final String at;
@@ -88,7 +89,7 @@ class Palette extends StatelessWidget {
       bodyPress,
       imLongPress,
       bodyLongPress;
-  final bool selected;
+  final bool selected, messagePreviewWasRead, snipOrMessageToRead;
   final List<ButtonsInfo> buttonsInfo;
   final String? messagePreview;
   final bool squish, alignedRight, fold, fadeButton, fade;
@@ -141,12 +142,12 @@ class Palette extends StatelessWidget {
     throw 'stop breaking my app';
   }
 
-  Palette({
+  const Palette({
     required this.node,
     required this.at,
-    this.fadeMS = 200,
+    this.fadeMS = 100,
     this.containerMS = 600,
-    this.fadeButtonMS = 200,
+    this.fadeButtonMS = 100,
     this.messagePreview,
     this.buttonsInfo = const [],
     this.imPress,
@@ -154,6 +155,8 @@ class Palette extends StatelessWidget {
     this.imLongPress,
     this.bodyLongPress,
     this.selected = false,
+    this.messagePreviewWasRead = false,
+    this.snipOrMessageToRead = false,
     this.squish = true,
     this.fold = false,
     this.alignedRight = false,
@@ -170,9 +173,11 @@ class Palette extends StatelessWidget {
       node: node,
       at: at,
       messagePreview: messagePreview,
+      snipOrMessageToRead: snipOrMessageToRead,
       selected: !selected,
       imPress: imPress,
       buttonsInfo: buttonsInfo,
+      messagePreviewWasRead: messagePreviewWasRead,
       imLongPress: imLongPress,
       bodyPress: bodyPress,
       bodyLongPress: bodyLongPress,
@@ -197,6 +202,8 @@ class Palette extends StatelessWidget {
       fold: fold ?? this.fold,
       node: node,
       at: at,
+      snipOrMessageToRead: snipOrMessageToRead,
+      messagePreviewWasRead: messagePreviewWasRead,
       messagePreview: messagePreview,
       selected: selected ?? this.selected,
       imPress: imPress,
@@ -216,6 +223,7 @@ class Palette extends StatelessWidget {
       squish: squish,
       fold: fold,
       alignedRight: alignedRight,
+      messagePreview: messagePreview,
       node: node,
       at: at,
       buttonsInfo: buttonsInfo
@@ -236,6 +244,9 @@ class Palette extends StatelessWidget {
 
   Widget get buttons => AnimatedOpacity(
       opacity: fadeButton ? 0 : 1,
+      // : snipOrMessageToRead
+      //     ? 1
+      //     : 0.50,
       curve: Curves.easeOut,
       duration: Duration(milliseconds: fadeButtonMS),
       child: Row(
@@ -364,8 +375,11 @@ class Palette extends StatelessWidget {
                         maxLines: 1,
                         style: TextStyle(
                           fontSize: 12,
+                          // fontStyle: messagePreviewWasRead
+                          //     ? FontStyle.normal
+                          //     : FontStyle.italic,
                           fontWeight:
-                              selected ? FontWeight.bold : FontWeight.normal,
+                              !selected ? FontWeight.normal : FontWeight.bold,
                         ),
                       )
                     : const SizedBox.shrink()
@@ -375,9 +389,78 @@ class Palette extends StatelessWidget {
         ),
       );
 
+  // Widget shadowContainer({required Widget child}) => SizedBox(
+  //       height: paletteHeight,
+  //       child: AnimatedContainer(
+  //         duration: Duration(milliseconds: containerMS),
+  //         clipBehavior: Clip.hardEdge,
+  //         curve: Curves.easeOut,
+  //         decoration: BoxDecoration(
+  //           boxShadow: [
+  //             BoxShadow(
+  //               color: squish && !selected && !fold
+  //                   ? Colors.black54
+  //                   : Colors.transparent,
+  //               blurRadius: squish && !selected && !fold ? 6.0 : 0.0,
+  //               spreadRadius: -6.0,
+  //               offset: squish && !selected && !fold
+  //                   ? const Offset(6.0, 6.0)
+  //                   : const Offset(0, 0),
+  //               blurStyle: BlurStyle.normal,
+  //             ),
+  //           ],
+  //         ),
+  //         child: child,
+  //       ),
+  //     );
+
+  // Widget get thePalette => AnimatedContainer(
+  //       margin: const EdgeInsets.symmetric(horizontal: 22.0),
+  //       duration: Duration(milliseconds: containerMS),
+  //       height: fold ? 0 : gapSize + paletteHeight,
+  //       curve: Curves.easeOut,
+  //       decoration: BoxDecoration(
+  //         boxShadow: [
+  //           BoxShadow(
+  //             color: squish && !selected && !fold
+  //                 ? Colors.black54
+  //                 : Colors.transparent,
+  //             blurRadius: squish && !selected && !fold ? 6.0 : 0.0,
+  //             spreadRadius: -6.0,
+  //             offset: squish && !selected && !fold
+  //                 ? const Offset(6.0, 6.0)
+  //                 : const Offset(0, 0),
+  //             blurStyle: BlurStyle.normal,
+  //           ),
+  //         ],
+  //         // borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+  //         // border: Border.all(
+  //         //   width: 2.0,
+  //         //   color: selected ? PinkTheme.black : Colors.transparent,
+  //         // ),
+  //       ),
+  //       child: Column(
+  //         children: [
+  //           shadowContainer(
+  //               child: mainContainer(
+  //                   child: row(children: [image, body, buttons]))),
+  //           SizedBox(height: gapSize),
+  //         ],
+  //       ),
+  //     );
+
   @override
   Widget build(BuildContext context) {
-    final gapSize = Sizes.h * 0.02;
+    // return AnimatedOpacity(
+    //   opacity: fade ? 0 : 1,
+    //   duration: Duration(milliseconds: fadeMS),
+    //   curve: Curves.easeOut,
+    //   child: Align(
+    //     alignment: alignedRight ? Alignment.centerRight : Alignment.centerLeft,
+    //     child: thePalette,
+    //   ),
+    // );
+
     return AnimatedOpacity(
         opacity: fade ? 0 : 1,
         curve: Curves.easeOut,
@@ -391,7 +474,7 @@ class Palette extends StatelessWidget {
                   mainContainer(child: row(children: [image, body, buttons])),
             ),
             AnimatedContainer(
-                duration: const Duration(milliseconds: 600),
+                duration: Duration(milliseconds: containerMS),
                 curve: Curves.easeOut,
                 height: fold ? 0 : gapSize),
           ]),

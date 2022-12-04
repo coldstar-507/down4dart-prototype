@@ -1,6 +1,6 @@
 import 'dart:io' as io;
 
-import 'package:flutter_testproject/src/down4_utility.dart';
+import 'package:down4/src/down4_utility.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 
@@ -130,12 +130,28 @@ extension PaletteExtensions on Iterable<Palette> {
     return theList;
   }
 
+  List<Palette> inReversedOrder(Iterable<Identifier> ids) {
+    var theList = <Palette>[];
+    var palIds = asIds();
+    for (final id in ids.toList(growable: false).reversed) {
+      if (palIds.contains(id)) {
+        theList.add(firstWhere((p) => p.node.id == id));
+      }
+    }
+    return theList;
+  }
+
   List<Palette> formatted() => toList(growable: false)
     ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+
+  List<Palette> formattedReverse() => toList(growable: false)
+    ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
+
   Iterable<Palette> unfolded() => where((p) => !p.fold);
   Iterable<Palette> folded() => where((p) => p.fold);
   Iterable<Palette> deactivated() => map((p) => p.deactivated());
-  Iterable<E> asNodes<E>() => map((p) => p.node).whereType<E>();
+  Iterable<BaseNode> asNodes<BaseNode>() =>
+      map((p) => p.node).whereType<BaseNode>();
   Iterable<Palette> selected() => where((p) => p.selected);
   Iterable<Palette> notSelected() => where((p) => !p.selected);
   Iterable<Identifier> asIds() => map((e) => e.node.id);

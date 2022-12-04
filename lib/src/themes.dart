@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
+  static const myBubblesColor = Color.fromARGB(255, 252, 213, 216);
   static const bodyColor = buttonColor;
   static const inactivatedButtonColor = Color.fromARGB(255, 219, 214, 214);
   static const backGroundColor = Color.fromARGB(255, 255, 241, 242);

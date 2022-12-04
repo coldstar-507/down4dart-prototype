@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/down4_utility.dart';
-import 'package:flutter_testproject/src/render_objects/render_utils.dart';
+import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/render_objects/render_utils.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -11,7 +11,7 @@ import '../boxes.dart';
 
 class HomePage extends StatelessWidget {
   final ScrollController scrollController;
-  final List<Palette> palettes;
+  final Iterable<Palette> palettes;
   final Console console;
   const HomePage({
     required this.scrollController,
@@ -25,8 +25,9 @@ class HomePage extends StatelessWidget {
     return Andrew(pages: [
       Down4Page(
         scrollController: scrollController,
+        staticList: true,
         title: "Home",
-        palettes: palettes,
+        palettes: palettes.toList(),
         console: console,
       ),
     ]);

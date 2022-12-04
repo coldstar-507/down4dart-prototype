@@ -5,9 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
    <application
         android:usesCleartextTraffic="true"
-        android:label="flutter_testproject"
+        android:label="Down4"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"

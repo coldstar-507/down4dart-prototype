@@ -204,8 +204,8 @@ class ConsoleInput extends StatelessWidget {
   Widget animatedContainer({required Widget child}) => AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       constraints: BoxConstraints(
-        minHeight: b! ? 0 : buttonHeight,
-        maxHeight: b! // ? 0 : buttonHeight,
+        minHeight: b ?? false ? 0 : buttonHeight,
+        maxHeight: b ?? false // ? 0 : buttonHeight,
             ? 0
             : activated
                 ? buttonHeight * 4
@@ -214,7 +214,7 @@ class ConsoleInput extends StatelessWidget {
       decoration: BoxDecoration(
         color:
             activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
-        border: Border.all(color: Colors.black, width: b! ? 0 : 0.5),
+        border: Border.all(color: Colors.black, width: b ?? false ? 0 : 0.5),
       ),
       child: child);
 
@@ -249,6 +249,7 @@ class Console extends StatelessWidget {
   final List<Down4Media>? medias;
   final void Function(Down4Media)? selectMedia;
   final String? imagePreviewPath;
+  final bool animatedInputs;
   final VideoPlayerController? videoPlayerController;
   final List<ConsoleInput>? inputs, topInputs;
   final MobileScannerController? scanController;
@@ -256,13 +257,16 @@ class Console extends StatelessWidget {
   final List<Palette>? forwardingPalette;
   final bool invertedColors;
 
-  int get nImageRows => (b.images.keys.length / 5).ceil();
+  int get nImageRows => (b.images.keys.length / 5).round();
   double get rowHeight => (consoleWidth / 5);
   // double get initialHeight => rowHeight;
   // double get currentHeight => initialHeight;
   // double get maxHeight => rowHeight * 1; //((nImageRows < 7) ? nImageRows : 7);
-  double get mediasHeight =>
-      nImageRows == 0 ? rowHeight : rowHeight * nImageRows;
+  double get mediasHeight => nImageRows == 0
+      ? rowHeight
+      : nImageRows <= 3
+          ? rowHeight * nImageRows
+          : rowHeight * 3;
 
   List<Widget> get extraTopButtons {
     final consoleHorizontalGap = Sizes.h * 0.023;
@@ -334,6 +338,7 @@ class Console extends StatelessWidget {
     this.forwardingPalette,
     this.selectMedia,
     this.images,
+    this.animatedInputs = true,
     this.medias,
     this.imagePreviewPath,
     this.videoPlayerController,
@@ -407,7 +412,7 @@ class Console extends StatelessWidget {
               []);
 
   Widget consoleMedias() => ListView.builder(
-      itemCount: (medias?.length ?? 0 / 4.0).ceil(),
+      itemCount: (medias?.length ?? 0 / 3.0).ceil(),
       itemBuilder: ((context, index) {
         Widget f(int i) {
           if ((medias?.length ?? 0) > i) {
@@ -536,8 +541,10 @@ class Console extends StatelessWidget {
           forwardingPalette != null
               ? forwardingPalettes()
               : const SizedBox.shrink(),
-          topConsoleInputs(),
-          bottomConsoleInputs(),
+          !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
+          !animatedInputs ? Row(children: inputs ?? []) : bottomConsoleInputs(),
+          // topConsoleInputs(),
+          // bottomConsoleInputs(),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: consoleWidth,

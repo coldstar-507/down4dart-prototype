@@ -192,7 +192,7 @@ class TXID {
 
   // String get asHexBigEndian => data.reversed.toList().toHex();
 
-  bool equals(TXID other) => data == other.data;
+  // bool equals(TXID other) => data == other.data;
 
   @override
   int get hashCode => BigInt.parse(asHex, radix: 16).hashCode;

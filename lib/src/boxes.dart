@@ -45,33 +45,6 @@ Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
   return localNodes + (await externalNodes ?? <BaseNode>[]);
 }
 
-// Future<BaseNode?> getSingleNode(Identifier nodeID) async {
-//   var doc = await fs.collection("Nodes").doc(nodeID).get();
-//   var jsonNode = doc.data();
-//   if (jsonNode == null) return null;
-//
-//   var node = Node.fromJson(jsonNode);
-//
-//   Down4Media? nodeMedia;
-//   final imageID = jsonNode["im"];
-//   if (imageID != null) {
-//     var imRef = st_node.ref(imageID);
-//     final fData = imRef.getData();
-//     final fMD = imRef.getMetadata();
-//
-//     final jsonMetadata = (await fMD).customMetadata;
-//     if (jsonMetadata != null) {
-//       final md = MediaMetadata.fromJson(jsonMetadata);
-//       final imData = await fData;
-//       if (imData != null) {
-//         nodeMedia = Down4Media(id: imageID, data: imData, metadata: md);
-//       }
-//     }
-//   }
-//   node.image = nodeMedia;
-//   return node;
-// }
-
 Future<Down4Media?> getMessageMediaFromDB(Identifier mediaID) async {
   var ref = st.ref(mediaID);
   var fmd = ref.getMetadata();
@@ -90,42 +63,43 @@ Future<Down4Media?> getMessageMediaFromDB(Identifier mediaID) async {
 }
 
 extension MessageSave on Down4Message {
-  void save() => b.messages.put(id, jsonEncode(this));
+  Future<void> save() =>
+      b.messages.put(id, jsonEncode(toJson(withReadStatus: true)));
 }
 
 extension NodeSave on BaseNode {
-  void save() => b.home.put(id, jsonEncode(this));
-  void saveUser() => b.user.put(id, jsonEncode(this));
+  Future<void> save() => b.home.put(id, jsonEncode(this));
+  Future<void> saveUser() => b.user.put(id, jsonEncode(this));
 }
 
 extension MediaSave on Down4Media {
   void writeFile() {
-    var f = File(b.dirPath + "/" + id);
+    var f = File("${b.dirPath}/$id");
     f.writeAsBytesSync(data);
     file = f;
   }
 
-  void save({bool toPersonal = false, bool toSnips = false}) {
+  Future<void> save({bool toPersonal = false, bool toSnips = false}) {
     if (!toPersonal) {
-      b.messageMedias.put(id, jsonEncode(this));
+      return b.messageMedias.put(id, jsonEncode(this));
     } else if (toSnips) {
-      b.snips.put(id, jsonEncode(this));
+      return b.snips.put(id, jsonEncode(this));
     } else {
       if (metadata.isVideo) {
-        b.videos.put(id, jsonEncode(this));
+        return b.videos.put(id, jsonEncode(this));
       } else {
-        b.images.put(id, jsonEncode(this));
+        return b.images.put(id, jsonEncode(this));
       }
     }
   }
 }
 
 extension PaymentSave on Down4Payment {
-  void save() => b.payments.put(id, jsonEncode(this));
+  Future<void> save() => b.payments.put(id, jsonEncode(this));
 }
 
 extension WalletSave on Wallet {
-  void save() => b.user.put("wallet", jsonEncode(this));
+  Future<void> save() => b.user.put("wallet", jsonEncode(this));
 }
 
 class Boxes {
@@ -251,6 +225,8 @@ class Boxes {
   }
 
   Down4Message? loadMessage(Identifier id) {
+    var msg = messages.get(id);
+    if (msg is! String) return null;
     var msgJson = jsonDecode(messages.get(id));
     if (msgJson == null) return null;
     return Down4Message.fromJson(msgJson);

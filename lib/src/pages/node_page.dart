@@ -1,6 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/data_objects.dart';
+import 'package:down4/src/data_objects.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -13,7 +13,7 @@ class NodePage extends StatefulWidget {
   final void Function(int) onPageChange;
   final List<CameraDescription> cameras;
   final List<Palette>? palettes;
-  final MessageList4? messageList;
+  // final MessageList4? messageList;
   final Palette palette;
   final User self;
   final Palette? Function(BaseNode, {String at}) nodeToPalette;
@@ -31,7 +31,7 @@ class NodePage extends StatefulWidget {
     required this.back,
     required this.self,
     this.palettes,
-    this.messageList,
+    // this.messageList,
     Key? key,
   }) : super(key: key);
 
@@ -48,6 +48,7 @@ class _NodePageState extends State<NodePage> {
     if (node is User) {
       _view = Andrew(pages: [
         Down4Page(
+          reversedList: false,
           title: node.name,
           console: userPaletteConsole,
           topDownColumnWidgets: [

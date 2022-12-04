@@ -61,7 +61,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         inputCallBack: (id) async {
           _isValidUsername = await r.usernameIsValid(id);
           _id = id.toLowerCase();
-          setState(() {});
+          baseConsole();
         },
         placeHolder: "@username",
         value: _id == '' ? '' : '@' + _id,
@@ -69,7 +69,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
       ConsoleInput(
         tec: tec2,
         inputCallBack: (firstName) {
-          setState(() => _name = firstName);
+          _name = firstName;
+          baseConsole();
         },
         placeHolder: 'First Name',
         value: _name,
@@ -87,6 +88,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
   void baseConsole() {
     _console = Console(
+      animatedInputs: false,
       topInputs: [_inputs[0]],
       inputs: [_inputs[1], _inputs[2]],
       bottomButtons: [

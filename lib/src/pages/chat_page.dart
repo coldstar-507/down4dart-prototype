@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/data_objects.dart';
+import 'package:down4/src/data_objects.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_player/video_player.dart';
-import 'package:file_picker/file_picker.dart';
+// import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
@@ -51,12 +52,16 @@ class _ChatPageState extends State<ChatPage> {
   Console? _console;
   ConsoleInput? _consoleInput;
   var tec = TextEditingController();
-  Down4Media? _cameraInput, _mediaInput;
-  Map<Identifier, Down4Media> _cachedMedias = {};
+  Down4Media? _cameraInput;
   Map<Identifier, ChatMessage> _cachedMessages = {};
+  Map<Identifier, Down4Message?> _cachedDown4Message = {};
+  String? idOfLastMessageRead;
 
-  Map<Identifier, Down4Media> cachedImages = {};
-  Map<Identifier, Down4Media> cachedVideos = {};
+  Map<Identifier, Down4Media> _cachedImages = {};
+  Map<Identifier, Down4Media> _cachedVideos = {};
+
+  late var theNode = widget.node;
+  late final bool isGroupChat = theNode is GroupNode;
 
   @override
   void initState() {
@@ -80,13 +85,13 @@ class _ChatPageState extends State<ChatPage> {
       final nImagesToLoad = nImages <= 25 ? nImages : 25;
       for (int i = 0; i < nImagesToLoad; i++) {
         final mediaID = keys.elementAt(i);
-        cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        _cachedImages[mediaID] = b.loadSavedImage(mediaID);
         print("load media id=$mediaID");
       }
     }).then((value) {
       Future(() {
         print("loaded all images");
-        for (final image in cachedImages.values) {
+        for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
           precacheImage(MemoryImage(image.data), context);
         }
@@ -95,10 +100,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Iterable<Down4Media> get savedImages => b.images.keys
-      .map((mediaID) => cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+      .map((mediaID) => _cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
 
   Iterable<Down4Media> get savedVideos => b.videos.keys
-      .map((mediaID) => cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
+      .map((mediaID) => _cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
         tec: tec,
@@ -120,7 +125,7 @@ class _ChatPageState extends State<ChatPage> {
       double mediaHeight = 0;
       double mediaWidth = 0;
 
-      var down4Message = b.loadMessage(msgID);
+      var down4Message = _cachedDown4Message[msgID] ??= b.loadMessage(msgID);
       if (down4Message == null) return;
       Down4Media? media;
       if (down4Message.mediaID != null) {
@@ -129,6 +134,14 @@ class _ChatPageState extends State<ChatPage> {
           mediaWidth = maxWidth - messageBorder;
           mediaHeight = mediaWidth * (media.metadata.aspectRatio ?? 1.0);
         }
+      }
+
+      if (!down4Message.read) {
+        down4Message
+          ..read = true
+          ..save();
+      } else {
+        idOfLastMessageRead ??= down4Message.id;
       }
 
       String? prevMsgSender = _cachedMessages.isEmpty
@@ -215,18 +228,45 @@ class _ChatPageState extends State<ChatPage> {
         return [specialDisplayText, neededWidth];
       }
 
-      final bool hasHeader =
-          isUpdate ? true : prevMsgSender != down4Message.senderID;
+      final bool senderIsSelf = down4Message.senderID == widget.self.id;
+      final List<ReplyData>? repliesData = down4Message.replies
+          ?.map((msgID) {
+            final replyMsg =
+                _cachedDown4Message[msgID] ??= b.loadMessage(msgID);
+            final replyUser = widget.senders[replyMsg?.senderID];
+            if (replyMsg == null || replyUser == null) return null;
+            final String replyBody = replyMsg.text?.isNotEmpty ?? false
+                ? replyMsg.text!
+                : "&attachment";
+            return ReplyData(
+              senderName: replyUser.node.name,
+              messageRefID: replyMsg.id,
+              thumbnail: replyUser.nodeImage,
+              body: replyBody,
+              type: replyUser.node.colorCode,
+            );
+          })
+          .whereType<ReplyData>()
+          .toList(growable: false);
+
+      final bool hasHeader = !isGroupChat || senderIsSelf
+          ? false
+          : isUpdate
+              ? true
+              : prevMsgSender != down4Message.senderID;
       final textData = textAsStringList();
       final lineStrings = textData?[0] as List<String>?;
       final textWidth = textData?[1] as double?;
-      final headerSize = hasHeader ? 18 : 0;
+      final headerSize = hasHeader ? ChatMessage.headerHeight : 0;
+      final repliesHeight =
+          (repliesData?.length ?? 0) * ChatMessage.headerHeight;
       final messageHeight = lineStrings != null
           ? (lineStrings.length * oneTextLineHeight + textPadding) +
               mediaHeight +
               messageBorder +
-              headerSize
-          : mediaHeight + messageBorder + headerSize;
+              headerSize +
+              repliesHeight
+          : mediaHeight + messageBorder + headerSize + repliesHeight;
       final messageWidth = media != null
           ? maxWidth
           : lineStrings != null
@@ -238,9 +278,9 @@ class _ChatPageState extends State<ChatPage> {
       final precalculatedSize = Size(messageWidth, messageHeight);
       print("PrecalculatedSize=$precalculatedSize");
       print("MaxWidth=$maxWidth");
-
       var chatMessage = ChatMessage(
         key: GlobalKey(),
+        repliesData: repliesData,
         sender: widget.senders[down4Message.senderID]!,
         message: down4Message,
         myMessage: widget.self.id == down4Message.senderID,
@@ -280,29 +320,47 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Future<void> handleImport() async {
-    FilePickerResult? r = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'png', 'jpeg'],
-      withData: true,
-      allowMultiple: true,
-    );
-    final ts = u.timeStamp();
-    for (final pf in r?.files ?? <PlatformFile>[]) {
-      if (pf.bytes != null) {
-        final compressedData = await FlutterImageCompress.compressWithList(
-          pf.bytes!,
-          minHeight: 520,
-          minWidth: 0,
-        );
-        final mediaID = u.generateMediaID(compressedData);
-        _cachedMedias[mediaID] = Down4Media(
+  Future<void> handleImport({required bool importImages}) async {
+    if (importImages) {
+      final files = await ImagePicker().pickMultiImage(
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 70,
+        requestFullMetadata: false,
+      );
+      for (final file in files) {
+        final bytes = await file.readAsBytes();
+        final decodedImage = await decodeImageFromList(bytes);
+        final mediaID = u.generateMediaID(bytes);
+        final down4Media = Down4Media(
           id: mediaID,
-          data: compressedData,
-          metadata: MediaMetadata(owner: widget.self.id, timestamp: ts),
-        );
-        Boxes.instance.saveImage(_cachedMedias[mediaID]!);
+          data: bytes,
+          metadata: MediaMetadata(
+            timestamp: u.timeStamp(),
+            owner: widget.self.id,
+            aspectRatio: decodedImage.height / decodedImage.width,
+          ),
+        )..save(toPersonal: true);
+        _cachedImages[mediaID] = down4Media;
       }
+    } else {
+      final video = await ImagePicker().pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 15),
+      );
+      if (video == null) return;
+      final bytes = await video.readAsBytes();
+      final mediaID = u.generateMediaID(bytes);
+      final down4Media = Down4Media(
+        id: mediaID,
+        data: bytes,
+        metadata: MediaMetadata(
+          timestamp: u.timeStamp(),
+          owner: widget.self.id,
+          isVideo: true,
+        ),
+      );
+      _cachedVideos[mediaID] = down4Media;
     }
     mediasConsole();
   }
@@ -321,50 +379,46 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void send2() {
-    if (tec.value.text != "" || _mediaInput != null || _cameraInput != null) {
-      final ts = DateTime.now().millisecondsSinceEpoch;
-      final targets = widget.node.targets(widget.self.id);
+  void unselectSelectedMessage() {
+    for (final key in _cachedMessages.keys) {
+      if (_cachedMessages[key]?.selected ?? false) {
+        _cachedMessages[key] = _cachedMessages[key]!.invertedSelection();
+      }
+    }
+    setState(() {});
+  }
+
+  void send2({Down4Media? mediaInput}) {
+    if (tec.value.text != "" || mediaInput != null || _cameraInput != null) {
+      final ts = u.timeStamp();
+      final targets = widget.node.calculateTargets(widget.self.id);
 
       var msg = Down4Message(
+        root: widget.node is GroupNode ? widget.node.id : null,
         type: Messages.chat,
-        id: u.generateMessageID(widget.self.id, ts),
+        id: messagePushId(),
         timestamp: ts,
         senderID: widget.self.id,
-        mediaID: _mediaInput?.id ?? _cameraInput?.id,
+        mediaID: mediaInput?.id ?? _cameraInput?.id,
         text: tec.value.text,
+        replies: _cachedMessages.values
+            .where((msg) => msg.selected)
+            .map((msg) => msg.message.id)
+            .toList(growable: false),
       );
+
+      unselectSelectedMessage();
 
       var req = r.ChatRequest(
         message: msg,
         targets: targets,
-        media: _mediaInput ?? _cameraInput,
+        media: mediaInput ?? _cameraInput,
       );
 
       widget.send(req);
       tec.clear();
     }
   }
-
-  // void getTheMedia(Identifier mediaID, Identifier msgID) async {
-  //   var media = await getMessageMediaFromEverywhere(mediaID);
-  //   if (media == null) return;
-  //   _cachedMessages[msgID] = _cachedMessages[msgID]!.withMedia(media);
-  //   setState(() {});
-  // }
-
-  // MessageList4 get messageList => MessageList4(
-  //       senders: widget.senders,
-  //       messages: widget.node.messages.reversed.toList(),
-  //       self: widget.self,
-  //       messageMap: _cachedMessages,
-  //       cache: (msg) => _cachedMessages[msg.message.id] = msg,
-  //       getTheMedia: getTheMedia,
-  //       select: (id, _) {
-  //         _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
-  //         setState(() {});
-  //       },
-  //     );
 
   Future<void> camConsole([
     CameraController? ctrl,
@@ -563,12 +617,12 @@ class _ChatPageState extends State<ChatPage> {
       images: true,
       inputs: [_consoleInput ?? consoleInput],
       medias: images ? savedImages.toList() : savedVideos.toList(),
-      selectMedia: (media) {
-        _mediaInput = media;
-        send2();
-      },
+      selectMedia: (media) => send2(mediaInput: media),
       topButtons: [
-        ConsoleButton(name: "Import", onPress: handleImport),
+        ConsoleButton(
+          name: "Import",
+          onPress: () => handleImport(importImages: images),
+        ),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: baseConsole),

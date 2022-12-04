@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/down4_utility.dart';
-import 'package:flutter_testproject/src/render_objects/render_utils.dart';
+import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -123,7 +123,7 @@ class MoneyPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _MoneyPageState createState() => _MoneyPageState();
+  State<MoneyPage> createState() => _MoneyPageState();
 }
 
 class _MoneyPageState extends State<MoneyPage> {
@@ -480,13 +480,15 @@ class _MoneyPageState extends State<MoneyPage> {
 
   @override
   Widget build(BuildContext context) {
-    print("Initial page:${widget.pageIndex}");
+    print("All palettes name=${palettes.map((e) => e.node.name).toList()}");
+    print("Money size of list=${palettes.length}");
     return Andrew(
       initialPageIndex: widget.pageIndex,
       onPageChange: widget.onPageChange,
       pages: [
         Down4Page(
           scrollController: scrollController,
+          staticList: true,
           title: "Money",
           palettes: palettes.toList(growable: false),
           console: _console!,

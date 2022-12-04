@@ -5,9 +5,9 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_testproject/src/bsv/utils.dart';
-import 'package:flutter_testproject/src/data_objects.dart';
-import 'package:flutter_testproject/src/render_objects/navigator.dart';
+import 'package:down4/src/bsv/utils.dart';
+import 'package:down4/src/data_objects.dart';
+import 'package:down4/src/render_objects/navigator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
 
@@ -60,8 +60,6 @@ class _HomeState extends State<Home> {
   //
   // List<String> currencies = ["Satoshis", "USD"]; //, "CAD"];
 
-  ScrollController _homeScrollController = ScrollController();
-
   List<r.Request> _requests = [];
 
   Map<Identifier, Map<Identifier, Palette>> _paletteMap = {
@@ -74,7 +72,13 @@ class _HomeState extends State<Home> {
 
   StreamSubscription? _messageListener;
 
-  List<Location> _locations = [Location(id: "Home")];
+  List<Location> _locations = [Location(id: "Home", scroll: 0.0)];
+
+  late ScrollController _homeScrollController = ScrollController()
+    ..addListener(() {
+      print("Moved");
+      _locations.first.scroll = _homeScrollController.offset;
+    });
 
   List<Palette> _forwardingPalettes = [];
 
@@ -104,8 +108,7 @@ class _HomeState extends State<Home> {
   }
 
   void loadExchangeRate() async {
-    _exchangeRate =
-        b.loadExchangeRate() ?? ExchangeRate(lastUpdate: 0, rate: 0);
+    _exchangeRate = b.loadExchangeRate();
     updateExchangeRate();
   }
 
@@ -114,7 +117,10 @@ class _HomeState extends State<Home> {
     var groupPeopleIDs = Set<Identifier>.identity();
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = BaseNode.fromJson(jsonDecode(jsonEncodedHomeNode));
-      if (node is GroupNode) groupPeopleIDs.addAll(node.group);
+      if (node is GroupNode) {
+        print("This is the group of the groupNode ${node.name} ${node.group}");
+        groupPeopleIDs.addAll(node.group);
+      }
       writePalette(node);
     }
 
@@ -176,7 +182,16 @@ class _HomeState extends State<Home> {
               if (fetchedNodes == null || fetchedNodes.length != 1) return;
               var newNode = fetchedNodes.first as ChatableNode;
               newNode.messages.add(msg.id);
-              print("writing node to home");
+              if (newNode is GroupNode) {
+                // need to get the palettes from the guys who are not friends in this new group
+                var idsToFetch = newNode.group
+                    .toSet()
+                    .difference(palettes().asIds().toSet());
+                var newNodes = await r.getNodes(idsToFetch);
+                for (var node in newNodes ?? []) {
+                  writePalette(node, at: "Hidden", fold: true);
+                }
+              }
               writePalette(newNode
                 ..updateActivity()
                 ..save());
@@ -293,12 +308,6 @@ class _HomeState extends State<Home> {
 
   // ======================================================= UTILS ============================================================ //
 
-  // String nextCurrency(String currency) {
-  //   final idx = currencies.indexOf(currency);
-  //   final nextIdx = (idx + 1) % currencies.length;
-  //   return currencies[nextIdx];
-  // }
-
   Future<void> updateExchangeRate() async {
     final lastUpdate = _exchangeRate.lastUpdate;
     final rightNow = timeStamp();
@@ -337,23 +346,29 @@ class _HomeState extends State<Home> {
       {String at = "Home", bool fold = false, bool fade = false}) {
     if (node is User) {
       String? lastMessagePreview;
+      bool messagePreviewWasRead = true;
       if (node.messages.isNotEmpty) {
         var msg = b.loadMessage(node.messages.last);
         lastMessagePreview = msg?.text ?? "&attachment";
+        messagePreviewWasRead = msg?.read ?? true;
       }
       return Palette(
           node: node,
           at: at,
           fold: fold,
           fade: fade,
+          snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
           messagePreview: lastMessagePreview,
+          messagePreviewWasRead: messagePreviewWasRead,
           imPress: select,
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
               assetPath: at == "Home" && node.snips.isNotEmpty
-                  ? "lib/src/assets/rightRedArrow.png"
-                  : "lib/src/assets/rightBlackArrow.png",
+                  ? "lib/src/assets/redArrow.png"
+                  : messagePreviewWasRead
+                      ? "lib/src/assets/50.png"
+                      : "lib/src/assets/filled.png",
               pressFunc: at == "Home"
                   ? node.snips.isNotEmpty
                       ? checkSnips
@@ -364,8 +379,8 @@ class _HomeState extends State<Home> {
             )
           ]);
     } else if (node is Hyperchat) {
-      print("Trying to create a hyperchat!");
       String? lastMessagePreview;
+      bool messagePreviewWasRead = false;
       if (node.messages.isEmpty) {
         return null;
       } else {
@@ -378,34 +393,41 @@ class _HomeState extends State<Home> {
           return null;
         }
         lastMessagePreview = msg?.text ?? "&attachment";
+        messagePreviewWasRead = msg?.read ?? false;
       }
       return Palette(
         node: node,
         at: at,
+        snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
         messagePreview: lastMessagePreview,
+        messagePreviewWasRead: messagePreviewWasRead,
         imPress: select,
         bodyPress: select,
         buttonsInfo: [
           ButtonsInfo(
             rightMost: true,
             pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
-            assetPath: node.snips.isNotEmpty
-                ? "lib/src/assets/rightRedArrow.png"
-                : "lib/src/assets/rightBlackArrow.png",
+            assetPath: at == "Home" && node.snips.isNotEmpty
+                ? "lib/src/assets/redArrow.png"
+                : messagePreviewWasRead
+                    ? "lib/src/assets/50.png"
+                    : "lib/src/assets/filled.png",
           )
         ],
       );
     } else if (node is Group) {
-      print("are we getting some nodes to group or something?");
       String? lastMessagePreview;
+      bool messagePreviewWasRead = false;
       if (node.messages.isNotEmpty) {
         var msg = b.loadMessage(node.messages.last);
         lastMessagePreview = msg?.text ?? "&attachment";
+        messagePreviewWasRead = msg?.read ?? false;
       }
-      print(node.snips);
       return Palette(
         node: node,
+        snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
         messagePreview: lastMessagePreview,
+        messagePreviewWasRead: messagePreviewWasRead,
         at: at,
         imPress: select,
         bodyPress: select,
@@ -413,9 +435,11 @@ class _HomeState extends State<Home> {
           ButtonsInfo(
             rightMost: true,
             pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
-            assetPath: node.snips.isNotEmpty
-                ? "lib/src/assets/rightRedArrow.png"
-                : "lib/src/assets/rightBlackArrow.png",
+            assetPath: at == "Home" && node.snips.isNotEmpty
+                ? "lib/src/assets/redArrow.png"
+                : messagePreviewWasRead
+                    ? "lib/src/assets/50.png"
+                    : "lib/src/assets/filled.png",
           )
         ],
       );
@@ -439,52 +463,93 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> processWebRequests() async {
-    Future<bool> _processWebRequest(r.Request req) async {
-      if (req is r.ChatRequest) {
-        final targetNode = req.message.root ?? req.targets.first;
-        var node = nodeAt(targetNode) as ChatableNode?;
-        if (node == null) return false;
-        node.messages.add(req.message.id);
-        req.message.save();
-        req.media?.save();
-        if (_page is ChatPage && _locations.last.id == targetNode) {
-          chatPage(node);
-        }
-        return r.chatRequest(req);
-      } else if (req is r.GroupRequest) {
-        var node = await r.groupRequest(req);
-        if (node == null) return false;
-        node.messages.add(req.message.id);
-        req.message.save();
-        req.media?.save();
-        writePalette(node);
-        node.save();
-        chatPage(node);
-        return true;
-      } else if (req is r.HyperchatRequest) {
-        var node = await r.hyperchatRequest(req);
-        if (node == null) return false;
-        node.messages.add(req.message.id);
-        req.message.save();
-        req.media?.save();
-        writePalette(node);
-        homePage();
-        return true;
-      } else if (req is r.PaymentRequest) {
-        parsePayment(req.payment);
-        return await r.paymentRequest(req);
-      } else if (req is r.PingRequest) {
-        final success = r.pingRequest(req);
-        _tec.clear();
-        return success;
-      } else if (req is r.SnipRequest) {
-        return r.snipRequest(req);
+    Future<bool> processWebRequest(r.Request req) async {
+      switch (req.type) {
+        case r.RequestType.chat:
+          req as r.ChatRequest;
+          final targetNode = req.message.root ?? req.targets.first;
+          var node = nodeAt(targetNode) as ChatableNode?;
+          if (node == null) return false;
+          await req.message.save();
+          req.media?.save();
+
+          node
+            ..messages.add(req.message.id)
+            ..updateActivity()
+            ..save();
+          writePalette(node);
+
+          if (_page is ChatPage && _locations.last.id == targetNode) {
+            chatPage(node);
+          }
+          return r.chatRequest(req);
+
+        case r.RequestType.ping:
+          req as r.PingRequest;
+          final success = r.pingRequest(req);
+          _tec.clear();
+          unselectSelectedPalettes(updateActivity: true);
+          homePage();
+          return success;
+
+        case r.RequestType.snip:
+          req as r.SnipRequest;
+          final success = r.snipRequest(req);
+          unselectSelectedPalettes(updateActivity: true);
+          homePage();
+          return success;
+
+        case r.RequestType.hyperchat:
+          loadingPage();
+          req as r.HyperchatRequest;
+          var node = await r.hyperchatRequest(req);
+          if (node == null) {
+            homePage();
+            return false;
+          }
+          unselectSelectedPalettes();
+          node
+            ..messages.add(req.message.id)
+            ..updateActivity()
+            ..save();
+          req
+            ..message.save()
+            ..media?.save();
+          writePalette(node);
+          openChat(node.id, "Home");
+          return true;
+
+        case r.RequestType.group:
+          loadingPage();
+          req as r.GroupRequest;
+          var node = await r.groupRequest(req);
+          if (node == null) {
+            homePage();
+            return false;
+          }
+          unselectSelectedPalettes();
+          node
+            ..messages.add(req.message.id)
+            ..updateActivity()
+            ..save();
+
+          req
+            ..message.save()
+            ..media?.save();
+
+          writePalette(node);
+          openChat(node.id, "Home");
+          return true;
+
+        case r.RequestType.payment:
+          req as r.PaymentRequest;
+          parsePayment(req.payment);
+          return await r.paymentRequest(req);
       }
-      return false;
     }
 
     for (final req in List<r.Request>.from(_requests)) {
-      final success = await _processWebRequest(req);
+      final success = await processWebRequest(req);
       if (success) _requests.remove(req);
     }
   }
@@ -586,9 +651,10 @@ class _HomeState extends State<Home> {
   }
 
   void delete({String at = "Home"}) {
-    for (final p in palettes(at: at).selected()) {
-      b.deleteNode(p.node.id);
-      _paletteMap[at]?.remove(p.node.id);
+    final nodeIDsToRemove = palettes(at: at).selected().asIds();
+    for (final nodeID in List<Identifier>.from(nodeIDsToRemove)) {
+      b.deleteNode(nodeID);
+      paletteMap(at).remove(nodeID);
     }
     // TODO for other places than home
     if (_page is HomePage) homePage();
@@ -596,8 +662,7 @@ class _HomeState extends State<Home> {
 
   Future<bool> search(List<String> ids) async {
     final friendIds = palettes()
-        .asNodes()
-        .whereType<User>()
+        .asNodes<User>()
         .where((user) => user.isFriend)
         .asIds()
         .toList(growable: false);
@@ -627,8 +692,20 @@ class _HomeState extends State<Home> {
   }
 
   void back([bool remove = true]) {
+    final prevLoc = curLoc.copy();
     if (remove) _locations.removeLast();
     if (curLoc.id == "Home") {
+      if (prevLoc.type == "Chat") {
+        print("fucking niggers!");
+        final lastNode = nodeAt(prevLoc.id);
+        if (lastNode != null) writePalette(lastNode);
+      }
+      _homeScrollController.dispose();
+      _homeScrollController =
+          ScrollController(initialScrollOffset: curLoc.scroll!)
+            ..addListener(() {
+              curLoc.scroll = _homeScrollController.offset;
+            });
       homePage();
     } else if (curLoc.id == "Search") {
       searchPage();
@@ -741,48 +818,6 @@ class _HomeState extends State<Home> {
     _paletteMap[at]![id] = _paletteMap[at]![id]!.invertedSelection();
   }
 
-  // List<Palette> get selectedFriendPalettesDeactivated {
-  //   var idsInSelectedGroups = palettes()
-  //       .where((p) => p.node is GroupNode && p.selected)
-  //       .asIds()
-  //       .toSet();
-  //
-  //   var palettes_ = <Palette>[];
-  //   final selectedNonGroups = formattedHomePalettes
-  //       .where((p) => p.node is User && p.selected)
-  //       .asIds();
-  //   for (final pal in selectedNonGroups) {
-  //     if (!idsInSelGroups.contains(pal.node.id)) {
-  //       palettes_.add(pal.deactivated());
-  //     }
-  //   }
-  //
-  //   return palettes_;
-  // }
-
-  // List<Palette> get selectedHomeUserPaletteDeactivated {
-  //   final selectedGroupIds = formattedHomePalettes
-  //       .selected()
-  //       .asNodes()
-  //       .whereType<GroupNode>()
-  //       .map((groupNode) => groupNode.group)
-  //       .expand((id) => id)
-  //       .toSet()
-  //       .toList(growable: false);
-  //
-  //   final selectedUserIds = formattedHomePalettes
-  //       .selected()
-  //       .asNodes()
-  //       .whereType<User>()
-  //       .asIds()
-  //       .toList(growable: false);
-  //
-  //   return (selectedGroupIds + selectedUserIds)
-  //       .toSet()
-  //       .map((id) => nodeToPalette(nodeAt(id)!)!.deactivated())
-  //       .toList(growable: false);
-  // }
-
   Pair<List<Palette>, Iterable<User>>
       homeToMoneyOrHyperchatOrGroupTransition() {
     final allHomePalettes = formattedHomePalettes;
@@ -801,6 +836,7 @@ class _HomeState extends State<Home> {
     final unselectedGroups = unselected.groups();
     final unselectedUsers = unselected.users();
     final unHide = hidden.those(idsInGroups);
+    final keepHiding = hidden.notThose(idsInGroups);
     final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
     final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
     // groups are folded
@@ -820,39 +856,25 @@ class _HomeState extends State<Home> {
           .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
       ...unHide
           .map((e) => e.animated(fold: false, fade: false).withoutButton()),
+      ...keepHiding
     };
 
     print("pals=${pals.map((e) => e.node.name).toList()}");
     return Pair(
-        pals.inThatOrder(originalOrder), pals.unfolded().asNodes<User>());
+      // pals.inReversedOrder(originalOrder),
+      pals.inThatOrder(originalOrder),
+      pals.unfolded().asNodes<User>(),
+    );
   }
 
   Location get curLoc => _locations.last;
-
-  // List<Palette> palettes([String at = "Home"]) {
-  //   return _paletteMap[at]?.values.toList(growable: false) ?? <Palette>[];
-  // }
 
   Iterable<Palette> palettes({at = "Home"}) {
     return _paletteMap[at]?.values ?? const Iterable<Palette>.empty();
   }
 
-  //
-  // Iterable<Palette> allPalettes({at = "Home"}) {
-  //   return _paletteMap[at]?.values ?? const Iterable<Palette>.empty();
-  // }
-
-  // Iterable<Palette> showingPalettes({at = "Home"}) {
-  //   return _paletteMap[at]?.values.unfolded() ??
-  //       const Iterable<Palette>.empty();
-  // }
-  //
-  // Iterable<Palette> hiddenPalette({at = "Home"}) {
-  //   return _paletteMap[at]?.values.folded() ?? const Iterable<Palette>.empty();
-  // }
-
   List<Palette> get formattedHomePalettes {
-    return palettes().followedBy(palettes(at: "Hidden")).formatted();
+    return palettes().followedBy(palettes(at: "Hidden")).formattedReverse();
   }
 
   Location get prevLoc {
@@ -865,10 +887,9 @@ class _HomeState extends State<Home> {
   // ============================================================== BUILD ================================================================ //
 
   void homePage([bool extra = false]) {
-    // _page = HomePage(
-    //   groupUsersAndHiddenUsers: formattedHomePalettes,
-    //   // key: ObjectKey(_counter.next()),
-    // );
+    // print(
+    //     "All palettes name=${formattedHomePalettes.map((e) => e.node.name).toList()}");
+    // print("Original size of list=${formattedHomePalettes.length}");
     _page = HomePage(
       scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
@@ -936,6 +957,11 @@ class _HomeState extends State<Home> {
         ],
       ),
     );
+    setState(() {});
+  }
+
+  void loadingPage({String? seed}) {
+    _page = LoadingPage2(seed: seed);
     setState(() {});
   }
 
@@ -1007,7 +1033,6 @@ class _HomeState extends State<Home> {
       palettes: formattedHomePalettes,
       transitioned: transition.first,
       userTargets: transition.second,
-      // transition: homeToMoneyOrHyperchatOrGroupTransition,
       hyperchatRequest: (hyperchatRequest) {
         _requests.add(hyperchatRequest);
         processWebRequests();
@@ -1027,7 +1052,7 @@ class _HomeState extends State<Home> {
     _page = GroupPage(
       initialOffset: _homeScrollController.offset,
       self: widget.self,
-      afterMessageCallback: (node) => writePalette(node),
+      // afterMessageCallback: (node) => writePalette(node),
       back: homePage,
       groupRequest: (groupRequest) {
         _requests.add(groupRequest);
@@ -1035,7 +1060,6 @@ class _HomeState extends State<Home> {
       },
       transitioned: transition.first,
       userTargets: transition.second,
-      // transition: homeToMoneyOrHyperchatOrGroupTransition,
       palettes: formattedHomePalettes,
       cameras: widget.cameras,
     );
@@ -1143,18 +1167,30 @@ class _HomeState extends State<Home> {
     //   senders[node.id] = nodeToPalette(node)!;
     // }
 
-    final senders = node is Group ? node.group : [widget.self.id, node.id];
-    if (palettes(at: node.id).length != senders.length) {
-      for (final sender in senders) {
-        var userNode = nodeAt(sender);
-        userNode ??= nodeAt(sender, "Hidden");
-        if (userNode != null) writePalette(userNode, at: node.id);
+    List<Identifier> sendersID;
+    Map<Identifier, Palette> senders;
+    if (node is GroupNode) {
+      sendersID = node.group;
+      if (palettes(at: node.id).length != sendersID.length) {
+        for (final sender in sendersID) {
+          BaseNode? userNode;
+          if (sender == widget.self.id) {
+            userNode = widget.self;
+          } else {
+            userNode = nodeAt(sender);
+            userNode ??= nodeAt(sender, "Hidden");
+          }
+          if (userNode != null) writePalette(userNode, at: node.id);
+        }
       }
+      senders = paletteMap(node.id).those(sendersID);
+    } else {
+      sendersID = [widget.self.id, node.id];
+      senders = paletteMap().those(sendersID);
     }
-
     _page = ChatPage(
       nodeToPalette: nodeToPalette,
-      senders: paletteMap(node.id).those(senders),
+      senders: senders,
       send: (messageRequest) {
         _requests.add(messageRequest);
         processWebRequests();

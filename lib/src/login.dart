@@ -135,6 +135,7 @@ class _Down4State extends State<Down4> {
       children: [],
       messages: [],
       snips: [],
+      isFriend: true,
     );
 
     b.user.putAll({

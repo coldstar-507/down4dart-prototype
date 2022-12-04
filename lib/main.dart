@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_testproject/src/down4_utility.dart';
+import 'package:down4/src/down4_utility.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
@@ -63,6 +63,18 @@ Future<void> main() async {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
+    const initializationSettingsAndroid = AndroidInitializationSettings(
+      "@mipmap/ic_down4_fatter", // TODO change to real icon
+    ); // <- default icon name is @mipmap/ic_launcher
+    // var initializationSettingsIOS = IOSInitializationSettings(
+    //     onDidReceiveLocalNotification: onDidReceiveLocalNotification);
+    const initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    ); // , initializationSettingsIOS);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    // ,onSelectNotification: onSelectNotification); // TODO onSelect
+
     /// Update the iOS foreground notification presentation options to allow
     /// heads up notifications.
     await FirebaseMessaging.instance
@@ -71,6 +83,29 @@ Future<void> main() async {
       badge: true,
       sound: true,
     );
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      // If `onMessage` is triggered with a notification, construct our own
+      // local notification to show to users using the created channel.
+      if (notification != null && android != null) {
+        flutterLocalNotificationsPlugin.show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                channel.id,
+                channel.name,
+                channelDescription: channel.description,
+                icon: android.smallIcon,
+                // other properties...
+              ),
+            ));
+      }
+    });
   } else {
     // TODO kIsWeb
   }

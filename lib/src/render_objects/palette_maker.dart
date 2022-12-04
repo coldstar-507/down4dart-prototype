@@ -240,12 +240,42 @@ class UserMakerPalette extends StatelessWidget {
   }
 }
 
+// abstract class PaletteMaker2 {
+//   void Function()? get nameCallBack;
+//   void Function()? get imagePress;
+//   Image get defaultImage;
+//   String get defaultName;
+//   String? get name;
+//   NodesColor get colorCode;
+//   Nodes? get parentType;
+//   TextEditingController get tec;
+//   bool get fold;
+//   void Function(Identifier)? get go;
+//   const PaletteMaker2({
+//     void Function()? nameCallBack,
+//     void Function()? imagePress,
+//     required Image defaultImage,
+//     required String defaultName,
+//     String? name,
+//     required NodesColor colorCode,
+//     Nodes? parentType,
+//     required TextEditingController tec,
+//     bool fold = false,
+//     void Function(Identifier)? go,
+//   });
+// }
+//
+// class GroupMaker extends StatelessWidget implements PaletteMaker2 {
+//
+// }
+
 class PaletteMaker extends StatelessWidget {
-  final void Function(String) nameCallBack;
-  final void Function(Uint8List) imageCallBack;
+  final void Function(String)? nameCallBack;
+  // final void Function(Uint8List) imageCallBack;
+  final void Function() imagePress;
   final String name, id;
   final String hintText;
-  final Uint8List image;
+  final Down4Media? image;
   final void Function(Identifier)? go;
   final NodesColor colorCode;
   final Nodes type;
@@ -258,9 +288,10 @@ class PaletteMaker extends StatelessWidget {
     required this.tec,
     required this.id,
     required this.name,
-    required this.nameCallBack,
-    required this.imageCallBack,
-    required this.image,
+    this.nameCallBack,
+    required this.imagePress,
+    // required this.imageCallBack,
+    this.image,
     required this.hintText,
     this.go,
     this.type = Nodes.user,
@@ -268,62 +299,154 @@ class PaletteMaker extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  Widget mainContainer({required List<Widget> children}) => AnimatedOpacity(
-        opacity: fold ? 0 : 1,
+  Widget mainContainer({required Widget child}) => AnimatedOpacity(
+      opacity: fold ? 0 : 1,
+      duration: const Duration(milliseconds: 600),
+      child: AnimatedContainer(
         duration: const Duration(milliseconds: 600),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 600),
-          height: fold ? 0 : Palette.height,
-          margin: EdgeInsets.only(
-            left: 22.0,
-            right: 22.0,
-            bottom: fold ? 0 : Sizes.h * 0.02,
-          ),
-          clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-              boxShadow: const [
-                BoxShadow(
-                    color: Colors.black54,
-                    blurRadius: 6.0,
-                    spreadRadius: -6.0,
-                    offset: Offset(8.0, 8.0),
-                    blurStyle: BlurStyle.normal)
-              ],
-              borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-              border: Border.all(width: 2.0, color: Colors.transparent)),
-          child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              textDirection: TextDirection.ltr,
-              children: children),
+        height: fold ? 0 : Palette.height,
+        margin: EdgeInsets.only(
+          left: 22.0,
+          right: 22.0,
+          bottom: fold ? 0 : Sizes.h * 0.02,
+        ),
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+            boxShadow: const [
+              BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 6.0,
+                  spreadRadius: -6.0,
+                  offset: Offset(8.0, 8.0),
+                  blurStyle: BlurStyle.normal)
+            ],
+            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+            border: Border.all(width: 2.0, color: Colors.transparent)),
+        child: child,
+      ));
+
+  Widget customRow({required List<Widget> children}) => Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: PinkTheme.nodeColors[colorCode],
+          borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          textDirection: TextDirection.ltr,
+          children: children,
         ),
       );
 
+  Widget get _defaultImage {
+    switch (type) {
+      case Nodes.user:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.hyperchat:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.group:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.root:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.market:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.checkpoint:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.journal:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.item:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.event:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.ticket:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+        );
+
+      case Nodes.payment:
+        throw 'We are not going to be paletteMaking payments';
+    }
+  }
+
   Widget get paletteImage => GestureDetector(
-        onTap: () async {
-          FilePickerResult? r = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: ['jpg', 'png', 'jpeg'],
-              withData: true);
-          if (r?.files.single.bytes != null) {
-            imageCallBack(r!.files.single.bytes!);
-          }
-        },
+        onTap: imagePress,
         child: Container(
-          clipBehavior: Clip.hardEdge,
-          decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(4.0),
-            bottomLeft: Radius.circular(4.0),
-          )),
-          width: Palette.height - 2.0, // borderWidth x2
-          child: image.isEmpty
-              ? Image.asset(
-                  'lib/src/assets/picture_place_holder_2.png',
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                )
+          // clipBehavior: Clip.hardEdge,
+          // decoration: const BoxDecoration(
+          //   borderRadius: BorderRadius.horizontal(left: Radius.circular(4.0)),
+          // ),
+          width: Palette.height - 4.0, // borderWidth x2
+          child: image == null
+              ? _defaultImage
               : Image.memory(
-                  image,
+                  image!.data,
                   gaplessPlayback: true,
                   fit: BoxFit.cover,
                 ),
@@ -333,7 +456,7 @@ class PaletteMaker extends StatelessWidget {
   Widget get paletteBody => Expanded(
         child: Container(
           padding: const EdgeInsets.only(left: 10.0, top: 10.0),
-          color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
+          // color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
           child: Down4Input(
             tec: tec,
             inputCallBack: nameCallBack,
@@ -345,26 +468,36 @@ class PaletteMaker extends StatelessWidget {
 
   Widget get paletteAction => GestureDetector(
       onTap: () {
-        if (name.isNotEmpty && image.isNotEmpty) {
+        if (name.isNotEmpty && image != null) {
           go?.call(id);
         }
       },
       child: Container(
-          clipBehavior: Clip.hardEdge,
+          // clipBehavior: Clip.hardEdge,
           padding: const EdgeInsets.all(2.0),
-          width: type != Nodes.user ? Palette.height - 2.0 : 4.0,
-          decoration: BoxDecoration(
-              color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
-              borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(4.0),
-                  bottomRight: Radius.circular(4.0))),
+          width: Palette.height - 4,
+          height: Palette.height - 4,
+          // decoration: BoxDecoration(
+          //     color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
+          //     borderRadius: const BorderRadius.only(
+          //         topRight: Radius.circular(4.0),
+          //         bottomRight: Radius.circular(4.0))),
           child: go != null
               ? Image.asset('lib/src/assets/rightBlackArrow.png')
               : const SizedBox.shrink()));
 
   @override
   Widget build(BuildContext context) {
-    return mainContainer(children: [paletteImage, paletteBody, paletteAction]);
+    return Column(
+      children: [
+        mainContainer(
+          child: customRow(
+            children: [paletteImage, paletteBody, paletteAction],
+          ),
+        ),
+        const SizedBox(height: 0)
+      ],
+    );
   }
 }
 

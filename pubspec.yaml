@@ -1,5 +1,5 @@
-name: flutter_testproject
-description: A new Flutter project.
+name: down4
+description: Down4
 
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -44,6 +44,7 @@ dependencies:
   http: ^0.13.4
   file_picker: ^5.2.2
   english_words: ^4.0.0
+  image_picker: ^0.8.6
   hive: ^2.1.0
   camera: ^0.10.0+4
   video_player: ^2.4.2
@@ -63,8 +64,17 @@ dependencies:
   cloud_firestore: 4.0.2
 #  dart_bs58check: ^3.0.2
 
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "lib/src/assets/down4_fat.png"
+  min_sdk_android: 21
+
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.11.0
+
+
   flutter_test:
     sdk: flutter
 

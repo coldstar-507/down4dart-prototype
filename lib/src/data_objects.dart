@@ -110,12 +110,14 @@ class Down4Message {
   final String? text;
   final int timestamp;
   final List<Identifier>? replies, nodes; // reactions, nodes
+  bool read;
 
   Down4Message({
     required this.senderID,
     required this.type,
     required this.timestamp,
     required this.id,
+    this.read = false,
     this.root,
     this.mediaID,
     this.paymentID,
@@ -147,6 +149,7 @@ class Down4Message {
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
+      read: decodedJson["rs"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
       paymentID: decodedJson["p"],
@@ -161,13 +164,14 @@ class Down4Message {
     );
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool withReadStatus = false}) => {
         't': type.name,
         'id': id,
         if (root != null) 'rt': root!,
         if (text != null) 'txt': text,
         's': senderID,
         'ts': timestamp,
+        if (withReadStatus) 'rs': read,
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
@@ -335,6 +339,7 @@ abstract class BaseNode {
           messages: List<Identifier>.from(decodedJson["msg"] ?? []),
           snips: List<Identifier>.from(decodedJson["snp"] ?? []),
           media: Down4Media.fromJson(decodedJson["im"]),
+          activity: decodedJson["a"],
         );
 
       case Nodes.group:
@@ -382,9 +387,9 @@ abstract class ChatableNode extends BaseNode {
   ChatableNode({int? activity, required this.messages, required this.snips})
       : super(activity: activity);
 
-  List<Identifier> targets(Identifier selfID) {
+  List<Identifier> calculateTargets(Identifier selfID) {
     if (this is GroupNode) {
-      return (this as GroupNode).group..remove(selfID);
+      return List<Identifier>.from((this as GroupNode).group)..remove(selfID);
     }
     return [id];
   }
@@ -404,12 +409,12 @@ abstract class GroupNode extends ChatableNode {
     required List<Identifier> messages,
     required List<Identifier> snips,
   }) : super(activity: activity, messages: messages, snips: snips);
-} // interface
+}
 
 abstract class BranchNode extends BaseNode {
   List<Identifier> get children;
   set children(List<Identifier> children);
-} // interface
+}
 
 class User extends ChatableNode implements BranchNode {
   final Identifier id;
@@ -622,6 +627,14 @@ class Location {
     this.pageIndex = 0,
     this.scroll,
   });
+
+  Location copy() => Location(
+        id: id,
+        at: at,
+        type: type,
+        pageIndex: pageIndex,
+        scroll: scroll,
+      );
 }
 
 class ExchangeRate {

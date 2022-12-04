@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_testproject/src/bsv/types.dart';
-import 'package:flutter_testproject/src/data_objects.dart';
-import 'package:flutter_testproject/src/render_objects/render_utils.dart';
+import 'package:down4/src/bsv/types.dart';
+import 'package:down4/src/data_objects.dart';
+import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 

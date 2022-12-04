@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter_testproject/src/down4_utility.dart';
+import 'package:down4/src/down4_utility.dart';
 import 'bsv/utils.dart' show sha256;
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
@@ -213,10 +213,20 @@ Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
   return res.statusCode == 200;
 }
 
+enum RequestType {
+  chat,
+  ping,
+  snip,
+  hyperchat,
+  group,
+  payment,
+}
+
 abstract class Request {
   final List<Identifier> targets;
   const Request({required this.targets});
   Map<String, dynamic> toJson();
+  RequestType get type;
 }
 
 class ChatRequest implements Request {
@@ -231,6 +241,9 @@ class ChatRequest implements Request {
   });
   @override
   final List<Identifier> targets;
+
+  @override
+  RequestType get type => RequestType.chat;
 
   @override
   Map<String, dynamic> toJson([bool withMedia = false]) => {
@@ -253,6 +266,9 @@ class PingRequest implements Request {
   final List<Identifier> targets;
 
   @override
+  RequestType get type => RequestType.ping;
+
+  @override
   Map<String, dynamic> toJson() => {
         "s": senderID,
         "txt": text,
@@ -266,6 +282,9 @@ class SnipRequest extends ChatRequest {
     required Down4Message message,
     required List<Identifier> targets,
   }) : super(targets: targets, message: message, media: media);
+
+  @override
+  RequestType get type => RequestType.snip;
 
   @override
   Map<String, dynamic> toJson([bool withMedia = true]) => {
@@ -283,6 +302,9 @@ class HyperchatRequest extends ChatRequest {
     Down4Media? media,
     required this.wordPairs,
   }) : super(message: message, targets: targets, media: media);
+
+  @override
+  RequestType get type => RequestType.hyperchat;
 
   @override
   Map<String, dynamic> toJson([bool withMedia = false]) => {
@@ -309,6 +331,9 @@ class GroupRequest extends ChatRequest {
   }) : super(targets: targets, message: message, media: media);
 
   @override
+  RequestType get type => RequestType.group;
+
+  @override
   Map<String, dynamic> toJson([bool withMedia = false]) => {
         "id": groupID,
         "msg": message.toJson(),
@@ -330,6 +355,9 @@ class PaymentRequest implements Request {
     required this.payment,
     required this.sender,
   });
+
+  @override
+  RequestType get type => RequestType.payment;
 
   @override
   final List<Identifier> targets;
