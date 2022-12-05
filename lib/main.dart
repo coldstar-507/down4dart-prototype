@@ -64,7 +64,7 @@ Future<void> main() async {
         ?.createNotificationChannel(channel);
 
     const initializationSettingsAndroid = AndroidInitializationSettings(
-      "@mipmap/ic_down4_fatter", // TODO change to real icon
+      "@mipmap/ic_down4_inverted_white", // TODO change to real icon
     ); // <- default icon name is @mipmap/ic_launcher
     // var initializationSettingsIOS = IOSInitializationSettings(
     //     onDidReceiveLocalNotification: onDidReceiveLocalNotification);
