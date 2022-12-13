@@ -294,7 +294,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                     .entries
                     .map((page) => AnimatedContainer(
                         duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeOut,
+                        curve: Curves.easeInOut,
                         width: curPos == page.key ? Sizes.w : 0,
                         child: page.value.staticList
                             ? StaticList(

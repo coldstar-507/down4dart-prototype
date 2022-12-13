@@ -113,6 +113,8 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> loadHomePalettes() async {
+    writePalette(widget.self);
+
     final jsonEncodedHomeNodes = b.home.values;
     var groupPeopleIDs = Set<Identifier>.identity();
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
@@ -189,7 +191,7 @@ class _HomeState extends State<Home> {
                     .difference(palettes().asIds().toSet());
                 var newNodes = await r.getNodes(idsToFetch);
                 for (var node in newNodes ?? []) {
-                  writePalette(node, at: "Hidden", fold: true);
+                  writePalette(node, at: "Hidden", fold: true, fade: true);
                 }
               }
               writePalette(newNode
@@ -344,6 +346,9 @@ class _HomeState extends State<Home> {
 
   Palette? nodeToPalette(BaseNode node,
       {String at = "Home", bool fold = false, bool fade = false}) {
+    print("Writing this palette at:$at, id${node.id}");
+    print("isSelf = ${node.id == widget.self.id}");
+
     if (node is User) {
       String? lastMessagePreview;
       bool messagePreviewWasRead = true;
@@ -356,6 +361,7 @@ class _HomeState extends State<Home> {
           node: node,
           at: at,
           fold: fold,
+          isSelf: widget.self.id == node.id,
           fade: fade,
           snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
           messagePreview: lastMessagePreview,
@@ -470,19 +476,25 @@ class _HomeState extends State<Home> {
           final targetNode = req.message.root ?? req.targets.first;
           var node = nodeAt(targetNode) as ChatableNode?;
           if (node == null) return false;
-          await req.message.save();
+          await (req.message..read = true).save();
           req.media?.save();
 
           node
             ..messages.add(req.message.id)
             ..updateActivity()
-            ..save();
+            ..save(isSelf: widget.self.id == node.id);
           writePalette(node);
 
           if (_page is ChatPage && _locations.last.id == targetNode) {
             chatPage(node);
           }
-          return r.chatRequest(req);
+
+          // we don't do the request if we are sending this message to ourself
+          if (node.id != widget.self.id) {
+            return r.chatRequest(req);
+          }
+
+          return false;
 
         case r.RequestType.ping:
           req as r.PingRequest;
@@ -1133,7 +1145,16 @@ class _HomeState extends State<Home> {
       onPageChange: (pageIdx) => curLoc.pageIndex = pageIdx,
       cameras: widget.cameras,
       self: widget.self,
-      openChat: openChat,
+      openChat: (id, at) {
+        if (at == "Home") {
+          openChat(id, at);
+        } else {
+          var homeNode = nodeAt(id);
+          // if the node is not in Home, we must add it before opening it
+          if (homeNode == null) writePalette(node);
+          openChat(id, at);
+        }
+      },
       palette: _paletteMap[_locations.last.at]![node.id]!,
       palettes: _paletteMap[node.id]?.values.toList() ?? <Palette>[],
       openNode: openNode,
@@ -1144,35 +1165,10 @@ class _HomeState extends State<Home> {
   }
 
   void chatPage(ChatableNode node) async {
-    // var senders = <Identifier, Palette>{};
-    // if (node is GroupNode) {
-    //   final cached = palettes(at: node.id);
-    //   var toFetch = node.group
-    //       .toSet()
-    //       .difference(cached.asIds().toSet())
-    //       .toList(growable: false);
-    //
-    //   if (toFetch.isNotEmpty) {
-    //     var fetchedNodes = await getNodesFromEverywhere(toFetch);
-    //     for (var fetchedNode in fetchedNodes) {
-    //       writePalette(fetchedNode, at: node.id);
-    //     }
-    //   }
-    //
-    //   for (var palette in palettes(at: node.id)) {
-    //     senders[palette.node.id] = palette;
-    //   }
-    // } else {
-    //   senders[widget.self.id] = nodeToPalette(widget.self)!;
-    //   senders[node.id] = nodeToPalette(node)!;
-    // }
-
-    List<Identifier> sendersID;
     Map<Identifier, Palette> senders;
     if (node is GroupNode) {
-      sendersID = node.group;
-      if (palettes(at: node.id).length != sendersID.length) {
-        for (final sender in sendersID) {
+      if (palettes(at: node.id).length != node.group.length) {
+        for (final sender in node.group) {
           BaseNode? userNode;
           if (sender == widget.self.id) {
             userNode = widget.self;
@@ -1183,10 +1179,12 @@ class _HomeState extends State<Home> {
           if (userNode != null) writePalette(userNode, at: node.id);
         }
       }
-      senders = paletteMap(node.id).those(sendersID);
+      senders = paletteMap(node.id);
     } else {
-      sendersID = [widget.self.id, node.id];
-      senders = paletteMap().those(sendersID);
+      senders = {
+        widget.self.id: palette(widget.self.id)!,
+        node.id: palette(node.id)!,
+      };
     }
     _page = ChatPage(
       nodeToPalette: nodeToPalette,

@@ -165,7 +165,7 @@ class _MoneyPageState extends State<MoneyPage> {
     Future(() {
       palettes = widget.transitioned;
       scrollController.animateTo(0,
-          duration: const Duration(milliseconds: 600), curve: Curves.easeOut);
+          duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
       setState(() {});
     });
   }

@@ -41,7 +41,7 @@ class _LoadingPage2State extends State<LoadingPage2>
   }
 
   Image get down4Logo => Image.asset(
-        "lib/src/assets/down4.png",
+        "lib/src/assets/down4_inverted.png",
         height: 0.82 * Sizes.w,
         width: 0.82 * Sizes.w,
       );
@@ -73,7 +73,7 @@ class _LoadingPage2State extends State<LoadingPage2>
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: PinkTheme.qrColor,
+      color: PinkTheme.backGroundColor,
       child: Align(
         alignment: AlignmentDirectional.center,
         child: rotatingLogo,

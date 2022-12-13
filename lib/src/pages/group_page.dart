@@ -108,7 +108,7 @@ class _GroupPageState extends State<GroupPage> {
           items = [...widget.transitioned, groupMaker(fold: false)];
           scrollController.animateTo(0,
               duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOut);
+              curve: Curves.easeInOut);
         }));
   }
 

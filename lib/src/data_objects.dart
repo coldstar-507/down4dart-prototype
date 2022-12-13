@@ -441,9 +441,9 @@ class User extends ChatableNode implements BranchNode {
   })  : description = description ?? "",
         super(activity: activity, messages: messages, snips: snips);
 
-  String get displayID => "@" + id;
+  String get displayID => "@$id";
 
-  String get name => firstName + ((lastName != null) ? lastName! : "");
+  String get name => firstName + ((lastName != null) ? " $lastName" : "");
 
   // Image get image => media != null
   //     ? Image.memory(media!.data, fit: BoxFit.cover)

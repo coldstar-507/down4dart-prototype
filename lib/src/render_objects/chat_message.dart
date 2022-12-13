@@ -663,7 +663,8 @@ class ChatMessage extends StatelessWidget {
           padding: const EdgeInsets.all(6.0),
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
-              color: myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
+              color:
+                  myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
               borderRadius: BorderRadius.vertical(
                 top: Radius.circular(media != null ? 0 : 4),
                 bottom: Radius.circular(hasHeader ? 0 : 4),
@@ -673,7 +674,7 @@ class ChatMessage extends StatelessWidget {
             children: specialDisplayTexts!
                 .map((str) => AnimatedDefaultTextStyle(
                       duration: Duration(milliseconds: show ? 900 : 300),
-                      curve: show ? Curves.easeInQuad : Curves.easeOut,
+                      curve: show ? Curves.easeInQuad : Curves.easeInOut,
                       // str,
                       maxLines: 1,
                       // textDirection: TextDirection.ltr,
@@ -715,7 +716,7 @@ class ChatMessage extends StatelessWidget {
       transformAlignment:
           transitionFromRight ? Alignment.centerRight : Alignment.centerLeft,
       clipBehavior: Clip.hardEdge,
-      curve: Curves.easeOut,
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
           borderRadius: const BorderRadius.all(Radius.circular(6.0)),
           boxShadow: [
@@ -783,7 +784,7 @@ class ChatMessage extends StatelessWidget {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 600),
       opacity: show ? 1 : 0,
-      curve: Curves.easeOut,
+      curve: Curves.easeInOut,
       child: Column(children: [chatMessage, const SizedBox(height: 4)]),
     );
   }

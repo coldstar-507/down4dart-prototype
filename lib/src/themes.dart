@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class PinkTheme {
   static const buttonColor = Color.fromARGB(255, 250, 222, 224);
   static const myBubblesColor = Color.fromARGB(255, 252, 213, 216);
+  static const selfPaletteColor = Color.fromARGB(255, 199, 118, 132);
   static const bodyColor = buttonColor;
   static const inactivatedButtonColor = Color.fromARGB(255, 219, 214, 214);
   static const backGroundColor = Color.fromARGB(255, 255, 241, 242);
@@ -23,6 +24,7 @@ class PinkTheme {
     NodesColor.market: Color.fromARGB(255, 34, 134, 64),
     NodesColor.ticket: Color.fromARGB(255, 233, 220, 30),
     NodesColor.friend: Color.fromARGB(255, 230, 174, 193),
+    // NodesColor.self: Color.fromARGB(255, 94, 48, 69),
     NodesColor.group: Color.fromARGB(255, 175, 134, 209),
     NodesColor.nonFriend: Color.fromARGB(255, 158, 92, 114),
     NodesColor.unsafeTx: Colors.red,

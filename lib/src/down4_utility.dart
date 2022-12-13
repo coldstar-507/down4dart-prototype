@@ -5,6 +5,8 @@ import 'data_objects.dart';
 import 'package:collection/collection.dart';
 import 'dart:io';
 import 'package:bs58/bs58.dart';
+import 'dart:math' as math;
+import 'package:english_words/english_words.dart' as w;
 
 final listEqual = const ListEquality().equals;
 
@@ -41,6 +43,18 @@ String deterministicHyperchatRoot(List<String> ids) {
 
   final hash = sha1.SHA1Digest().process(asString.codeUnits.asUint8List());
   return hex.encode(hash);
+}
+
+Iterable<Pair<String, String>> randomPairs(int count) {
+  final random = math.Random();
+
+  return Iterable.generate(
+    count,
+        (_) => Pair(
+      w.adjectives[random.nextInt(w.adjectives.length)],
+      w.nouns[random.nextInt(w.nouns.length)],
+    ),
+  );
 }
 
 String deterministicGroupRoot(List<String> ids) {

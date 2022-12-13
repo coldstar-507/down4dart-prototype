@@ -68,7 +68,9 @@ extension MessageSave on Down4Message {
 }
 
 extension NodeSave on BaseNode {
-  Future<void> save() => b.home.put(id, jsonEncode(this));
+  Future<void> save({bool isSelf = false}) => isSelf
+      ? b.user.put(id, jsonEncode(this))
+      : b.home.put(id, jsonEncode(this));
   Future<void> saveUser() => b.user.put(id, jsonEncode(this));
 }
 

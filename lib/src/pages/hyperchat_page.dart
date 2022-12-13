@@ -10,7 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:video_player/video_player.dart';
-import 'package:english_words/english_words.dart' as rw;
+// import 'package:english_words/english_words.dart' as rw;
 import 'package:file_picker/file_picker.dart';
 
 import '../boxes.dart';
@@ -72,7 +72,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
           palettes = widget.transitioned;
           scrollController.animateTo(0,
               duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOut);
+              curve: Curves.easeInOut);
         }));
   }
 
@@ -121,9 +121,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
       text: tec.value.text,
     );
 
-    final pairs = rw
-        .generateWordPairs(safeOnly: false)
-        .take(10)
+    final pairs = u
+        .randomPairs(10)
         .map((e) => "${e.first} ${e.second}")
         .toList(growable: false);
 
