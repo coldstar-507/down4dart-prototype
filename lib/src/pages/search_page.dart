@@ -5,15 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/types.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:down4/src/render_objects/render_utils.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../themes.dart';
 import '../boxes.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
+import '../render_objects/qr.dart';
+
 
 class AddFriendPage extends StatefulWidget {
   final User self;
@@ -115,24 +115,23 @@ class _AddFriendPageState extends State<AddFriendPage> {
     setState(() {});
   }
 
-  Widget get qr => Align(
-        alignment: AlignmentDirectional.topCenter,
-        child: Container(
-          padding: EdgeInsets.only(
-            top: ((Sizes.w - (Sizes.w * (1 / golden))) / 2) * (1 / golden),
-          ),
-          child: QrImage(
-            size: Sizes.w * (1 / golden),
-            foregroundColor: PinkTheme.qrColor,
-            data: [
-              widget.self.id,
-              widget.self.name,
-              widget.self.lastName,
-              widget.self.neuter.toYouKnow(),
-            ].join("~"),
-          ),
-        ),
-      );
+  String get qrData => [
+        widget.self.id,
+        widget.self.name,
+        widget.self.lastName,
+        widget.self.neuter.toYouKnow(),
+      ].join("~");
+
+  Widget get qr {
+    final topPadding = Sizes.w * 0.08;
+    final qrSize = Sizes.w - (topPadding * golden * 2);
+
+    return Container(
+      alignment: Alignment.topCenter,
+      padding: EdgeInsets.only(top: topPadding),
+      child: Down4Qr(data: qrData, dimension: qrSize),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -359,13 +359,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
         title: pageHeader,
         backgroundColor: PinkTheme.qrColor,
       ),
-      body:
-          // AnnotatedRegion<SystemUiOverlayStyle>(
-          //   value: SystemUiOverlayStyle.light.copyWith(
-          //     statusBarColor: PinkTheme.qrColor,
-          //   ),
-          //   child:
-          SafeArea(
+      body: SafeArea(
         child: GestureDetector(
           onHorizontalDragUpdate: (DragUpdateDetails details) {
             if ((details.primaryDelta ?? 0) > 0) {
@@ -382,10 +376,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
               Container(
                 color: PinkTheme.backGroundColor,
                 child: Column(
-                  // crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // fake header since true header is on stack so it can over shadow the rest
-                    // const SizedBox(height: 32),
                     pageBody,
                     curPage.console ?? const SizedBox.shrink(),
                   ],

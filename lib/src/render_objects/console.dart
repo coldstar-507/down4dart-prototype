@@ -9,9 +9,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
-import 'palette.dart';
-import '../down4_utility.dart';
 
+import 'palette.dart';
 import 'render_utils.dart';
 
 class ConsoleButton extends StatelessWidget {
@@ -44,12 +43,31 @@ class ConsoleButton extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  ConsoleButton invertedColors() => ConsoleButton(
+  ConsoleButton invertedColors({required Key key}) => ConsoleButton(
         name: name,
         onPress: onPress,
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
         invertColors: true,
+        leftEpsilon: leftEpsilon,
+        bottomEpsilon: bottomEpsilon,
+        widthEpsilon: widthEpsilon,
+        heightEpsilon: heightEpsilon,
+        extraButtons: extraButtons,
+        showExtra: showExtra,
+        shouldBeDownButIsnt: shouldBeDownButIsnt,
+        isMode: isMode,
+        isSpecial: isSpecial,
+        isActivated: isActivated,
+        key: key,
+      );
+
+  ConsoleButton withKey({required Key key}) => ConsoleButton(
+        name: name,
+        onPress: onPress,
+        onLongPress: onLongPress,
+        onLongPressUp: onLongPressUp,
+        invertColors: false,
         leftEpsilon: leftEpsilon,
         bottomEpsilon: bottomEpsilon,
         widthEpsilon: widthEpsilon,
@@ -241,8 +259,8 @@ class ConsoleInput extends StatelessWidget {
 }
 
 class Console extends StatelessWidget {
-  final List<ConsoleButton>? topButtons;
-  final List<ConsoleButton> bottomButtons;
+  final List<ConsoleButton>? _topButtons;
+  final List<ConsoleButton> _bottomButtons;
   final CameraController? cameraController;
   final double? aspectRatio;
   final bool? toMirror, images;
@@ -259,9 +277,6 @@ class Console extends StatelessWidget {
 
   int get nImageRows => (b.images.keys.length / 5).round();
   double get rowHeight => (consoleWidth / 5);
-  // double get initialHeight => rowHeight;
-  // double get currentHeight => initialHeight;
-  // double get maxHeight => rowHeight * 1; //((nImageRows < 7) ? nImageRows : 7);
   double get mediasHeight => nImageRows == 0
       ? rowHeight
       : nImageRows <= 3
@@ -269,21 +284,25 @@ class Console extends StatelessWidget {
           : rowHeight * 3;
 
   List<Widget> get extraTopButtons {
-    final consoleHorizontalGap = Sizes.h * 0.023;
-    final consoleVerticalGap = Sizes.h * 0.021;
-    final buttonWidth = ((Sizes.w - (consoleHorizontalGap * 2.0)) /
-            (bottomButtons.length.toDouble())) +
-        1.0; // 1.0 for borders
+    // final consoleHorizontalGap = Sizes.h * 0.023;
+    // final consoleVerticalGap = Sizes.h * 0.021;
+    // final buttonWidth = ((Sizes.w - (consoleHorizontalGap * 2.0)) /
+    // (bottomButtons.length.toDouble())) +
+    // 0 for borders
     List<Widget> extras = [];
-    int i = 0;
-    for (final b in topButtons ?? <ConsoleButton>[]) {
+    for (final b in topConsoleButtons) {
       if (b.showExtra) {
+        final key = b.key as GlobalKey;
+        final renderBox = key.currentContext!.findRenderObject() as RenderBox;
+        final semantics = renderBox.semanticBounds;
+        final buttonWidth = semantics.width;
+        final leftBottom = semantics.bottomLeft;
+
         extras.add(Positioned(
-          bottom: consoleVerticalGap + (ConsoleButton.height * 2),
-          left: consoleHorizontalGap + (buttonWidth * i),
+          bottom: leftBottom.dy - 0.5,
+          left: leftBottom.dx - 0.5,
           child: Container(
-            height: b.extraButtons!.length * (ConsoleButton.height + 0.5),
-            width: buttonWidth,
+            width: buttonWidth + 0.5,
             decoration: BoxDecoration(border: Border.all(width: 0.5)),
             child: Column(children: b.extraButtons!),
           ),
@@ -291,36 +310,79 @@ class Console extends StatelessWidget {
       } else {
         extras.add(const SizedBox.shrink());
       }
-      i++;
     }
     return extras;
   }
 
   List<Widget> get extraBottomButtons {
-    final horizontalGap = Sizes.h * 0.023;
-    final verticalGap = Sizes.h * 0.021;
-    final nBottomButton = bottomButtons.length;
-    final buttonWidth = (Sizes.w - (2 * horizontalGap)) / nBottomButton;
-    List<Widget> extras = [];
-    int i = 0;
-    for (final b in bottomButtons) {
-      final nExtra = b.extraButtons?.length ?? 0;
-      if (b.showExtra && nExtra > 0) {
-        extras.add(Positioned(
-            bottom: verticalGap + ConsoleButton.height + b.bottomEpsilon,
-            left: horizontalGap + (buttonWidth * i) + b.leftEpsilon,
-            child: Container(
-              height: (nExtra * ConsoleButton.height) + b.heightEpsilon,
-              width: buttonWidth + b.widthEpsilon,
-              decoration: BoxDecoration(border: Border.all(width: 0.5)),
-              child: Column(children: b.extraButtons!),
-            )));
+    return bottomConsoleButtons.map((b) {
+      if (b.showExtra) {
+        final key = b.key as GlobalKey?;
+        final context = key!.currentContext;
+        final renderBox = context!.findRenderObject() as RenderBox;
+        final Offset position = renderBox.localToGlobal(Offset.zero);
+        final semantics = renderBox.semanticBounds;
+        final buttonWidth = semantics.width;
+        final buttonHeight = semantics.height;
+
+        print("""
+        button height: $buttonHeight
+        position:      $position
+        Sizes.w:       ${Sizes.w}
+        Sizes.h:       ${Sizes.h}
+        """);
+
+        return Positioned(
+          left: position.dx - 0.5,
+          top: position.dy -
+              Sizes.viewPaddingHeight -
+              0.5 -
+              (buttonHeight * (b.extraButtons!.length)),
+          child: Container(
+            width: buttonWidth + 1.0,
+            height: buttonHeight * b.extraButtons!.length + 1.0,
+            decoration: BoxDecoration(border: Border.all(width: 0.5)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: b.extraButtons!,
+            ),
+          ),
+        );
       } else {
-        extras.add(const SizedBox.shrink());
+        return const SizedBox.shrink();
       }
-      i++;
-    }
-    return extras;
+    }).toList();
+
+    // final horizontalGap = Sizes.h * 0.023;
+    // final verticalGap = Sizes.h * 0.021;
+    // final nBottomButton = bottomButtons.length;
+    // final buttonWidth = (Sizes.w - (2 * horizontalGap)) / nBottomButton;
+    // List<Widget> extras = [];
+    // for (final b in bottomButtons) {
+    //   if (b.showExtra) {
+    //     final key = b.key as GlobalKey?;
+    //     final context = key!.currentContext;
+    //     final renderBox = context!.findRenderObject() as RenderBox;
+    //     final Offset position = renderBox.localToGlobal(Offset.zero);
+    //     final semantics = renderBox.semanticBounds;
+    //     final buttonWidth = semantics.width;
+    //     final buttonHeight = semantics.height;
+    //
+    //     extras.add(Positioned(
+    //       bottom: position.dy - 0.5,
+    //       left: position - 0.5,
+    //       child: Container(
+    //         width: buttonWidth + 0.5,
+    //         height: buttonHeight * bottomButtons.length + 0.5,
+    //         decoration: BoxDecoration(border: Border.all(width: 0.5)),
+    //         child: Column(children: b.extraButtons!),
+    //       ),
+    //     ));
+    //   } else {
+    //     extras.add(const SizedBox.shrink());
+    //   }
+    // }
+    // return extras;
   }
 
   double get consoleWidth => Sizes.w - (Sizes.h * 0.023 * 2);
@@ -333,7 +395,7 @@ class Console extends StatelessWidget {
       scanController != null;
 
   const Console({
-    required this.bottomButtons,
+    required List<ConsoleButton> bottomButtons,
     this.invertedColors = false,
     this.forwardingPalette,
     this.selectMedia,
@@ -347,11 +409,13 @@ class Console extends StatelessWidget {
     this.cameraController,
     this.inputs,
     this.topInputs,
-    this.topButtons,
+    List<ConsoleButton>? topButtons,
     this.scanCallBack,
     this.scanController,
     Key? key,
-  }) : super(key: key);
+  })  : _bottomButtons = bottomButtons,
+        _topButtons = topButtons,
+        super(key: key);
 
   Widget mainContainer({required List<Widget> children}) => Container(
         margin: EdgeInsets.only(
@@ -502,23 +566,37 @@ class Console extends StatelessWidget {
         ),
       );
 
-  Widget bottomConsoleButtons() => Row(
-        textDirection: TextDirection.ltr,
-        children: invertedColors
-            ? bottomButtons
-                .map((button) => button.invertedColors())
-                .toList(growable: false)
-            : bottomButtons,
-      );
+  List<ConsoleButton> get bottomConsoleButtons => invertedColors
+      ? _bottomButtons
+          .asMap()
+          .map((key, value) => MapEntry(
+              key,
+              value.invertedColors(
+                  key: ButtonKeys.instance.bottomButtonKeys[key])))
+          .values
+          .toList(growable: false)
+      : _bottomButtons
+          .asMap()
+          .map((key, value) => MapEntry(key,
+              value.withKey(key: ButtonKeys.instance.bottomButtonKeys[key])))
+          .values
+          .toList(growable: false);
 
-  Widget topConsoleButtons() => Row(
-        textDirection: TextDirection.ltr,
-        children: invertedColors
-            ? (topButtons ?? [])
-                .map((button) => button.invertedColors())
-                .toList(growable: false)
-            : (topButtons ?? []),
-      );
+  List<ConsoleButton> get topConsoleButtons => invertedColors
+      ? (_topButtons ?? [])
+          .asMap()
+          .map((key, value) => MapEntry(
+              key,
+              value.invertedColors(
+                  key: ButtonKeys.instance.topButtonKeys[key])))
+          .values
+          .toList(growable: false)
+      : (_topButtons ?? [])
+          .asMap()
+          .map((key, value) => MapEntry(
+              key, value.withKey(key: ButtonKeys.instance.topButtonKeys[key])))
+          .values
+          .toList(growable: false);
 
   @override
   Widget build(BuildContext context) {
@@ -567,8 +645,8 @@ class Console extends StatelessWidget {
                                   : const SizedBox.shrink(),
             ),
           ),
-          topConsoleButtons(),
-          bottomConsoleButtons(),
+          Row(textDirection: TextDirection.ltr, children: topConsoleButtons),
+          Row(textDirection: TextDirection.ltr, children: bottomConsoleButtons),
         ],
       ),
     );

@@ -3,9 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:down4/src/down4_utility.dart';
-import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../data_objects.dart';
 import '../web_requests.dart' as r;
@@ -13,10 +11,12 @@ import '../bsv/wallet.dart';
 import '../bsv/types.dart';
 import '../bsv/utils.dart';
 import '../themes.dart';
+import '../boxes.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
+import '../render_objects/qr.dart';
 
 void printWrapped(String text) {
   final pattern = RegExp('.{1,800}'); // 800 is the size of each chunk
@@ -58,23 +58,25 @@ class _PaymentPageState extends State<PaymentPage> {
     super.dispose();
   }
 
-  Widget qr() => Container(
-        padding: const EdgeInsets.only(top: 27, right: 44, left: 44),
-        child: Align(
-          alignment: AlignmentDirectional.topCenter,
-          child: QrImage(
-            foregroundColor: PinkTheme.qrColor,
-            data: widget.paymentList[listIndex],
-          ),
-        ),
-      );
+  Widget qr() {
+    final topPadding = Sizes.w * 0.08;
+    final qrSize = Sizes.w - (topPadding * golden * 2);
+    return Container(
+      padding: EdgeInsets.only(top: topPadding),
+      alignment: AlignmentDirectional.topCenter,
+      child: Down4Qr(
+        data: widget.paymentList[listIndex],
+        dimension: qrSize,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
         title: sha1(widget.payment.txs.last.txID!.data).toBase58(),
-        stackWidgets: [qr()],
+        // stackWidgets: [qr()],
         console: Console(
           bottomButtons: [
             ConsoleButton(

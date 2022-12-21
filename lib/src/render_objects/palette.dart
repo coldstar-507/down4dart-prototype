@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:down4/src/down4_utility.dart';
 import 'package:hive/hive.dart';

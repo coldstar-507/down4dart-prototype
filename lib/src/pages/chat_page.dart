@@ -417,6 +417,7 @@ class _ChatPageState extends State<ChatPage> {
 
       widget.send(req);
       tec.clear();
+      _cameraInput = null;
     }
   }
 

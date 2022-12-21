@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
 import '../main.dart' as main;
 import 'dart:convert';
@@ -17,6 +18,29 @@ var db = FirebaseDatabase.instance.ref();
 var fs = FirebaseFirestore.instance;
 var st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 var st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+
+class ButtonKeys {
+  final List<GlobalKey> topButtonKeys;
+  final List<GlobalKey> bottomButtonKeys;
+  ButtonKeys._()
+      : topButtonKeys = [
+          GlobalKey(),
+          GlobalKey(),
+          GlobalKey(),
+          GlobalKey(),
+          GlobalKey(),
+        ],
+        bottomButtonKeys = [
+          GlobalKey(),
+          GlobalKey(),
+          GlobalKey(),
+          GlobalKey(),
+          GlobalKey(),
+        ];
+
+  static ButtonKeys? _instance;
+  static ButtonKeys get instance => _instance ??= ButtonKeys._();
+}
 
 String messagePushId() => db.child("Messages").push().key!;
 
@@ -273,6 +297,8 @@ class Sizes {
   static double h = 0;
   static double w = 0;
   static double fullHeight = 0;
+  static double get headerHeight => 32;
+  static double get viewPaddingHeight => fullHeight - h;
   static double get fullAspectRatio => w / fullHeight;
   static double get paddedAspectRatio => w / h;
 }

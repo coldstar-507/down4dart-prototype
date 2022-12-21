@@ -37,10 +37,11 @@ dependencies:
 
   # Packages
   # random_words: ^1.0.2
+  qr: ^3.0.1
   mobile_scanner: ^2.0.0
   # base58check: ^2.0.0
   path_provider: ^2.0.9
-  qr_flutter: ^4.0.0
+#  qr_flutter: ^4.0.0
   http: ^0.13.4
   file_picker: ^5.2.2
   english_words: ^4.0.0

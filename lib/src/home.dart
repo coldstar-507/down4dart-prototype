@@ -898,10 +898,15 @@ class _HomeState extends State<Home> {
 
   // ============================================================== BUILD ================================================================ //
 
+  // List<Key> homeButtonKeys = [
+  //   GlobalKey(),
+  //   GlobalKey(),
+  //   GlobalKey(),
+  //   GlobalKey(),
+  //   GlobalKey(),
+  // ];
+
   void homePage([bool extra = false]) {
-    // print(
-    //     "All palettes name=${formattedHomePalettes.map((e) => e.node.name).toList()}");
-    // print("Original size of list=${formattedHomePalettes.length}");
     _page = HomePage(
       scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
@@ -913,7 +918,10 @@ class _HomeState extends State<Home> {
           ),
         ],
         topButtons: [
-          ConsoleButton(name: "Hyperchat", onPress: hyperchatPage),
+          ConsoleButton(
+            name: "Hyperchat",
+            onPress: hyperchatPage,
+          ),
           ConsoleButton(
               name: "Money",
               onPress: () {
