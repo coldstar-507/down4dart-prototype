@@ -57,8 +57,6 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   Widget? _page;
   var _exchangeRate = b.loadExchangeRate();
-  //
-  // List<String> currencies = ["Satoshis", "USD"]; //, "CAD"];
 
   List<r.Request> _requests = [];
 
@@ -83,10 +81,6 @@ class _HomeState extends State<Home> {
   List<Palette> _forwardingPalettes = [];
 
   var _tec = TextEditingController();
-  // var cashTec = TextEditingController();
-  // var importTec = TextEditingController();
-
-  // late List<Palette> curPals = formattedHomePalettes;
 
   // ======================================================= INITIALIZATION ============================================================ //
 
@@ -120,7 +114,6 @@ class _HomeState extends State<Home> {
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = BaseNode.fromJson(jsonDecode(jsonEncodedHomeNode));
       if (node is GroupNode) {
-        print("This is the group of the groupNode ${node.name} ${node.group}");
         groupPeopleIDs.addAll(node.group);
       }
       writePalette(node);
@@ -294,7 +287,6 @@ class _HomeState extends State<Home> {
     widget.wallet.parsePayment(widget.self, payment);
     widget.wallet.save();
     writePalette(Payment(payment: payment), at: "Payments");
-    if (_page is MoneyPage) moneyPage();
   }
 
   void loadPayments() async {
@@ -302,7 +294,6 @@ class _HomeState extends State<Home> {
     widget.wallet.settlementRoutine();
     widget.wallet.save();
     for (final payment in widget.wallet.payments) {
-      print("Loading payment: ${payment.id}");
       writePalette(Payment(payment: payment), at: "Payments");
     }
     if (_page is MoneyPage) moneyPage();
@@ -344,11 +335,12 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Palette? nodeToPalette(BaseNode node,
-      {String at = "Home", bool fold = false, bool fade = false}) {
-    print("Writing this palette at:$at, id${node.id}");
-    print("isSelf = ${node.id == widget.self.id}");
-
+  Palette? nodeToPalette(
+    BaseNode node, {
+    String at = "Home",
+    bool fold = false,
+    bool fade = false,
+  }) {
     if (node is User) {
       String? lastMessagePreview;
       bool messagePreviewWasRead = true;
@@ -679,10 +671,7 @@ class _HomeState extends State<Home> {
         .asIds()
         .toList(growable: false);
 
-    print(friendIds);
-
     final nodes = await r.getNodes(ids);
-    print("ids: $ids\nnodes: ${nodes?.length}");
     if (nodes != null) {
       for (var node in nodes) {
         var node_ = nodeAt(node.id) ?? node;
@@ -769,15 +758,14 @@ class _HomeState extends State<Home> {
 
   void select(String id, String at) {
     selectPalette(id, at);
-    // if (curLoc.id == "Home") homePages();
     if (_page is ForwardingPage) {
       forwardPage();
     } else if (_page is HomePage) {
       homePage();
     } else if (_page is ChatPage) {
-      chatPage(nodeAt(at, prevLoc.id)! as ChatableNode);
+      chatPage(nodeAt(at, prevLoc.id) as ChatableNode);
     } else if (_page is NodePage) {
-      nodePage(nodeAt(id, at)!);
+      nodePage(nodeAt(id, at) as BaseNode);
     } else if (_page is AddFriendPage) {
       searchPage();
     } else if (_page is MoneyPage) {
@@ -896,16 +884,6 @@ class _HomeState extends State<Home> {
     throw "Invalid previous location";
   }
 
-  // ============================================================== BUILD ================================================================ //
-
-  // List<Key> homeButtonKeys = [
-  //   GlobalKey(),
-  //   GlobalKey(),
-  //   GlobalKey(),
-  //   GlobalKey(),
-  //   GlobalKey(),
-  // ];
-
   void homePage([bool extra = false]) {
     _page = HomePage(
       scrollController: _homeScrollController,
@@ -1012,6 +990,16 @@ class _HomeState extends State<Home> {
 
   void paymentPage(Down4Payment payment) {
     _page = PaymentPage(
+      self: widget.self,
+      ok: () {
+        _locations.removeLast();
+        _locations.removeLast();
+        homePage();
+      },
+      paymentRequest: (pr) {
+        _requests.add(pr);
+        processWebRequests();
+      },
       back: back,
       payment: payment,
     );
@@ -1029,6 +1017,10 @@ class _HomeState extends State<Home> {
       trueTargets: transition.second,
       exchangeRate: _exchangeRate.rate,
       homePalettes: formattedHomePalettes,
+      importMoney: (payment) {
+        parsePayment(payment);
+        moneyPage(fromHome: false);
+      },
       paymentAsPalettes: palettes(at: "Payments")
           .toList(growable: false)
           .reversed
@@ -1037,7 +1029,11 @@ class _HomeState extends State<Home> {
         _requests.add(paymentRequest);
         processWebRequests();
       },
-      parsePayment: parsePayment,
+      makePayment: (payment) {
+        parsePayment(payment);
+        _locations.add(Location(id: "Payment"));
+        paymentPage(payment);
+      },
       back: back,
       pageIndex: curLoc.pageIndex,
       onPageChange: (idx) => curLoc.pageIndex = idx,
@@ -1356,454 +1352,6 @@ class _HomeState extends State<Home> {
 
     setState(() {});
   }
-
-  /////////////////////////////////////////////////////////////////
-
-  // Andrew? andrew;
-
-  // void homePages({bool extra = false}) {
-  //   Console2 homeConsole() => Console2(
-  //         inputs: [
-  //           ConsoleInput(
-  //             tec: _tec,
-  //             placeHolder: ":)",
-  //           ),
-  //         ],
-  //         topButtons: [
-  //           ConsoleButton2(name: "Hyperchat", onPress: hyperchatPage),
-  //           ConsoleButton2(
-  //               name: "Money",
-  //               onPress: () {
-  //                 _locations.add(Location(id: "Money"));
-  //                 moneyPages(method: "Split", currency: "Satoshis");
-  //                 setState(() {});
-  //                 // moneyPage();
-  //               }),
-  //         ],
-  //         bottomButtons: [
-  //           ConsoleButton2(
-  //               showExtra: extra,
-  //               name: "Group",
-  //               bottomEpsilon: -0.3,
-  //               widthEpsilon: 0.7,
-  //               heightEpsilon: -1.0,
-  //               onPress: () => extra ? homePages(extra: extra) : groupPage(),
-  //               isSpecial: true,
-  //               onLongPress: () => homePages(extra: !extra),
-  //               extraButtons: [
-  //                 ConsoleButton2(name: "Delete", onPress: delete),
-  //                 ConsoleButton2(
-  //                   name: "Forward",
-  //                   onPress: () => forward(
-  //                     formattedHomePalettes.selected().toList(growable: false),
-  //                   ),
-  //                 ),
-  //                 ConsoleButton2(name: "Shit", onPress: () => homePage(!extra)),
-  //                 ConsoleButton2(name: "Wacko", onPress: () => homePage(!extra)),
-  //               ]),
-  //           ConsoleButton2(
-  //             name: "Search",
-  //             onPress: () {
-  //               _locations.add(Location(id: "Search"));
-  //               searchPage();
-  //             },
-  //           ),
-  //           ConsoleButton2(
-  //             name: "Ping",
-  //             onPress: () {
-  //               if (_tec.value.text.isNotEmpty) {
-  //                 final pr = r.PingRequest(
-  //                   text: _tec.value.text,
-  //                   targets: selectedHomeUserPaletteDeactivated
-  //                       .asIds()
-  //                       .toList(growable: false),
-  //                   senderID: widget.self.id,
-  //                 );
-  //                 handleWebRequest(pr);
-  //                 _tec.clear();
-  //               }
-  //             },
-  //             onLongPress: snipPage,
-  //             isSpecial: true,
-  //           ),
-  //         ],
-  //       );
-  //   andrew = Andrew(pages: [
-  //     Down4Page2(
-  //         title: "Home",
-  //         console: homeConsole(),
-  //         palettes: formattedHomePalettes),
-  //   ]);
-  //   setState(() {});
-  // }
-  //
-  // void moneyPages({
-  //   // should I make this shit static
-  //   // required are states that need to stay across reloads
-  //   // required List<User> targets,
-  //   required String method,
-  //   required String currency,
-  //   int page = 0,
-  //   Console2? console,
-  //   MobileScannerController? scanner,
-  //   bool extra = false,
-  //   bool scanning = false,
-  //   // required Map<String, dynamic> currencies,
-  // }) {
-  //   final targetsLen = selectedHomeUserPaletteDeactivated.length;
-  //   final bool empty = targetsLen == 0;
-  //   var scannedData = {};
-  //   var scannedDataLength = -1;
-  //
-  //   void moneyBack() {
-  //     cashTec.clear();
-  //     importTec.clear();
-  //     scanner?.dispose();
-  //     back();
-  //   }
-  //
-  //   dynamic onScan(Barcode bc, MobileScannerArguments? args) async {
-  //     final raw = bc.rawValue;
-  //     if (raw != null) {
-  //       final decodedRaw = jsonDecode(raw);
-  //       scannedDataLength = decodedRaw["tot"];
-  //       scannedData.putIfAbsent(decodedRaw["index"], () => decodedRaw["data"]);
-  //       if (scannedData.length == scannedDataLength) {
-  //         // we have all the data
-  //         await scanner?.stop();
-  //         var sortedData = <String>[];
-  //         final sortedKeys = scannedData.keys.toList()..sort();
-  //         for (final key in sortedKeys) {
-  //           sortedData.add(scannedData[key]!);
-  //         }
-  //         final payment = Down4Payment.fromJsonList(sortedData);
-  //         widget.wallet.parsePayment(widget.self, payment);
-  //         moneyPages(method: method, currency: currency);
-  //       }
-  //     }
-  //   }
-  //
-  //   int usdToSatoshis(double usds) =>
-  //       ((usds / _exchangeRate.rate) * 100000000).floor();
-  //
-  //   double satoshisToUSD(int satoshis) =>
-  //       (satoshis / 100000000) * _exchangeRate.rate;
-  //
-  //   String satoshis() => widget.wallet.balance.toString();
-  //
-  //   String formattedSats(int sats) => String.fromCharCodes(sats
-  //       .toString()
-  //       .codeUnits
-  //       .reversed
-  //       .toList()
-  //       .asMap()
-  //       .map((key, value) => key % 3 == 0 && key != 0
-  //           ? MapEntry(key, [value, 0x002C])
-  //           : MapEntry(key, [value]))
-  //       .values
-  //       .reduce((value, element) => [...element, ...value]));
-  //
-  //   String usds() => satoshisToUSD(widget.wallet.balance).toStringAsFixed(4);
-  //
-  //   int inputAsSatoshis() {
-  //     int amount;
-  //     final numInput = num.parse(cashTec.value.text);
-  //     if (currency == "Satoshis") {
-  //       amount = method == "Split"
-  //           ? numInput.round()
-  //           : (numInput * selectedHomeUserPaletteDeactivated.length)
-  //               .round(); // TODO
-  //     } else {
-  //       amount = method == "Split"
-  //           ? usdToSatoshis(numInput.toDouble())
-  //           : usdToSatoshis(numInput.toDouble() *
-  //               selectedHomeUserPaletteDeactivated.length);
-  //     }
-  //     return amount;
-  //   }
-  //
-  //   ConsoleInput mainViewInput() => ConsoleInput(
-  //         type: TextInputType.number,
-  //         placeHolder: currency == "USD" ? "${usds()}\$" : "${satoshis()} sat",
-  //         tec: cashTec,
-  //       );
-  //
-  //   Console2 importConsole([List<Down4TXOUT>? utxos]) {
-  //     ConsoleInput input;
-  //     if (utxos == null) {
-  //       input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
-  //     } else {
-  //       final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
-  //       final ph = "Found ${formattedSats(sats)} sat";
-  //       input = ConsoleInput(placeHolder: ph, tec: importTec, activated: false);
-  //     }
-  //
-  //     void import() async {
-  //       final payment =
-  //           await widget.wallet.importMoney(importTec.value.text, widget.self);
-  //
-  //       if (payment == null) return;
-  //
-  //       parsePayment(payment);
-  //       moneyPages(method: method, currency: currency);
-  //     }
-  //
-  //     return Console2(
-  //       inputs: [input],
-  //       topButtons: [
-  //         ConsoleButton2(name: "Import", onPress: import),
-  //       ],
-  //       bottomButtons: [
-  //         ConsoleButton2(
-  //           name: "Back",
-  //           onPress: () => moneyPages(method: method, currency: currency),
-  //         ),
-  //         ConsoleButton2(
-  //           name: "Check",
-  //           onPress: () async =>
-  //               importConsole(await checkPrivateKey(importTec.value.text)),
-  //         ),
-  //       ],
-  //     );
-  //   }
-  //
-  //   Console2 confirmationConsole(String inputCurrency) {
-  //     double asUSD;
-  //     int asSats;
-  //     if (inputCurrency == "USD") {
-  //       asUSD = num.parse(cashTec.value.text).toDouble() *
-  //           (method == "Split"
-  //               ? 1.0
-  //               : selectedHomeUserPaletteDeactivated.length);
-  //       asSats = usdToSatoshis(asUSD);
-  //     } else {
-  //       asSats = num.parse(cashTec.value.text).toInt() *
-  //           (method == "Split" ? 1 : targetsLen);
-  //       asUSD = satoshisToUSD(asSats);
-  //     }
-  //
-  //     final satsString = formattedSats(asSats);
-  //
-  //     return Console2(
-  //       inputs: [
-  //         ConsoleInput(
-  //           placeHolder: currency == "USD"
-  //               ? "${asUSD.toStringAsFixed(4)} \$"
-  //               : "$satsString sat",
-  //           tec: cashTec,
-  //           activated: false,
-  //         ),
-  //       ],
-  //       topButtons: [
-  //         ConsoleButton2(
-  //             name: "Confirm",
-  //             onPress: () {
-  //               final pay = widget.wallet.payUsers(
-  //                 selectedHomeUserPaletteDeactivated
-  //                     .asNodes()
-  //                     .toList(growable: false) as List<User>,
-  //                 widget.self,
-  //                 Sats(inputAsSatoshis()),
-  //               );
-  //               if (pay != null) {
-  //                 for (final tx in pay.txs) {
-  //                   printWrapped("=================");
-  //                   printWrapped(tx.fullRawHex);
-  //                   printWrapped("=================");
-  //                   printWrapped(tx.txID!.asHex);
-  //                   printWrapped("=================");
-  //                 }
-  //                 parsePayment(pay);
-  //                 printWrapped("pay: ${pay.toYouKnow()}###\n###");
-  //                 print("ID: ${sha256(utf8.encode(pay.toYouKnow())).toHex()}");
-  //                 print("txid: ${pay.txs.last.txID!.asHex}");
-  //                 moneyPages(method: method, currency: currency);
-  //               }
-  //             }),
-  //       ],
-  //       bottomButtons: [
-  //         ConsoleButton2(
-  //             name: "Back",
-  //             onPress: () => moneyPages(method: method, currency: currency)),
-  //         ConsoleButton2(
-  //           name: currency,
-  //           isMode: true,
-  //           onPress: () => moneyPages(
-  //             method: method,
-  //             currency: nextCurrency(currency),
-  //             console: confirmationConsole(inputCurrency),
-  //           ),
-  //         ),
-  //       ],
-  //     );
-  //   }
-  //
-  //   Console2 emptyViewConsole() => Console2(
-  //         scanCallBack: scanning ? onScan : null,
-  //         scanController: scanning ? scanner : null,
-  //         inputs: scanning ? null : [mainViewInput()],
-  //         topButtons: [
-  //           ConsoleButton2(
-  //             name: "Scan",
-  //             onPress: () {
-  //               if (!scanning) {
-  //                 moneyPages(
-  //                   scanner: MobileScannerController(),
-  //                   scanning: !scanning,
-  //                   currency: currency,
-  //                   method: method,
-  //                 );
-  //               } else {
-  //                 scanner?.dispose();
-  //                 moneyPages(
-  //                   method: method,
-  //                   currency: currency,
-  //                   scanning: !scanning,
-  //                 );
-  //               }
-  //             },
-  //           )
-  //         ],
-  //         bottomButtons: [
-  //           ConsoleButton2(
-  //             name: "Back",
-  //             isSpecial: true,
-  //             widthEpsilon: 0.5,
-  //             heightEpsilon: 0.5,
-  //             bottomEpsilon: -0.5,
-  //             showExtra: extra,
-  //             onPress: () {
-  //               if (extra) {
-  //                 moneyPages(currency: currency, method: method, extra: !extra);
-  //               } else {
-  //                 moneyBack();
-  //               }
-  //             },
-  //             onLongPress: () =>
-  //                 moneyPages(currency: currency, method: method, extra: !extra),
-  //             extraButtons: [
-  //               ConsoleButton2(
-  //                 name: "Import",
-  //                 onPress: () => moneyPages(
-  //                     console: importConsole(),
-  //                     currency: currency,
-  //                     method: method),
-  //               )
-  //             ],
-  //           ),
-  //           ConsoleButton2(
-  //             isMode: true,
-  //             name: currency,
-  //             onPress: () =>
-  //                 moneyPages(currency: nextCurrency(currency), method: method),
-  //           ),
-  //         ],
-  //       );
-  //
-  //   Console2 mainViewConsole() => Console2(
-  //         inputs: [mainViewInput()],
-  //         bottomButtons: [
-  //           ConsoleButton2(
-  //             name: "Back",
-  //             isSpecial: true,
-  //             showExtra: extra,
-  //             onPress: () {
-  //               if (extra) {
-  //                 moneyPages(method: method, currency: currency, extra: !extra);
-  //               } else {
-  //                 moneyBack();
-  //               }
-  //             },
-  //             onLongPress: () =>
-  //                 moneyPages(method: method, currency: currency, extra: !extra),
-  //             extraButtons: [
-  //               ConsoleButton2(name: "Import", onPress: importConsole),
-  //             ],
-  //           ),
-  //           ConsoleButton2(
-  //               name: method,
-  //               isMode: true,
-  //               onPress: () => moneyPages(
-  //                   method: method == "Split" ? "Each" : "Split",
-  //                   currency: currency)),
-  //           ConsoleButton2(
-  //               name: currency,
-  //               isMode: true,
-  //               onPress: () => moneyPages(
-  //                   method: method, currency: nextCurrency(currency))),
-  //         ],
-  //         topButtons: [
-  //           ConsoleButton2(name: "Bill", onPress: () => print("TODO")),
-  //           ConsoleButton2(
-  //               name: "Pay",
-  //               onPress: () => moneyPages(
-  //                   method: method,
-  //                   currency: currency,
-  //                   console: confirmationConsole(currency))),
-  //         ],
-  //       );
-  //
-  //   final defaultConsole = empty ? emptyViewConsole() : mainViewConsole();
-  //
-  //   andrew = Andrew(
-  //     onPageChange: (idx) => curLoc.pageIndex = idx,
-  //     pages: [
-  //       Down4Page2(
-  //           title: "Money",
-  //           console: console ?? defaultConsole,
-  //           palettes: homeToMoneyOrHyperchatTransition(formattedHomePalettes)),
-  //       Down4Page2(
-  //           title: "Status",
-  //           console: console ?? defaultConsole,
-  //           palettes: palettes(at: "Payments").toList(growable: false))
-  //     ],
-  //   );
-  //   setState(() {});
-  // }
-
-  // void hyperchatPages({required Console console, bool reload = false}) {}
-  //
-  // void groupPages({required Console console, bool reload = false}) {}
-  //
-  // void searchPages({bool scanning = false, bool reload = false}) {}
-  //
-  // void chatPages({
-  //   required ChatableNode node,
-  //   required Console console,
-  //   bool reload = false,
-  // }) {}
-
-  // void nodePages({required BaseNode node, })
-
-  // Console moneyConsole([bool reloadInput = false, bool extra = false]) =>
-  //     Console(
-  //       inputs: [ConsoleInput(placeHolder: "\$", tec: _tec)],
-  //       bottomButtons: [
-  //         ConsoleButton(
-  //           name: "Back",
-  //           isSpecial: true,
-  //           showExtra: extra,
-  //           onPress: back,
-  //           extraButtons: [
-  //             ConsoleButton(name: "Import", onPress: () => print("TODO")),
-  //           ],
-  //         ),
-  //         ConsoleButton(
-  //           name: "Each",
-  //           isMode: true,
-  //           onPress: () => print("TODO"),
-  //         ),
-  //         ConsoleButton(
-  //           name: "USD",
-  //           isMode: true,
-  //           onPress: () => print("TODO"),
-  //         ),
-  //       ],
-  //       topButtons: [
-  //         ConsoleButton(name: "Bill", onPress: () => print("TODO")),
-  //         ConsoleButton(name: "Pay", onPress: () => print("TODO")),
-  //       ],
-  //     );
 
   @override
   Widget build(BuildContext context) {

@@ -621,8 +621,6 @@ class Console extends StatelessWidget {
               : const SizedBox.shrink(),
           !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
           !animatedInputs ? Row(children: inputs ?? []) : bottomConsoleInputs(),
-          // topConsoleInputs(),
-          // bottomConsoleInputs(),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: consoleWidth,

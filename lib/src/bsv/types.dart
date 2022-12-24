@@ -32,7 +32,8 @@ class Down4InternetPayment {
 class Down4Payment {
   List<Down4TX> txs;
   bool safe;
-  Down4Payment(this.txs, this.safe);
+  String? textNote;
+  Down4Payment(this.txs, this.safe, {this.textNote});
 
   int get independentGets {
     final tx = txs.last;
@@ -116,6 +117,7 @@ class Down4Payment {
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,
         "safe": safe,
+        if (textNote != null) "txt": textNote,
       };
 
   String toYouKnow() => base64Encode(utf8.encode(jsonEncode(this)));
@@ -132,6 +134,7 @@ class Down4Payment {
           .map((e) => Down4TX.fromJson(e))
           .toList(),
       decodedJson["safe"],
+      textNote: decodedJson["txt"],
     );
   }
 }
@@ -819,7 +822,6 @@ class Down4Keys {
 }
 
 void main() {
-
   print("What the fuck is going on");
 
   var lol = 0x41;

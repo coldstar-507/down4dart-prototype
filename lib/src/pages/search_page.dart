@@ -14,7 +14,6 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
 
-
 class AddFriendPage extends StatefulWidget {
   final User self;
   final List<Palette> palettes;
@@ -35,20 +34,20 @@ class AddFriendPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _AddFriendPageState createState() => _AddFriendPageState();
+  State<AddFriendPage> createState() => _AddFriendPageState();
 }
 
 class _AddFriendPageState extends State<AddFriendPage> {
   Console? _console;
-  ConsoleInput? _consoleInputRef;
   var tec = TextEditingController();
   CameraController? _cameraController;
+  MobileScannerController? scanner;
 
   @override
   void initState() {
     super.initState();
     defaultConsole();
-    _consoleInputRef = consoleInput;
+    // loadQr();
   }
 
   @override
@@ -59,10 +58,33 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   ConsoleInput get consoleInput {
     return ConsoleInput(
+      maxLines: 1,
       tec: tec,
       placeHolder: "@search",
     );
   }
+
+  String get qrData => [
+        widget.self.id,
+        widget.self.name,
+        widget.self.lastName,
+        widget.self.neuter.toYouKnow(),
+      ].join("~");
+
+  double get dimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);
+
+  Widget get qr => Align(
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            SizedBox(height: Sizes.w - dimension * 2 * 1 / golden),
+            SizedBox.square(
+              dimension: dimension,
+              child: Down4Qr(data: qrData, dimension: dimension),
+            ),
+          ],
+        ),
+      );
 
   scanCallBack(Barcode bc, MobileScannerArguments? args) {
     if (bc.rawValue != null) {
@@ -82,12 +104,16 @@ class _AddFriendPageState extends State<AddFriendPage> {
   }
 
   void defaultConsole([scanning = false]) {
-    MobileScannerController? scannerController;
-    if (scanning) scannerController = MobileScannerController();
+    if (scanning) {
+      scanner = MobileScannerController();
+    } else {
+      scanner?.dispose();
+      scanner = null;
+    }
     _console = Console(
-      scanController: scannerController,
-      scanCallBack: scanCallBack,
-      inputs: [_consoleInputRef ?? consoleInput],
+      scanController: scanning ? scanner : null,
+      scanCallBack: scanning ? scanCallBack : null,
+      inputs: [consoleInput],
       topButtons: [
         ConsoleButton(
           name: "Add",
@@ -113,24 +139,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
       ],
     );
     setState(() {});
-  }
-
-  String get qrData => [
-        widget.self.id,
-        widget.self.name,
-        widget.self.lastName,
-        widget.self.neuter.toYouKnow(),
-      ].join("~");
-
-  Widget get qr {
-    final topPadding = Sizes.w * 0.08;
-    final qrSize = Sizes.w - (topPadding * golden * 2);
-
-    return Container(
-      alignment: Alignment.topCenter,
-      padding: EdgeInsets.only(top: topPadding),
-      child: Down4Qr(data: qrData, dimension: qrSize),
-    );
   }
 
   @override

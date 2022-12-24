@@ -180,126 +180,11 @@ class Down4Message {
       };
 }
 
-// class Node {
-//   final Identifier id;
-//   final Down4Keys? neuter;
-//
-//   final Down4Payment? payment;
-//
-//   String name;
-//   String? lastName;
-//   Down4Media? image;
-//   String? description;
-//   Nodes type;
-//   int activity;
-//   List<Identifier>? admins;
-//   List<Identifier>? childs;
-//   List<Identifier>? parents;
-//   List<Identifier>? friends;
-//   List<Identifier>? snips;
-//   List<Identifier>? group;
-//   List<Identifier>? messages;
-//   List<Identifier>? posts; // messages / either post or chat
-//   Node({
-//     required this.type,
-//     required this.id,
-//     required this.name,
-//     this.image,
-//     this.neuter,
-//     this.payment,
-//     this.description,
-//     this.activity = 0,
-//     this.lastName,
-//     this.posts,
-//     this.messages,
-//     this.admins,
-//     this.childs,
-//     this.group,
-//     this.parents,
-//     this.friends,
-//     this.snips,
-//   });
-//
-//   void mutateType(Nodes t) => type = t;
-//
-//   void updateActivity() => activity = d4utils.timeStamp();
-//
-//   void merge(Node mergeNode) {
-//     childs = mergeNode.childs;
-//     parents = mergeNode.parents;
-//     admins = mergeNode.admins;
-//     friends = mergeNode.friends;
-//     posts = mergeNode.posts;
-//     description = mergeNode.description;
-//     image = mergeNode.image;
-//     name = mergeNode.name;
-//     lastName = mergeNode.lastName;
-//   }
-//
-//   factory Node.fromJson(Map<String, dynamic> decodedJson) {
-//     return Node(
-//       id: decodedJson["id"],
-//       name: decodedJson["nm"],
-//       neuter: decodedJson["nt"] != null
-//           ? Down4Keys.fromYouKnow(decodedJson["nt"])
-//           : null,
-//       lastName: decodedJson["ln"],
-//       activity: decodedJson["a"] ?? 0,
-//       image: decodedJson["im"] != null
-//           ? Down4Media.fromJson(decodedJson["im"])
-//           : null,
-//       type: Nodes.values.byName(decodedJson["t"]),
-//       messages: decodedJson["msg"] != null
-//           ? List<String>.from(decodedJson["msg"])
-//           : null,
-//       admins: decodedJson["adm"] != null
-//           ? List<String>.from(decodedJson["adm"])
-//           : null,
-//       childs: decodedJson["chl"] != null
-//           ? List<String>.from(decodedJson["chl"])
-//           : null,
-//       parents: decodedJson["prt"] != null
-//           ? List<String>.from(decodedJson["prt"])
-//           : null,
-//       posts: decodedJson["pst"] != null
-//           ? List<String>.from(decodedJson["pst"])
-//           : null,
-//       group: decodedJson["grp"] != null
-//           ? List<String>.from(decodedJson["grp"])
-//           : null,
-//       friends: decodedJson["frd"] != null
-//           ? List<String>.from(decodedJson["frd"])
-//           : null,
-//       snips: decodedJson["snp"] != null
-//           ? List<String>.from(decodedJson["snp"])
-//           : null,
-//     );
-//   }
-//
-//   Map<String, dynamic> toJson([bool withMedia = true]) => {
-//         "id": id,
-//         "t": type.name,
-//         "a": activity,
-//         "nm": name,
-//         if (neuter != null) "nt": neuter!.toYouKnow(),
-//         if (lastName != null) "ln": lastName,
-//         if (image != null) "im": withMedia ? image!.toJson() : image!.id,
-//         if (messages != null) "msg": messages,
-//         if (admins != null) "adm": admins,
-//         if (childs != null) "chl": childs,
-//         if (parents != null) "prt": parents,
-//         if (posts != null) "pst": posts,
-//         if (group != null) "grp": group,
-//         if (snips != null) "snp": snips,
-//       };
-// }
-
 abstract class BaseNode {
   NodesColor get colorCode;
   Identifier get id;
   String get name;
   String get displayID;
-  // Image get image;
   Map toJson();
   int activity;
   BaseNode({int? activity}) : activity = activity ?? 0;
@@ -399,11 +284,6 @@ abstract class GroupNode extends ChatableNode {
   List<Identifier> get group;
   set group(List<Identifier> group);
   Down4Media get media;
-  // Image get image => Image.memory(
-  //       media.data,
-  //       fit: BoxFit.cover,
-  //       gaplessPlayback: true,
-  //     );
   GroupNode({
     int? activity,
     required List<Identifier> messages,
@@ -444,10 +324,6 @@ class User extends ChatableNode implements BranchNode {
   String get displayID => "@$id";
 
   String get name => firstName + ((lastName != null) ? " $lastName" : "");
-
-  // Image get image => media != null
-  //     ? Image.memory(media!.data, fit: BoxFit.cover)
-  //     : Image.asset('lib/src/assets/hashirama.jpg', fit: BoxFit.cover);
 
   NodesColor get colorCode =>
       isFriend ? NodesColor.friend : NodesColor.nonFriend;
@@ -548,13 +424,7 @@ class Payment extends BaseNode {
 
   String get displayID => "Confirmations: ${payment.lastConfirmations}";
 
-  // Image get image => payment.independentGets < 2000000
-  //     ? Image.asset('lib/src/assets/Dollar_Sign_1.png', fit: BoxFit.cover)
-  //     : payment.independentGets < 10000000
-  //         ? Image.asset('lib/src/assets/Dollar_Sign_2.png', fit: BoxFit.cover)
-  //         : Image.asset('lib/src/assets/Dollar_Sign_3.png', fit: BoxFit.cover);
-
-  NodesColor get colorCode => payment.lastConfirmations < 3
+  NodesColor get colorCode => payment.lastConfirmations == 0
       ? NodesColor.unsafeTx
       : payment.lastConfirmations < 6
           ? NodesColor.mediumTx

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:convert/convert.dart';
 import '../data_objects.dart';
 import '../down4_utility.dart';
 import '../web_requests.dart' as r;
@@ -21,13 +20,12 @@ class Wallet {
 
   Set<Down4Payment> get payments => _payments.values.toSet();
 
-  Set<TXID> get uTXID => _payments.values
-      .map((pay) => pay.txs.map((tx) => tx.txID!))
-      .expand((txid) => txid)
-      .toSet();
+  Set<TXID> get uTXID => unsettledTxs.map((ustx) => ustx.txID!).toSet();
 
-  Set<Down4TX> get unsettledTxs =>
-      _payments.values.map((pay) => pay.txs).expand((tx) => tx).toSet();
+  Set<Down4TX> get unsettledTxs => _payments.values
+      .map((pay) => pay.txs.where((tx) => tx.confirmations < 6))
+      .expand((tx) => tx)
+      .toSet();
 
   void settlementRoutine() {
     for (final payment in payments) {
@@ -56,28 +54,25 @@ class Wallet {
     final ids = payment.txs.map((e) => e.txID!.asHex).toList();
 
     final confirmations = await r.confirmations(ids);
-    if (confirmations == null || confirmations.length != ids.length) {
-      return null;
-    }
+    if (confirmations == null || confirmations.length != ids.length) return;
 
     for (int i = 0; i < confirmations.length; i++) {
       _payments[payment.id]!.txs[i].confirmations = confirmations[i];
     }
   }
 
-  // void paymentRoutine() {
-  //   // clears space and make other routines faster
-  //   // we can remove payment after the last tx has over 60 confirmations
-  //   for (final payment in payments) {
-  //     final confirmations = payment.txs.last.confirmations ?? 0;
-  //     if (confirmations > 100) {
-  //       _payments.remove(payment.id);
-  //     } else if (confirmations == 0) {
-  //       _trySettlement(payment);
-  //     }
-  //   }
-  //   save();
-  // }
+  void paymentRoutine() {
+    // clears space and make other routines faster
+    // we can remove payment after the last tx has over 60 confirmations
+    for (final payment in payments) {
+      final confirmations = payment.txs.last.confirmations;
+      if (confirmations > 60) {
+        _payments.remove(payment.id);
+      } else if (confirmations == 0) {
+        _trySettlement(payment);
+      }
+    }
+  }
 
   Wallet._({
     int? ix,
@@ -218,18 +213,18 @@ class Wallet {
   List<Down4TX> _chainedTxs(Down4TX from) {
     final unsettledIDs = uTXID;
     Set<Down4TX> deps = {from};
-    List<Down4TX> cop;
+    List<Down4TX> copy;
     do {
-      cop = List<Down4TX>.from(deps);
-      var depIDs = cop.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
+      copy = List<Down4TX>.from(deps);
+      var depIDs = copy.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
       for (final depID in depIDs) {
         if (unsettledIDs.contains(depID)) {
           deps.add(unsettledTxs.singleWhere((tx) => tx.txID == depID));
         }
       }
-    } while (deps.length != cop.length);
+    } while (deps.length != copy.length);
 
-    return cop.reversed.toList(growable: false);
+    return copy.reversed.toList(growable: false);
   }
 
   Future<Down4Payment?> importMoney(String pkBase68, User self) async {

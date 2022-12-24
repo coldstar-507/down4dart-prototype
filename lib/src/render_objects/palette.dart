@@ -118,29 +118,6 @@ class Palette extends StatelessWidget {
               : Image.asset('lib/src/assets/Dollar_Sign_3.png',
                   fit: BoxFit.cover);
     }
-    // switch (node.runtimeType) {
-    //   case User:
-    //     var user = node as User;
-    //     return user.media != null
-    //         ? Image.memory(user.media!.data, fit: BoxFit.cover)
-    //         : Image.asset('lib/src/assets/hashirama.jpg', fit: BoxFit.cover);
-    //   case GroupNode:
-    //     var gn = node as GroupNode;
-    //     return Image.memory(
-    //       gn.media.data,
-    //       fit: BoxFit.cover,
-    //       gaplessPlayback: true,
-    //     );
-    //   case Payment:
-    //     var pay = node as Payment;
-    //     return pay.payment.independentGets < 2000000
-    //         ? Image.asset('lib/src/assets/Dollar_Sign_1.png', fit: BoxFit.cover)
-    //         : pay.payment.independentGets < 10000000
-    //             ? Image.asset('lib/src/assets/Dollar_Sign_2.png',
-    //                 fit: BoxFit.cover)
-    //             : Image.asset('lib/src/assets/Dollar_Sign_3.png',
-    //                 fit: BoxFit.cover);
-    // }
     throw 'stop breaking my app';
   }
 

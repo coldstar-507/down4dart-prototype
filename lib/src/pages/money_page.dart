@@ -10,7 +10,6 @@ import '../web_requests.dart' as r;
 import '../bsv/wallet.dart';
 import '../bsv/types.dart';
 import '../bsv/utils.dart';
-import '../themes.dart';
 import '../boxes.dart';
 
 import '../render_objects/console.dart';
@@ -24,30 +23,52 @@ void printWrapped(String text) {
 }
 
 class PaymentPage extends StatefulWidget {
-  final void Function() back;
+  final User self;
+  final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentList;
+  final void Function(r.PaymentRequest) paymentRequest;
 
   PaymentPage({
+    required this.self,
+    required this.ok,
     required this.back,
     required this.payment,
+    required this.paymentRequest,
     Key? key,
   })  : paymentList = payment.toJsonList(),
         super(key: key);
 
   @override
-  _PaymentPageState createState() => _PaymentPageState();
+  State<PaymentPage> createState() => _PaymentPageState();
 }
 
 class _PaymentPageState extends State<PaymentPage> {
   Timer? timer;
   int listIndex = 0;
+  var qrs = <Widget Function(int)>[];
+  var tec = TextEditingController();
+  late var input = ConsoleInput(placeHolder: "(Text Note)", tec: tec);
 
   @override
   void initState() {
     super.initState();
-    timer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
-      listIndex = (listIndex + 1) % (widget.paymentList.length);
+    for (int i = 0; i < widget.paymentList.length; i++) {
+      var paymentData = widget.paymentList[i];
+      qrs.add((int index) => Opacity(
+          opacity: index == i ? 1 : 0,
+          child: Align(
+              alignment: Alignment.topCenter,
+              child: Column(children: [
+                SizedBox(height: topPadding),
+                SizedBox.square(
+                    dimension: qrDimension,
+                    child: Down4Qr(data: paymentData, dimension: qrDimension))
+              ]))));
+    }
+
+    timer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      listIndex = (listIndex + 1) % widget.paymentList.length;
       setState(() {});
     });
   }
@@ -58,34 +79,47 @@ class _PaymentPageState extends State<PaymentPage> {
     super.dispose();
   }
 
-  Widget qr() {
-    final topPadding = Sizes.w * 0.08;
-    final qrSize = Sizes.w - (topPadding * golden * 2);
-    return Container(
-      padding: EdgeInsets.only(top: topPadding),
-      alignment: AlignmentDirectional.topCenter,
-      child: Down4Qr(
-        data: widget.paymentList[listIndex],
-        dimension: qrSize,
-      ),
-    );
-  }
+  double get qrDimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);
+
+  double get topPadding => Sizes.w - qrDimension * 2 * 1 / golden;
+
+  Console get theConsole => Console(
+        inputs: [input],
+        topButtons: [
+          ConsoleButton(name: "Ok", onPress: widget.ok),
+        ],
+        bottomButtons: [
+          ConsoleButton(name: "Back", onPress: widget.back),
+          ConsoleButton(
+              name: "Send",
+              onPress: () {
+                final textNode = tec.value.text.isEmpty ? null : tec.value.text;
+                final spender = widget.payment.txs.last.txsIn.first.spender;
+                if (spender == widget.self.id) {
+                  final pr = r.PaymentRequest(
+                    sender: spender!,
+                    payment: widget.payment..textNote = textNode,
+                    targets: widget.payment.txs.last.txsOut
+                        .where((txout) => txout.isGets)
+                        .map((txout) => txout.receiver)
+                        .whereType<String>()
+                        .toList(growable: false),
+                  );
+                  widget.paymentRequest(pr);
+                  widget.ok();
+                }
+              })
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
         title: sha1(widget.payment.txs.last.txID!.data).toBase58(),
-        // stackWidgets: [qr()],
-        console: Console(
-          bottomButtons: [
-            ConsoleButton(
-              name: "Back",
-              onPress: widget.back,
-            ),
-          ],
-        ),
-      ),
+        stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
+        console: theConsole,
+      )
     ]);
   }
 }
@@ -97,17 +131,16 @@ class MoneyPage extends StatefulWidget {
   final Iterable<Palette> homePalettes;
   final Iterable<User> trueTargets;
   final User self;
-  // final List<Palette> Function() transition;
   final List<Palette> transitioned;
   final void Function() back;
-  final void Function(Down4Payment) parsePayment;
+  final void Function(Down4Payment) makePayment, importMoney;
   final void Function(r.Request req) paymentRequest;
   final int pageIndex;
   final void Function(int) onPageChange;
   final double initialOffset;
 
   const MoneyPage({
-    // required this.transition,
+    required this.importMoney,
     required this.trueTargets,
     required this.transitioned,
     required this.wallet,
@@ -118,7 +151,7 @@ class MoneyPage extends StatefulWidget {
     required this.self,
     required this.pageIndex,
     required this.onPageChange,
-    required this.parsePayment,
+    required this.makePayment,
     required this.paymentRequest,
     required this.initialOffset,
     Key? key,
@@ -146,18 +179,17 @@ class _MoneyPageState extends State<MoneyPage> {
     "i": 0,
   };
   late var palettes = widget.homePalettes;
-  // late final transitioned = widget.transition();
   late var scrollController =
       ScrollController(initialScrollOffset: widget.initialOffset);
 
   @override
   void initState() {
     super.initState();
-    mainViewInput(true);
+    loadMainViewInput(true);
     if (widget.trueTargets.isEmpty) {
-      emptyViewConsole();
+      loadEmptyViewConsole();
     } else {
-      mainViewConsole();
+      loadMainViewConsole();
     }
 
     delayed();
@@ -181,8 +213,6 @@ class _MoneyPageState extends State<MoneyPage> {
     scrollController.dispose();
     super.dispose();
   }
-
-  void startScan() {}
 
   int usdToSatoshis(double usds) =>
       ((usds / widget.exchangeRate) * 100000000).floor();
@@ -225,228 +255,9 @@ class _MoneyPageState extends State<MoneyPage> {
     return amount;
   }
 
-  void mainViewInput([bool reload = false]) {
-    _cachedMainViewInput = ConsoleInput(
-      maxLines: 1,
-      type: TextInputType.number,
-      placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
-      tec: tec,
-    );
-    if (reload) setState(() {});
-  }
-
-  void emptyViewConsole([
-    bool scanning = false,
-    bool extraBack = false,
-    bool reloadInput = false,
-  ]) {
-    if (scanning) {
-      scanner = MobileScannerController();
-    } else {
-      scanner?.dispose();
-      scanner = null;
-    }
-
-    mainViewInput(reloadInput);
-    _console = Console(
-      scanCallBack: scanning ? onScan : null,
-      scanController: scanning ? scanner : null,
-      inputs: [_cachedMainViewInput!],
-      topButtons: [
-        ConsoleButton(
-          name: "Scan",
-          onPress: () => emptyViewConsole(!scanning),
-        )
-      ],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          isSpecial: true,
-          widthEpsilon: 0.5,
-          heightEpsilon: 0.5,
-          bottomEpsilon: -0.5,
-          showExtra: extraBack,
-          onPress: () => extraBack
-              ? emptyViewConsole(scanning, !extraBack, reloadInput)
-              : widget.back(),
-          onLongPress: () =>
-              emptyViewConsole(scanning, !extraBack, reloadInput),
-          extraButtons: [
-            ConsoleButton(
-              name: "Import",
-              onPress: importConsole,
-            )
-          ],
-        ),
-        ConsoleButton(
-          isMode: true,
-          name: currency,
-          onPress: () {
-            rotateCurrency();
-            emptyViewConsole(scanning, extraBack, true);
-          },
-        ),
-      ],
-    );
-    setState(() {});
-  }
-
-  void mainViewConsole([bool reloadInput = false, bool extra = false]) {
-    mainViewInput(reloadInput);
-    _console = Console(
-      inputs: [_cachedMainViewInput!],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          isSpecial: true,
-          showExtra: extra,
-          onPress: () =>
-              extra ? mainViewConsole(reloadInput, !extra) : widget.back(),
-          onLongPress: () => mainViewConsole(reloadInput, !extra),
-          extraButtons: [
-            ConsoleButton(name: "Import", onPress: importConsole),
-          ],
-        ),
-        ConsoleButton(
-            name: method,
-            isMode: true,
-            onPress: () {
-              rotateMethod();
-              mainViewConsole();
-            }),
-        ConsoleButton(
-            name: currency,
-            isMode: true,
-            onPress: () {
-              rotateCurrency();
-              mainViewConsole(tec.value.text.isEmpty ? true : false);
-            }),
-      ],
-      topButtons: [
-        ConsoleButton(name: "Bill", onPress: () => print("TODO")),
-        ConsoleButton(
-            name: "Pay", onPress: () => confirmationConsole(currency)),
-      ],
-    );
-
-    setState(() {});
-  }
-
-  void confirmationConsole(String inputCurrency) {
-    double asUSD;
-    int asSats;
-    if (inputCurrency == "USD") {
-      asUSD = num.parse(tec.value.text).toDouble() *
-          (method == "Split" ? 1.0 : widget.trueTargets.length);
-      asSats = usdToSatoshis(asUSD);
-    } else {
-      asSats = num.parse(tec.value.text).toInt() *
-          (method == "Split" ? 1 : widget.trueTargets.length);
-      asUSD = satoshisToUSD(asSats);
-    }
-
-    final satsString = formattedSats(asSats);
-    // tec.clear();
-    _console = Console(
-      inputs: [
-        ConsoleInput(
-          placeHolder: currency == "USD"
-              ? "${asUSD.toStringAsFixed(4)} \$"
-              : "$satsString sat",
-          tec: emptyTec,
-          activated: false,
-        ),
-      ],
-      topButtons: [
-        ConsoleButton(
-            name: "Confirm",
-            onPress: () {
-              final pay = widget.wallet.payUsers(
-                widget.trueTargets.toList(growable: false),
-                widget.self,
-                Sats(inputAsSatoshis),
-              );
-              if (pay != null) {
-                for (final tx in pay.txs) {
-                  printWrapped("=================");
-                  printWrapped(tx.fullRawHex);
-                  printWrapped("=================");
-                  printWrapped(tx.txID!.asHex);
-                  printWrapped("=================");
-                }
-                widget.parsePayment(pay);
-                printWrapped("pay: ${pay.toYouKnow()}###\n###");
-                print("ID: ${sha256(utf8.encode(pay.toYouKnow())).toHex()}");
-                print("txid: ${pay.txs.last.txID!.asHex}");
-                if (widget.trueTargets.isEmpty) {
-                  emptyViewConsole(false, false, true);
-                } else {
-                  mainViewConsole(true);
-                }
-              }
-            }),
-      ],
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: mainViewConsole),
-        ConsoleButton(
-          name: currency,
-          isMode: true,
-          onPress: () {
-            rotateCurrency();
-            confirmationConsole(inputCurrency);
-          },
-        ),
-      ],
-    );
-
-    setState(() {});
-  }
-
-  void importConsole([List<Down4TXOUT>? utxos]) {
-    ConsoleInput input;
-    if (utxos == null) {
-      input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
-    } else {
-      final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
-      final ph = "Found ${formattedSats(sats)} sat";
-      input = ConsoleInput(placeHolder: ph, tec: emptyTec, activated: false);
-    }
-
-    void import() async {
-      final payment =
-          await widget.wallet.importMoney(importTec.value.text, widget.self);
-
-      if (payment == null) return;
-
-      widget.parsePayment(payment);
-      if (widget.trueTargets.isEmpty) {
-        emptyViewConsole(false, false, true);
-      } else {
-        mainViewConsole(true);
-      }
-    }
-
-    _console = Console(
-      inputs: [input],
-      topButtons: [
-        ConsoleButton(name: "Import", onPress: import),
-      ],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: () => widget.trueTargets.isEmpty
-              ? emptyViewConsole()
-              : mainViewConsole(),
-        ),
-        ConsoleButton(
-          name: "Check",
-          onPress: () async =>
-              importConsole(await checkPrivateKey(importTec.value.text)),
-        ),
-      ],
-    );
-
-    setState(() {});
+  void rotateCurrency() {
+    _currencies["i"] =
+        (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
   }
 
   void rotateMethod() {
@@ -470,20 +281,216 @@ class _MoneyPageState extends State<MoneyPage> {
         }
         final payment = Down4Payment.fromJsonList(sortedData);
         widget.wallet.parsePayment(widget.self, payment);
-        emptyViewConsole(false, false, true);
+        loadEmptyViewConsole(false, false, true);
       }
     }
   }
 
-  void rotateCurrency() {
-    _currencies["i"] =
-        (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
+  void loadMainViewInput([bool reload = false]) {
+    _cachedMainViewInput = ConsoleInput(
+      maxLines: 1,
+      type: TextInputType.number,
+      placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
+      tec: tec,
+    );
+    if (reload) setState(() {});
+  }
+
+  void loadEmptyViewConsole([
+    bool scanning = false,
+    bool extraBack = false,
+    bool reloadInput = false,
+  ]) {
+    if (scanning) {
+      scanner = MobileScannerController();
+    } else {
+      scanner?.dispose();
+      scanner = null;
+    }
+    loadMainViewInput(reloadInput);
+    _console = Console(
+      scanCallBack: scanning ? onScan : null,
+      scanController: scanning ? scanner : null,
+      inputs: [_cachedMainViewInput!],
+      topButtons: [
+        ConsoleButton(
+          name: "Scan",
+          onPress: () => loadEmptyViewConsole(!scanning),
+        )
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          isSpecial: true,
+          widthEpsilon: 0.5,
+          heightEpsilon: 0.5,
+          bottomEpsilon: -0.5,
+          showExtra: extraBack,
+          onPress: () => extraBack
+              ? loadEmptyViewConsole(scanning, !extraBack, reloadInput)
+              : widget.back(),
+          onLongPress: () =>
+              loadEmptyViewConsole(scanning, !extraBack, reloadInput),
+          extraButtons: [
+            ConsoleButton(
+              name: "Import",
+              onPress: loadImportConsole,
+            )
+          ],
+        ),
+        ConsoleButton(
+          isMode: true,
+          name: currency,
+          onPress: () {
+            rotateCurrency();
+            loadEmptyViewConsole(scanning, extraBack, true);
+          },
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  void loadMainViewConsole([bool reloadInput = false, bool extra = false]) {
+    loadMainViewInput(reloadInput);
+    _console = Console(
+      inputs: [_cachedMainViewInput!],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          isSpecial: true,
+          showExtra: extra,
+          onPress: () =>
+              extra ? loadMainViewConsole(reloadInput, !extra) : widget.back(),
+          onLongPress: () => loadMainViewConsole(reloadInput, !extra),
+          extraButtons: [
+            ConsoleButton(name: "Import", onPress: loadImportConsole),
+          ],
+        ),
+        ConsoleButton(
+            name: method,
+            isMode: true,
+            onPress: () {
+              rotateMethod();
+              loadMainViewConsole();
+            }),
+        ConsoleButton(
+            name: currency,
+            isMode: true,
+            onPress: () {
+              rotateCurrency();
+              loadMainViewConsole(tec.value.text.isEmpty ? true : false);
+            }),
+      ],
+      topButtons: [
+        ConsoleButton(name: "Bill", onPress: () => print("TODO")),
+        ConsoleButton(
+            name: "Pay", onPress: () => loadConfirmationConsole(currency)),
+      ],
+    );
+
+    setState(() {});
+  }
+
+  void loadConfirmationConsole(String inputCurrency) {
+    double asUSD;
+    int asSats;
+    if (inputCurrency == "USD") {
+      asUSD = num.parse(tec.value.text).toDouble() *
+          (method == "Split" ? 1.0 : widget.trueTargets.length);
+      asSats = usdToSatoshis(asUSD);
+    } else {
+      asSats = num.parse(tec.value.text).toInt() *
+          (method == "Split" ? 1 : widget.trueTargets.length);
+      asUSD = satoshisToUSD(asSats);
+    }
+
+    void confirmPayment() {
+      final pay = widget.wallet.payUsers(
+        widget.trueTargets.toList(growable: false),
+        widget.self,
+        Sats(inputAsSatoshis),
+      );
+      print("The pay: ${pay?.toJson()}");
+      if (pay != null) widget.makePayment(pay);
+    }
+
+    final satsString = formattedSats(asSats);
+    _console = Console(
+      inputs: [
+        ConsoleInput(
+          placeHolder: currency == "USD"
+              ? "${asUSD.toStringAsFixed(4)} \$"
+              : "$satsString sat",
+          tec: emptyTec,
+          activated: false,
+        ),
+      ],
+      topButtons: [
+        ConsoleButton(name: "Confirm", onPress: confirmPayment),
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadMainViewConsole),
+        ConsoleButton(
+          name: currency,
+          isMode: true,
+          onPress: () {
+            rotateCurrency();
+            loadConfirmationConsole(inputCurrency);
+          },
+        ),
+      ],
+    );
+    setState(() {});
+  }
+
+  void loadImportConsole([List<Down4TXOUT>? utxos]) {
+    ConsoleInput input;
+    if (utxos == null) {
+      input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
+    } else {
+      final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
+      final ph = "Found ${formattedSats(sats)} sat";
+      input = ConsoleInput(placeHolder: ph, tec: emptyTec, activated: false);
+    }
+
+    void import() async {
+      final payment =
+          await widget.wallet.importMoney(importTec.value.text, widget.self);
+
+      if (payment == null) return;
+      widget.importMoney(payment);
+      if (widget.trueTargets.isEmpty) {
+        loadEmptyViewConsole(false, false, true);
+      } else {
+        loadMainViewConsole(true);
+      }
+    }
+
+    _console = Console(
+      inputs: [input],
+      topButtons: [
+        ConsoleButton(name: "Import", onPress: import),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () => widget.trueTargets.isEmpty
+              ? loadEmptyViewConsole()
+              : loadMainViewConsole(),
+        ),
+        ConsoleButton(
+          name: "Check",
+          onPress: () async =>
+              loadImportConsole(await checkPrivateKey(importTec.value.text)),
+        ),
+      ],
+    );
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    print("All palettes name=${palettes.map((e) => e.node.name).toList()}");
-    print("Money size of list=${palettes.length}");
     return Andrew(
       initialPageIndex: widget.pageIndex,
       onPageChange: widget.onPageChange,
@@ -502,8 +509,5 @@ class _MoneyPageState extends State<MoneyPage> {
         ),
       ],
     );
-
-    // if (_view == null) widget.palettes.isEmpty ? emptyMainView() : mainView();
-    // return _view!;
   }
 }
