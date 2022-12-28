@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:qr/qr.dart';
 import '../themes.dart';
+import '../boxes.dart';
 
 class QrPainter extends CustomPainter {
   final double strokeWidth;
@@ -49,18 +50,14 @@ class Down4Qr2 {
           errorCorrectLevel: qrErrorCorrectLevel ?? QrErrorCorrectLevel.H,
         );
 
-  Future<Image?> asImage() async {
+  Future<Uint8List?> asImage() async {
     final qrImage = QrImage(qrCode);
-    print(0);
     final recorder = ui.PictureRecorder();
-    print(1);
     final canvas = Canvas(
       recorder,
     );
 
-    print(2);
     final strokeWidth = dimension / qrImage.moduleCount;
-    print(3);
     var paint = Paint()
       ..color = PinkTheme.qrColor
       ..strokeWidth = strokeWidth
@@ -76,19 +73,14 @@ class Down4Qr2 {
       }
     }
     //draw points on canvas
-    print(4444);
     canvas.drawPoints(ui.PointMode.points, points, paint);
 
-    print(4);
     final picture = recorder.endRecording();
-    print(5);
-    final dartImage = await picture.toImage(dimension.ceil(), dimension.ceil());
-    print(6);
+    final picDimension = (dimension * golden).ceil();
+    final dartImage = await picture.toImage(picDimension, picDimension);
     final bytes = await dartImage.toByteData(format: ui.ImageByteFormat.png);
-    print(7);
     if (bytes == null) return null;
-    print(8);
-    return Image.memory(Uint8List.view(bytes.buffer));
+    return Uint8List.view(bytes.buffer);
   }
 }
 

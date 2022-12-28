@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:down4/src/down4_utility.dart';
@@ -26,7 +27,7 @@ class PaymentPage extends StatefulWidget {
   final User self;
   final void Function() back, ok;
   final Down4Payment payment;
-  final List<String> paymentList;
+  final List<String> paymentAsList;
   final void Function(r.PaymentRequest) paymentRequest;
 
   PaymentPage({
@@ -36,7 +37,7 @@ class PaymentPage extends StatefulWidget {
     required this.payment,
     required this.paymentRequest,
     Key? key,
-  })  : paymentList = payment.toJsonList(),
+  })  : paymentAsList = payment.toJsonList(),
         super(key: key);
 
   @override
@@ -47,14 +48,67 @@ class _PaymentPageState extends State<PaymentPage> {
   Timer? timer;
   int listIndex = 0;
   var qrs = <Widget Function(int)>[];
+  var qrs2 = <Widget>[];
   var tec = TextEditingController();
   late var input = ConsoleInput(placeHolder: "(Text Note)", tec: tec);
 
   @override
   void initState() {
     super.initState();
-    for (int i = 0; i < widget.paymentList.length; i++) {
-      var paymentData = widget.paymentList[i];
+    // loadQrs();
+    loadQrsAsPaints();
+    startTimer();
+  }
+
+  void startTimer() {
+    timer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      listIndex = (listIndex + 1) % widget.paymentAsList.length;
+      setState(() {});
+    });
+  }
+
+  // Future<void> loadQrs() async {
+  //   if (widget.payment.qrPngs != null) {
+  //     qrs2 = widget.payment.qrPngs!
+  //         .map((e) => Align(
+  //             alignment: Alignment.topCenter,
+  //             child: Column(children: [
+  //               SizedBox(height: topPadding),
+  //               SizedBox.square(
+  //                   dimension: qrDimension,
+  //                   child: Image.memory(e,
+  //                       height: qrDimension, width: qrDimension))
+  //             ])))
+  //         .toList(growable: false);
+  //   } else {
+  //     widget.payment.qrPngs = widget.paymentAsList
+  //         .map((e) async =>
+  //             await Down4Qr2(data: e, dimension: qrDimension).asImage())
+  //         .whereType<Uint8List>()
+  //         .toList(growable: false);
+  //
+  //     widget.payment.save();
+  //
+  //     qrs2 = widget.payment.qrPngs!
+  //         .map((e) => Align(
+  //             alignment: Alignment.topCenter,
+  //             child: Column(children: [
+  //               SizedBox(height: topPadding),
+  //               SizedBox.square(
+  //                   dimension: qrDimension,
+  //                   child: Image.memory(e,
+  //                       height: qrDimension, width: qrDimension))
+  //             ])))
+  //         .toList(growable: false);
+  //   }
+  //   setState(() {
+  //     startTimer();
+  //   });
+  // }
+
+  void loadQrsAsPaints() {
+    for (int i = 0; i < widget.paymentAsList.length; i++) {
+      var paymentData = widget.paymentAsList[i];
       qrs.add((int index) => Opacity(
           opacity: index == i ? 1 : 0,
           child: Align(
@@ -66,11 +120,6 @@ class _PaymentPageState extends State<PaymentPage> {
                     child: Down4Qr(data: paymentData, dimension: qrDimension))
               ]))));
     }
-
-    timer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
-      listIndex = (listIndex + 1) % widget.paymentList.length;
-      setState(() {});
-    });
   }
 
   @override
@@ -83,40 +132,41 @@ class _PaymentPageState extends State<PaymentPage> {
 
   double get topPadding => Sizes.w - qrDimension * 2 * 1 / golden;
 
-  Console get theConsole => Console(
-        inputs: [input],
-        topButtons: [
-          ConsoleButton(name: "Ok", onPress: widget.ok),
-        ],
-        bottomButtons: [
-          ConsoleButton(name: "Back", onPress: widget.back),
-          ConsoleButton(
-              name: "Send",
-              onPress: () {
-                final textNode = tec.value.text.isEmpty ? null : tec.value.text;
-                final spender = widget.payment.txs.last.txsIn.first.spender;
-                if (spender == widget.self.id) {
-                  final pr = r.PaymentRequest(
-                    sender: spender!,
-                    payment: widget.payment..textNote = textNode,
-                    targets: widget.payment.txs.last.txsOut
-                        .where((txout) => txout.isGets)
-                        .map((txout) => txout.receiver)
-                        .whereType<String>()
-                        .toList(growable: false),
-                  );
-                  widget.paymentRequest(pr);
-                  widget.ok();
-                }
-              })
-        ],
-      );
+  late Console theConsole = Console(
+    inputs: [input],
+    topButtons: [
+      ConsoleButton(name: "Ok", onPress: widget.ok),
+    ],
+    bottomButtons: [
+      ConsoleButton(name: "Back", onPress: widget.back),
+      ConsoleButton(
+          name: "Send",
+          onPress: () {
+            final textNode = tec.value.text.isEmpty ? null : tec.value.text;
+            final spender = widget.payment.txs.last.txsIn.first.spender;
+            if (spender == widget.self.id) {
+              final pr = r.PaymentRequest(
+                sender: spender!,
+                payment: widget.payment..textNote = textNode,
+                targets: widget.payment.txs.last.txsOut
+                    .where((txout) => txout.isGets)
+                    .map((txout) => txout.receiver)
+                    .whereType<String>()
+                    .toList(growable: false),
+              );
+              widget.paymentRequest(pr);
+              widget.ok();
+            }
+          })
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
         title: sha1(widget.payment.txs.last.txID!.data).toBase58(),
+        // stackWidgets: qrs2.isNotEmpty ? [qrs2[listIndex]] : null,
         stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
         console: theConsole,
       )

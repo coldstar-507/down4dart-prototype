@@ -1032,6 +1032,7 @@ class _HomeState extends State<Home> {
       makePayment: (payment) {
         parsePayment(payment);
         _locations.add(Location(id: "Payment"));
+        unselectSelectedPalettes(updateActivity: true);
         paymentPage(payment);
       },
       back: back,

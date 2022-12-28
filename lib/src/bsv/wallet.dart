@@ -20,12 +20,12 @@ class Wallet {
 
   Set<Down4Payment> get payments => _payments.values.toSet();
 
-  Set<TXID> get uTXID => unsettledTxs.map((ustx) => ustx.txID!).toSet();
-
   Set<Down4TX> get unsettledTxs => _payments.values
       .map((pay) => pay.txs.where((tx) => tx.confirmations < 6))
       .expand((tx) => tx)
       .toSet();
+
+  Set<TXID> get uTXID => unsettledTxs.map((ustx) => ustx.txID!).toSet();
 
   void settlementRoutine() {
     for (final payment in payments) {
@@ -197,9 +197,10 @@ class Wallet {
   }
 
   void parsePayment(User self, Down4Payment pay) {
-    final sortedTxs = topologicalSort(pay.txs);
+    // this failed and should not be needed, the txs are sorted in the payment
+    // final sortedTxs = topologicalSort(pay.txs);
     // if I'm right, we only care about utxos of the last TX
-    var releventTx = sortedTxs.last;
+    var releventTx = pay.txs.last;
     for (final utxo in releventTx.txsOut) {
       if (utxo.receiver == self.id) _utxos[utxo.id] = utxo;
     }
@@ -328,7 +329,8 @@ class Wallet {
 }
 
 void main() {
-  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  // var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  var f = io.File("/home/scott/jeff.txt");
   var pkHex = f.readAsStringSync();
 
   // final seed1 = safeSeed(32);

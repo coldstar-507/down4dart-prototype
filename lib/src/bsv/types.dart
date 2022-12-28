@@ -30,10 +30,11 @@ class Down4InternetPayment {
 }
 
 class Down4Payment {
-  List<Down4TX> txs;
-  bool safe;
+  final List<Down4TX> txs;
+  final bool safe;
   String? textNote;
-  Down4Payment(this.txs, this.safe, {this.textNote});
+  List<Uint8List>? qrPngs;
+  Down4Payment(this.txs, this.safe, {this.textNote, this.qrPngs});
 
   int get independentGets {
     final tx = txs.last;
@@ -112,12 +113,14 @@ class Down4Payment {
         "safe": safe,
       };
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({bool withImages = false}) => {
         "id": id,
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,
         "safe": safe,
         if (textNote != null) "txt": textNote,
+        if (withImages && qrPngs != null)
+          "qrs": qrPngs!.map((qr) => base64Encode(qr)).toList(growable: false),
       };
 
   String toYouKnow() => base64Encode(utf8.encode(jsonEncode(this)));
@@ -135,6 +138,11 @@ class Down4Payment {
           .toList(),
       decodedJson["safe"],
       textNote: decodedJson["txt"],
+      qrPngs: decodedJson["qrs"] == null
+          ? null
+          : List<String>.from(decodedJson["qrs"])
+              .map((b) => base64Decode(b))
+              .toList(growable: false),
     );
   }
 }

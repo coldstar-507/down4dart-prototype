@@ -121,7 +121,8 @@ extension MediaSave on Down4Media {
 }
 
 extension PaymentSave on Down4Payment {
-  Future<void> save() => b.payments.put(id, jsonEncode(this));
+  Future<void> save() =>
+      b.payments.put(id, jsonEncode(toJson(withImages: true)));
 }
 
 extension WalletSave on Wallet {

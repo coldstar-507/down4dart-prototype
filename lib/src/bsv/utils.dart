@@ -41,22 +41,22 @@ Uint8List safeSeed(int len) {
   return Uint8List.fromList(seed);
 }
 
-List<Down4TX> topologicalSort(List<Down4TX> txs) {
-  var sorted = <Down4TX>[];
-  var prevSortIDs = <TXID>[];
-  sorted.addAll(txs.where((tx) => tx.txidDeps.isEmpty));
-  do {
-    prevSortIDs = sorted.map((e) => e.txID!).toList();
-    final unSorted = txs.where((tx) => !prevSortIDs.contains(tx.txID));
-    for (final unsortedTx in unSorted) {
-      final deps = unsortedTx.txidDeps;
-      if (deps.every((dep) => prevSortIDs.contains(dep))) {
-        sorted.add(unsortedTx);
-      }
-    }
-  } while (sorted.length != prevSortIDs.length);
-  return sorted;
-}
+// List<Down4TX> topologicalSort(List<Down4TX> txs) {
+//   var sorted = <Down4TX>[];
+//   var prevSortIDs = <TXID>[];
+//   sorted.addAll(txs.where((tx) => tx.txidDeps.isEmpty));
+//   do {
+//     prevSortIDs = sorted.map((e) => e.txID!).toList();
+//     final unSorted = txs.where((tx) => !prevSortIDs.contains(tx.txID));
+//     for (final unsortedTx in unSorted) {
+//       final deps = unsortedTx.txidDeps;
+//       if (deps.every((dep) => prevSortIDs.contains(dep))) {
+//         sorted.add(unsortedTx);
+//       }
+//     }
+//   } while (sorted.length != prevSortIDs.length);
+//   return sorted;
+// }
 
 Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
   final url = Uri.parse(
