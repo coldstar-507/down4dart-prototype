@@ -92,7 +92,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
       topInputs: [_inputs[0]],
       inputs: [_inputs[1], _inputs[2]],
       bottomButtons: [
-        ConsoleButton(name: "Camera", onPress: () => print("TODO")),
+        ConsoleButton(name: "Camera", onPress: camConsole),
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),
         ConsoleButton(
             key: buttonKey,
@@ -117,20 +117,18 @@ class _UserMakerPageState extends State<UserMakerPage> {
     setState(() {});
   }
 
-  Future<void> camConsole([
+  Future<void> camConsole({
     CameraController? ctrl,
-    int cameraIdx = 0,
-    ResolutionPreset resolution = ResolutionPreset.medium,
-    FlashMode flashMode = FlashMode.off,
-    bool reloadCtrl = false,
+    int cam = 0,
+    bool reload = false,
     String? path,
-  ]) async {
-    if (ctrl == null || reloadCtrl) {
+  }) async {
+    if (ctrl == null || reload) {
       try {
         ctrl = CameraController(
-          widget.cameras[cameraIdx],
-          resolution,
-          enableAudio: true,
+          widget.cameras[cam],
+          ResolutionPreset.high,
+          enableAudio: false,
         );
         await ctrl.initialize();
       } catch (err) {
@@ -138,89 +136,29 @@ class _UserMakerPageState extends State<UserMakerPage> {
       }
     }
 
-    ctrl?.setFlashMode(flashMode);
-
-    void nextCam() => cameraIdx == 0
-        ? camConsole(ctrl, 1, resolution, FlashMode.off, true)
-        : camConsole(ctrl, 0, resolution, FlashMode.off, true);
-
-    void nextRes() {
-      switch (resolution) {
-        case ResolutionPreset.low:
-          camConsole(ctrl, cameraIdx, ResolutionPreset.medium, flashMode, true);
-          break;
-        case ResolutionPreset.medium:
-          camConsole(ctrl, cameraIdx, ResolutionPreset.high, flashMode, true);
-          break;
-        case ResolutionPreset.high:
-          camConsole(ctrl, cameraIdx, ResolutionPreset.low, flashMode, true);
-          break;
-        case ResolutionPreset.veryHigh:
-          // TODO: Handle this case.
-          break;
-        case ResolutionPreset.ultraHigh:
-          // TODO: Handle this case.
-          break;
-        case ResolutionPreset.max:
-          // TODO: Handle this case.
-          break;
-      }
-    }
-
-    void nextFlash() => flashMode == FlashMode.off
-        ? camConsole(ctrl, cameraIdx, resolution, FlashMode.torch)
-        : camConsole(ctrl, cameraIdx, resolution, FlashMode.off);
+    void nextCam() => cam == 0
+        ? camConsole(ctrl: ctrl, cam: 1, reload: true)
+        : camConsole(ctrl: ctrl, cam: 0, reload: true);
 
     if (path == null) {
       _console = Console(
         cameraController: ctrl,
+        toMirror: cam == 1,
         aspectRatio: ctrl?.value.aspectRatio,
         topButtons: [
-          ConsoleButton(
-            name: cameraIdx == 0 ? "Front" : "Rear",
-            onPress: nextCam,
-            isMode: true,
-          ),
           ConsoleButton(
             name: "Capture",
             onPress: () async {
               XFile? f = await ctrl?.takePicture();
-              if (f != null) {
-                path = f.path;
-                Uint8List? compressed;
-                compressed = await FlutterImageCompress.compressWithFile(
-                  path!,
-                  minHeight: 520, // palette height
-                  minWidth: 520, // palette height
-                  quality: 40,
-                );
-                if (compressed != null) {
-                  _image = compressed;
-                } else {
-                  path = null;
-                }
-              }
-              camConsole(
-                ctrl,
-                cameraIdx,
-                resolution,
-                FlashMode.off,
-                false,
-                path,
-              );
+              camConsole(ctrl: ctrl, cam: cam, reload: false, path: f?.path);
             },
           ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: baseConsole),
           ConsoleButton(
-            name: resolution.name.capitalize(),
-            onPress: nextRes,
-            isMode: true,
-          ),
-          ConsoleButton(
-            name: flashMode.name.capitalize(),
-            onPress: nextFlash,
+            name: cam == 0 ? "Front" : "Rear",
+            onPress: nextCam,
             isMode: true,
           ),
         ],
@@ -228,24 +166,36 @@ class _UserMakerPageState extends State<UserMakerPage> {
     } else {
       _console = Console(
         imagePreviewPath: path,
-        toMirror: cameraIdx == 1,
+        toMirror: cam == 1,
         topButtons: [
           ConsoleButton(
             name: "Accept",
-            onPress: () {
-              _toReverse = cameraIdx == 1;
+            onPress: () async {
+              final compressedImage =
+                  await FlutterImageCompress.compressWithFile(
+                path,
+                minHeight: 256,
+                minWidth: 256,
+                format: CompressFormat.png,
+                quality: 60,
+              );
+              _image = compressedImage ?? Uint8List(0);
+              _toReverse = cam == 1;
               baseConsole();
             },
           ),
         ],
         bottomButtons: [
           ConsoleButton(
-              name: "Back",
+            name: "Back",
+            onPress: () => camConsole(ctrl: ctrl, cam: cam, reload: false),
+          ),
+          ConsoleButton(
+              name: "Cancel",
               onPress: () {
-                _image = Uint8List(0);
-                camConsole(ctrl, cameraIdx, resolution, flashMode, false, null);
+                ctrl?.dispose();
+                baseConsole();
               }),
-          ConsoleButton(name: "Cancel", onPress: baseConsole),
         ],
       );
     }

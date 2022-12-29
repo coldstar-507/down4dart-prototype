@@ -112,7 +112,7 @@ Future<Down4Payment?> getPayment(String paymentID) async {
     print("error getting payment, id: $paymentID\n");
     return null;
   }
-  return Down4Payment.fromYouKnow(req.body);
+  return Down4Payment.fromJson(jsonDecode(req.body));
 }
 
 Future<double?> getExchangeRate() async {
@@ -205,13 +205,13 @@ Future<List<Down4Message>?> getPosts(List<String> ids) async {
   return null;
 }
 
-Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePayment",
-  );
-  final res = await http.post(url, body: jsonEncode(payment));
-  return res.statusCode == 200;
-}
+// Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePayment",
+//   );
+//   final res = await http.post(url, body: jsonEncode(payment));
+//   return res.statusCode == 200;
+// }
 
 enum RequestType {
   chat,
@@ -348,12 +348,14 @@ class GroupRequest extends ChatRequest {
 class PaymentRequest implements Request {
   final Down4Payment payment;
   final String sender;
+  final String? textNote;
   String get id => payment.id;
 
   PaymentRequest({
     required this.targets,
     required this.payment,
     required this.sender,
+    this.textNote,
   });
 
   @override
@@ -368,5 +370,6 @@ class PaymentRequest implements Request {
         "id": id,
         "tr": targets,
         "pay": payment.toYouKnow(),
+        if (payment.textNote != null) "txt": payment.textNote,
       };
 }

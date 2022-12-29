@@ -151,9 +151,9 @@ class UserMakerPalette extends StatelessWidget {
 
   Widget get body => Expanded(
         child: Container(
-          decoration: BoxDecoration(
-            color: PinkTheme.nodeColors[NodesColor.friend],
-            borderRadius: const BorderRadius.horizontal(
+          decoration: const BoxDecoration(
+            color: PinkTheme.selfPaletteColor,
+            borderRadius: BorderRadius.horizontal(
               right: Radius.circular(4.0),
             ),
           ),

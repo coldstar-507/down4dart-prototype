@@ -445,6 +445,7 @@ class _HomeState extends State<Home> {
       return Palette(
         node: node,
         at: "Payments",
+        messagePreview: node.payment.textNote,
         buttonsInfo: [
           ButtonsInfo(
             assetPath: 'lib/src/assets/rightBlackArrow.png',

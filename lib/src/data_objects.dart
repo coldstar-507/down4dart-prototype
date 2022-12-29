@@ -414,25 +414,27 @@ class Hyperchat extends GroupNode {
 }
 
 class Payment extends BaseNode {
-  final Down4Payment payment;
+  final Down4Payment _payment;
   final Identifier id;
   final String name;
   Payment({required Down4Payment payment})
-      : payment = payment,
+      : _payment = payment,
         id = payment.id,
         name = payment.formattedName;
 
-  String get displayID => "Confirmations: ${payment.lastConfirmations}";
+  Down4Payment get payment => _payment;
 
-  NodesColor get colorCode => payment.lastConfirmations == 0
+  String get displayID => "Confirmations: ${_payment.lastConfirmations}";
+
+  NodesColor get colorCode => _payment.lastConfirmations == 0
       ? NodesColor.unsafeTx
-      : payment.lastConfirmations < 6
+      : _payment.lastConfirmations < 6
           ? NodesColor.mediumTx
           : NodesColor.safeTx;
 
   Map toJson() => {
         "t": Nodes.payment.name,
-        "pay": payment.toYouKnow(),
+        "pay": _payment.toYouKnow(),
       };
 }
 

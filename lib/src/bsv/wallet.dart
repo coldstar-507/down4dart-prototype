@@ -33,82 +33,31 @@ class Wallet {
     }
   }
 
-  Future<void> _trySettlement(Down4Payment payment) async {
-    final txsToSettle = payment.txs
-        .where((tx) => tx.confirmations == 0)
-        .toList(growable: false);
-
-    final failedIndices = await r.broadcastTxs(txsToSettle);
-    for (final i in failedIndices) {
-      print("Failed to broadcast tx ID: ${payment.txs[i]}");
-    }
-  }
-
   Future<void> updateAllStatus() async {
     for (final payment in payments) {
       _updateStatus(payment);
     }
   }
 
-  Future<void> _updateStatus(Down4Payment payment) async {
-    final ids = payment.txs.map((e) => e.txID!.asHex).toList();
+  // void paymentRoutine() {
+  //   // clears space and make other routines faster
+  //   // we can remove payment after the last tx has over 60 confirmations
+  //   for (final payment in payments) {
+  //     final confirmations = payment.txs.last.confirmations;
+  //     if (confirmations > 60) {
+  //       _payments.remove(payment.id);
+  //     } else if (confirmations == 0) {
+  //       _trySettlement(payment);
+  //     }
+  //   }
+  // }
 
-    final confirmations = await r.confirmations(ids);
-    if (confirmations == null || confirmations.length != ids.length) return;
-
-    for (int i = 0; i < confirmations.length; i++) {
-      _payments[payment.id]!.txs[i].confirmations = confirmations[i];
-    }
-  }
-
-  void paymentRoutine() {
-    // clears space and make other routines faster
-    // we can remove payment after the last tx has over 60 confirmations
-    for (final payment in payments) {
-      final confirmations = payment.txs.last.confirmations;
-      if (confirmations > 60) {
-        _payments.remove(payment.id);
-      } else if (confirmations == 0) {
-        _trySettlement(payment);
-      }
-    }
-  }
-
-  Wallet._({
-    int? ix,
-    Map<Identifier, Down4TXOUT>? utxos,
-    Map<Identifier, Down4Payment>? payments,
-    required Down4Keys keys,
-  })  : _utxos = utxos ?? <Identifier, Down4TXOUT>{},
-        _payments = payments ?? <Identifier, Down4Payment>{},
-        _keys = keys,
-        _ix = ix ?? -1;
-
-  factory Wallet.fromSeed(Uint8List seed1, Uint8List seed2) {
-    if (seed1.lengthInBytes < 32) throw 'invalid seed1 length';
-    if (seed2.lengthInBytes < 32) throw 'invalid seed2 length';
-    return Wallet._(keys: Down4Keys.fromRandom(seed1, seed2));
-  }
-
-  factory Wallet.fromJson(dynamic decodedJson) {
-    return Wallet._(
-      utxos: Map.from(decodedJson["utxos"])
-          .map((key, value) => MapEntry(key, Down4TXOUT.fromJson(value))),
-      payments: Map.from(decodedJson["payments"])
-          .map((key, value) => MapEntry(key, Down4Payment.fromJson(value))),
-      keys: Down4Keys.fromJson(decodedJson["keys"]),
-      ix: decodedJson["ix"],
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        "utxos": _utxos.map((key, val) => MapEntry(key, val.toJson())),
-        "payments": _payments.map((key, val) => MapEntry(key, val.toJson())),
-        "keys": _keys.toJson(),
-        "ix": _ix,
-      };
-
-  Down4Payment? payUsers(List<User> users, User self, Sats amount) {
+  Down4Payment? payUsers({
+    required List<User> users,
+    required User self,
+    required Sats amount,
+    String textNote = "",
+  }) {
     final nUsers = users.length;
     final payPerUser = Sats((amount.asInt / nUsers).floor());
 
@@ -193,7 +142,7 @@ class Wallet {
       txout.txid = theTxID;
     }
 
-    return Down4Payment(_chainedTxs(theTx), true);
+    return Down4Payment(_chainedTxs(theTx), true, textNote: textNote);
   }
 
   void parsePayment(User self, Down4Payment pay) {
@@ -209,23 +158,6 @@ class Wallet {
     }
     _payments[pay.id] = pay;
     _trySettlement(pay);
-  }
-
-  List<Down4TX> _chainedTxs(Down4TX from) {
-    final unsettledIDs = uTXID;
-    Set<Down4TX> deps = {from};
-    List<Down4TX> copy;
-    do {
-      copy = List<Down4TX>.from(deps);
-      var depIDs = copy.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
-      for (final depID in depIDs) {
-        if (unsettledIDs.contains(depID)) {
-          deps.add(unsettledTxs.singleWhere((tx) => tx.txID == depID));
-        }
-      }
-    } while (deps.length != copy.length);
-
-    return copy.reversed.toList(growable: false);
   }
 
   Future<Down4Payment?> importMoney(String pkBase68, User self) async {
@@ -289,7 +221,46 @@ class Wallet {
       txout.txid = txid;
     }
 
-    return Down4Payment([theTx], true);
+    return Down4Payment([theTx], true, textNote: "Imported");
+  }
+
+  Future<void> _trySettlement(Down4Payment payment) async {
+    final txsToSettle = payment.txs
+        .where((tx) => tx.confirmations == 0)
+        .toList(growable: false);
+
+    final failedIndices = await r.broadcastTxs(txsToSettle);
+    for (final i in failedIndices) {
+      print("Failed to broadcast tx ID: ${payment.txs[i]}");
+    }
+  }
+
+  Future<void> _updateStatus(Down4Payment payment) async {
+    final ids = payment.txs.map((e) => e.txID!.asHex).toList();
+
+    final confirmations = await r.confirmations(ids);
+    if (confirmations == null || confirmations.length != ids.length) return;
+
+    for (int i = 0; i < confirmations.length; i++) {
+      _payments[payment.id]!.txs[i].confirmations = confirmations[i];
+    }
+  }
+
+  List<Down4TX> _chainedTxs(Down4TX from) {
+    final unsettledIDs = uTXID;
+    Set<Down4TX> deps = {from};
+    List<Down4TX> copy;
+    do {
+      copy = List<Down4TX>.from(deps);
+      var depIDs = copy.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
+      for (final depID in depIDs) {
+        if (unsettledIDs.contains(depID)) {
+          deps.add(unsettledTxs.singleWhere((tx) => tx.txID == depID));
+        }
+      }
+    } while (deps.length != copy.length);
+
+    return copy.reversed.toList(growable: false);
   }
 
   List<dynamic>? _unsignedIns(User self, Sats pay, int currentTxSize) {
@@ -326,11 +297,45 @@ class Wallet {
     }
     return null;
   }
+
+  Wallet._({
+    int? ix,
+    Map<Identifier, Down4TXOUT>? utxos,
+    Map<Identifier, Down4Payment>? payments,
+    required Down4Keys keys,
+  })  : _utxos = utxos ?? <Identifier, Down4TXOUT>{},
+        _payments = payments ?? <Identifier, Down4Payment>{},
+        _keys = keys,
+        _ix = ix ?? -1;
+
+  factory Wallet.fromSeed(Uint8List seed1, Uint8List seed2) {
+    if (seed1.lengthInBytes < 32) throw 'invalid seed1 length';
+    if (seed2.lengthInBytes < 32) throw 'invalid seed2 length';
+    return Wallet._(keys: Down4Keys.fromRandom(seed1, seed2));
+  }
+
+  factory Wallet.fromJson(dynamic decodedJson) {
+    return Wallet._(
+      utxos: Map.from(decodedJson["utxos"])
+          .map((key, value) => MapEntry(key, Down4TXOUT.fromJson(value))),
+      payments: Map.from(decodedJson["payments"])
+          .map((key, value) => MapEntry(key, Down4Payment.fromJson(value))),
+      keys: Down4Keys.fromJson(decodedJson["keys"]),
+      ix: decodedJson["ix"],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        "utxos": _utxos.map((key, val) => MapEntry(key, val.toJson())),
+        "payments": _payments.map((key, val) => MapEntry(key, val.toJson())),
+        "keys": _keys.toJson(),
+        "ix": _ix,
+      };
 }
 
 void main() {
-  // var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
-  var f = io.File("/home/scott/jeff.txt");
+  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  // var f = io.File("/home/scott/jeff.txt");
   var pkHex = f.readAsStringSync();
 
   // final seed1 = safeSeed(32);

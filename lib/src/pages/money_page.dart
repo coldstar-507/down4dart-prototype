@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:down4/src/down4_utility.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr/qr.dart';
 
 import '../data_objects.dart';
 import '../web_requests.dart' as r;
@@ -37,7 +37,7 @@ class PaymentPage extends StatefulWidget {
     required this.payment,
     required this.paymentRequest,
     Key? key,
-  })  : paymentAsList = payment.toJsonList(),
+  })  : paymentAsList = payment.asQrData,
         super(key: key);
 
   @override
@@ -55,17 +55,17 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   void initState() {
     super.initState();
+    print("widget.payment.toYouKnow().length");
     // loadQrs();
     loadQrsAsPaints();
-    startTimer();
+    timer = startedTimer;
   }
 
-  void startTimer() {
-    timer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
-      listIndex = (listIndex + 1) % widget.paymentAsList.length;
-      setState(() {});
-    });
-  }
+  Timer get startedTimer =>
+      Timer.periodic(const Duration(milliseconds: 300), (timer) {
+        listIndex = (listIndex + 1) % widget.paymentAsList.length;
+        setState(() {});
+      });
 
   // Future<void> loadQrs() async {
   //   if (widget.payment.qrPngs != null) {
@@ -117,7 +117,11 @@ class _PaymentPageState extends State<PaymentPage> {
                 SizedBox(height: topPadding),
                 SizedBox.square(
                     dimension: qrDimension,
-                    child: Down4Qr(data: paymentData, dimension: qrDimension))
+                    child: Down4Qr(
+                      data: paymentData,
+                      dimension: qrDimension,
+                      errorCorrectionLevel: QrErrorCorrectLevel.L,
+                    ))
               ]))));
     }
   }
@@ -133,7 +137,7 @@ class _PaymentPageState extends State<PaymentPage> {
   double get topPadding => Sizes.w - qrDimension * 2 * 1 / golden;
 
   late Console theConsole = Console(
-    inputs: [input],
+    // inputs: [input],
     topButtons: [
       ConsoleButton(name: "Ok", onPress: widget.ok),
     ],
@@ -142,12 +146,12 @@ class _PaymentPageState extends State<PaymentPage> {
       ConsoleButton(
           name: "Send",
           onPress: () {
-            final textNode = tec.value.text.isEmpty ? null : tec.value.text;
+            // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
             final spender = widget.payment.txs.last.txsIn.first.spender;
             if (spender == widget.self.id) {
               final pr = r.PaymentRequest(
                 sender: spender!,
-                payment: widget.payment..textNote = textNode,
+                payment: widget.payment,
                 targets: widget.payment.txs.last.txsOut
                     .where((txout) => txout.isGets)
                     .map((txout) => txout.receiver)
@@ -214,11 +218,11 @@ class MoneyPage extends StatefulWidget {
 class _MoneyPageState extends State<MoneyPage> {
   var tec = TextEditingController();
   var importTec = TextEditingController();
-  var emptyTec = TextEditingController();
+  var textNoteTec = TextEditingController();
   MobileScannerController? scanner;
   Console? _console;
   Map<int, String> scannedData = {};
-  int scannedDataLength = -1;
+  int? scannedDataLength;
   ConsoleInput? _cachedMainViewInput;
   final Map<String, dynamic> _currencies = {
     "l": ["USD", "Satoshis"],
@@ -258,7 +262,7 @@ class _MoneyPageState extends State<MoneyPage> {
   void dispose() {
     tec.dispose();
     importTec.dispose();
-    emptyTec.dispose();
+    textNoteTec.dispose();
     scanner?.dispose();
     scrollController.dispose();
     super.dispose();
@@ -319,18 +323,18 @@ class _MoneyPageState extends State<MoneyPage> {
     final raw = bc.rawValue;
     if (raw != null) {
       final decodedRaw = jsonDecode(raw);
-      scannedDataLength = decodedRaw["tot"];
-      scannedData.putIfAbsent(decodedRaw["index"], () => decodedRaw["data"]);
+      if (scannedDataLength != null && decodedRaw["l"] is int) {
+        scannedDataLength = decodedRaw["l"];
+      }
+      final int? iDecoded = decodedRaw["i"] is int ? decodedRaw["i"] : null;
+      if (iDecoded != null) {
+        scannedData.putIfAbsent(iDecoded, () => decodedRaw);
+      }
       if (scannedData.length == scannedDataLength) {
         // we have all the data
         await scanner?.stop();
-        var sortedData = <String>[];
-        final sortedKeys = scannedData.keys.toList()..sort();
-        for (final key in sortedKeys) {
-          sortedData.add(scannedData[key]!);
-        }
-        final payment = Down4Payment.fromJsonList(sortedData);
-        widget.wallet.parsePayment(widget.self, payment);
+        final payment = Down4Payment.fromQrData(scannedData.values.toList());
+        if (payment != null) widget.wallet.parsePayment(widget.self, payment);
         loadEmptyViewConsole(false, false, true);
       }
     }
@@ -340,7 +344,7 @@ class _MoneyPageState extends State<MoneyPage> {
     _cachedMainViewInput = ConsoleInput(
       maxLines: 1,
       type: TextInputType.number,
-      placeHolder: currency == "USD" ? usds + "\$" : satoshis + " sat",
+      placeHolder: currency == "USD" ? "$usds \$" : "$satoshis sat",
       tec: tec,
     );
     if (reload) setState(() {});
@@ -457,27 +461,42 @@ class _MoneyPageState extends State<MoneyPage> {
 
     void confirmPayment() {
       final pay = widget.wallet.payUsers(
-        widget.trueTargets.toList(growable: false),
-        widget.self,
-        Sats(inputAsSatoshis),
+        users: widget.trueTargets.toList(growable: false),
+        self: widget.self,
+        amount: Sats(inputAsSatoshis),
+        textNote: textNoteTec.value.text,
       );
       print("The pay: ${pay?.toJson()}");
       if (pay != null) widget.makePayment(pay);
     }
 
-    final satsString = formattedSats(asSats);
+    final satsString = "${formattedSats(asSats)} sat";
+    final usdString = "${asUSD.toStringAsFixed(4)} \$";
+    // final satsStringLen = satsString.length;
+    // final usdStringLen = usdString.length;
+    // final usdGap = satsStringLen >= usdStringLen
+    //     ? "".padRight(satsStringLen - usdStringLen, " ")
+    //     : "";
+    // final satsGap = satsStringLen >= usdStringLen
+    //     ? ""
+    //     : "".padRight(usdStringLen - satsStringLen, " ");
+
     _console = Console(
       inputs: [
-        ConsoleInput(
-          placeHolder: currency == "USD"
-              ? "${asUSD.toStringAsFixed(4)} \$"
-              : "$satsString sat",
-          tec: emptyTec,
-          activated: false,
-        ),
+        ConsoleInput(placeHolder: "(Text Note)", tec: textNoteTec)
+        // ConsoleInput(
+        //   placeHolder: currency == "USD"
+        //       ? "${asUSD.toStringAsFixed(4)} \$"
+        //       : "$satsString sat",
+        //   tec: emptyTec,
+        //   activated: false,
+        // ),
       ],
       topButtons: [
-        ConsoleButton(name: "Confirm", onPress: confirmPayment),
+        ConsoleButton(
+            name: "-${currency == "USD" ? usdString : satsString}",
+            onPress: confirmPayment)
+        // ConsoleButton(name: "Confirm", onPress: confirmPayment),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: loadMainViewConsole),
@@ -501,7 +520,7 @@ class _MoneyPageState extends State<MoneyPage> {
     } else {
       final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
       final ph = "Found ${formattedSats(sats)} sat";
-      input = ConsoleInput(placeHolder: ph, tec: emptyTec, activated: false);
+      input = ConsoleInput(placeHolder: ph, tec: textNoteTec, activated: false);
     }
 
     void import() async {
