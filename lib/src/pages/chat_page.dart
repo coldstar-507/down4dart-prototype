@@ -552,6 +552,7 @@ class _ChatPageState extends State<ChatPage> {
       _console = Console(
         inputs: [_consoleInput ?? consoleInput],
         imagePreviewPath: imPrev,
+        toMirror: _cameraInput!.metadata.toReverse,
         videoPlayerController: videoCtrl,
         topButtons: [
           ConsoleButton(

@@ -12,6 +12,7 @@ class Wallet {
   final Down4Keys _keys;
   Map<Identifier, Down4TXOUT> _utxos;
   Map<Identifier, Down4Payment> _payments;
+  Map<Identifier, bool> _spent;
   int _ix;
 
   Down4Keys get keys => _keys;
@@ -21,7 +22,7 @@ class Wallet {
   Set<Down4Payment> get payments => _payments.values.toSet();
 
   Set<Down4TX> get unsettledTxs => _payments.values
-      .map((pay) => pay.txs.where((tx) => tx.confirmations < 6))
+      .map((pay) => pay.txs.where((tx) => tx.confirmations == 0))
       .expand((tx) => tx)
       .toSet();
 
@@ -36,6 +37,35 @@ class Wallet {
   Future<void> updateAllStatus() async {
     for (final payment in payments) {
       _updateStatus(payment);
+    }
+  }
+
+  void printWalletInfo() {
+    for (final p in _payments.entries) {
+      print("============PAYMENT============");
+      print("""
+      id       = ${p.key}
+      lastTxID = ${p.value.txs.last.txID!.asHex}
+      message  = ${p.value.textNote}
+      """);
+      print("============TXIN===========");
+      for (final txin in p.value.txs.last.txsIn) {
+        print("""
+        spender = ${txin.spender}
+        outIx   = ${txin.utxo.outIndex}
+        outId   = ${txin.utxo.txid!.asHex}
+        """);
+      }
+      print("============UTXO============");
+      for (final utxo in p.value.txs.last.txsOut) {
+        print("""
+        outIx    = ${utxo.outIndex} 
+        sats     = ${utxo.sats.asInt} ${utxo.sats.data}
+        txid     = ${utxo.txid!.asHex}
+        id       = ${utxo.id}
+        receiver = ${utxo.receiver}
+        """);
+      }
     }
   }
 
@@ -125,7 +155,8 @@ class Wallet {
 
     var theTx = Down4TX(txsIn: ins, txsOut: outs);
     for (var i = 0; i < theTx.txsIn.length; i++) {
-      final secret = theTx.txsIn[i].utxo.secret;
+      final spentUtxo = theTx.txsIn[i].utxo;
+      final secret = spentUtxo.secret;
       if (secret == null) return null;
 
       final keysForSig = keys.derive(secret);
@@ -135,6 +166,7 @@ class Wallet {
       if (scriptSig == null) return null;
 
       theTx.txsIn[i].script = scriptSig;
+      _spent[spentUtxo.id] = true;
     }
 
     final theTxID = theTx.txid();
@@ -151,7 +183,8 @@ class Wallet {
     // if I'm right, we only care about utxos of the last TX
     var releventTx = pay.txs.last;
     for (final utxo in releventTx.txsOut) {
-      if (utxo.receiver == self.id) _utxos[utxo.id] = utxo;
+      final spent = _spent[utxo.id] ?? false;
+      if (utxo.receiver == self.id && !spent) _utxos[utxo.id] = utxo;
     }
     for (final txin in releventTx.txsIn) {
       if (txin.spender == self.id) _utxos.remove(txin.utxo.id);
@@ -303,8 +336,10 @@ class Wallet {
     Map<Identifier, Down4TXOUT>? utxos,
     Map<Identifier, Down4Payment>? payments,
     required Down4Keys keys,
+    Map<Identifier, bool>? spent,
   })  : _utxos = utxos ?? <Identifier, Down4TXOUT>{},
         _payments = payments ?? <Identifier, Down4Payment>{},
+        _spent = spent ?? <Identifier, bool>{},
         _keys = keys,
         _ix = ix ?? -1;
 
@@ -322,6 +357,7 @@ class Wallet {
           .map((key, value) => MapEntry(key, Down4Payment.fromJson(value))),
       keys: Down4Keys.fromJson(decodedJson["keys"]),
       ix: decodedJson["ix"],
+      spent: Map.from(decodedJson["spent"]),
     );
   }
 
@@ -330,6 +366,7 @@ class Wallet {
         "payments": _payments.map((key, val) => MapEntry(key, val.toJson())),
         "keys": _keys.toJson(),
         "ix": _ix,
+        "spent": _spent,
       };
 }
 

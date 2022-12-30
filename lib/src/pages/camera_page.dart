@@ -277,6 +277,7 @@ class _SnipCameraState extends State<SnipCamera> {
   double _scale = 1.0;
   double _baseScale = 1.0;
   var tec = TextEditingController();
+  bool _extra = false;
   // late Size mediaSize = MediaQuery.of(context).size;
 
   @override
@@ -335,14 +336,9 @@ class _SnipCameraState extends State<SnipCamera> {
     return vpc;
   }
 
-  void capturingPage([bool extra = false]) {
-    // final aspectRatio = Sizes.w / (Sizes.h + 32);
-    // final mediaSize = MediaQuery.of(context).size;
-    print("Full aspectRatio= ${Sizes.fullAspectRatio}");
-    print("Full height= ${Sizes.fullHeight}");
-    // print(Sizes.fullHeight);
+  Widget capturingPage([bool extra = false]) {
     final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
-    _preview = Stack(children: [
+    return Stack(children: [
       GestureDetector(
         onTap: () => print("LALALALALAL"),
         onScaleStart: (details) => _baseScale = _scale,
@@ -388,23 +384,29 @@ class _SnipCameraState extends State<SnipCamera> {
             bottomButtons: [
               ConsoleButton(
                 name: "Back",
-                onPress: () =>
-                    !extra ? widget.cameraBack() : capturingPage(!extra),
-                onLongPress: () => capturingPage(!extra),
-                isSpecial: true,
-                showExtra: extra,
-                extraButtons: [
-                  ConsoleButton(
-                    isMode: true,
-                    name: widget.ctrl.resolutionPreset.name.capitalize(),
-                    onPress: widget.nextRes,
-                  ),
-                  ConsoleButton(
-                    isMode: true,
-                    name: widget.ctrl.value.flashMode.name.capitalize(),
-                    onPress: _nextFlashMode,
-                  ),
-                ],
+                onPress: widget.cameraBack,
+                // onPress: () => !_extra
+                //     ? widget.cameraBack()
+                //     : setState(() {
+                //         _extra = !_extra;
+                //       }),
+                // onLongPress: () => setState(() {
+                //   _extra = !_extra;
+                // }),
+                // isSpecial: true,
+                // showExtra: extra,
+                // extraButtons: [
+                //   ConsoleButton(
+                //     isMode: true,
+                //     name: widget.ctrl.resolutionPreset.name.capitalize(),
+                //     onPress: widget.nextRes,
+                //   ),
+                //   ConsoleButton(
+                //     isMode: true,
+                //     name: widget.ctrl.value.flashMode.name.capitalize(),
+                //     onPress: _nextFlashMode,
+                //   ),
+                // ],
               ),
               ConsoleButton(
                 isMode: true,
@@ -416,84 +418,6 @@ class _SnipCameraState extends State<SnipCamera> {
         ),
       ),
     ]);
-    // return Jeff(
-    //   index: 0,
-    //   titles: ["TODO"],
-    //   bodies: [
-    //     PageBody(
-    //       stackWidgets: [
-    //         GestureDetector(
-    //           onTap: () => print("LALALALALAL"),
-    //           onScaleStart: (details) => _baseScale = _scale,
-    //           onScaleUpdate: (details) {
-    //             if (_baseScale * details.scale < widget.minZoom) {
-    //               _scale = widget.minZoom;
-    //             } else if (_baseScale * details.scale > widget.maxZoom) {
-    //               _scale = widget.maxZoom;
-    //             } else {
-    //               _scale = _baseScale * details.scale;
-    //             }
-    //             if (_scale >= widget.minZoom && _scale <= widget.maxZoom) {
-    //               widget.ctrl.setZoomLevel(_scale);
-    //             }
-    //           },
-    //           child: SizedBox(
-    //             height: mediaSize.height,
-    //             width: mediaSize.width,
-    //             child: Transform.scale(
-    //               scaleX: scale,
-    //               alignment: Alignment.center,
-    //               child: CameraPreview(widget.ctrl),
-    //             ),
-    //           ),
-    //         ),
-    //       ],
-    //     ),
-    //   ],
-    //   consoles: [
-    //     PageConsole(
-    //       console: Console(
-    //         topButtons: [
-    //           ConsoleButton(
-    //             shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
-    //             name: "Capture",
-    //             isSpecial: widget.enableVideo,
-    //             onPress: _takePicture,
-    //             onLongPress: widget.enableVideo ? _startRecording : null,
-    //             onLongPressUp: widget.enableVideo ? _stopRecording : null,
-    //           ),
-    //         ],
-    //         bottomButtons: [
-    //           ConsoleButton(
-    //             name: "Back",
-    //             onPress: () =>
-    //                 !extra ? widget.cameraBack() : capturingPage(!extra),
-    //             onLongPress: () => capturingPage(!extra),
-    //             isSpecial: true,
-    //             extraButtons: [
-    //               ConsoleButton(
-    //                 isMode: true,
-    //                 name: widget.ctrl.resolutionPreset.name.capitalize(),
-    //                 onPress: widget.nextRes,
-    //               ),
-    //               ConsoleButton(
-    //                 isMode: true,
-    //                 name: widget.ctrl.value.flashMode.name.capitalize(),
-    //                 onPress: _nextFlashMode,
-    //               ),
-    //             ],
-    //             showExtra: extra,
-    //           ),
-    //           ConsoleButton(
-    //             isMode: true,
-    //             name: widget.camNum == 0 ? "Rear" : "Front",
-    //             onPress: widget.flip,
-    //           ),
-    //         ],
-    //       ),
-    //     ),
-    //   ],
-    // );
   }
 
   void videoPreview(
@@ -582,7 +506,9 @@ class _SnipCameraState extends State<SnipCamera> {
                 onPress: () => setState(() {
                   tec.clear();
                   vpc.dispose();
-                  capturingPage();
+                  setState(() {
+                    _preview = null;
+                  });
                 }),
               ),
               ConsoleButton(
@@ -777,7 +703,9 @@ class _SnipCameraState extends State<SnipCamera> {
                   name: "Back",
                   onPress: () => setState(() {
                     tec.clear();
-                    capturingPage();
+                    setState(() {
+                      _preview = null;
+                    });
                   }),
                 ),
                 ConsoleButton(
@@ -892,6 +820,7 @@ class _SnipCameraState extends State<SnipCamera> {
 
   @override
   Widget build(BuildContext context) {
-    return _preview!;
+    // print("Extra = $_extra}");
+    return _preview ?? capturingPage();
   }
 }

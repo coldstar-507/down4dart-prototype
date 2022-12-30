@@ -90,6 +90,7 @@ class _HomeState extends State<Home> {
     loadExchangeRate();
     loadHomePalettes();
     loadPayments();
+    widget.wallet.printWalletInfo();
     connectToMessages();
     processWebRequests();
     homePage();
@@ -1104,7 +1105,7 @@ class _HomeState extends State<Home> {
   Future<void> snipPage({
     CameraController? ctrl,
     int camera = 0,
-    ResolutionPreset res = ResolutionPreset.medium,
+    ResolutionPreset res = ResolutionPreset.high,
     bool reload = false,
   }) async {
     void nextRes() {
@@ -1124,7 +1125,7 @@ class _HomeState extends State<Home> {
       snipPage(ctrl: ctrl, camera: (camera + 1) % 2, reload: true, res: res);
     }
 
-    void snip() async {
+    Future<void> snip() async {
       _page = SnipCamera(
         maxZoom: await ctrl!.getMaxZoomLevel(),
         minZoom: await ctrl.getMinZoomLevel(),
@@ -1139,6 +1140,7 @@ class _HomeState extends State<Home> {
     }
 
     if (ctrl == null || reload) {
+      await ctrl?.dispose();
       ctrl = CameraController(widget.cameras[camera], res);
       await ctrl.initialize();
       snip();

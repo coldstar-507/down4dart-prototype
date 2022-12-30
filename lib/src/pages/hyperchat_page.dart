@@ -247,6 +247,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
     console = Console(
       inputs: [consoleInput],
+      toMirror: cameraInput!.metadata.toReverse,
       videoPlayerController: vpc,
       imagePreviewPath: path,
       topButtons: [

@@ -112,7 +112,7 @@ class Down4Payment {
 
   List<String> get asQrData {
     const maxPerQr = 2500;
-    final asString = toYouKnow();
+    final asString = jsonEncode(this);
     final checkSum = hash256(utf8.encode(asString)).toHex().substring(0, 4);
     final totalData = asString + checkSum;
     final size = totalData.length;
@@ -159,7 +159,7 @@ class Down4Payment {
     final data = totalData.substring(0, totalData.length - 5);
     final computedChecksum = hash256(utf8.encode(data)).toHex().substring(0, 4);
     if (computedChecksum != checksum) return null;
-    return Down4Payment.fromYouKnow(data);
+    return Down4Payment.fromJson(jsonDecode(data));
   }
 
   Map<String, dynamic> toJson({bool withImages = false}) => {
@@ -368,13 +368,13 @@ class Down4TXOUT {
   final bool isFee;
 
   Down4TXOUT({
+    required this.sats,
     this.isChange = false,
     this.isFee = false,
     this.receiver,
     this.secret,
     this.txid,
     this.outIndex,
-    required this.sats,
     this.scriptPubKey,
   }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey?.length ?? 0);
 

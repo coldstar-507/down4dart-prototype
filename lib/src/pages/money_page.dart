@@ -51,14 +51,19 @@ class _PaymentPageState extends State<PaymentPage> {
   var qrs2 = <Widget>[];
   var tec = TextEditingController();
   late var input = ConsoleInput(placeHolder: "(Text Note)", tec: tec);
+  late Console theConsole = aConsole;
 
   @override
   void initState() {
     super.initState();
-    print("widget.payment.toYouKnow().length");
+    final dataLen =
+        widget.paymentAsList.fold<int>(0, (prv, ele) => prv + ele.length);
+    print("Total qrData length = $dataLen");
+    print("${widget.payment.txs.length} txs in payment");
+    // print("widget.payment.toYouKnow().length");
     // loadQrs();
-    loadQrsAsPaints();
-    timer = startedTimer;
+    // loadQrsAsPaints();
+    // timer = startedTimer;
   }
 
   Timer get startedTimer =>
@@ -124,6 +129,10 @@ class _PaymentPageState extends State<PaymentPage> {
                     ))
               ]))));
     }
+    setState(() {
+      theConsole = aConsole;
+      if (qrs.length > 1) timer = startedTimer;
+    });
   }
 
   @override
@@ -136,34 +145,36 @@ class _PaymentPageState extends State<PaymentPage> {
 
   double get topPadding => Sizes.w - qrDimension * 2 * 1 / golden;
 
-  late Console theConsole = Console(
-    // inputs: [input],
-    topButtons: [
-      ConsoleButton(name: "Ok", onPress: widget.ok),
-    ],
-    bottomButtons: [
-      ConsoleButton(name: "Back", onPress: widget.back),
-      ConsoleButton(
-          name: "Send",
-          onPress: () {
-            // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
-            final spender = widget.payment.txs.last.txsIn.first.spender;
-            if (spender == widget.self.id) {
-              final pr = r.PaymentRequest(
-                sender: spender!,
-                payment: widget.payment,
-                targets: widget.payment.txs.last.txsOut
-                    .where((txout) => txout.isGets)
-                    .map((txout) => txout.receiver)
-                    .whereType<String>()
-                    .toList(growable: false),
-              );
-              widget.paymentRequest(pr);
-              widget.ok();
-            }
-          })
-    ],
-  );
+  Console get aConsole => Console(
+        // inputs: [input],
+        topButtons: [
+          qrs.isEmpty
+              ? ConsoleButton(name: "Generate QR", onPress: loadQrsAsPaints)
+              : ConsoleButton(name: "Ok", onPress: widget.ok),
+        ],
+        bottomButtons: [
+          ConsoleButton(name: "Back", onPress: widget.back),
+          ConsoleButton(
+              name: "Send",
+              onPress: () {
+                // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
+                final spender = widget.payment.txs.last.txsIn.first.spender;
+                if (spender == widget.self.id) {
+                  final pr = r.PaymentRequest(
+                    sender: spender!,
+                    payment: widget.payment,
+                    targets: widget.payment.txs.last.txsOut
+                        .where((txout) => txout.isGets)
+                        .map((txout) => txout.receiver)
+                        .whereType<String>()
+                        .toList(growable: false),
+                  );
+                  widget.paymentRequest(pr);
+                  widget.ok();
+                }
+              })
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -294,20 +305,20 @@ class _MoneyPageState extends State<MoneyPage> {
 
   String get method => _paymentMethod["l"][_paymentMethod["i"]] as String;
 
-  int get inputAsSatoshis {
-    int amount;
-    final numInput = num.parse(tec.value.text);
-    if (currency == "Satoshis") {
-      amount = method == "Split"
-          ? numInput.round()
-          : (numInput * widget.trueTargets.length).round();
-    } else {
-      amount = method == "Split"
-          ? usdToSatoshis(numInput.toDouble())
-          : usdToSatoshis(numInput.toDouble() * widget.trueTargets.length);
-    }
-    return amount;
-  }
+  // int get inputAsSatoshis {
+  //   int amount;
+  //   final numInput = num.parse(tec.value.text);
+  //   if (currency == "Satoshis") {
+  //     amount = method == "Split"
+  //         ? numInput.round()
+  //         : (numInput * widget.trueTargets.length).round();
+  //   } else {
+  //     amount = method == "Split"
+  //         ? usdToSatoshis(numInput.toDouble())
+  //         : usdToSatoshis(numInput.toDouble() * widget.trueTargets.length);
+  //   }
+  //   return amount;
+  // }
 
   void rotateCurrency() {
     _currencies["i"] =
@@ -409,6 +420,14 @@ class _MoneyPageState extends State<MoneyPage> {
     loadMainViewInput(reloadInput);
     _console = Console(
       inputs: [_cachedMainViewInput!],
+      topButtons: [
+        ConsoleButton(name: "Bill", onPress: () => print("TODO")),
+        ConsoleButton(
+            name: "Pay",
+            onPress: () {
+              if (tec.value.text.isNotEmpty) loadConfirmationConsole(currency);
+            }),
+      ],
       bottomButtons: [
         ConsoleButton(
           name: "Back",
@@ -436,11 +455,6 @@ class _MoneyPageState extends State<MoneyPage> {
               loadMainViewConsole(tec.value.text.isEmpty ? true : false);
             }),
       ],
-      topButtons: [
-        ConsoleButton(name: "Bill", onPress: () => print("TODO")),
-        ConsoleButton(
-            name: "Pay", onPress: () => loadConfirmationConsole(currency)),
-      ],
     );
 
     setState(() {});
@@ -463,7 +477,7 @@ class _MoneyPageState extends State<MoneyPage> {
       final pay = widget.wallet.payUsers(
         users: widget.trueTargets.toList(growable: false),
         self: widget.self,
-        amount: Sats(inputAsSatoshis),
+        amount: Sats(asSats),
         textNote: textNoteTec.value.text,
       );
       print("The pay: ${pay?.toJson()}");
