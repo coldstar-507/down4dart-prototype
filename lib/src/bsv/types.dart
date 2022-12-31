@@ -1,5 +1,5 @@
-import 'dart:math';
 import 'dart:typed_data';
+import 'dart:math';
 import 'dart:convert';
 import 'package:convert/convert.dart';
 import 'package:pointycastle/export.dart';
@@ -14,21 +14,6 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
   "pub": "02ace06b1e02ed686f9f312198aea81254799e991b2ddcea1676aaa43ae9fcac50",
   "cc": "0000000000000000000000000000000000000000000000000000000000000000",
 });
-
-// class Down4InternetPayment {
-//   List<String> targets;
-//   String sender;
-//   Down4Payment pay;
-//   Down4InternetPayment(this.targets, this.sender, this.pay);
-//
-//   Map<String, dynamic> toJson() => {
-//         "trgts": targets,
-//         "sdrid": sender,
-//         "pay": pay.toJson(),
-//       };
-//
-//   List<int> toData() => utf8.encode(jsonEncode(this));
-// }
 
 class Down4Payment {
   final List<Down4TX> txs;
@@ -74,47 +59,11 @@ class Down4Payment {
   @override
   operator ==(other) => other is Down4Payment && other.id == id;
 
-  // List<String> toJsonList() {
-  //   var asData = base64Encode(utf8.encode(jsonEncode(txs)));
-  //   var theList = <String>[];
-  //   var len = asData.length;
-  //   var devider = 1;
-  //   while (len / devider > 1000) {
-  //     devider = devider + 1;
-  //   }
-  //   var devided = (len / devider).ceil();
-  //   for (int i = 0; i < devider; i++) {
-  //     Map<String, dynamic> obj = {"index": i, "tot": devider};
-  //     if (i == devider - 1) {
-  //       obj["data"] = asData.substring(i * devided);
-  //     } else {
-  //       obj["data"] = asData.substring(i * devided, (i + 1) * devided);
-  //     }
-  //     theList.add(jsonEncode(obj));
-  //   }
-  //   return theList;
-  // }
-  //
-  // factory Down4Payment.fromJsonList(List<String> dataList) {
-  //   final fullData = dataList.join("");
-  //   final jsonTxs = jsonDecode(utf8.decode(base64Decode(fullData)));
-  //   final txs = List.from(jsonTxs)
-  //       .map((e) => Down4TX.fromJson(e))
-  //       .toList(growable: false);
-  //   return Down4Payment(txs, true);
-  // }
-
-  // Map<String, dynamic> toJsoni(int i) => {
-  //       "tx": txs[i].toJson(),
-  //       "len": txs.length,
-  //       "safe": safe,
-  //     };
-
   List<String> get asQrData {
     const maxPerQr = 2500;
-    final asString = jsonEncode(this);
-    final checkSum = hash256(utf8.encode(asString)).toHex().substring(0, 4);
-    final totalData = asString + checkSum;
+    final paymentData = toYouKnow();
+    final checkSum = hash256(utf8.encode(paymentData)).toHex().substring(0, 4);
+    final totalData = paymentData + checkSum;
     final size = totalData.length;
     int divider = 1;
     while (size / divider > maxPerQr) {
@@ -124,42 +73,34 @@ class Down4Payment {
     List<String> splitData = [];
     for (int i = 0; i < divider; i++) {
       final bool isLast = i == divider;
+      var jsonData = <String, Object>{"l": divider, "i": i};
       if (isLast) {
-        final jsonData = {
-          "l": divider,
-          "i": i,
-          "d": totalData.substring(i * divided),
-        };
-        splitData.add(jsonEncode(jsonData));
+        jsonData["d"] = totalData.substring(i * divided);
       } else {
-        final jsonData = {
-          "l": divider,
-          "i": i,
-          "d": totalData.substring(i * divided, (i + 1) * divided),
-        };
-        splitData.add(jsonEncode(jsonData));
+        jsonData["d"] = totalData.substring(i * divided, (i + 1) * divided);
       }
+      splitData.add(jsonEncode(jsonData));
     }
     return splitData;
   }
 
-  static Down4Payment? fromQrData(List<String> qrData) {
+  static Down4Payment? fromQrData(List<dynamic> qrData) {
     // might not be sorted
-    final jsonData = qrData.map((e) => jsonDecode(e)).toList()
+    final sortedJsonData = qrData
       ..sort((a, b) {
         final int ia = a["i"] is int ? a["i"] : 0;
         final int ib = b["i"] is int ? b["i"] : 0;
         return ia.compareTo(ib);
       });
-    final totalData = jsonData.fold<String>("", (prev, ele) {
+    final totalData = sortedJsonData.fold<String>("", (prev, ele) {
       final String s = ele["d"] is String ? ele["d"] : "";
       return prev + s;
     });
-    final checksum = totalData.substring(totalData.length - 5);
-    final data = totalData.substring(0, totalData.length - 5);
+    final checksum = totalData.substring(totalData.length - 1 - 4);
+    final data = totalData.substring(0, totalData.length - 1 - 4);
     final computedChecksum = hash256(utf8.encode(data)).toHex().substring(0, 4);
     if (computedChecksum != checksum) return null;
-    return Down4Payment.fromJson(jsonDecode(data));
+    return Down4Payment.fromJson(jsonDecode(utf8.decode(base64Decode(data))));
   }
 
   Map<String, dynamic> toJson({bool withImages = false}) => {
