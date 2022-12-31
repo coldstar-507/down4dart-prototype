@@ -299,6 +299,7 @@ class _SnipCameraState extends State<SnipCamera> {
     try {
       final xfile = await widget.ctrl.takePicture();
       final path = xfile.path;
+      await precacheImage(FileImage(File(path)), context);
       imagePreview(path, false, widget.camNum == 1);
     } catch (e) {
       widget.cameraCallBack(null, null, null, null, -1);
