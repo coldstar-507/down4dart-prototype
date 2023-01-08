@@ -14,10 +14,15 @@ import 'palette.dart';
 import 'render_utils.dart';
 
 class ConsoleButton extends StatelessWidget {
-  static const double height = 26.0;
+  static double get buttonHeight => Sizes.h * 0.043;
   final String name;
   final List<ConsoleButton>? extraButtons;
-  final bool isSpecial, isMode, shouldBeDownButIsnt, isActivated, showExtra;
+  final bool isSpecial,
+      isMode,
+      shouldBeDownButIsnt,
+      isActivated,
+      showExtra,
+      greyedOut;
   final void Function() onPress;
   final void Function()? onLongPress;
   final void Function()? onLongPressUp;
@@ -33,6 +38,7 @@ class ConsoleButton extends StatelessWidget {
     this.widthEpsilon = 0.0,
     this.heightEpsilon = 0.0,
     this.extraButtons,
+    this.greyedOut = false,
     this.showExtra = false,
     this.shouldBeDownButIsnt = false,
     this.isMode = false,
@@ -51,6 +57,7 @@ class ConsoleButton extends StatelessWidget {
         invertColors: true,
         leftEpsilon: leftEpsilon,
         bottomEpsilon: bottomEpsilon,
+        greyedOut: greyedOut,
         widthEpsilon: widthEpsilon,
         heightEpsilon: heightEpsilon,
         extraButtons: extraButtons,
@@ -68,6 +75,7 @@ class ConsoleButton extends StatelessWidget {
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
         invertColors: false,
+        greyedOut: greyedOut,
         leftEpsilon: leftEpsilon,
         bottomEpsilon: bottomEpsilon,
         widthEpsilon: widthEpsilon,
@@ -99,7 +107,7 @@ class ConsoleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final buttonHeight = Sizes.h * 0.038; // 3.8%
+    // final buttonHeight = Sizes.h * 0.044; // 3.8%
     return Expanded(
       child: Container(
         height: buttonHeight,
@@ -107,43 +115,32 @@ class ConsoleButton extends StatelessWidget {
             shape: BoxShape.rectangle,
             color: invertColors ? null : PinkTheme.black,
             border: Border.all(color: Colors.black, width: 0.5)),
-        child: isActivated
-            ? TouchableOpacity(
-                shouldBeDownButIsnt: shouldBeDownButIsnt,
-                onPress: onPress,
-                onLongPress: onLongPress,
-                onLongPressUp: onLongPressUp,
-                child: Container(
-                  color: invertColors ? Colors.black12 : PinkTheme.buttonColor,
-                  child: Center(
-                    child: Text(
-                      name,
-                      style: TextStyle(
-                        color:
-                            invertColors ? PinkTheme.buttonColor : Colors.black,
-                        decoration: isSpecial ? TextDecoration.underline : null,
-                        decorationStyle: TextDecorationStyle.solid,
-                        fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : Container(
-                color: PinkTheme.inactivatedButtonColor,
-                child: Center(
-                  child: Text(
-                    name,
-                    style: TextStyle(
-                      decoration: isSpecial ? TextDecoration.underline : null,
-                      decorationStyle: TextDecorationStyle.solid,
-                      fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+        child: TouchableOpacity(
+          shouldBeDownButIsnt: shouldBeDownButIsnt,
+          onPress: isActivated ? onPress : () {},
+          onLongPress: isActivated ? onLongPress : () {},
+          onLongPressUp: isActivated ? onLongPressUp : () {},
+          child: Container(
+            color: invertColors
+                ? Colors.black12
+                : greyedOut
+                    ? PinkTheme.inactivatedButtonColor
+                    : PinkTheme.buttonColor,
+            child: Center(
+              child: Text(
+                name,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: invertColors ? PinkTheme.buttonColor : Colors.black,
+                  decoration: isSpecial ? TextDecoration.underline : null,
+                  decorationStyle: TextDecorationStyle.solid,
+                  fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -174,8 +171,6 @@ class ConsoleInput extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  double get buttonHeight => Sizes.h * 0.038; // 3.8%
-
   ConsoleInput animated(bool b) => ConsoleInput(
         type: type,
         placeHolder: placeHolder,
@@ -194,12 +189,11 @@ class ConsoleInput extends StatelessWidget {
         key: GlobalKey(),
         maxLines: maxLines,
         keyboardType: type,
-        textAlignVertical: TextAlignVertical.center,
         textAlign: TextAlign.center,
         decoration: InputDecoration(
           isDense: true,
           isCollapsed: true,
-          contentPadding: const EdgeInsets.all(2.0),
+          contentPadding: EdgeInsets.symmetric(vertical: Sizes.w * 0.008),
           hintText: placeHolder,
           border: InputBorder.none,
           prefixIcon: Text(prefix),
@@ -219,15 +213,24 @@ class ConsoleInput extends StatelessWidget {
 
   Widget get unactivatedField => Center(child: Text(placeHolder));
 
+  // Widget sizedContainer({required Widget child}) => SizedBox(
+  //       height: ConsoleButton.buttonHeight,
+  //       child: DecoratedBox(
+  //         decoration: BoxDecoration(
+  //             border: Border.all(width: 0.5), color: Colors.white),
+  //         child: Center(child: child),
+  //       ),
+  //     );
+
   Widget animatedContainer({required Widget child}) => AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       constraints: BoxConstraints(
-        minHeight: b ?? false ? 0 : buttonHeight,
+        minHeight: b ?? false ? 0 : ConsoleButton.buttonHeight,
         maxHeight: b ?? false // ? 0 : buttonHeight,
             ? 0
             : activated
-                ? buttonHeight * 4
-                : buttonHeight,
+                ? ConsoleButton.buttonHeight * 4
+                : ConsoleButton.buttonHeight,
       ),
       decoration: BoxDecoration(
         color:
@@ -238,8 +241,10 @@ class ConsoleInput extends StatelessWidget {
 
   Widget unanimatedContainer({required Widget child}) => Container(
       constraints: BoxConstraints(
-        minHeight: b! ? 0 : buttonHeight,
-        maxHeight: activated ? buttonHeight * 4 : buttonHeight,
+        minHeight: b! ? 0 : ConsoleButton.buttonHeight,
+        maxHeight: activated
+            ? ConsoleButton.buttonHeight * 4
+            : ConsoleButton.buttonHeight,
       ),
       decoration: BoxDecoration(
         color:
@@ -385,7 +390,9 @@ class Console extends StatelessWidget {
     // return extras;
   }
 
-  double get consoleWidth => Sizes.w - (Sizes.h * 0.023 * 2);
+  double get consoleGap => Sizes.w * 0.024;
+
+  double get consoleWidth => Sizes.w - (2.0 * consoleGap);
 
   bool get bb =>
       images == true ||
@@ -419,9 +426,10 @@ class Console extends StatelessWidget {
 
   Widget mainContainer({required List<Widget> children}) => Container(
         margin: EdgeInsets.only(
-            left: Sizes.h * 0.023,
-            right: Sizes.h * 0.023,
-            bottom: Sizes.h * 0.021),
+          left: consoleGap,
+          right: consoleGap,
+          bottom: consoleGap,
+        ),
         decoration: BoxDecoration(
             border: Border.all(
                 width: 0.5,
@@ -430,7 +438,7 @@ class Console extends StatelessWidget {
       );
 
   Widget forwardingPalettes() => SizedBox(
-        height: ConsoleButton.height,
+        height: ConsoleButton.buttonHeight,
         width: consoleWidth,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -447,8 +455,8 @@ class Console extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             SizedBox(
-                                width: ConsoleButton.height,
-                                height: ConsoleButton.height,
+                                width: ConsoleButton.buttonHeight,
+                                height: ConsoleButton.buttonHeight,
                                 child: palette.image),
                             Expanded(
                                 child: Container(
@@ -602,9 +610,9 @@ class Console extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: EdgeInsets.only(
-        left: Sizes.h * 0.023,
-        right: Sizes.h * 0.023,
-        bottom: Sizes.h * 0.021,
+        left: consoleGap,
+        right: consoleGap,
+        bottom: consoleGap,
       ),
       decoration: BoxDecoration(
         border: Border.all(

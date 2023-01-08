@@ -84,7 +84,7 @@ Future<List<int>> broadcastTxs(List<Down4TX> txs) async {
   for (int i = 0; i < txs.length; i++) {
     var res = await responses[i];
     if (res.statusCode != 200) failedBroadcast.add(i);
-    print("Response: ${jsonDecode(res.body)}");
+    // print("Response: ${jsonDecode(res.body)}");
   }
   return failedBroadcast;
 }

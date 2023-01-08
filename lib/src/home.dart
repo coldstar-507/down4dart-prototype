@@ -284,7 +284,7 @@ class _HomeState extends State<Home> {
     });
   }
 
-  void parsePayment(Down4Payment payment) async {
+  void parsePayment(Down4Payment payment) {
     widget.wallet.parsePayment(widget.self, payment);
     widget.wallet.save();
     writePalette(Payment(payment: payment), at: "Payments");
@@ -1019,7 +1019,7 @@ class _HomeState extends State<Home> {
       trueTargets: transition.second,
       exchangeRate: _exchangeRate.rate,
       homePalettes: formattedHomePalettes,
-      importMoney: (payment) {
+      scanOrImport: (payment) {
         parsePayment(payment);
         moneyPage(fromHome: false);
       },

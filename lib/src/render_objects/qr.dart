@@ -15,14 +15,11 @@ class QrPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    print("Painting QRCODE from QrPainter");
-
     var paint = Paint()
       ..color = PinkTheme.qrColor
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke;
 
-    //draw points on canvas
     canvas.drawPoints(ui.PointMode.points, points, paint);
   }
 
@@ -31,7 +28,6 @@ class QrPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    print("Should repaint QRCODE? returning FALSE");
     return false;
   }
 }
@@ -93,7 +89,7 @@ class Down4Qr extends StatefulWidget {
     required this.dimension,
     int? errorCorrectionLevel,
     Key? key,
-  })  : errorCorrectionLevel = errorCorrectionLevel ?? QrErrorCorrectLevel.H,
+  })  : errorCorrectionLevel = errorCorrectionLevel ?? QrErrorCorrectLevel.L,
         super(key: key);
 
   @override

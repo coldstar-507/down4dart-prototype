@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
+import 'package:down4/src/down4_utility.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/types.dart';
 import 'package:down4/src/data_objects.dart';
@@ -143,6 +146,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   @override
   Widget build(BuildContext context) {
+    print("QR DATA LEN = ${qrData.length}");
     return Andrew(pages: [
       Down4Page(
         title: "Search",

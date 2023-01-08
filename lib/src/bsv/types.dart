@@ -1,8 +1,11 @@
 import 'dart:typed_data';
-import 'dart:math';
 import 'dart:convert';
+
 import 'package:convert/convert.dart';
+import 'package:down4/src/pages/money_page.dart';
+import 'package:flutter/services.dart';
 import 'package:pointycastle/export.dart';
+import 'package:base85/base85.dart';
 
 import '../down4_utility.dart';
 import '../data_objects.dart';
@@ -47,8 +50,8 @@ class Down4Payment {
   }
 
   String get id {
-    final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID!.data);
-    return sha256(idFold.asUint8List()).toHex();
+    final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
+    return sha256(idFold.toUint8List()).toHex();
   }
 
   int get lastConfirmations => txs.last.confirmations;
@@ -59,49 +62,98 @@ class Down4Payment {
   @override
   operator ==(other) => other is Down4Payment && other.id == id;
 
-  List<String> get asQrData {
-    const maxPerQr = 2500;
-    final paymentData = toYouKnow();
-    final checkSum = hash256(utf8.encode(paymentData)).toHex().substring(0, 4);
-    final totalData = paymentData + checkSum;
-    final size = totalData.length;
-    int divider = 1;
-    while (size / divider > maxPerQr) {
-      divider++;
+  List<int> get compressed => [
+        safe ? 0x01 : 0x00,
+        textNote.length,
+        ...utf8.encode(textNote),
+        txs.length,
+        ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
+      ];
+
+  factory Down4Payment.fromCompressed(Uint8List buf) {
+    final safe = buf[0] == 0x01;
+    final textNoteLen = buf[1];
+    List<int> textNoteData = [];
+    String textNote = "";
+    if (textNoteLen != 0) {
+      textNoteData = buf.sublist(2, 2 + textNoteLen);
+      textNote = utf8.decode(textNoteData);
     }
-    final divided = (size / divider).floor();
-    List<String> splitData = [];
-    for (int i = 0; i < divider; i++) {
-      final bool isLast = i == divider;
-      var jsonData = <String, Object>{"l": divider, "i": i};
-      if (isLast) {
-        jsonData["d"] = totalData.substring(i * divided);
-      } else {
-        jsonData["d"] = totalData.substring(i * divided, (i + 1) * divided);
-      }
-      splitData.add(jsonEncode(jsonData));
+
+    final nTx = buf[2 + textNoteLen];
+    List<Down4TX> txs = [];
+    int offset = 3 + textNoteLen;
+    for (int i = 0; i < nTx; i++) {
+      final pair = Down4TX.fromCompressed(buf.sublist(offset));
+      txs.add(pair.first);
+      offset = offset + pair.second;
     }
-    return splitData;
+
+    return Down4Payment(txs, safe, textNote: textNote);
   }
 
-  static Down4Payment? fromQrData(List<dynamic> qrData) {
-    // might not be sorted
-    final sortedJsonData = qrData
-      ..sort((a, b) {
-        final int ia = a["i"] is int ? a["i"] : 0;
-        final int ib = b["i"] is int ? b["i"] : 0;
-        return ia.compareTo(ib);
-      });
-    final totalData = sortedJsonData.fold<String>("", (prev, ele) {
-      final String s = ele["d"] is String ? ele["d"] : "";
-      return prev + s;
-    });
-    final checksum = totalData.substring(totalData.length - 1 - 4);
-    final data = totalData.substring(0, totalData.length - 1 - 4);
-    final computedChecksum = hash256(utf8.encode(data)).toHex().substring(0, 4);
-    if (computedChecksum != checksum) return null;
-    return Down4Payment.fromJson(jsonDecode(utf8.decode(base64Decode(data))));
+  List<String> get asQrData {
+    final rawFold = txs.fold<List<int>>(<int>[], (p, v) => p + v.raw);
+    final compressedFold =
+        txs.fold<List<int>>(<int>[], (p, v) => p + v.compressed);
+
+    print("COMPRESSING QR");
+    print(txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
+
+    var comp = compressed;
+    while (comp.length % 4 != 0) {
+      comp.add(0x00);
+    }
+    print("COMPRESSED\n${comp.toHex()}");
+
+    const maxSize = 800;
+    final codec = Base85Codec(Alphabets.z85);
+    final encode = codec.encode(comp.toUint8List());
+    int diviser = 1;
+    while (encode.length / diviser > maxSize) {
+      diviser = diviser + 1;
+    }
+
+    final divided = (encode.length / diviser).floor();
+    List<String> listData = [];
+    for (int i = 0; i < diviser; i++) {
+      String prefix = i == 0 ? "$diviser," : "$i;";
+      bool isLast = i == (diviser - 1);
+      if (isLast) {
+        listData.add(prefix + encode.substring(i * divided));
+      } else {
+        listData.add(prefix + encode.substring(i * divided, (i + 1) * divided));
+      }
+    }
+
+    print("THERE ARE ${txs.length} TXS");
+    print(
+      "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsIn.length)} INPUTS",
+    );
+    print(
+      "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsOut.length)} OUTPUTS",
+    );
+    print("RAW FOLDED LEN = ${rawFold.length}");
+    print("COMPRESSED FOLDED LEN = ${compressedFold.length}");
+    print("QR FOLDED LEN = ${listData.join().length}");
+
+    return listData;
   }
+
+  // factory Down4Payment.fromQrData(List<String> qrData) {
+  //   final codec = Base85Codec(Alphabets.z85);
+  //   List<String> sorted =
+  //       List<String>.generate(qrData.length, (index) => "", growable: false);
+  //
+  //   for (final str in qrData) {
+  //     final prefixEnd = str.indexOf(";");
+  //     final ix = int.parse(str.substring(0, prefixEnd));
+  //     sorted[ix] = str.substring(prefixEnd + 1);
+  //   }
+  //
+  //   final decoded = codec.decode(sorted.join());
+  //   return Down4Payment.fromCompressed(decoded);
+  // }
 
   Map<String, dynamic> toJson({bool withImages = false}) => {
         "id": id,
@@ -114,15 +166,9 @@ class Down4Payment {
   String toYouKnow() => base64Encode(utf8.encode(jsonEncode(this)));
 
   factory Down4Payment.fromYouKnow(String youKnow) {
-    print("YouKnow = $youKnow");
     final base64Decoded = base64Decode(youKnow);
     final utf8Decoded = utf8.decode(base64Decoded);
     final jsonDecoded = jsonDecode(utf8Decoded);
-    print("""
-          Base64Decoded = $base64Decoded
-          Utf8Decoded   = $utf8Decoded
-          JsonDecoded   = $jsonDecoded
-          """);
     return Down4Payment.fromJson(jsonDecoded);
   }
 
@@ -163,6 +209,28 @@ class VarInt {
     return VarInt._(data, n);
   }
 
+  factory VarInt.fromRaw(Uint8List raw) {
+    if (raw.lengthInBytes < 1) throw 'Invalid raw for VarInt.fromRaw';
+    final firstByte = raw[0];
+    if (firstByte == 0xFF) {
+      final buf = Uint8List.fromList(raw.sublist(0, 9));
+      final theInt = buf.buffer.asByteData().getUint64(1);
+      return VarInt._(buf, theInt);
+    } else if (firstByte == 0xFE) {
+      final buf = Uint8List.fromList(raw.sublist(0, 5));
+      final theInt = buf.buffer.asByteData().getUint32(1);
+      return VarInt._(buf, theInt);
+    } else if (firstByte == 0xFD) {
+      final buf = Uint8List.fromList(raw.sublist(0, 3));
+      final theInt = buf.buffer.asByteData().getUint16(1);
+      return VarInt._(buf, theInt);
+    } else {
+      final buf = Uint8List.fromList(raw.sublist(0, 1));
+      final theInt = buf.buffer.asByteData().getUint8(0);
+      return VarInt._(buf, theInt);
+    }
+  }
+
   String toHex() => hex.encode(data);
 }
 
@@ -173,6 +241,11 @@ class FourByteInt {
   FourByteInt(int n)
       : data = Uint8List(4)..buffer.asByteData().setUint32(0, n, Endian.little),
         asInt = n;
+
+  factory FourByteInt.fromRaw(Uint8List raw) {
+    final int = raw.buffer.asByteData().getUint32(0, Endian.little);
+    return FourByteInt(int);
+  }
 }
 
 class TXID {
@@ -182,18 +255,11 @@ class TXID {
 
   factory TXID.fromHex(String h) => TXID(hex.decode(h).reversed.toList());
 
-  // factory TXID.fromBigEndian(List<int> be) => TXID(be.reversed.toList());
-  //
-  // factory TXID.fromBigEndianHex(String beh) =>
-  //     TXID(hex.decode(beh).reversed.toList());
+  factory TXID.fromBase64(String b64) => TXID(base64Decode(b64));
 
-  // List<int> get asBigEndian => data.reversed.toList();
+  String get asBase64 => base64Encode(data);
 
   String get asHex => data.reversed.toList().toHex();
-
-  // String get asHexBigEndian => data.reversed.toList().toHex();
-
-  // bool equals(TXID other) => data == other.data;
 
   @override
   int get hashCode => BigInt.parse(asHex, radix: 16).hashCode;
@@ -229,15 +295,20 @@ class Sats {
 }
 
 class Down4TXIN {
-  Down4TXOUT utxo;
+  // Down4TXOUT utxo;
   Identifier? spender;
   VarInt? _scriptSigLen;
+  TXID utxoTXID;
+  FourByteInt utxoIndex;
   List<int>? _scriptSig;
-  TXID? dependance;
+  // dependance can be logically replaced by multiple order txs in a payment
+  TXID? dependance; // So I will probably remove it
   FourByteInt sequenceNo;
 
   Down4TXIN({
-    required this.utxo,
+    // required this.utxo,
+    required this.utxoIndex,
+    required this.utxoTXID,
     int? scriptSigLen,
     List<int>? scriptSig,
     this.spender,
@@ -257,19 +328,80 @@ class Down4TXIN {
   // }
   List<int>? get scriptSig => _scriptSig;
 
+  List<int> get compressed {
+    return [
+      ...raw,
+      ...spender == null ? [0x00] : [spender!.length, ...utf8.encode(spender!)],
+      // ...dependance == null ? [] : dependance!.data,
+    ];
+  }
+
+  static Pair<Down4TXIN, int> fromCompressed(Uint8List d4) {
+    final utxoID = TXID(d4.sublist(0, 32));
+    final utxoIX = FourByteInt.fromRaw(d4.sublist(32, 36));
+    final scriptLenVarInt = VarInt.fromRaw(d4.sublist(36));
+    final offset = scriptLenVarInt.data.length;
+    final scriptLen = scriptLenVarInt.asInt;
+    final script = d4.sublist(36 + offset, 36 + offset + scriptLen);
+    final seqNo = FourByteInt.fromRaw(
+      d4.sublist(36 + offset + scriptLen, 36 + offset + scriptLen + 4),
+    );
+
+    final d4Offset = 36 + offset + scriptLen + 4;
+    String? spender;
+    if (d4[d4Offset] != 0x00) {
+      final spenderData = d4.sublist(d4Offset + 1, d4Offset + 1 + d4[d4Offset]);
+      spender = utf8.decode(spenderData);
+    }
+    return Pair(
+      Down4TXIN(
+        utxoIndex: utxoIX,
+        utxoTXID: utxoID,
+        scriptSig: script,
+        scriptSigLen: scriptLen,
+        sequenceNo: seqNo.asInt,
+        spender: spender,
+      ),
+      d4Offset + 1 + d4[d4Offset], // final offset
+    );
+  }
+
+  String get utxoID => down4UtxoID(utxoTXID, utxoIndex);
+
   factory Down4TXIN.fromJson(dynamic decodedJson) => Down4TXIN(
-        utxo: Down4TXOUT.fromJson(decodedJson["utxo"]),
+        // utxo: Down4TXOUT.fromJson(decodedJson["utxo"]),
+        utxoTXID: TXID.fromBase64(decodedJson["id"]),
+        utxoIndex: FourByteInt(decodedJson["ix"]),
         spender: decodedJson["sp"],
         sequenceNo: decodedJson["sn"],
         scriptSigLen: decodedJson["sl"],
         scriptSig: hex.decode(decodedJson["sc"]),
-        dependance:
-            decodedJson["dp"] != null ? TXID.fromHex(decodedJson["dp"]) : null,
+        dependance: decodedJson["dp"] != null
+            ? TXID.fromBase64(decodedJson["dp"])
+            : null,
       );
 
-  List<int> get asData => [
-        ...utxo.txid!.data,
-        ...FourByteInt(utxo.outIndex!).data,
+  // factory Down4TXIN.fromRaw(Uint8List raw) {
+  //   final utxoID = TXID(raw.sublist(0, 32));
+  //   final utxoIX = FourByteInt.fromRaw(raw.sublist(32, 36));
+  //   final scriptLenVarInt = VarInt.fromRaw(raw.sublist(36));
+  //   final offset = scriptLenVarInt.data.length;
+  //   final scriptLen = scriptLenVarInt.asInt;
+  //   final script = raw.sublist(36 + offset, 36 + offset + scriptLen);
+  //   final seqNo = FourByteInt.fromRaw(raw.sublist(36 + offset + scriptLen));
+  //   // final utxo =
+  //   // return Down4TXIN(utxo: utxo)
+  //   // now we decompose the script
+  //   // there could be many different scripts, but
+  // }
+  //
+  // Down4TXOUT utxoWhere(Wallet w, TXID txid, int idx) {
+  //
+  // }
+
+  List<int> get raw => [
+        ...utxoTXID.data,
+        ...utxoIndex.data,
         ..._scriptSigLen!.data,
         ..._scriptSig!,
         ...sequenceNo.data,
@@ -278,8 +410,8 @@ class Down4TXIN {
   List<int> get seqNo => sequenceNo.data;
 
   List<int> get prevOut => [
-        ...utxo.txid!.data,
-        ...FourByteInt(utxo.outIndex!).data,
+        ...utxoTXID.data,
+        ...utxoIndex.data,
       ];
 
   set script(List<int> script) {
@@ -288,36 +420,37 @@ class Down4TXIN {
   }
 
   Map<String, dynamic> toJson() => {
-        "utxo": utxo.toJson(),
+        "id": utxoTXID.asBase64,
+        "ix": utxoIndex.asInt,
         "sp": spender,
         "sn": sequenceNo.asInt,
         "sl": _scriptSigLen?.asInt,
         "sc": _scriptSig!.toHex(),
-        "dp": dependance?.asHex,
+        if (dependance != null) "dp": dependance?.asBase64,
       };
 }
 
 class Down4TXOUT {
+  final List<int> scriptPubKey;
+  final VarInt scriptPubKeyLen;
+  final bool isChange;
+  final bool isFee;
   Identifier? receiver;
   int? outIndex;
   List<int>? secret;
   TXID? txid;
   Sats sats;
-  VarInt? scriptPubKeyLen;
-  List<int>? scriptPubKey;
-  final bool isChange;
-  final bool isFee;
 
   Down4TXOUT({
     required this.sats,
+    required this.scriptPubKey,
     this.isChange = false,
     this.isFee = false,
     this.receiver,
     this.secret,
     this.txid,
     this.outIndex,
-    this.scriptPubKey,
-  }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey?.length ?? 0);
+  }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey.length);
 
   factory Down4TXOUT.fromJson(dynamic decodedJson) => Down4TXOUT(
         receiver: decodedJson["rc"],
@@ -334,10 +467,9 @@ class Down4TXOUT {
         scriptPubKey: hex.decode(decodedJson["sc"]),
       );
 
-  set scriptLen(int n) => scriptPubKeyLen = VarInt.fromInt(n);
-
   String get id =>
-      sha256((txid!.data + FourByteInt(outIndex!).data).asUint8List()).toHex();
+      sha256((txid!.data + FourByteInt(outIndex!).data).toUint8List())
+          .toBase64();
 
   bool get isGets => !(isFee || isChange);
 
@@ -351,11 +483,61 @@ class Down4TXOUT {
   bool operator ==(other) =>
       other is Down4TXOUT && other.txid == txid && other.outIndex == outIndex;
 
-  List<int> get asData => [
+  List<int> get raw => [
         ...sats.data,
-        ...scriptPubKeyLen!.data,
-        ...scriptPubKey!,
+        ...scriptPubKeyLen.data,
+        ...scriptPubKey,
       ];
+
+  List<int> get compressed => [
+        ...raw,
+        ...receiver == null
+            ? [0x00]
+            : [receiver!.length, ...utf8.encode(receiver!)],
+        isFee
+            ? 0x00
+            : isChange
+                ? 0x01
+                : 0x02
+      ];
+
+  static Pair<Down4TXOUT, int> fromCompressed(Uint8List d4) {
+    final satInt = Uint8List.fromList(d4.sublist(0, 8))
+        .buffer
+        .asByteData()
+        .getUint64(0, Endian.little);
+
+    final scriptPubKeyVarInt = VarInt.fromRaw(d4.sublist(8));
+    final scriptLen = scriptPubKeyVarInt.asInt;
+    final offset = scriptPubKeyVarInt.data.length;
+    final script = d4.sublist(8 + offset, 8 + offset + scriptLen);
+
+    final curOffset = 8 + offset + scriptLen;
+
+    String? receiver;
+    int receiverLen = 0;
+    if ((receiverLen = d4[curOffset]) != 0x00) {
+      final receiverData =
+          d4.sublist(curOffset + 1, curOffset + 1 + receiverLen);
+      receiver = utf8.decode(receiverData);
+    }
+
+    final flag = d4[curOffset + 1 + receiverLen];
+    // final isGets = flag == 0x02;
+    final isChange = flag == 0x01;
+    final isFee = flag == 0x00;
+
+    return Pair(
+      Down4TXOUT(
+        sats: Sats(satInt),
+        scriptPubKey: script,
+        receiver: receiver,
+        isChange: isChange,
+        isFee: isFee,
+      ),
+      curOffset + 1 + receiverLen + 1,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         "if": isFee,
@@ -365,38 +547,50 @@ class Down4TXOUT {
         "oi": outIndex,
         "id": txid!.asHex,
         "s": sats.asInt,
-        "sc": hex.encode(scriptPubKey!),
+        "sc": hex.encode(scriptPubKey),
       };
 }
 
 class Down4TX {
   Identifier? maker;
-  FourByteInt versionNo, nLockTime;
-  List<Down4TXIN> txsIn;
-  List<Down4TXOUT> txsOut;
-  VarInt inCounter, outCounter;
-  TXID? txID;
+  final List<int> down4Secret;
+  final FourByteInt versionNo, nLockTime;
+  final List<Down4TXIN> txsIn;
+  final List<Down4TXOUT> txsOut;
+  final VarInt inCounter, outCounter;
+  late TXID txID;
   int confirmations;
 
   Down4TX({
-    this.maker,
-    int? versionNo,
-    int? nLockTime,
+    required this.down4Secret,
     required this.txsIn,
     required this.txsOut,
-    this.txID,
+    this.maker,
+    FourByteInt? vNo,
+    FourByteInt? nLock,
+    VarInt? inCount,
+    VarInt? outCout,
     this.confirmations = 0,
-  })  : versionNo = FourByteInt(versionNo ?? 1),
-        nLockTime = FourByteInt(nLockTime ?? 0),
+  })  : versionNo = vNo ?? FourByteInt(1),
+        nLockTime = nLock ?? FourByteInt(0),
         inCounter = VarInt.fromInt(txsIn.length),
-        outCounter = VarInt.fromInt(txsOut.length);
+        outCounter = VarInt.fromInt(txsOut.length) {
+    txID = TXID(hash256([
+      ...versionNo.data,
+      ...inCounter.data,
+      ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
+      ...outCounter.data,
+      ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
+      ...nLockTime.data,
+    ]));
+  }
 
   factory Down4TX.fromJson(dynamic decodedJson) => Down4TX(
         maker: decodedJson["mk"],
-        versionNo: decodedJson["vn"],
-        nLockTime: decodedJson["nl"],
+        vNo: FourByteInt(decodedJson["vn"]),
+        nLock: FourByteInt(decodedJson["nl"]),
         confirmations: decodedJson["cf"],
-        txID: TXID.fromHex(decodedJson["id"]),
+        down4Secret: List<int>.from(decodedJson["sc"] ?? []),
         txsIn: List.from(decodedJson["ti"])
             .map((jsonIn) => Down4TXIN.fromJson(jsonIn))
             .toList(),
@@ -405,18 +599,78 @@ class Down4TX {
             .toList(),
       );
 
-  List<int> get raw {
-    return [
-      ...versionNo.data,
-      ...inCounter.data,
-      ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
-      ...outCounter.data,
-      ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData]),
-      ...nLockTime.data,
-    ];
+  List<int> get raw => [
+        ...versionNo.data,
+        ...inCounter.data,
+        ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
+        ...outCounter.data,
+        ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
+        ...nLockTime.data,
+      ];
+
+  // this is necessary in the current system of discarding txs and keeping only
+  // the utxos, we can save much space
+  void writeTxInfosToUTXOs() {
+    for (int i = 0; i < txsOut.length; i++) {
+      txsOut[i].txid = txID;
+      txsOut[i].outIndex = i;
+      txsOut[i].secret = down4Secret;
+    }
   }
 
-  List<int>? sigData(int nIn, [int sigHashType = SIG.ALL]) {
+  List<int> get compressed => [
+        ...versionNo.data,
+        ...inCounter.data,
+        ...txsIn.fold(<int>[], (buf, txin) => [...buf, ...txin.compressed]),
+        ...outCounter.data,
+        ...txsOut.fold(<int>[], (buf, txout) => [...buf, ...txout.compressed]),
+        ...nLockTime.data,
+        down4Secret.length,
+        ...down4Secret,
+        confirmations,
+      ];
+
+  static Pair<Down4TX, int> fromCompressed(Uint8List buf) {
+    final vNo = FourByteInt.fromRaw(buf.sublist(0, 4));
+    final inCountVarInt = VarInt.fromRaw(buf.sublist(4));
+    var txsIn = <Down4TXIN>[];
+    var offset = 4 + inCountVarInt.data.length;
+    for (int i = 0; i < inCountVarInt.asInt; i++) {
+      final pair = Down4TXIN.fromCompressed(buf.sublist(offset));
+      txsIn.add(pair.first);
+      offset = offset + pair.second;
+    }
+
+    final outCounterVarInt = VarInt.fromRaw(buf.sublist(offset));
+    var txsOut = <Down4TXOUT>[];
+    offset = offset + outCounterVarInt.data.length;
+    for (int i = 0; i < outCounterVarInt.asInt; i++) {
+      final pair = Down4TXOUT.fromCompressed(buf.sublist(offset));
+      txsOut.add(pair.first);
+      offset = offset + pair.second;
+    }
+
+    final nLockTime = FourByteInt.fromRaw(buf.sublist(offset, offset + 4));
+    final down4SecretLen = buf[offset + 4];
+    final down4Secret = buf.sublist(offset + 5, offset + 5 + down4SecretLen);
+    final confirmations = buf[offset + 5 + down4SecretLen];
+
+    final finalOffset = offset + 5 + down4SecretLen + 1;
+    final down4Tx = Down4TX(
+      down4Secret: down4Secret,
+      inCount: inCountVarInt,
+      txsIn: txsIn,
+      outCout: outCounterVarInt,
+      txsOut: txsOut,
+      vNo: vNo,
+      nLock: nLockTime,
+      confirmations: confirmations,
+    );
+
+    return Pair(down4Tx, finalOffset);
+  }
+
+  List<int>? sigData(int nIn, Down4TXOUT utxo, [int sigHashType = SIG.ALL]) {
     switch (sigHashType) {
       case SIG.ALL:
         return [
@@ -424,11 +678,11 @@ class Down4TX {
           ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
           ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
           ...txsIn[nIn].prevOut,
-          ...txsIn[nIn].utxo.scriptPubKeyLen!.data,
-          ...txsIn[nIn].utxo.scriptPubKey!,
-          ...txsIn[nIn].utxo.sats.data,
+          ...utxo.scriptPubKeyLen.data,
+          ...utxo.scriptPubKey,
+          ...utxo.sats.data,
           ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData])),
+          ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
           ...nLockTime.data,
           ...FourByteInt(sigHashType).data,
         ];
@@ -438,11 +692,11 @@ class Down4TX {
           ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
           ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
           ...txsIn[nIn].prevOut,
-          ...txsIn[nIn].utxo.scriptPubKeyLen!.data,
-          ...txsIn[nIn].utxo.scriptPubKey!,
-          ...txsIn[nIn].utxo.sats.data,
+          ...utxo.scriptPubKeyLen.data,
+          ...utxo.scriptPubKey,
+          ...utxo.sats.data,
           ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut[nIn].asData),
+          ...hash256(txsOut[nIn].raw),
           ...nLockTime.data,
           ...FourByteInt(sigHashType).data,
         ];
@@ -452,9 +706,9 @@ class Down4TX {
           ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
           ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
           ...txsIn[nIn].prevOut,
-          ...txsIn[nIn].utxo.scriptPubKeyLen!.data,
-          ...txsIn[nIn].utxo.scriptPubKey!,
-          ...txsIn[nIn].utxo.sats.data,
+          ...utxo.scriptPubKeyLen.data,
+          ...utxo.scriptPubKey,
+          ...utxo.sats.data,
           ...txsIn[nIn].sequenceNo.data,
           ...Uint8List(32),
           ...nLockTime.data,
@@ -466,11 +720,11 @@ class Down4TX {
           ...Uint8List(32),
           ...Uint8List(32),
           ...txsIn[nIn].prevOut,
-          ...txsIn[nIn].utxo.scriptPubKeyLen!.data,
-          ...txsIn[nIn].utxo.scriptPubKey!,
-          ...txsIn[nIn].utxo.sats.data,
+          ...utxo.scriptPubKeyLen.data,
+          ...utxo.scriptPubKey,
+          ...utxo.sats.data,
           ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.asData])),
+          ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
           ...nLockTime.data,
           ...FourByteInt(sigHashType).data,
         ];
@@ -480,11 +734,11 @@ class Down4TX {
           ...Uint8List(32),
           ...Uint8List(32),
           ...txsIn[nIn].prevOut,
-          ...txsIn[nIn].utxo.scriptPubKeyLen!.data,
-          ...txsIn[nIn].utxo.scriptPubKey!,
-          ...txsIn[nIn].utxo.sats.data,
+          ...utxo.scriptPubKeyLen.data,
+          ...utxo.scriptPubKey,
+          ...utxo.sats.data,
           ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut[nIn].asData),
+          ...hash256(txsOut[nIn].raw),
           ...nLockTime.data,
           ...FourByteInt(sigHashType).data,
         ];
@@ -494,9 +748,9 @@ class Down4TX {
           ...Uint8List(32),
           ...Uint8List(32),
           ...txsIn[nIn].prevOut,
-          ...txsIn[nIn].utxo.scriptPubKeyLen!.data,
-          ...txsIn[nIn].utxo.scriptPubKey!,
-          ...txsIn[nIn].utxo.sats.data,
+          ...utxo.scriptPubKeyLen.data,
+          ...utxo.scriptPubKey,
+          ...utxo.sats.data,
           ...txsIn[nIn].sequenceNo.data,
           ...Uint8List(32),
           ...nLockTime.data,
@@ -516,15 +770,14 @@ class Down4TX {
     });
   }
 
-  TXID txid() => txID = TXID(hash256(raw.asUint8List()));
-
   String get fullRawHex => hex.encode(raw);
 
   Map<String, dynamic> toJson([bool withTxs = true]) => {
+        "sc": down4Secret,
         "mk": maker,
         "vn": versionNo.asInt,
         "nl": nLockTime.asInt,
-        "id": txID!.asHex,
+        "id": txID.asHex,
         "cf": confirmations,
         if (withTxs) "ti": txsIn.map((txin) => txin.toJson()).toList(),
         if (withTxs) "to": txsOut.map((txout) => txout.toJson()).toList(),
@@ -533,7 +786,7 @@ class Down4TX {
   String get asQrData => jsonEncode(toJson());
 
   @override
-  int get hashCode => BigInt.parse(txID!.asHex, radix: 16).hashCode;
+  int get hashCode => BigInt.parse(txID.asHex, radix: 16).hashCode;
 
   @override
   bool operator ==(other) => other is Down4TX && other.txID == txID;
@@ -698,7 +951,7 @@ class Down4Keys {
     var signer = Signer('SHA-256/DET-ECDSA');
     signer.init(true, pkParam);
 
-    var sig = signer.generateSignature(message.asUint8List()) as ECSignature;
+    var sig = signer.generateSignature(message.toUint8List()) as ECSignature;
     return sig.normalize(secp256k1);
   }
 
@@ -725,7 +978,7 @@ class Down4Keys {
 
     final data = bigX + bigY + secret;
 
-    final out = hmac.process(data.asUint8List());
+    final out = hmac.process(data.toUint8List());
     final left = out.sublist(0, 32);
     final right = out.sublist(32, 64);
 
@@ -777,21 +1030,21 @@ class Down4Keys {
   }
 
   factory Down4Keys.fromJson(dynamic decodedJson) {
-    final chainCode = hex.decode(decodedJson["cc"]).asUint8List();
+    final chainCode = hex.decode(decodedJson["cc"]).toUint8List();
     ECPrivateKey? prv;
     if (decodedJson["prv"] != null) {
       var big = BigInt.parse(decodedJson["prv"], radix: 16);
       prv = ECPrivateKey(big, secp256k1);
     }
 
-    final pubByte = hex.decode(decodedJson["pub"]).asUint8List();
+    final pubByte = hex.decode(decodedJson["pub"]).toUint8List();
     final pub = uncompressPublicKey(pubByte);
 
     return Down4Keys._(publicKey: pub, chainCode: chainCode, privateKey: prv);
   }
 
   factory Down4Keys.fromRandom(Uint8List keySeed, Uint8List chainCodeSeed) {
-    var chainCode = sha256(chainCodeSeed).asUint8List();
+    var chainCode = sha256(chainCodeSeed).toUint8List();
 
     var keyParams = ECKeyGeneratorParameters(secp256k1);
 

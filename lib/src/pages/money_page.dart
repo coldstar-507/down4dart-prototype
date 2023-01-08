@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/down4_utility.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -17,6 +19,8 @@ import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
+
+final base85 = Base85Codec(Alphabets.z85);
 
 void printWrapped(String text) {
   final pattern = RegExp('.{1,800}'); // 800 is the size of each chunk
@@ -56,18 +60,11 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   void initState() {
     super.initState();
-    final dataLen =
-        widget.paymentAsList.fold<int>(0, (prv, ele) => prv + ele.length);
-    print("Total qrData length = $dataLen");
-    print("${widget.payment.txs.length} txs in payment");
-    // print("widget.payment.toYouKnow().length");
-    // loadQrs();
-    // loadQrsAsPaints();
-    // timer = startedTimer;
+    print("THERE ARE ${widget.paymentAsList.length} QRS");
   }
 
   Timer get startedTimer =>
-      Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      Timer.periodic(const Duration(milliseconds: 400), (timer) {
         listIndex = (listIndex + 1) % widget.paymentAsList.length;
         setState(() {});
       });
@@ -180,7 +177,7 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
-        title: sha1(widget.payment.txs.last.txID!.data).toBase58(),
+        title: sha1(widget.payment.txs.last.txID.data).toBase58(),
         // stackWidgets: qrs2.isNotEmpty ? [qrs2[listIndex]] : null,
         stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
         console: theConsole,
@@ -198,14 +195,14 @@ class MoneyPage extends StatefulWidget {
   final User self;
   final List<Palette> transitioned;
   final void Function() back;
-  final void Function(Down4Payment) makePayment, importMoney;
+  final void Function(Down4Payment) makePayment, scanOrImport;
   final void Function(r.Request req) paymentRequest;
   final int pageIndex;
   final void Function(int) onPageChange;
   final double initialOffset;
 
   const MoneyPage({
-    required this.importMoney,
+    required this.scanOrImport,
     required this.trueTargets,
     required this.transitioned,
     required this.wallet,
@@ -233,7 +230,7 @@ class _MoneyPageState extends State<MoneyPage> {
   MobileScannerController? scanner;
   Console? _console;
   Map<int, String> scannedData = {};
-  int? scannedDataLength;
+  int scannedDataLength = -1;
   ConsoleInput? _cachedMainViewInput;
   final Map<String, dynamic> _currencies = {
     "l": ["USD", "Satoshis"],
@@ -332,20 +329,40 @@ class _MoneyPageState extends State<MoneyPage> {
 
   dynamic onScan(Barcode bc, MobileScannerArguments? args) async {
     final raw = bc.rawValue;
+    print("Trying to scan some good stuff right here!");
     if (raw != null) {
-      final decodedRaw = jsonDecode(raw);
-      if (scannedDataLength != null && decodedRaw["l"] is int) {
-        scannedDataLength = decodedRaw["l"];
+      final prefixEnd = raw.indexOf(";");
+      if (prefixEnd != -1) {
+        final ix = int.parse(raw.substring(0, prefixEnd));
+        scannedData.putIfAbsent(ix, () => raw.substring(prefixEnd + 1));
+      } else {
+        final countPrefixEnd = raw.indexOf(",");
+        scannedDataLength = int.parse(raw.substring(0, countPrefixEnd));
+        scannedData.putIfAbsent(0, () => raw.substring(countPrefixEnd + 1));
       }
-      final int? iDecoded = decodedRaw["i"] is int ? decodedRaw["i"] : null;
-      if (iDecoded != null) {
-        scannedData.putIfAbsent(iDecoded, () => decodedRaw);
-      }
-      if (scannedData.length == scannedDataLength) {
+
+      if (scannedData.keys.length == scannedDataLength) {
         // we have all the data
+        print("WE HAVE ALL THE DATA, SENDING!!!!");
         await scanner?.stop();
-        final payment = Down4Payment.fromQrData(scannedData.values.toList());
-        if (payment != null) widget.wallet.parsePayment(widget.self, payment);
+        final sortedKeys = scannedData.keys.toList(growable: false)..sort();
+        final sortedData = sortedKeys
+            .map((e) => scannedData[e])
+            .toList(growable: false)
+            .join();
+
+        print("SORTED KEYS = $sortedKeys");
+
+        final base85DecodedData = base85.decode(sortedData);
+
+        final payment = Down4Payment.fromCompressed(base85DecodedData);
+        print(payment.txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
+
+        print("the payment = $payment");
+        widget.scanOrImport(payment);
+        print("Parsing the payment!");
+        scannedData = {};
+        scannedDataLength = -1;
         loadEmptyViewConsole(false, false, true);
       }
     }
@@ -355,7 +372,9 @@ class _MoneyPageState extends State<MoneyPage> {
     _cachedMainViewInput = ConsoleInput(
       maxLines: 1,
       type: TextInputType.number,
-      placeHolder: currency == "USD" ? "$usds \$" : "$satoshis sat",
+      placeHolder: currency == "USD"
+          ? "$usds \$"
+          : "${formattedSats(widget.wallet.balance)} sat",
       tec: tec,
     );
     if (reload) setState(() {});
@@ -480,7 +499,7 @@ class _MoneyPageState extends State<MoneyPage> {
         amount: Sats(asSats),
         textNote: textNoteTec.value.text,
       );
-      print("The pay: ${pay?.toJson()}");
+      // print("The pay: ${pay?.toJson()}");
       if (pay != null) widget.makePayment(pay);
     }
 
@@ -542,7 +561,7 @@ class _MoneyPageState extends State<MoneyPage> {
           await widget.wallet.importMoney(importTec.value.text, widget.self);
 
       if (payment == null) return;
-      widget.importMoney(payment);
+      widget.scanOrImport(payment);
       if (widget.trueTargets.isEmpty) {
         loadEmptyViewConsole(false, false, true);
       } else {

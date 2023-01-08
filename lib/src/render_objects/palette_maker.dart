@@ -24,7 +24,7 @@ class UserPaletteMaker extends StatelessWidget {
       ..text = info['id'].toLowerCase()
       ..selection = TextSelection.collapsed(offset: info['id'].length);
     return Container(
-      height: Palette.height,
+      height: Palette.paletteHeight,
       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
       decoration: BoxDecoration(
           boxShadow: const [
@@ -60,7 +60,7 @@ class UserPaletteMaker extends StatelessWidget {
                 topLeft: Radius.circular(4.0),
                 bottomLeft: Radius.circular(4.0),
               )),
-              width: Palette.height - 2.0, // borderWidth x2
+              width: Palette.paletteHeight - 2.0, // borderWidth x2
               child: info['image'] == null || info['image'] == ""
                   ? Image.asset(
                       'lib/src/assets/picture_place_holder_2.png',
@@ -95,7 +95,7 @@ class UserPaletteMaker extends StatelessWidget {
                   hintText: "@username",
                   border: InputBorder.none,
                   contentPadding:
-                      const EdgeInsets.only(bottom: Palette.height / 2),
+                      EdgeInsets.only(bottom: Palette.paletteHeight / 2),
                 ),
                 textDirection: TextDirection.ltr,
                 onChanged: ((value) {
@@ -111,7 +111,7 @@ class UserPaletteMaker extends StatelessWidget {
 }
 
 class UserMakerPalette extends StatelessWidget {
-  static const double height = 60.0;
+  // static const double height = 60.0;
   final String name, lastName, id;
   final List<int> image;
   final void Function() selectFile;
@@ -134,8 +134,8 @@ class UserMakerPalette extends StatelessWidget {
               left: Radius.circular(4.0),
             ),
           ),
-          height: Palette.height - 4.0,
-          width: Palette.height - 4.0, // borderWidth x2
+          height: Palette.paletteHeight - 4.0,
+          width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image.isNotEmpty
               ? Image.memory(
                   Uint8List.fromList(image),
@@ -191,7 +191,7 @@ class UserMakerPalette extends StatelessWidget {
   //     );
 
   Widget mainContainer({required Widget child}) => Container(
-      height: Palette.height,
+      height: Palette.paletteHeight,
       width: double.infinity,
       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
       decoration: BoxDecoration(
@@ -214,7 +214,7 @@ class UserMakerPalette extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(children: [
       Container(
-          height: Palette.height,
+          height: Palette.paletteHeight,
           // width: double.infinity,
           margin: const EdgeInsets.only(left: 22.0, right: 22.0),
           decoration: BoxDecoration(
@@ -304,10 +304,10 @@ class PaletteMaker extends StatelessWidget {
       duration: const Duration(milliseconds: 600),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 600),
-        height: fold ? 0 : Palette.height,
+        height: fold ? 0 : Palette.paletteHeight,
         margin: EdgeInsets.only(
-          left: 22.0,
-          right: 22.0,
+          left: Palette.paletteMargin,
+          right: Palette.paletteMargin,
           bottom: fold ? 0 : Sizes.h * 0.02,
         ),
         clipBehavior: Clip.hardEdge,
@@ -345,8 +345,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.hyperchat:
@@ -354,8 +354,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.group:
@@ -363,8 +363,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.root:
@@ -372,8 +372,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.market:
@@ -381,8 +381,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.checkpoint:
@@ -390,8 +390,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.journal:
@@ -399,8 +399,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.item:
@@ -408,8 +408,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.event:
@@ -417,8 +417,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.ticket:
@@ -426,8 +426,8 @@ class PaletteMaker extends StatelessWidget {
           'lib/src/assets/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
         );
 
       case Nodes.payment:
@@ -442,7 +442,7 @@ class PaletteMaker extends StatelessWidget {
           // decoration: const BoxDecoration(
           //   borderRadius: BorderRadius.horizontal(left: Radius.circular(4.0)),
           // ),
-          width: Palette.height - 4.0, // borderWidth x2
+          width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image == null
               ? _defaultImage
               : Image.memory(
@@ -461,7 +461,7 @@ class PaletteMaker extends StatelessWidget {
             tec: tec,
             inputCallBack: nameCallBack,
             placeHolder: hintText,
-            padding: const EdgeInsets.only(bottom: Palette.height / 2),
+            padding: EdgeInsets.only(bottom: Palette.paletteHeight / 2),
           ),
         ),
       );
@@ -475,8 +475,8 @@ class PaletteMaker extends StatelessWidget {
       child: Container(
           // clipBehavior: Clip.hardEdge,
           padding: const EdgeInsets.all(2.0),
-          width: Palette.height - 4,
-          height: Palette.height - 4,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
           // decoration: BoxDecoration(
           //     color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
           //     borderRadius: const BorderRadius.only(

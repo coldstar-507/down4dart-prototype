@@ -3,11 +3,14 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:down4/src/down4_utility.dart';
+
 import 'types.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:pointycastle/digests/sha256.dart' as s256;
 import 'package:pointycastle/digests/ripemd160.dart' as r160;
+import 'package:pointycastle/digests/md5.dart' as hash_md5;
 import 'package:bs58/bs58.dart';
 import 'package:convert/convert.dart';
 import 'package:pointycastle/export.dart';
@@ -19,11 +22,11 @@ import 'dart:io' as io;
 
 final listEqual_ = const ListEquality().equals;
 
-extension on List<int> {
-  Uint8List asUint8List() => Uint8List.fromList(this);
-  String toBase58() => base58.encode(this.asUint8List());
-  String toHex() => hex.encode(this);
-}
+// extension on List<int> {
+//   Uint8List asUint8List() => Uint8List.fromList(this);
+//   String toBase58() => base58.encode(this.asUint8List());
+//   String toHex() => hex.encode(this);
+// }
 
 int randomSats() {
   return Random().nextInt(50);
@@ -41,22 +44,103 @@ Uint8List safeSeed(int len) {
   return Uint8List.fromList(seed);
 }
 
-// List<Down4TX> topologicalSort(List<Down4TX> txs) {
-//   var sorted = <Down4TX>[];
-//   var prevSortIDs = <TXID>[];
-//   sorted.addAll(txs.where((tx) => tx.txidDeps.isEmpty));
-//   do {
-//     prevSortIDs = sorted.map((e) => e.txID!).toList();
-//     final unSorted = txs.where((tx) => !prevSortIDs.contains(tx.txID));
-//     for (final unsortedTx in unSorted) {
-//       final deps = unsortedTx.txidDeps;
-//       if (deps.every((dep) => prevSortIDs.contains(dep))) {
-//         sorted.add(unsortedTx);
-//       }
-//     }
-//   } while (sorted.length != prevSortIDs.length);
-//   return sorted;
-// }
+List<int>? sigData({
+  required List<Down4TXIN> txsIn,
+  required List<Down4TXOUT> txsOut,
+  required int nIn,
+  required Down4TXOUT utxo,
+  int versionNo = 1,
+  int nLockTime = 0,
+  int sigHashType = SIG.ALL,
+}) {
+  switch (sigHashType) {
+    case SIG.ALL:
+      return [
+        ...FourByteInt(versionNo).data,
+        ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
+        ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
+        ...txsIn[nIn].prevOut,
+        ...utxo.scriptPubKeyLen.data,
+        ...utxo.scriptPubKey,
+        ...utxo.sats.data,
+        ...txsIn[nIn].sequenceNo.data,
+        ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
+        ...FourByteInt(nLockTime).data,
+        ...FourByteInt(sigHashType).data,
+      ];
+    case SIG.SINGLE:
+      return [
+        ...FourByteInt(versionNo).data,
+        ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
+        ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
+        ...txsIn[nIn].prevOut,
+        ...utxo.scriptPubKeyLen.data,
+        ...utxo.scriptPubKey,
+        ...utxo.sats.data,
+        ...txsIn[nIn].sequenceNo.data,
+        ...hash256(txsOut[nIn].raw),
+        ...FourByteInt(nLockTime).data,
+        ...FourByteInt(sigHashType).data,
+      ];
+    case SIG.NONE:
+      return [
+        ...FourByteInt(versionNo).data,
+        ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
+        ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
+        ...txsIn[nIn].prevOut,
+        ...utxo.scriptPubKeyLen.data,
+        ...utxo.scriptPubKey,
+        ...utxo.sats.data,
+        ...txsIn[nIn].sequenceNo.data,
+        ...Uint8List(32),
+        ...FourByteInt(nLockTime).data,
+        ...FourByteInt(sigHashType).data,
+      ];
+    case SIG.ALL_ANYONECANPAY:
+      return [
+        ...FourByteInt(versionNo).data,
+        ...Uint8List(32),
+        ...Uint8List(32),
+        ...txsIn[nIn].prevOut,
+        ...utxo.scriptPubKeyLen.data,
+        ...utxo.scriptPubKey,
+        ...utxo.sats.data,
+        ...txsIn[nIn].sequenceNo.data,
+        ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
+        ...FourByteInt(nLockTime).data,
+        ...FourByteInt(sigHashType).data,
+      ];
+    case SIG.SINGLE_ANYONECANPAY:
+      return [
+        ...FourByteInt(versionNo).data,
+        ...Uint8List(32),
+        ...Uint8List(32),
+        ...txsIn[nIn].prevOut,
+        ...utxo.scriptPubKeyLen.data,
+        ...utxo.scriptPubKey,
+        ...utxo.sats.data,
+        ...txsIn[nIn].sequenceNo.data,
+        ...hash256(txsOut[nIn].raw),
+        ...FourByteInt(nLockTime).data,
+        ...FourByteInt(sigHashType).data,
+      ];
+    case SIG.NONE_ANYONECANPAY:
+      return [
+        ...FourByteInt(versionNo).data,
+        ...Uint8List(32),
+        ...Uint8List(32),
+        ...txsIn[nIn].prevOut,
+        ...utxo.scriptPubKeyLen.data,
+        ...utxo.scriptPubKey,
+        ...utxo.sats.data,
+        ...txsIn[nIn].sequenceNo.data,
+        ...Uint8List(32),
+        ...FourByteInt(nLockTime).data,
+        ...FourByteInt(sigHashType).data,
+      ];
+  }
+  return null;
+}
 
 Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
   final url = Uri.parse(
@@ -89,6 +173,9 @@ Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
   return d4utxos;
 }
 
+String down4UtxoID(TXID txid, FourByteInt ix) =>
+    sha256((txid.data + ix.data)).toBase64();
+
 Future<List<Down4TXOUT>?> checkPrivateKey(String base58PrivateKey) async {
   final asByte = base58.decode(base58PrivateKey);
   final big = BigInt.parse(asByte.toHex(), radix: 16);
@@ -101,14 +188,12 @@ Future<List<Down4TXOUT>?> checkPrivateKey(String base58PrivateKey) async {
   return getUtxos(address.toBase58());
 }
 
-List<int> d4out(List<int> address, int walletIndex) {
-  final wIdxBuf = Uint8List(4)..buffer.asByteData().setUint32(0, walletIndex);
-  return [
-    ...p2pkh(address),
-    OP.RETURN,
-    ...OP.PUSHDATA(wIdxBuf),
-  ];
-}
+List<int> d4out(List<int> address, List<int> userID, List<int> secret) => [
+      ...p2pkh(address),
+      OP.RETURN,
+      ...OP.PUSHDATA(userID),
+      ...OP.PUSHDATA(secret),
+    ];
 
 List<int> p2pkh(List<int> rawAddress) => [
       OP.DUP,
@@ -135,23 +220,29 @@ List<int> makeDER2(ECSignature sig, int sh) {
   return [0x30, len, 0x02, rLen, ...rBuf, 0x02, sLen, ...sBuf, sh];
 }
 
-List<int>? p2pkhSig(Down4Keys keys, Down4TX tx, int nIn, [int sh = SIG.ALL]) {
-  final sigData = tx.sigData(nIn, sh);
-  if (sigData == null) return null;
-  final sig = keys.sha256Sign(sha256(sigData).asUint8List());
+List<int>? p2pkhSig({
+  required Down4Keys keys,
+  required List<int> sigData,
+  int sigHashType = SIG.ALL,
+}) {
+  final sig = keys.sha256Sign(sha256(sigData).toUint8List());
   if (sig == null) return null;
   return [
-    ...OP.PUSHDATA(makeDER2(sig, sh)),
+    ...OP.PUSHDATA(makeDER2(sig, sigHashType)),
     ...OP.PUSHDATA(keys.publicKey.Q!.getEncoded()),
   ];
 }
 
 List<int> sha1(List<int> data) {
-  return Digest('SHA-1').process(data.asUint8List());
+  return Digest('SHA-1').process(data.toUint8List());
 }
 
 List<int> sha256(List<int> data) {
-  return s256.SHA256Digest().process(data.asUint8List());
+  return s256.SHA256Digest().process(data.toUint8List());
+}
+
+Uint8List md5(Uint8List data) {
+  return hash_md5.MD5Digest().process(data);
 }
 
 List<int> hash256(List<int> data) {
@@ -159,7 +250,7 @@ List<int> hash256(List<int> data) {
 }
 
 List<int> ripemd160(List<int> data) {
-  return r160.RIPEMD160Digest().process(data.asUint8List());
+  return r160.RIPEMD160Digest().process(data.toUint8List());
 }
 
 List<int> mainetAddress(List<int> pubKey) {

@@ -275,7 +275,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                 style: TextStyle(
                   fontFamily: "Alice",
                   color: Colors.white.withOpacity(curPos == e.key ? 1 : 0.3),
-                  fontSize: 18,
+                  fontSize: 20,
                 ),
                 child: Text(" ${e.value} ", softWrap: true)))
             .toList(growable: false),
@@ -355,7 +355,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 32,
+        toolbarHeight: Sizes.headerHeight,
         title: pageHeader,
         backgroundColor: PinkTheme.qrColor,
       ),
@@ -394,3 +394,4 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
     );
   }
 }
+

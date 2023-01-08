@@ -183,7 +183,9 @@ class _Down4State extends State<Down4> {
     final truePadding = mediaQuery.viewPadding;
     // final fakePadding = mediaQuery.padding;
     Sizes.fullHeight = size.height;
-    Sizes.h = size.height - truePadding.top - truePadding.bottom - 32;
+    Sizes.headerHeight = size.height * 0.056;
+    Sizes.h =
+        size.height - truePadding.top - truePadding.bottom - Sizes.headerHeight;
     Sizes.w = size.width - truePadding.left - truePadding.right;
     return _view ?? const LoadingPage();
   }
