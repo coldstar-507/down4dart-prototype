@@ -83,8 +83,12 @@ class ButtonsInfo {
 
 class Palette extends StatelessWidget {
   static double get paletteHeight => Sizes.h * 0.1007;
-  static double get gapSize => Sizes.h * 0.0193;
-  static double get paletteMargin => Sizes.w * 0.04;
+  static double get gapSize => Sizes.h * 0.0192;
+  static double get paletteMargin => Sizes.w * 0.042;
+  static double get blurRadius => 6.0;
+  static double get spreadRadius => -7.0;
+  static Offset get shadowOffset => const Offset(6.0, 6.0);
+  static Color get shadowColor => Colors.black.withOpacity(0.66);
   // static const double height = 60.0;
   final BaseNode node;
   final String at;
@@ -262,12 +266,12 @@ class Palette extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: squish && !selected && !fold
-                  ? Colors.black54
+                  ? shadowColor
                   : Colors.transparent,
-              blurRadius: squish && !selected && !fold ? 6.0 : 0.0,
-              spreadRadius: -6.0,
+              blurRadius: squish && !selected && !fold ? blurRadius : 0.0,
+              spreadRadius: spreadRadius,
               offset: squish && !selected && !fold
-                  ? const Offset(6.0, 6.0)
+                  ? shadowOffset
                   : const Offset(0, 0),
               blurStyle: BlurStyle.normal,
             ),

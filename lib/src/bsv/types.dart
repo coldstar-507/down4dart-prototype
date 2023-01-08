@@ -2,8 +2,6 @@ import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:convert/convert.dart';
-import 'package:down4/src/pages/money_page.dart';
-import 'package:flutter/services.dart';
 import 'package:pointycastle/export.dart';
 import 'package:base85/base85.dart';
 
@@ -231,7 +229,7 @@ class VarInt {
     }
   }
 
-  String toHex() => hex.encode(data);
+  String toHex() => data.toHex();
 }
 
 class FourByteInt {

@@ -193,15 +193,15 @@ class UserMakerPalette extends StatelessWidget {
   Widget mainContainer({required Widget child}) => Container(
       height: Palette.paletteHeight,
       width: double.infinity,
-      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      margin: EdgeInsets.symmetric(horizontal: Palette.gapSize),
       decoration: BoxDecoration(
         // borderRadius: BorderRadius.circular(4.0),
-        boxShadow: const [
+        boxShadow:  [
           BoxShadow(
-            color: Colors.black54,
-            blurRadius: 6.0,
-            spreadRadius: -6.0,
-            offset: Offset(8.0, 8.0),
+            color: Palette.shadowColor,
+            blurRadius: Palette.blurRadius,
+            spreadRadius: Palette.spreadRadius,
+            offset: Palette.shadowOffset,
             blurStyle: BlurStyle.normal,
           ),
         ],
@@ -215,8 +215,7 @@ class UserMakerPalette extends StatelessWidget {
     return Column(children: [
       Container(
           height: Palette.paletteHeight,
-          // width: double.infinity,
-          margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+          margin: EdgeInsets.symmetric(horizontal: Palette.gapSize),
           decoration: BoxDecoration(
             boxShadow: const [
               BoxShadow(
@@ -312,12 +311,12 @@ class PaletteMaker extends StatelessWidget {
         ),
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-            boxShadow: const [
+            boxShadow:  [
               BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 6.0,
-                  spreadRadius: -6.0,
-                  offset: Offset(8.0, 8.0),
+                  color: Palette.shadowColor,
+                  blurRadius: Palette.blurRadius,
+                  spreadRadius: Palette.spreadRadius,
+                  offset: Palette.shadowOffset,
                   blurStyle: BlurStyle.normal)
             ],
             borderRadius: const BorderRadius.all(Radius.circular(6.0)),

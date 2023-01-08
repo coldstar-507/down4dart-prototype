@@ -384,8 +384,8 @@ class Wallet {
 }
 
 void main() {
-  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
-  // var f = io.File("/home/scott/jeff.txt");
+  // var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  var f = io.File("/home/scott/jeff.txt");
   var pkHex = f.readAsStringSync();
 
   // final seed1 = safeSeed(32);

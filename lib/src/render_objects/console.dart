@@ -390,7 +390,7 @@ class Console extends StatelessWidget {
     // return extras;
   }
 
-  double get consoleGap => Sizes.w * 0.024;
+  double get consoleGap => Sizes.w * 0.028;
 
   double get consoleWidth => Sizes.w - (2.0 * consoleGap);
 

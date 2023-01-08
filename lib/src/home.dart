@@ -5,10 +5,7 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:down4/src/bsv/utils.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:down4/src/render_objects/navigator.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
 
 import 'boxes.dart';
@@ -16,7 +13,6 @@ import 'web_requests.dart' as r;
 import 'down4_utility.dart';
 import 'bsv/wallet.dart';
 import 'bsv/types.dart';
-import 'themes.dart';
 
 import 'pages/chat_page.dart';
 import 'pages/forwarding_page.dart';
