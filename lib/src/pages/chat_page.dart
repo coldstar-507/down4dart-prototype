@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -120,7 +121,9 @@ class _ChatPageState extends State<ChatPage> {
     final maxWidth = Sizes.w * 0.76;
     const textPadding = 12;
     const messageBorder = 4;
+    final maxTextWidth = maxWidth - textPadding - messageBorder;
     for (var msgID in messageToLoad.toList(growable: false).reversed) {
+      TextStyle ts = const TextStyle(fontFamily: "Alice");
       double oneTextLineHeight = 0;
       double mediaHeight = 0;
       double mediaWidth = 0;
@@ -170,44 +173,77 @@ class _ChatPageState extends State<ChatPage> {
           if (word == "\n") {
             specialDisplayText.add(previousString);
             final specialTp = TextPainter(
-              text: TextSpan(text: previousString),
+              text: TextSpan(text: previousString, style: ts),
               textDirection: TextDirection.ltr,
             )..layout();
-            if (specialTp.width + 5 > neededWidth!) {
-              neededWidth = specialTp.width + 5;
+            if (specialTp.width > neededWidth!) {
+              neededWidth = specialTp.width;
             }
             previousString = "";
           } else if (word.isNotEmpty) {
-            final currentString =
-                previousString.isEmpty ? word : "$previousString $word";
-
-            final previousTp = TextPainter(
-              text: TextSpan(text: previousString),
+            final wordTp = TextPainter(
+              text: TextSpan(text: word, style: ts),
               textDirection: TextDirection.ltr,
             )..layout();
-
-            final currentTp = TextPainter(
-              text: TextSpan(text: currentString),
-              textDirection: TextDirection.ltr,
-            )..layout();
-
-            oneTextLineHeight = currentTp.height;
-
-            // if the current text is larger than the available width
-            if (currentTp.width + 5 >= maxWidth - 16) {
-              // we add the previousString to the list of display text
-              specialDisplayText.add(previousString);
-              // if the previous layout is bigger than our current biggest width,
-              // it because the new biggest width
-              if (previousTp.width + 5 > neededWidth!) {
-                neededWidth = previousTp.width + 5;
+            var wordlen = wordTp.width;
+            var words = [word];
+            while (wordlen > maxTextWidth) {
+              final splitLen = (words.first.length / 2).ceil();
+              words = words
+                  .map((w) => [w.substring(0, splitLen), w.substring(splitLen)])
+                  .expand((element) => element)
+                  .toList();
+              wordlen = words
+                  .map((w) => TextPainter(
+                      text: TextSpan(text: w, style: ts),
+                      textDirection: TextDirection.ltr)
+                    ..layout())
+                  .map((e) => e.width)
+                  .reduce(max);
+            }
+            if (words.length > 1) {
+              // we have a word split
+              if (previousString.isNotEmpty) {
+                specialDisplayText.add(previousString);
               }
-              // now we set the previous string as the word
-              previousString = word;
+              for (final word in words) {
+                specialDisplayText.add(word);
+              }
+              oneTextLineHeight = wordTp.height;
+              if (wordlen > neededWidth!) neededWidth = wordlen;
+              previousString = "";
             } else {
-              // if the current text is not larger than available width
-              // we simply update it
-              previousString = currentString;
+              final currentString =
+                  previousString.isEmpty ? word : "$previousString $word";
+
+              final previousTp = TextPainter(
+                text: TextSpan(text: previousString, style: ts),
+                textDirection: TextDirection.ltr,
+              )..layout();
+
+              final currentTp = TextPainter(
+                text: TextSpan(text: currentString, style: ts),
+                textDirection: TextDirection.ltr,
+              )..layout();
+
+              oneTextLineHeight = currentTp.height;
+
+              // if the current text is larger than the available width
+              if (currentTp.width >= maxTextWidth) {
+                // we add the previousString to the list of display text
+                specialDisplayText.add(previousString);
+                // if the previous layout is bigger than our current biggest width,
+                // it because the new biggest width
+                if (previousTp.width > neededWidth!) {
+                  neededWidth = previousTp.width;
+                }
+                // now we set the previous string as the word
+                previousString = word;
+              } else {
+                // if the current text is not larger than available width
+                // we simply update it
+                previousString = currentString;
+              }
             }
           }
         }
@@ -215,11 +251,11 @@ class _ChatPageState extends State<ChatPage> {
         // don't leave out the last string
         if (previousString.isNotEmpty && previousString != "\n") {
           final lastLiner = TextPainter(
-            text: TextSpan(text: previousString),
+            text: TextSpan(text: previousString, style: ts),
             textDirection: TextDirection.ltr,
           )..layout();
-          if (lastLiner.width + 5 > neededWidth!) {
-            neededWidth = lastLiner.width + 5;
+          if (lastLiner.width > neededWidth!) {
+            neededWidth = lastLiner.width;
           }
           print("last String = $previousString");
           specialDisplayText.add(previousString);

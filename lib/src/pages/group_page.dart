@@ -279,6 +279,7 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
           isMode: true,
           isActivated: !forGroupImage,
+          greyedOut: forGroupImage,
           name: images ? "Images" : "Videos",
           onPress: () => loadMediaConsole(images: !images),
         ),

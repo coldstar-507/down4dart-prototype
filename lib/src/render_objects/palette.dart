@@ -40,8 +40,8 @@ class BasicActionButton extends StatelessWidget {
       onTap: () => goPress(id, location),
       onLongPress: () => goLongPress?.call(id, location),
       child: Container(
-        height: Palette.height,
-        width: Palette.height,
+        height: Palette.paletteHeight,
+        width: Palette.paletteHeight,
         padding: const EdgeInsets.all(6.0),
         decoration: BoxDecoration(
           // color: color,
@@ -82,9 +82,10 @@ class ButtonsInfo {
 }
 
 class Palette extends StatelessWidget {
-  double get paletteHeight => Sizes.h * 0.08575;
-  double get gapSize => Sizes.h * 0.02;
-  static const double height = 60.0;
+  static double get paletteHeight => Sizes.h * 0.1007;
+  static double get gapSize => Sizes.h * 0.0193;
+  static double get paletteMargin => Sizes.w * 0.04;
+  // static const double height = 60.0;
   final BaseNode node;
   final String at;
   final void Function(String, String)? imPress,
@@ -256,7 +257,7 @@ class Palette extends StatelessWidget {
         // width: squish ? 0 : null,
         clipBehavior: Clip.hardEdge,
         curve: Curves.easeInOut,
-        margin: const EdgeInsets.symmetric(horizontal: 22),
+        margin: EdgeInsets.symmetric(horizontal: paletteMargin),
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(

@@ -86,7 +86,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
     ];
   }
 
-  void baseConsole() {
+  void baseConsole({bool activatedProceed = true}) {
     _console = Console(
       animatedInputs: false,
       topInputs: [_inputs[0]],
@@ -96,9 +96,11 @@ class _UserMakerPageState extends State<UserMakerPage> {
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),
         ConsoleButton(
             key: buttonKey,
-            isActivated: isReady,
+            isActivated: isReady && activatedProceed,
+            greyedOut: !isReady,
             name: "Proceed",
             onPress: () async {
+              baseConsole(activatedProceed: false);
               _errorTryAgain = !await widget.initUser(
                 _id,
                 _name,
@@ -107,11 +109,29 @@ class _UserMakerPageState extends State<UserMakerPage> {
                 _toReverse,
               );
               if (_errorTryAgain) {
-                setState(() {});
+                baseConsole();
               } else {
                 widget.success();
               }
             }),
+      ],
+    );
+    setState(() {});
+  }
+
+  void fakeBaseConsole() {
+    _console = Console(
+      animatedInputs: false,
+      topInputs: [_inputs[0]],
+      inputs: [_inputs[1], _inputs[2]],
+      bottomButtons: [
+        ConsoleButton(name: "Camera", onPress: () {}),
+        ConsoleButton(name: "Recover", onPress: () {}),
+        ConsoleButton(
+            key: buttonKey,
+            isActivated: isReady,
+            name: "Proceed",
+            onPress: () {}),
       ],
     );
     setState(() {});

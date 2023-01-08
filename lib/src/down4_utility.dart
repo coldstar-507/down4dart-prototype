@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:convert/convert.dart';
 import 'dart:typed_data';
 import 'package:pointycastle/digests/sha1.dart' as sha1;
@@ -41,7 +43,7 @@ String deterministicHyperchatRoot(List<String> ids) {
   final sortedList = ids..sort();
   final asString = sortedList.join("");
 
-  final hash = sha1.SHA1Digest().process(asString.codeUnits.asUint8List());
+  final hash = sha1.SHA1Digest().process(asString.codeUnits.toUint8List());
   return hex.encode(hash);
 }
 
@@ -50,7 +52,7 @@ Iterable<Pair<String, String>> randomPairs(int count) {
 
   return Iterable.generate(
     count,
-        (_) => Pair(
+    (_) => Pair(
       w.adjectives[random.nextInt(w.adjectives.length)],
       w.nouns[random.nextInt(w.nouns.length)],
     ),
@@ -60,14 +62,14 @@ Iterable<Pair<String, String>> randomPairs(int count) {
 String deterministicGroupRoot(List<String> ids) {
   final sortedList = ids..sort();
   final asString = sortedList.reversed.join("");
-  final hash = sha1.SHA1Digest().process(asString.codeUnits.asUint8List());
+  final hash = sha1.SHA1Digest().process(asString.codeUnits.toUint8List());
   return hex.encode(hash);
 }
 
 String generateMessageID(String senderID, num timeStamp) {
   final senderCodeUnits = senderID.codeUnits;
   final tsCodeUnits = timeStamp.toString().codeUnits;
-  final data = (senderCodeUnits + tsCodeUnits).asUint8List();
+  final data = (senderCodeUnits + tsCodeUnits).toUint8List();
   final hash = sha1.SHA1Digest().process(data);
   return hex.encode(hash);
 }
@@ -79,7 +81,7 @@ String generateMediaID(Uint8List mediaData) {
   for (int i = 1; i < 101; i++) {
     bytes.add(mediaData[(i * prime) % n]);
   }
-  return hex.encode(sha1.SHA1Digest().process(bytes.asUint8List()));
+  return hex.encode(sha1.SHA1Digest().process(bytes.toUint8List()));
 }
 
 int timeStamp() => DateTime.now().millisecondsSinceEpoch;
@@ -112,12 +114,13 @@ extension IsTypes on BaseNode {
 }
 
 extension AsUint8List on List<int> {
-  Uint8List asUint8List() => Uint8List.fromList(this);
+  Uint8List toUint8List() => Uint8List.fromList(this);
 }
 
 extension ByteEncoding on List<int> {
   String toHex() => hex.encode(this);
-  String toBase58() => base58.encode(asUint8List());
+  String toBase58() => base58.encode(toUint8List());
+  String toBase64() => base64Encode(this);
 }
 
 extension StringExtension on String {

@@ -298,7 +298,7 @@ class Sizes {
   static double h = 0;
   static double w = 0;
   static double fullHeight = 0;
-  static double get headerHeight => 32;
+  static double headerHeight = 0;
   static double get viewPaddingHeight => fullHeight - h;
   static double get fullAspectRatio => w / fullHeight;
   static double get paddedAspectRatio => w / h;
