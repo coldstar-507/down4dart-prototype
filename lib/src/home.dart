@@ -253,16 +253,23 @@ class _HomeState extends State<Home> {
             } else {
               // nodeRoot is in home
               nodeRoot.snips.add(msg.mediaID!);
+              // can predownload the snip
+              final media = await r.getMessageMedia(msg.mediaID!);
+              if (media != null) b.saveSnip(media);
               writePalette(nodeRoot
                 ..updateActivity()
                 ..save());
             }
           } else {
             // user snip
-            final homeUserRoot = nodeAt(msg.senderID) as ChatableNode?;
+            final homeUserRoot = nodeAt(msg.senderID) as User?;
             if (homeUserRoot != null) {
               // user is in home
               homeUserRoot.snips.add(msg.mediaID!);
+              if (homeUserRoot.isFriend) {
+                final media = await r.getMessageMedia(msg.mediaID!);
+                if (media != null) b.saveSnip(media);
+              }
               writePalette(homeUserRoot
                 ..updateActivity()
                 ..save());
