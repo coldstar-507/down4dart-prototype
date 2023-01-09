@@ -109,7 +109,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
     }
 
     final messageID = messagePushId();
-    final randomRoot = sha1(utf8.encode(messageID)).toBase58();
+    final ts = u.timeStamp();
+    final idd = utf8.encode(messageID + ts.toRadixString(16));
+    final randomRoot = sha1(idd).toBase58();
 
     final msg = Down4Message(
       root: randomRoot,
@@ -128,7 +130,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
     final hcReq = r.HyperchatRequest(
       message: msg,
-      targets: widget.userTargets.asIds().toList()..remove(widget.self.id),
+      targets: widget.userTargets.asIds().toList()
+        ..noDuplicates()
+        ..remove(widget.self.id),
       wordPairs: pairs,
       media: mediaInput ?? cameraInput,
     );

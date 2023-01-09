@@ -86,6 +86,16 @@ String generateMediaID(Uint8List mediaData) {
 
 int timeStamp() => DateTime.now().millisecondsSinceEpoch;
 
+extension StringIterables on List<String> {
+  Iterable<String> noDuplicates() {
+    List<String> singles = [];
+    for (final s in this) {
+      if (!singles.contains(s)) singles.add(s);
+    }
+    return singles;
+  }
+}
+
 extension IterableNodes on Iterable<BaseNode> {
   List<BaseNode> formatted() =>
       toList(growable: false)..sort((a, b) => b.activity.compareTo(a.activity));

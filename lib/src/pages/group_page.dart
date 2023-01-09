@@ -133,7 +133,12 @@ class _GroupPageState extends State<GroupPage> {
       return;
     }
 
+    final ts = u.timeStamp();
+    final idd = utf8.encode(groupName + groupImage!.id + ts.toRadixString(16));
+    final groupID = sha1(idd).toBase58();
+
     final msg = Down4Message(
+      root: groupID,
       type: Messages.chat,
       id: messagePushId(),
       senderID: widget.self.id,
@@ -141,9 +146,6 @@ class _GroupPageState extends State<GroupPage> {
       mediaID: mediaInput?.id ?? cameraInput?.id,
       text: tec.value.text,
     );
-
-    final groupID =
-        sha256(utf8.encode(groupName + groupImage!.id + msg.id)).toBase58();
 
     final grpReq = r.GroupRequest(
       groupID: groupID,
