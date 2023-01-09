@@ -338,7 +338,9 @@ class _SnipCameraState extends State<SnipCamera> {
   }
 
   Widget capturingPage([bool extra = false]) {
-    final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
+    // final mediaSize = MediaQuery.of(context).size;
+    // final scale =  widget.ctrl.value.aspectRatio;
+    final scale = widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
     return Stack(children: [
       GestureDetector(
         onTap: () => print("LALALALALAL"),
@@ -359,7 +361,11 @@ class _SnipCameraState extends State<SnipCamera> {
           height: Sizes.fullHeight,
           width: Sizes.w,
           child: Transform.scale(
-            scaleX: scale,
+            // scaleX: 1 / widget.ctrl.value.aspectRatio,
+            // scaleX: 1.0,
+            // scaleX: 1 / widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio,
+            // scaleX:  scale * (1 / (1 - scale)),
+            scale: scale,
             alignment: Alignment.center,
             child: CameraPreview(widget.ctrl),
           ),
@@ -430,13 +436,15 @@ class _SnipCameraState extends State<SnipCamera> {
     bool input = false,
   ]) {
     // final mediaSize = MediaQuery.of(context).size;
-    final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
+    // final scale = 1 / mediaSize.aspectRatio;
+    final scale = widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
     _preview = Stack(children: [
       SizedBox(
         height: Sizes.fullHeight,
         width: Sizes.w,
         child: Transform.scale(
-          scaleX: scale,
+          scale: scale,
+          // scaleX: 1.0,
           child: Transform(
             alignment: Alignment.center,
             transform: Matrix4.rotationY(toReverse ? math.pi : 0),
@@ -637,17 +645,18 @@ class _SnipCameraState extends State<SnipCamera> {
     String? text,
     bool input = false,
   ]) {
-    // final mediaSize = MediaQuery.of(context).size;
-    final scale = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
+    final scale = widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
     _preview = Stack(children: [
       SizedBox(
         height: Sizes.fullHeight,
         width: Sizes.w,
         child: Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-          child: Image.file(File(filePath), fit: BoxFit.cover),
-        ),
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+            child: Transform.scale(
+              scaleX: scale,
+              child: Image.file(File(filePath), fit: BoxFit.cover),
+            )),
       ),
       input
           ? Center(

@@ -61,7 +61,7 @@ class _HomeState extends State<Home> {
     "Search": {},
     "Forward": {},
     "Payments": {},
-    "Hidden": {},
+    // "Hidden": {},
   };
 
   StreamSubscription? _messageListener;
@@ -120,7 +120,7 @@ class _HomeState extends State<Home> {
     final toFetchIDs = groupPeopleIDs.difference(homeUsers);
     final fetchedNodes = await r.getNodes(toFetchIDs);
     for (final fetchedNode in fetchedNodes ?? <BaseNode>[]) {
-      writePalette(fetchedNode, fold: true, fade: true, at: "Hidden");
+      writePalette(fetchedNode, fold: true, fade: true);
     }
   }
 
@@ -181,7 +181,7 @@ class _HomeState extends State<Home> {
                     .difference(palettes().asIds().toSet());
                 var newNodes = await r.getNodes(idsToFetch);
                 for (var node in newNodes ?? []) {
-                  writePalette(node, at: "Hidden", fold: true, fade: true);
+                  writePalette(node, fold: true, fade: true);
                 }
               }
               writePalette(newNode
@@ -219,6 +219,7 @@ class _HomeState extends State<Home> {
             if (n != null) chatPage(n);
           }
           break;
+
         case Messages.payment:
           final paymentID = msg.paymentID;
           if (paymentID == null) return;
@@ -230,9 +231,11 @@ class _HomeState extends State<Home> {
           widget.wallet.parsePayment(widget.self, payment);
           if (_page is MoneyPage) moneyPage();
           break;
+
         case Messages.bill:
           // TODO: Handle this case.
           break;
+
         case Messages.snip:
           if (msg.root != null) {
             var nodeRoot = nodeAt(msg.root!) as ChatableNode?;
@@ -656,7 +659,11 @@ class _HomeState extends State<Home> {
         writePalette(node, onlyIfAbsent: true);
       }
     }
-    searchPage();
+    if (curLoc.id == "Search") {
+      searchPage();
+    } else if (curLoc.id == "Home") {
+      homePage(false);
+    }
   }
 
   void delete({String at = "Home"}) {
@@ -879,7 +886,7 @@ class _HomeState extends State<Home> {
   }
 
   List<Palette> get formattedHomePalettes {
-    return palettes().followedBy(palettes(at: "Hidden")).formattedReverse();
+    return palettes().formattedReverse();
   }
 
   Location get prevLoc {
@@ -1234,8 +1241,7 @@ class _HomeState extends State<Home> {
       writePalette(node);
       return homePage();
     }
-    final scale =
-        1 / (media.metadata.aspectRatio ?? 1.0 * Sizes.fullAspectRatio);
+    final scale = media.metadata.aspectRatio ?? 1.0 * Sizes.fullAspectRatio;
 
     Widget displayMedia;
     String? text = media.metadata.text;
@@ -1248,7 +1254,8 @@ class _HomeState extends State<Home> {
       await ctrl.setLooping(true);
       await ctrl.play();
       displayMedia = Transform.scale(
-        scaleX: 1 / scale,
+        scale: scale,
+        alignment: Alignment.center,
         child: Transform(
           alignment: Alignment.center,
           transform: Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
@@ -1332,13 +1339,17 @@ class _HomeState extends State<Home> {
       ]);
     } else {
       await precacheImage(MemoryImage(media.data), context);
-      displayMedia = Transform(
+      displayMedia = Transform.scale(
+        scale: scale,
         alignment: Alignment.center,
-        transform: Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
-        child: Image.memory(
-          media.data,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
+        child: Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.rotationY(media.metadata.toReverse ? math.pi : 0),
+          child: Image.memory(
+            media.data,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+          ),
         ),
       );
 
