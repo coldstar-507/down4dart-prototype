@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
@@ -9,237 +10,6 @@ import 'package:video_player/video_player.dart';
 import '../down4_utility.dart';
 import '../render_objects/console.dart';
 import '../boxes.dart';
-
-// class CameraConsole extends StatefulWidget {
-//   final List<CameraDescription> cameras;
-//   final void Function(
-//     String? filePath,
-//     bool? isVideo,
-//     bool? toReverse,
-//   ) cameraCallBack;
-//   final void Function() cameraBack;
-//   final bool enableVideo;
-//   const CameraConsole(
-//       {required this.cameras,
-//       required this.cameraBack,
-//       required this.cameraCallBack,
-//       this.enableVideo = true,
-//       Key? key})
-//       : super(key: key);
-//
-//   @override
-//   _CameraConsoleState createState() => _CameraConsoleState();
-// }
-//
-// class _CameraConsoleState extends State<CameraConsole> {
-//   CameraController? _cameraController;
-//   String? _filePath;
-//   Console? _console;
-//   int _cameraIndex = 0; // 0 = rear, 1 = front
-//   bool _audio = true;
-//   FlashMode _flashMode = FlashMode.off;
-//   ResolutionPreset _resolution = ResolutionPreset.low;
-//   VideoPlayerController? _videoPlayerController;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _setCapturingConsole();
-//   }
-//
-//   void _nextResolution() {
-//     switch (_resolution) {
-//       case ResolutionPreset.low:
-//         _resolution = ResolutionPreset.medium;
-//         break;
-//       case ResolutionPreset.medium:
-//         _resolution = ResolutionPreset.high;
-//         break;
-//       case ResolutionPreset.high:
-//         _resolution = ResolutionPreset.low;
-//         break;
-//       case ResolutionPreset.veryHigh:
-//         break;
-//       case ResolutionPreset.ultraHigh:
-//         break;
-//       case ResolutionPreset.max:
-//         break;
-//     }
-//     _setCapturingConsole();
-//   }
-//
-//   void _nextFlashMode() {
-//     if (_flashMode == FlashMode.off) {
-//       _flashMode = FlashMode.torch;
-//     } else {
-//       _flashMode = FlashMode.off;
-//     }
-//     _cameraController?.setFlashMode(_flashMode);
-//     _drawCapturingConsole();
-//   }
-//
-//   Future<void> _initController() async {
-//     try {
-//       _cameraController = CameraController(
-//           widget.cameras[_cameraIndex], _resolution,
-//           enableAudio: _audio);
-//       await _cameraController?.initialize();
-//       await _cameraController?.setFlashMode(_flashMode);
-//     } catch (err) {
-//       widget.cameraCallBack(null, null, null);
-//     }
-//     setState(() {});
-//   }
-//
-//   Future<void> _setCapturingConsole() async {
-//     await _initController();
-//     _drawCapturingConsole();
-//   }
-//
-//   void _drawCapturingConsole() {
-//     setState(() {
-//       _console = Console(
-//         cameraController: _cameraController!,
-//         aspectRatio: _cameraController?.value.aspectRatio,
-//         topButtons: [
-//           ConsoleButton(
-//             shouldBeDownButIsnt: _cameraController!.value.isRecordingVideo,
-//             name: "Capture",
-//             isSpecial: widget.enableVideo,
-//             onPress: _takePicture,
-//             onLongPress: widget.enableVideo ? _startRecording : null,
-//             onLongPressUp: widget.enableVideo ? _stopRecording : null,
-//           ),
-//           ConsoleButton(
-//             isMode: true,
-//             name: _resolution.name.capitalize(),
-//             onPress: _nextResolution,
-//           ),
-//         ],
-//         bottomButtons: [
-//           ConsoleButton(name: "Back", onPress: widget.cameraBack),
-//           ConsoleButton(
-//             isMode: true,
-//             name: _flashMode.name.capitalize(),
-//             onPress: _nextFlashMode,
-//           ),
-//           ConsoleButton(
-//             isMode: true,
-//             name: _cameraIndex == 0 ? "Rear" : "Front",
-//             onPress: _nextCam,
-//           )
-//         ],
-//       );
-//     });
-//   }
-//
-//   Future<void> _setVideoPreviewConsole() async {
-//     _videoPlayerController = VideoPlayerController.file(File(_filePath!));
-//     try {
-//       await _videoPlayerController?.initialize();
-//       await _videoPlayerController?.setLooping(true);
-//       await _videoPlayerController?.play();
-//     } catch (err) {
-//       widget.cameraCallBack(null, null, null);
-//     }
-//     setState(() {
-//       _console = Console(
-//         videoPlayerController: _videoPlayerController,
-//         aspectRatio: _cameraController?.value.aspectRatio,
-//         toMirror: _cameraIndex == 1,
-//         topButtons: [
-//           ConsoleButton(
-//             name: "Accept",
-//             onPress: () =>
-//                 widget.cameraCallBack(_filePath, true, _cameraIndex == 1),
-//           ),
-//         ],
-//         bottomButtons: [
-//           ConsoleButton(
-//               name: "Back",
-//               onPress: () {
-//                 _setCapturingConsole();
-//               }),
-//           ConsoleButton(
-//             name: "Cancel",
-//             onPress: () => widget.cameraCallBack(null, null, null),
-//           )
-//         ],
-//       );
-//     });
-//   }
-//
-//   void _setImagePreviewConsole() {
-//     setState(() {
-//       _console = Console(
-//         imagePreviewPath: _filePath,
-//         toMirror: _cameraIndex == 1,
-//         topButtons: [
-//           ConsoleButton(
-//             name: "Accept",
-//             onPress: () =>
-//                 widget.cameraCallBack(_filePath, false, _cameraIndex == 1),
-//           ),
-//         ],
-//         bottomButtons: [
-//           ConsoleButton(name: "Back", onPress: _setCapturingConsole),
-//           ConsoleButton(
-//             name: "Cancel",
-//             onPress: () => widget.cameraCallBack(null, null, null),
-//           )
-//         ],
-//       );
-//     });
-//   }
-//
-//   @override
-//   Future<void> dispose() async {
-//     super.dispose();
-//     await _cameraController?.dispose();
-//     await _videoPlayerController?.dispose();
-//   }
-//
-//   void _nextCam() {
-//     _cameraIndex = (_cameraIndex + 1) % widget.cameras.length;
-//     _setCapturingConsole();
-//   }
-//
-//   Future<void> _takePicture() async {
-//     try {
-//       final xfile = await _cameraController?.takePicture();
-//       final path = xfile?.path;
-//       _filePath = path;
-//     } catch (e) {
-//       widget.cameraCallBack(null, null, null);
-//     }
-//     _setImagePreviewConsole();
-//   }
-//
-//   Future<void> _startRecording() async {
-//     try {
-//       await _cameraController?.startVideoRecording();
-//       _drawCapturingConsole();
-//     } catch (e) {
-//       widget.cameraCallBack(null, null, null);
-//     }
-//   }
-//
-//   Future<void> _stopRecording() async {
-//     try {
-//       XFile? f = await _cameraController?.stopVideoRecording();
-//       final path = f?.path;
-//       _filePath = path;
-//     } catch (e) {
-//       widget.cameraCallBack(null, null, null);
-//     }
-//     _setVideoPreviewConsole();
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return _console ?? Container();
-//   }
-// }
 
 class SnipCamera extends StatefulWidget {
   final CameraController ctrl;
@@ -279,6 +49,45 @@ class _SnipCameraState extends State<SnipCamera> {
   var tec = TextEditingController();
   bool _extra = false;
   // late Size mediaSize = MediaQuery.of(context).size;
+
+  double get scale => widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
+
+  bool get toReverse => widget.camNum != 0;
+
+  Widget inputBody(bool input) => input
+      ? Center(
+          child: Container(
+            width: Sizes.w,
+            decoration: const BoxDecoration(
+              // border: Border.symmetric(
+              //   horizontal: BorderSide(color: Colors.black38),
+              // ),
+              color: Colors.black38,
+              // color: PinkTheme.snipRibbon,
+            ),
+            constraints: BoxConstraints(
+              minHeight: 16,
+              maxHeight: Sizes.fullHeight,
+            ),
+            child: TextField(
+              autofocus: input,
+              textInputAction: TextInputAction.done,
+              cursorColor: Colors.white,
+              controller: tec,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                isCollapsed: true,
+              ),
+              maxLines: 15,
+              minLines: 1,
+              style: const TextStyle(color: Colors.white),
+              // style: const TextStyle(color: PinkTheme.black),
+            ),
+          ),
+        )
+      : const SizedBox.shrink();
 
   @override
   void initState() {
@@ -337,10 +146,37 @@ class _SnipCameraState extends State<SnipCamera> {
     return vpc;
   }
 
+  Widget previewsContainer(Widget child) => Center(
+        child: Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+          child: Transform.scale(
+            scale: scale > 1 ? scale : 1 / scale,
+            child: SizedBox(
+              height: widget.ctrl.value.aspectRatio * Sizes.w,
+              width: Sizes.w,
+              child: child,
+            ),
+          ),
+        ),
+      );
+
+  Widget consoleBody(Widget child) => Positioned(
+      bottom: 0,
+      left: 0,
+      child: SizedBox(
+        // height: mediaSize.height,
+        width: Sizes.w,
+        child: child,
+      ));
+
   Widget capturingPage([bool extra = false]) {
-    // final mediaSize = MediaQuery.of(context).size;
-    // final scale =  widget.ctrl.value.aspectRatio;
-    final scale = widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
+    final cscal = 1.143;
+    final cal = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
+    print("full = ${Sizes.fullAspectRatio}");
+    print("cam = ${widget.ctrl.value.aspectRatio}");
+    print("cscal = $cscal");
+    print("calll = $cal");
     return Stack(children: [
       GestureDetector(
         onTap: () => print("LALALALALAL"),
@@ -357,71 +193,29 @@ class _SnipCameraState extends State<SnipCamera> {
             widget.ctrl.setZoomLevel(_scale);
           }
         },
-        child: SizedBox(
-          height: Sizes.fullHeight,
-          width: Sizes.w,
-          child: Transform.scale(
-            // scaleX: 1 / widget.ctrl.value.aspectRatio,
-            // scaleX: 1.0,
-            // scaleX: 1 / widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio,
-            // scaleX:  scale * (1 / (1 - scale)),
-            scale: scale,
-            alignment: Alignment.center,
-            child: CameraPreview(widget.ctrl),
-          ),
-        ),
+        child: previewsContainer(CameraPreview(widget.ctrl)),
       ),
-      Positioned(
-        bottom: 0,
-        left: 0,
-        child: SizedBox(
-          width: Sizes.w,
-          child: Console(
-            invertedColors: true,
-            topButtons: [
-              ConsoleButton(
-                shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
-                name: "Capture",
-                isSpecial: widget.enableVideo,
-                onPress: _takePicture,
-                onLongPress: widget.enableVideo ? _startRecording : null,
-                onLongPressUp: widget.enableVideo ? _stopRecording : null,
-              ),
-            ],
-            bottomButtons: [
-              ConsoleButton(
-                name: "Back",
-                onPress: widget.cameraBack,
-                // onPress: () => !_extra
-                //     ? widget.cameraBack()
-                //     : setState(() {
-                //         _extra = !_extra;
-                //       }),
-                // onLongPress: () => setState(() {
-                //   _extra = !_extra;
-                // }),
-                // isSpecial: true,
-                // showExtra: extra,
-                // extraButtons: [
-                //   ConsoleButton(
-                //     isMode: true,
-                //     name: widget.ctrl.resolutionPreset.name.capitalize(),
-                //     onPress: widget.nextRes,
-                //   ),
-                //   ConsoleButton(
-                //     isMode: true,
-                //     name: widget.ctrl.value.flashMode.name.capitalize(),
-                //     onPress: _nextFlashMode,
-                //   ),
-                // ],
-              ),
-              ConsoleButton(
-                isMode: true,
-                name: widget.camNum == 0 ? "Rear" : "Front",
-                onPress: widget.flip,
-              ),
-            ],
-          ),
+      consoleBody(
+        Console(
+          invertedColors: true,
+          topButtons: [
+            ConsoleButton(
+              shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
+              name: "Capture",
+              isSpecial: widget.enableVideo,
+              onPress: _takePicture,
+              onLongPress: widget.enableVideo ? _startRecording : null,
+              onLongPressUp: widget.enableVideo ? _stopRecording : null,
+            ),
+          ],
+          bottomButtons: [
+            ConsoleButton(name: "Back", onPress: widget.cameraBack),
+            ConsoleButton(
+              isMode: true,
+              name: widget.camNum == 0 ? "Rear" : "Front",
+              onPress: widget.flip,
+            ),
+          ],
         ),
       ),
     ]);
@@ -433,208 +227,55 @@ class _SnipCameraState extends State<SnipCamera> {
     bool isVideo,
     bool toReverse, [
     String? text,
-    bool input = false,
+    bool hasInput = false,
   ]) {
-    // final mediaSize = MediaQuery.of(context).size;
-    // final scale = 1 / mediaSize.aspectRatio;
-    final scale = widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
     _preview = Stack(children: [
-      SizedBox(
-        height: Sizes.fullHeight,
-        width: Sizes.w,
-        child: Transform.scale(
-          scale: scale,
-          // scaleX: 1.0,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-            child: VideoPlayer(vpc),
-          ),
-        ),
-      ),
-      input
-          ? Center(
-              child: Container(
-                width: Sizes.w,
-                decoration: const BoxDecoration(
-                  // border: Border.symmetric(
-                  //   horizontal: BorderSide(color: Colors.black38),
-                  // ),
-                  color: Colors.black38,
-                  // color: PinkTheme.snipRibbon,
-                ),
-                constraints: BoxConstraints(
-                  minHeight: 16,
-                  maxHeight: Sizes.fullHeight,
-                ),
-                child: TextField(
-                  autofocus: input,
-                  textInputAction: TextInputAction.done,
-                  cursorColor: Colors.white,
-                  controller: tec,
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    isCollapsed: true,
-                  ),
-                  maxLines: 15,
-                  minLines: 1,
-                  style: const TextStyle(color: Colors.white),
-                  // style: const TextStyle(color: PinkTheme.black),
-                ),
-              ),
-            )
-          : const SizedBox.shrink(),
-      Positioned(
-        bottom: 0,
-        left: 0,
-        child: SizedBox(
-          width: Sizes.w,
-          // height: mediaSize.height,
-          child: Console(
-            invertedColors: true,
-            topButtons: [
-              ConsoleButton(
-                name: "Accept",
-                onPress: () async {
-                  await vpc.dispose();
-                  widget.cameraCallBack(
-                    filePath,
-                    isVideo,
-                    toReverse,
-                    tec.value.text,
-                    widget.ctrl.value.aspectRatio,
-                  );
-                },
-              ),
-            ],
-            bottomButtons: [
-              ConsoleButton(
-                name: "Back",
-                onPress: () => setState(() {
-                  tec.clear();
-                  vpc.dispose();
-                  setState(() {
-                    _preview = null;
-                  });
-                }),
-              ),
-              ConsoleButton(
-                name: "Text",
-                onPress: () => videoPreview(
-                  vpc,
+      previewsContainer(VideoPlayer(vpc)),
+      inputBody(hasInput),
+      consoleBody(
+        Console(
+          invertedColors: true,
+          topButtons: [
+            ConsoleButton(
+              name: "Accept",
+              onPress: () async {
+                await vpc.dispose();
+                widget.cameraCallBack(
                   filePath,
                   isVideo,
                   toReverse,
-                  text,
-                  !input,
-                ),
+                  tec.value.text,
+                  widget.ctrl.value.aspectRatio,
+                );
+              },
+            ),
+          ],
+          bottomButtons: [
+            ConsoleButton(
+              name: "Back",
+              onPress: () => setState(() {
+                tec.clear();
+                vpc.dispose();
+                setState(() {
+                  _preview = null;
+                });
+              }),
+            ),
+            ConsoleButton(
+              name: "Text",
+              onPress: () => videoPreview(
+                vpc,
+                filePath,
+                isVideo,
+                toReverse,
+                text,
+                !hasInput,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     ]);
-
-    // _preview = Jeff(
-    //   index: 0,
-    //   titles: ["TODO"],
-    //   bodies: [
-    //     PageBody(
-    //       stackWidgets: [
-    //         SizedBox(
-    //           height: mediaSize.height,
-    //           width: mediaSize.width,
-    //           child: Transform.scale(
-    //             scaleX: scale,
-    //             child: Transform(
-    //               alignment: Alignment.center,
-    //               transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-    //               child: VideoPlayer(vpc),
-    //             ),
-    //           ),
-    //         ),
-    //         input
-    //             ? Center(
-    //                 child: Container(
-    //                   width: mediaSize.width,
-    //                   decoration: const BoxDecoration(
-    //                     // border: Border.symmetric(
-    //                     //   horizontal: BorderSide(color: Colors.black38),
-    //                     // ),
-    //                     color: Colors.black38,
-    //                     // color: PinkTheme.snipRibbon,
-    //                   ),
-    //                   constraints: BoxConstraints(
-    //                     minHeight: 16,
-    //                     maxHeight: mediaSize.height,
-    //                   ),
-    //                   child: TextField(
-    //                     autofocus: input,
-    //                     textInputAction: TextInputAction.done,
-    //                     cursorColor: Colors.white,
-    //                     controller: tec,
-    //                     textAlign: TextAlign.center,
-    //                     decoration: const InputDecoration(
-    //                       border: InputBorder.none,
-    //                       isDense: true,
-    //                       isCollapsed: true,
-    //                     ),
-    //                     maxLines: 15,
-    //                     minLines: 1,
-    //                     style: const TextStyle(color: Colors.white),
-    //                     // style: const TextStyle(color: PinkTheme.black),
-    //                   ),
-    //                 ),
-    //               )
-    //             : const SizedBox.shrink(),
-    //       ],
-    //     ),
-    //   ],
-    //   consoles: [
-    //     PageConsole(
-    //       console: Console(
-    //         topButtons: [
-    //           ConsoleButton(
-    //             name: "Accept",
-    //             onPress: () async {
-    //               await vpc.dispose();
-    //               widget.cameraCallBack(
-    //                 filePath,
-    //                 isVideo,
-    //                 toReverse,
-    //                 tec.value.text,
-    //                 widget.ctrl.value.aspectRatio,
-    //               );
-    //             },
-    //           ),
-    //         ],
-    //         bottomButtons: [
-    //           ConsoleButton(
-    //             name: "Back",
-    //             onPress: () {
-    //               _preview = null;
-    //               vpc.dispose();
-    //               setState(() {});
-    //             },
-    //           ),
-    //           ConsoleButton(
-    //             name: "Text",
-    //             onPress: () => videoPreview(
-    //               vpc,
-    //               filePath,
-    //               isVideo,
-    //               toReverse,
-    //               text,
-    //               !input,
-    //             ),
-    //           ),
-    //         ],
-    //       ),
-    //     ),
-    //   ],
-    // );
     setState(() {});
   }
 
@@ -643,182 +284,49 @@ class _SnipCameraState extends State<SnipCamera> {
     bool isVideo,
     bool toReverse, [
     String? text,
-    bool input = false,
+    bool hasInput = false,
   ]) {
-    final scale = widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
     _preview = Stack(children: [
-      SizedBox(
-        height: Sizes.fullHeight,
-        width: Sizes.w,
-        child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-            child: Transform.scale(
-              scaleX: scale,
-              child: Image.file(File(filePath), fit: BoxFit.cover),
-            )),
-      ),
-      input
-          ? Center(
-              child: Container(
-                // width: ,
-                decoration: const BoxDecoration(
-                  color: Colors.black38,
-                  // color: PinkTheme.snipRibbon,
-                ),
-                constraints: BoxConstraints(
-                  minHeight: 16,
-                  maxHeight: Sizes.fullHeight,
-                ),
-                child: TextField(
-                  autofocus: input,
-                  textInputAction: TextInputAction.done,
-                  cursorColor: Colors.white,
-                  controller: tec,
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    isCollapsed: true,
-                  ),
-                  maxLines: 15,
-                  minLines: 1,
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            )
-          : const SizedBox.shrink(),
-      Positioned(
-        bottom: 0,
-        left: 0,
-        child: SizedBox(
-            // height: mediaSize.height,
-            width: Sizes.w,
-            child: Console(
-              invertedColors: true,
-              topButtons: [
-                ConsoleButton(
-                  name: "Accept",
-                  onPress: () => widget.cameraCallBack(
-                    filePath,
-                    isVideo,
-                    toReverse,
-                    tec.value.text,
-                    widget.ctrl.value.aspectRatio,
-                  ),
-                ),
-              ],
-              bottomButtons: [
-                ConsoleButton(
-                  name: "Back",
-                  onPress: () => setState(() {
-                    tec.clear();
-                    setState(() {
-                      _preview = null;
-                    });
-                  }),
-                ),
-                ConsoleButton(
-                  name: "Text",
-                  isMode: false,
-                  onPress: () => imagePreview(
-                    filePath,
-                    isVideo,
-                    toReverse,
-                    text,
-                    !input,
-                  ),
-                ),
-              ],
-            )),
-      ),
+      previewsContainer(Image.file(File(filePath))),
+      inputBody(hasInput),
+      consoleBody(Console(
+        invertedColors: true,
+        topButtons: [
+          ConsoleButton(
+            name: "Accept",
+            onPress: () => widget.cameraCallBack(
+              filePath,
+              isVideo,
+              toReverse,
+              tec.value.text,
+              widget.ctrl.value.aspectRatio,
+            ),
+          ),
+        ],
+        bottomButtons: [
+          ConsoleButton(
+            name: "Back",
+            onPress: () => setState(() {
+              tec.clear();
+              setState(() {
+                _preview = null;
+              });
+            }),
+          ),
+          ConsoleButton(
+            name: "Text",
+            isMode: false,
+            onPress: () => imagePreview(
+              filePath,
+              isVideo,
+              toReverse,
+              text,
+              !hasInput,
+            ),
+          ),
+        ],
+      )),
     ]);
-
-    // _preview = Jeff(
-    //   index: 0,
-    //   titles: ["TODO"],
-    //   bodies: [
-    //     PageBody(
-    //       stackWidgets: [
-    //         SizedBox(
-    //           height: mediaSize.height,
-    //           width: mediaSize.width,
-    //           child: Transform(
-    //             alignment: Alignment.center,
-    //             transform: Matrix4.rotationY(toReverse ? math.pi : 0),
-    //             child: Image.file(File(filePath), fit: BoxFit.cover),
-    //           ),
-    //         ),
-    //         input
-    //             ? Center(
-    //                 child: Container(
-    //                   width: mediaSize.width,
-    //                   decoration: const BoxDecoration(
-    //                     color: Colors.black38,
-    //                     // color: PinkTheme.snipRibbon,
-    //                   ),
-    //                   constraints: BoxConstraints(
-    //                     minHeight: 16,
-    //                     maxHeight: mediaSize.height,
-    //                   ),
-    //                   child: TextField(
-    //                     autofocus: input,
-    //                     textInputAction: TextInputAction.done,
-    //                     cursorColor: Colors.white,
-    //                     controller: tec,
-    //                     textAlign: TextAlign.center,
-    //                     decoration: const InputDecoration(
-    //                       border: InputBorder.none,
-    //                       isDense: true,
-    //                       isCollapsed: true,
-    //                     ),
-    //                     maxLines: 15,
-    //                     minLines: 1,
-    //                     style: const TextStyle(color: Colors.white),
-    //                   ),
-    //                 ),
-    //               )
-    //             : const SizedBox.shrink(),
-    //       ],
-    //     )
-    //   ],
-    //   consoles: [
-    //     PageConsole(
-    //       console: Console(
-    //         topButtons: [
-    //           ConsoleButton(
-    //             name: "Accept",
-    //             onPress: () => widget.cameraCallBack(
-    //               filePath,
-    //               isVideo,
-    //               toReverse,
-    //               tec.value.text,
-    //               widget.ctrl.value.aspectRatio,
-    //             ),
-    //           ),
-    //         ],
-    //         bottomButtons: [
-    //           ConsoleButton(
-    //             name: "Back",
-    //             onPress: () => setState(() => _preview = null),
-    //           ),
-    //           ConsoleButton(
-    //             name: "Text",
-    //             isMode: false,
-    //             onPress: () => imagePreview(
-    //               filePath,
-    //               isVideo,
-    //               toReverse,
-    //               text,
-    //               !input,
-    //             ),
-    //           ),
-    //         ],
-    //       ),
-    //     ),
-    //   ],
-    // );
-
     setState(() {});
   }
 

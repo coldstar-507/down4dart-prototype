@@ -18,11 +18,7 @@ class SnipViewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
-      SizedBox(
-        height: Sizes.fullHeight,
-        width: Sizes.w,
-        child: displayMedia,
-      ),
+      displayMedia,
       text != "" && text != null
           ? Center(
               child: Container(

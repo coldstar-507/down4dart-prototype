@@ -1,4 +1,8 @@
-import 'dart:io' as io;
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'dart:async';
 
 import 'package:down4/src/down4_utility.dart';
 import 'package:video_player/video_player.dart';
@@ -61,8 +65,8 @@ class _Down4InputState extends State<Down4Input> {
 }
 
 class Down4VideoPlayer extends StatefulWidget {
-  final io.File vid;
-  const Down4VideoPlayer({required this.vid, Key? key}) : super(key: key);
+  final Media media;
+  const Down4VideoPlayer({required this.media, Key? key}) : super(key: key);
 
   @override
   _Down4VideoPlayerState createState() => _Down4VideoPlayerState();
@@ -78,7 +82,9 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   }
 
   Future<void> initController() async {
-    _videoController = VideoPlayerController.file(widget.vid);
+    _videoController = widget.media.path != null
+        ? VideoPlayerController.file(File(widget.media.path!))
+        : VideoPlayerController.network(widget.media.url);
     await _videoController?.initialize();
     setState(() {});
   }
@@ -105,6 +111,19 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
           ? VideoPlayer(_videoController!)
           : const SizedBox.shrink(),
     );
+  }
+}
+
+class Down4ImageViewer extends StatelessWidget {
+  final Media media;
+  const Down4ImageViewer({required this.media, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return media.path != null
+        ? Image.file(File(media.path!),
+            fit: BoxFit.cover, gaplessPlayback: true)
+        : Image.network(media.url, fit: BoxFit.cover, gaplessPlayback: true);
   }
 }
 
@@ -143,10 +162,8 @@ extension PaletteExtensions on Iterable<Palette> {
 
   List<Palette> formatted() => toList(growable: false)
     ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
-
   List<Palette> formattedReverse() => toList(growable: false)
     ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
-
   Iterable<Palette> unfolded() => where((p) => !p.fold);
   Iterable<Palette> folded() => where((p) => p.fold);
   Iterable<Palette> deactivated() => map((p) => p.deactivated());
@@ -228,4 +245,67 @@ class MediaSizeClipper extends CustomClipper<Rect> {
   bool shouldReclip(CustomClipper<Rect> oldClipper) {
     return true;
   }
+}
+
+enum DisplayType {
+  image,
+  video,
+  camera,
+}
+
+class Down4Display extends StatelessWidget {
+  final Size renderRect;
+  final double captureAspectRatio;
+  final Widget child;
+  final bool isReversed;
+  final DisplayType displayType;
+
+  const Down4Display({
+    required this.captureAspectRatio,
+    required this.displayType,
+    required this.isReversed,
+    required this.renderRect,
+    required this.child,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = renderRect.aspectRatio * captureAspectRatio;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.rotationY(isReversed ? math.pi : 0),
+      child: Transform.scale(
+        scale: displayType == DisplayType.video
+            ? null
+            : scale > 1
+                ? scale
+                : 1 / scale,
+        scaleY: displayType == DisplayType.video ? captureAspectRatio : null,
+        child: Center(child: child),
+      ),
+    );
+  }
+}
+
+Future<Size>? calculateImageDimension({File? f, Uint8List? d, String? url}) {
+  Completer<Size> completer = Completer();
+  Image? image = f != null
+      ? Image.file(f)
+      : d != null
+          ? Image.memory(d)
+          : url != null
+              ? Image.network(url)
+              : null;
+  if (image == null) return null;
+  image.image.resolve(const ImageConfiguration()).addListener(
+    ImageStreamListener(
+      (ImageInfo image, bool synchronousCall) {
+        var myImage = image.image;
+        Size size = Size(myImage.width.toDouble(), myImage.height.toDouble());
+        completer.complete(size);
+      },
+    ),
+  );
+  return completer.future;
 }

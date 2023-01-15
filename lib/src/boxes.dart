@@ -1,15 +1,21 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:io';
+
+import 'package:down4/src/down4_utility.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
-import '../main.dart' as main;
-import 'dart:convert';
-import 'dart:io';
+
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+
 import 'data_objects.dart';
 import 'web_requests.dart' as r;
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
+
+import '../main.dart' as main;
 
 const golden = 1.618;
 
@@ -44,17 +50,15 @@ class ButtonKeys {
 
 String messagePushId() => db.child("Messages").push().key!;
 
-Future<Down4Media?> getMessageMediaFromEverywhere(Identifier mediaID) async {
-  if (b.messageMedias.containsKey(mediaID)) {
-    return Down4Media.fromJson(jsonDecode(b.messageMedias.get(mediaID)));
+Future<Media?> getMessageMediaFromEverywhere(Identifier mediaID) async {
+  if (b.messageImages.containsKey(mediaID)) {
+    return MessageMedia.fromJson(jsonDecode(b.messageImages.get(mediaID)));
   } else if (b.images.containsKey(mediaID)) {
-    return Down4Media.fromJson(jsonDecode(b.images.get(mediaID)));
+    return MessageMedia.fromJson(jsonDecode(b.images.get(mediaID)));
   } else if (b.videos.containsKey(mediaID)) {
-    return Down4Media.fromJson(jsonDecode(b.videos.get(mediaID)));
+    return MessageMedia.fromJson(jsonDecode(b.videos.get(mediaID)));
   } else {
-    final media = await r.getMessageMedia(mediaID);
-    if (media != null) media.save();
-    return media;
+    return r.getMessageMedia(mediaID);
   }
 }
 
@@ -69,24 +73,94 @@ Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
   return localNodes + (await externalNodes ?? <BaseNode>[]);
 }
 
-Future<Down4Media?> getMessageMediaFromDB(Identifier mediaID) async {
-  var ref = st.ref(mediaID);
-  var fmd = ref.getMetadata();
-  var fd = ref.getData();
+Future<Media?> downloadAndWriteMedia(
+  String mediaID, {
+  bool isNodeMedia = false,
+}) async {
+  final mediaRef = isNodeMedia ? st_node.ref(mediaID) : st.ref(mediaID);
+  try {
+    final futureMediaData = mediaRef.getData();
+    final fullMetadata = await mediaRef.getMetadata();
+    final customMetadata = fullMetadata.customMetadata as Map<String, String>;
+    final mediaMetadata = MediaMetadata.fromJson(customMetadata);
 
-  var md = (await fmd).customMetadata;
-  var d = (await fd);
-  if (md != null && d != null) {
-    return Down4Media(
-      id: mediaID,
-      metadata: MediaMetadata.fromJson(md),
-      data: d,
-    );
+    final path = "${b.dirPath}/$mediaID";
+
+    final mediaData = await futureMediaData;
+    if (mediaData != null) {
+      File(path).writeAsBytesSync(mediaData);
+    }
+    return isNodeMedia
+        ? NodeMedia(id: mediaID, path: path, metadata: mediaMetadata)
+        : MessageMedia(id: mediaID, path: path, metadata: mediaMetadata);
+  } catch (e) {
+    return null;
   }
-  return null;
 }
 
-extension MessageSave on Down4Message {
+Future<MediaMetadata?> downloadMediaMetadata(String mediaID) async {
+  try {
+    final fullMetadata = await st.ref(mediaID).getMetadata();
+    final jsonMetadata = fullMetadata.customMetadata as Map<String, String>;
+    return MediaMetadata.fromJson(jsonMetadata);
+  } catch (e) {
+    return null;
+  }
+}
+
+Future<void> uploadOrUpdateMedia(
+  Media media, {
+  bool skipCheck = false, // usually for camera uploads
+}) async {
+  if (media.path == null) return;
+  final mediaRef = st.ref(media.id);
+  if (skipCheck) {
+    mediaRef.putFile(
+      File(media.path!),
+      SettableMetadata(customMetadata: media.metadata.toJson()),
+    );
+  } else {
+    try {
+      final metadata = (await mediaRef.getMetadata());
+      final down4Metadata = MediaMetadata.fromJson(metadata.customMetadata!);
+      if (down4Metadata.timestamp.shouldBeUpdated) {
+        final newTimeStamp = timeStamp();
+        if (newTimeStamp > down4Metadata.timestamp) {
+          mediaRef.updateMetadata(
+            SettableMetadata(
+              customMetadata:
+                  down4Metadata.updatedTimestamp(timeStamp()).toJson(),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // TODO, find the actual exception we are looking for, docs aren't clear
+      // If there's an exception, it should mean that there is no media, so we
+      // do the full upload
+      mediaRef.putFile(
+        File(media.path!),
+        SettableMetadata(
+          customMetadata: media.metadata.updatedTimestamp(timeStamp()).toJson(),
+        ),
+      );
+    }
+  }
+}
+
+// void writeMedia({
+//   required Uint8List data,
+//   required String id,
+//   bool temp = false,
+// }) async {
+//   if (temp) {
+//     File("$temporaryPath/$id").writeAsBytesSync(data);
+//   } else {
+//     File("$documentPath/$id").writeAsBytesSync(data);
+//   }
+// }
+
+extension MessageSave on Message {
   Future<void> save() =>
       b.messages.put(id, jsonEncode(toJson(withReadStatus: true)));
 }
@@ -98,24 +172,27 @@ extension NodeSave on BaseNode {
   Future<void> saveUser() => b.user.put(id, jsonEncode(this));
 }
 
-extension MediaSave on Down4Media {
-  void writeFile() {
-    var f = File("${b.dirPath}/$id");
-    f.writeAsBytesSync(data);
-    file = f;
+extension ImageSave on Media {
+  void delete({bool isPersonal = false, bool isSnip = false}) {
+    if (isPersonal) {
+      b.images.delete(id);
+    } else if (isSnip) {
+      b.snipImages.delete(id);
+    } else {
+      b.messageImages.delete(id);
+    }
   }
 
-  Future<void> save({bool toPersonal = false, bool toSnips = false}) {
+  Future<void> save({
+    bool toPersonal = false,
+    bool toSnips = false,
+  }) {
     if (!toPersonal) {
-      return b.messageMedias.put(id, jsonEncode(this));
+      return b.messageImages.put(id, jsonEncode(this));
     } else if (toSnips) {
-      return b.snips.put(id, jsonEncode(this));
+      return b.snipImages.put(id, jsonEncode(this));
     } else {
-      if (metadata.isVideo) {
-        return b.videos.put(id, jsonEncode(this));
-      } else {
-        return b.images.put(id, jsonEncode(this));
-      }
+      return b.images.put(id, jsonEncode(this));
     }
   }
 }
@@ -143,8 +220,10 @@ class Boxes {
       bills,
       payments,
       savedMessages,
-      messageMedias,
-      snips;
+      messageImages,
+      messageVideos,
+      snipImages,
+      snipVideos;
   Boxes()
       : dirPath = main.docDirPath,
         fileIDs = [],
@@ -158,33 +237,45 @@ class Boxes {
         bills = Hive.box("Bills"),
         payments = Hive.box("Payments"),
         savedMessages = Hive.box("SavedMessages"),
-        snips = Hive.box("Snips"),
-        messageMedias = Hive.box("MessageMedias");
+        snipImages = Hive.box("SnipImages"),
+        snipVideos = Hive.box("SnipVideos"),
+        messageImages = Hive.box("MessageImages"),
+        messageVideos = Hive.box("MessageVideos");
 
-  File writeMediaToFile(Down4Media m) {
-    var f = File(dirPath + "/" + m.id);
-    f.writeAsBytes(m.data);
-    return f;
-  }
+  // File writeMediaToFile(Down4Media m) {
+  //   var f = File(dirPath + "/" + m.id);
+  //   f.writeAsBytes(m.data);
+  //   return f;
+  // }
 
-  void saveImage(Down4Media im) {
+  // String writeToDocs({required String cachedPath, required String mediaID}) {
+  //   var f = File("$documentPath/$mediaID");
+  //   final data = File(cachedPath).readAsBytesSync();
+  //   f.writeAsBytesSync(data);
+  //   return f.path;
+  // }
+
+  void saveImage(Media im) {
     images.put(im.id, jsonEncode(im));
   }
 
-  Down4Media loadSavedImage(Identifier id) {
-    return Down4Media.fromJson(jsonDecode(images.get(id)));
+  MessageMedia loadSavedImage(Identifier id) {
+    return MessageMedia.fromJson(jsonDecode(images.get(id)));
   }
 
   void deleteSavedImage(Identifier id) {
+    try {
+      File("$dirPath/$id").delete();
+    } catch (_) {}
     images.delete(id);
   }
 
-  void saveVideo(Down4Media im) {
+  void saveVideo(Media im) {
     videos.put(im.id, jsonEncode(im));
   }
 
-  Down4Media loadSavedVideo(Identifier id) {
-    return Down4Media.fromJson(jsonDecode(videos.get(id)));
+  MessageMedia loadSavedVideo(Identifier id) {
+    return MessageMedia.fromJson(jsonDecode(videos.get(id)));
   }
 
   ExchangeRate loadExchangeRate() {
@@ -201,16 +292,16 @@ class Boxes {
     videos.delete(id);
   }
 
-  void saveSnip(Down4Media snip) {
-    images.put(snip.id, jsonEncode(snip));
+  void saveSnip(Media snip) {
+    snipImages.put(snip.id, jsonEncode(snip));
   }
 
-  Down4Media loadSnip(Identifier id) {
-    return Down4Media.fromJson(jsonDecode(snips.get(id)));
+  Media loadSnip(Identifier id) {
+    return MessageMedia.fromJson(jsonDecode(snipImages.get(id)));
   }
 
   void deleteSnip(Identifier id) {
-    snips.delete(id);
+    snipImages.delete(id);
   }
 
   void saveUser(User u) {
@@ -247,44 +338,52 @@ class Boxes {
     home.delete(id);
   }
 
-  void saveMessage(Down4Message msg) {
+  void saveMessage(Message msg) {
     messages.put(msg.id, jsonEncode(msg));
   }
 
-  Down4Message? loadMessage(Identifier id) {
+  Message? loadMessage(Identifier id) {
     var msg = messages.get(id);
     if (msg is! String) return null;
     var msgJson = jsonDecode(messages.get(id));
     if (msgJson == null) return null;
-    return Down4Message.fromJson(msgJson);
+    return Message.fromJson(msgJson);
   }
 
   void deleteMessage(Identifier id) {
     final msgJson = jsonDecode(messages.get(id));
-    final mediaID = msgJson["m"]?["id"];
-    if (mediaID != null) messageMedias.delete(mediaID);
+    final mediaID = msgJson["m"];
+    if (mediaID != null) {
+      messageImages.delete(mediaID);
+      messageVideos.delete(mediaID);
+      if (!images.keys.contains(mediaID) || !videos.keys.contains(mediaID)) {
+        try {
+          File("$dirPath/$mediaID").delete();
+        } catch (_) {}
+      }
+    }
     messages.delete(id);
   }
 
   bool mediaIsLocal(Identifier mediaID) {
     final isSavedImage = images.containsKey(mediaID);
     final isSavedVideo = videos.containsKey(mediaID);
-    final isMessageMedia = messageMedias.containsKey(mediaID);
+    final isMessageMedia = messageImages.containsKey(mediaID);
     return isSavedImage || isSavedVideo || isMessageMedia;
   }
 
-  Down4Media? loadMessageMediaFromLocal(Identifier mediaID) {
+  Media? loadMessageMediaFromLocal(Identifier mediaID) {
     final isSavedImage = images.containsKey(mediaID);
     if (isSavedImage) {
-      return Down4Media.fromJson(jsonDecode(images.get(mediaID)));
+      return MessageMedia.fromJson(jsonDecode(images.get(mediaID)));
     } else {
-      final isMessageMedia = messageMedias.containsKey(mediaID);
+      final isMessageMedia = messageImages.containsKey(mediaID);
       if (isMessageMedia) {
-        return Down4Media.fromJson(jsonDecode(messageMedias.get(mediaID)));
+        return MessageMedia.fromJson(jsonDecode(messageImages.get(mediaID)));
       } else {
         final isSavedVideo = videos.containsKey(mediaID);
         if (isSavedVideo) {
-          return Down4Media.fromJson(jsonDecode(videos.get(mediaID)));
+          return MessageMedia.fromJson(jsonDecode(videos.get(mediaID)));
         }
       }
     }
@@ -299,6 +398,8 @@ class Sizes {
   static double w = 0;
   static double fullHeight = 0;
   static double headerHeight = 0;
+  static Size get fullSize => Size(w, fullAspectRatio);
+  static Size get paddedSize => Size(w, h);
   static double get viewPaddingHeight => fullHeight - h;
   static double get fullAspectRatio => w / fullHeight;
   static double get paddedAspectRatio => w / h;

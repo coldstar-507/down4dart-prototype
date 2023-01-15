@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -45,8 +46,8 @@ class _Down4State extends State<Down4> {
   @override
   void initState() {
     super.initState();
-    FirebaseDatabase.instance.setPersistenceEnabled(false);
-    fs.settings = const Settings(persistenceEnabled: false);
+    // FirebaseDatabase.instance.setPersistenceEnabled(false);
+    // fs.settings = const Settings(persistenceEnabled: false);
     loadTokenChangeListener();
     loadUser();
   }
@@ -74,7 +75,8 @@ class _Down4State extends State<Down4> {
     String id,
     String name,
     String lastName,
-    Uint8List imData,
+    String imPath,
+    double imAspectRatio,
     bool toReverse,
   ) async {
     final token = await FirebaseMessaging.instance.getToken();
@@ -89,22 +91,22 @@ class _Down4State extends State<Down4> {
     _wallet = Wallet.fromSeed(seed1, seed2);
     final neutered = _wallet!.keys.neutered();
 
-    final imageID = d4utils.generateMediaID(imData);
-    Down4Media image = Down4Media(
-      id: imageID,
-      data: imData,
+    NodeMedia image = NodeMedia(
+      id: d4utils.randomMediaID(),
       metadata: MediaMetadata(
         owner: id,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-        toReverse: toReverse,
+        timestamp: d4utils.timeStamp(),
+        elementAspectRatio: imAspectRatio,
+        isReversed: toReverse,
       ),
+      path: imPath,
     );
 
     final userInfo = {
       'id': id,
       'nm': name,
       'ln': lastName,
-      'sh': secret.toHex(),
+      'sh': secret.toBase64(),
       'tkn': token,
       'nt': neutered.toYouKnow(),
       'im': image,
@@ -117,14 +119,14 @@ class _Down4State extends State<Down4> {
       return false;
     }
 
-    final thumbnail = await FlutterImageCompress.compressWithList(
-      image.data,
-      minWidth: 20,
-      minHeight: 20,
-      quality: 50,
-    );
-
-    image.thumbnail = thumbnail;
+    // final thumbnail = await FlutterImageCompress.compressWithFile(
+    //   appPath,
+    //   minWidth: 20,
+    //   minHeight: 20,
+    //   quality: 50,
+    // );
+    //
+    // image.thumbnail = thumbnail;
 
     _user = User(
       neuter: neutered,
@@ -162,19 +164,19 @@ class _Down4State extends State<Down4> {
     _view = UserMakerPage(
       cameras: widget.cameras,
       initUser: initUser,
-      success: welcomePage,
+      success: home,
     );
     setState(() {});
   }
 
-  void welcomePage() {
-    _view = WelcomePage(
-      mnemonic: "No giving it bro sorry",
-      userInfo: _user!,
-      understood: home,
-    );
-    setState(() {});
-  }
+  // void welcomePage() {
+  //   _view = WelcomePage(
+  //     mnemonic: "No giving it bro sorry",
+  //     userInfo: _user!,
+  //     understood: home,
+  //   );
+  //   setState(() {});
+  // }
 
   @override
   Widget build(BuildContext context) {

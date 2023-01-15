@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:down4/src/down4_utility.dart';
-import 'bsv/utils.dart' show sha256;
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'down4_utility.dart';
 import 'data_objects.dart';
-import 'bsv/types.dart' show Down4Payment, Down4TX, Down4InternetPayment;
+import 'bsv/types.dart' show Down4Payment, Down4TX;
 // import 'package:firebase_database/firebase_database.dart';
 // import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -61,17 +61,16 @@ Future<MediaMetadata?> getMediaMetadata(String id) async {
   return MediaMetadata.fromJson(jsonDecode(res.body));
 }
 
-Future<Down4Media?> getMessageMedia(String id) async {
+Future<Media?> getMessageMedia(String id) async {
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMedia",
   );
   final res = await http.post(url, body: id);
-  if (res.statusCode == 200) {
-    return Down4Media.fromJson(jsonDecode(res.body));
-  }
-  return null;
+  if (res.statusCode != 200) return null;
+  return MessageMedia.fromJson(jsonDecode(res.body));
 }
 
+// TODO Might need adjustment for big batches
 Future<List<int>> broadcastTxs(List<Down4TX> txs) async {
   final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
   List<Future<http.Response>> responses = [];
@@ -90,17 +89,33 @@ Future<List<int>> broadcastTxs(List<Down4TX> txs) async {
 }
 
 Future<List<int>?> confirmations(List<String> txsID) async {
-  if (txsID.isEmpty) return null;
-  final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/txs/status");
-  var res = await http.post(url, body: jsonEncode({"txids": txsID}));
-  if (res.statusCode != 200) {
-    print("Error getting status of transactions");
-    return null;
+  List<List<String>> twentyTxsLists =
+      List.generate((txsID.length / 20).ceil(), (index) => <String>[]);
+  for (int i = 0; i < txsID.length; i++) {
+    final curIndex = (i / 20).floor();
+    twentyTxsLists[curIndex].add(txsID[i]);
   }
-  var answers = jsonDecode(res.body);
-  return List.from(answers)
-      .map((e) => (e["confirmations"] ?? 0) as int)
-      .toList();
+
+  List<List<int>> status = [];
+
+  // single threading it for now
+  for (final txids in twentyTxsLists) {
+    if (txsID.isEmpty) return null;
+    final url =
+        Uri.parse("https://api.whatsonchain.com/v1/bsv/test/txs/status");
+    var res = await http.post(url, body: jsonEncode({"txids": txids}));
+    if (res.statusCode != 200) {
+      print("Error getting status of transactions");
+    } else {
+      var answers = jsonDecode(res.body);
+      final iStatus = List.from(answers)
+          .map((e) => (e["confirmations"] ?? 0) as int)
+          .toList();
+      status.add(iStatus);
+    }
+  }
+
+  return status.expand((element) => element).toList(growable: false);
 }
 
 Future<Down4Payment?> getPayment(String paymentID) async {
@@ -124,73 +139,73 @@ Future<double?> getExchangeRate() async {
   return jsonDecode(res.body)["rate"];
 }
 
-Future<bool> pingRequest(PingRequest req) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
-  );
-  final res = await http.post(url, body: jsonEncode(req));
-  return res.statusCode == 200;
-}
-
-Future<bool> snipRequest(SnipRequest req) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
-  );
-  final res = await http.post(url, body: jsonEncode(req));
-  return res.statusCode == 200;
-}
-
-Future<Group?> groupRequest(GroupRequest req, [withMedia = false]) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
-  );
-  final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
-  if (res.statusCode == HttpStatus.noContent) {
-    return groupRequest(req, true);
-  }
-  if (res.statusCode == 200) {
-    return BaseNode.fromJson(jsonDecode(res.body)) as Group;
-  } else {
-    return null;
-  }
-}
-
-Future<Hyperchat?> hyperchatRequest(
-  HyperchatRequest req, [
-  bool withMedia = false,
-]) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
-  );
-  final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
-  if (res.statusCode == HttpStatus.noContent) {
-    return hyperchatRequest(req, true);
-  }
-  if (res.statusCode == 200) {
-    return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
-  } else {
-    return null;
-  }
-}
-
-Future<bool> paymentRequest(PaymentRequest req) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
-  );
-  final res = await http.post(url, body: jsonEncode(req));
-  return res.statusCode == 200;
-}
-
-Future<bool> chatRequest(ChatRequest req, [withMedia = false]) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
-  );
-  final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
-  if (res.statusCode == HttpStatus.noContent) {
-    return chatRequest(req, true);
-  }
-  return res.statusCode == 200;
-}
+// Future<bool> pingRequest(PingRequest req) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req));
+//   return res.statusCode == 200;
+// }
+//
+// Future<bool> snipRequest(SnipRequest req) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req));
+//   return res.statusCode == 200;
+// }
+//
+// Future<Group?> groupRequest(GroupRequest req, [withMedia = false]) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
+//   if (res.statusCode == HttpStatus.noContent) {
+//     return groupRequest(req, true);
+//   }
+//   if (res.statusCode == 200) {
+//     return BaseNode.fromJson(jsonDecode(res.body)) as Group;
+//   } else {
+//     return null;
+//   }
+// }
+//
+// Future<Hyperchat?> hyperchatRequest(
+//   HyperchatRequest req, [
+//   bool withMedia = false,
+// ]) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
+//   if (res.statusCode == HttpStatus.noContent) {
+//     return hyperchatRequest(req, true);
+//   }
+//   if (res.statusCode == 200) {
+//     return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
+//   } else {
+//     return null;
+//   }
+// }
+//
+// Future<bool> paymentRequest(PaymentRequest req) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req));
+//   return res.statusCode == 200;
+// }
+//
+// Future<bool> chatRequest(ChatRequest req, [withMedia = false]) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
+//   );
+//   final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
+//   if (res.statusCode == HttpStatus.noContent) {
+//     return chatRequest(req, true);
+//   }
+//   return res.statusCode == 200;
+// }
 
 Future<int> refreshTokenRequest(String newToken) async {
   final url = Uri.parse(
@@ -200,73 +215,61 @@ Future<int> refreshTokenRequest(String newToken) async {
   return res.statusCode;
 }
 
-Future<List<Down4Message>?> getPosts(List<String> ids) async {
+Future<List<Message>?> getPosts(List<String> ids) async {
   // TODO: getPosts
   return null;
-}
-
-// Future<bool> sendInternetPayment(Down4InternetPayment payment) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePayment",
-//   );
-//   final res = await http.post(url, body: jsonEncode(payment));
-//   return res.statusCode == 200;
-// }
-
-enum RequestType {
-  chat,
-  ping,
-  snip,
-  hyperchat,
-  group,
-  payment,
 }
 
 abstract class Request {
   final List<Identifier> targets;
   const Request({required this.targets});
   Map<String, dynamic> toJson();
-  RequestType get type;
+  send();
 }
 
-class ChatRequest implements Request {
-  final String? groupName;
-  final Down4Message message;
-  Down4Media? media;
-  ChatRequest({
+abstract class MessageRequest extends Request {
+  final Message message;
+  final MessageMedia? media;
+  MessageRequest({
+    required List<Identifier> targets,
     required this.message,
-    required this.targets,
-    this.groupName,
     this.media,
-  });
-  @override
-  final List<Identifier> targets;
+  }) : super(targets: targets);
+}
+
+class ChatRequest extends MessageRequest {
+  final String? groupName;
+  ChatRequest({
+    MessageMedia? media,
+    required Message message,
+    required List<Identifier> targets,
+    this.groupName,
+  }) : super(targets: targets, message: message, media: media);
 
   @override
-  RequestType get type => RequestType.chat;
+  Future<bool> send() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
+    );
+    final res = await http.post(url, body: jsonEncode(this));
+    return res.statusCode == 200;
+  }
 
   @override
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
+  Map<String, dynamic> toJson() => {
         if (groupName != null) "gn": groupName,
         "msg": message.toJson(),
         "tr": targets,
-        if (withMedia && media != null) "m": media!.toJson(),
       };
 }
 
-class PingRequest implements Request {
+class PingRequest extends Request {
   final String senderID, text;
   PingRequest({
     required this.senderID,
     required this.text,
-    required this.targets,
-  });
-
-  @override
-  final List<Identifier> targets;
-
-  @override
-  RequestType get type => RequestType.ping;
+    required List<Identifier> targets,
+  }) : super(targets: targets);
 
   @override
   Map<String, dynamic> toJson() => {
@@ -274,95 +277,138 @@ class PingRequest implements Request {
         "txt": text,
         "tr": targets,
       };
+
+  @override
+  Future<bool> send() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
+    );
+    final res = await http.post(url, body: jsonEncode(this));
+    return res.statusCode == 200;
+  }
 }
 
-class SnipRequest extends ChatRequest {
+class SnipRequest extends Request {
+  String senderID, mediaID;
+  String? groupName, root;
   SnipRequest({
-    Down4Media? media,
-    required Down4Message message,
+    required this.mediaID,
+    required this.senderID,
+    this.root,
+    this.groupName,
     required List<Identifier> targets,
+  }) : super(targets: targets);
+
+  @override
+  Map<String, dynamic> toJson() => {
+        "m": mediaID,
+        "rt": root,
+        "s": senderID,
+        "tr": targets,
+        if (groupName != null) "gn": groupName,
+      };
+
+  @override
+  Future<bool> send() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
+    );
+    final res = await http.post(url, body: jsonEncode(this));
+    return res.statusCode == 200;
+  }
+}
+
+class HyperchatRequest extends MessageRequest {
+  List<String> wordPairs;
+
+  HyperchatRequest({
+    required Message message,
+    MessageMedia? media,
+    required List<Identifier> targets,
+    required this.wordPairs,
   }) : super(targets: targets, message: message, media: media);
 
   @override
-  RequestType get type => RequestType.snip;
+  Future<Hyperchat?> send() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
+    );
+    final res = await http.post(url, body: jsonEncode(this));
+    if (res.statusCode == 200) {
+      return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
+    } else {
+      return null;
+    }
+  }
 
   @override
-  Map<String, dynamic> toJson([bool withMedia = true]) => {
-        "msg": message.toJson(),
-        "tr": targets,
-        if (media != null) "m": media!.toJson(),
-      };
-}
-
-class HyperchatRequest extends ChatRequest {
-  List<String> wordPairs;
-  HyperchatRequest({
-    required Down4Message message,
-    required List<Identifier> targets,
-    Down4Media? media,
-    required this.wordPairs,
-  }) : super(message: message, targets: targets, media: media);
-
-  @override
-  RequestType get type => RequestType.hyperchat;
-
-  @override
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
+  Map<String, dynamic> toJson() => {
         "msg": message.toJson(),
         "wp": wordPairs,
         "tr": targets,
-        if (withMedia && media != null) "m": media!.toJson(),
       };
 }
 
-class GroupRequest extends ChatRequest {
+class GroupRequest extends MessageRequest {
   final Identifier groupID;
   final String name;
   final bool private;
-  final Down4Media groupMedia;
+  final NodeMedia groupMedia;
   GroupRequest({
     required this.groupID,
     required this.private,
     required this.name,
     required this.groupMedia,
-    required Down4Message message,
-    Down4Media? media,
+    required Message message,
+    MessageMedia? media,
     required List<Identifier> targets,
   }) : super(targets: targets, message: message, media: media);
 
   @override
-  RequestType get type => RequestType.group;
+  Future<Group?> send() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
+    );
+    final res = await http.post(url, body: jsonEncode(this));
+    if (res.statusCode == 200) {
+      return BaseNode.fromJson(jsonDecode(res.body)) as Group;
+    } else {
+      return null;
+    }
+  }
 
   @override
-  Map<String, dynamic> toJson([bool withMedia = false]) => {
+  Map<String, dynamic> toJson() => {
         "id": groupID,
         "msg": message.toJson(),
         "pv": private,
         "gn": name,
         "gm": groupMedia.toJson(),
         "tr": targets,
-        if (withMedia && media != null) "m": media!.toJson(),
       };
 }
 
-class PaymentRequest implements Request {
+class PaymentRequest extends Request {
   final Down4Payment payment;
   final String sender;
   final String? textNote;
   String get id => payment.id;
 
   PaymentRequest({
-    required this.targets,
+    required List<Identifier> targets,
     required this.payment,
     required this.sender,
     this.textNote,
-  });
+  }) : super(targets: targets);
 
   @override
-  RequestType get type => RequestType.payment;
-
-  @override
-  final List<Identifier> targets;
+  Future<bool> send() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
+    );
+    final res = await http.post(url, body: jsonEncode(this));
+    return res.statusCode == 200;
+  }
 
   @override
   Map<String, dynamic> toJson() => {
@@ -370,6 +416,6 @@ class PaymentRequest implements Request {
         "id": id,
         "tr": targets,
         "pay": payment.toYouKnow(),
-        if (payment.textNote != null) "txt": payment.textNote,
+        if (payment.textNote.isNotEmpty) "txt": payment.textNote,
       };
 }

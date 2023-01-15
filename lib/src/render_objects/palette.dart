@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -106,11 +107,13 @@ class Palette extends StatelessWidget {
     Object n = node;
     if (n is User) {
       return n.media != null
-          ? Image.memory(n.media!.data, fit: BoxFit.cover)
+          ? n.isFriend
+              ? Image.file(File(n.media!.path!), fit: BoxFit.cover)
+              : Image.network(n.media!.url)
           : Image.asset('lib/src/assets/hashirama.jpg', fit: BoxFit.cover);
     } else if (n is GroupNode) {
-      return Image.memory(
-        n.media.data,
+      return Image.file(
+        File(n.media.path!),
         fit: BoxFit.cover,
         gaplessPlayback: true,
       );

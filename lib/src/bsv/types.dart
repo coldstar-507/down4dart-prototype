@@ -104,7 +104,7 @@ class Down4Payment {
     }
     print("COMPRESSED\n${comp.toHex()}");
 
-    const maxSize = 800;
+    const maxSize = 550;
     final codec = Base85Codec(Alphabets.z85);
     final encode = codec.encode(comp.toUint8List());
     int diviser = 1;
@@ -115,7 +115,7 @@ class Down4Payment {
     final divided = (encode.length / diviser).floor();
     List<String> listData = [];
     for (int i = 0; i < diviser; i++) {
-      String prefix = i == 0 ? "$diviser," : "$i;";
+      String prefix = i == 0 ? "_$diviser," : "$i;";
       bool isLast = i == (diviser - 1);
       if (isLast) {
         listData.add(prefix + encode.substring(i * divided));

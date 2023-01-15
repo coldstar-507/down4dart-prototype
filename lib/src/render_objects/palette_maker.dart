@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -112,8 +112,7 @@ class UserPaletteMaker extends StatelessWidget {
 
 class UserMakerPalette extends StatelessWidget {
   // static const double height = 60.0;
-  final String name, lastName, id;
-  final List<int> image;
+  final String name, lastName, id, imagePath;
   final void Function() selectFile;
 
   const UserMakerPalette({
@@ -121,7 +120,7 @@ class UserMakerPalette extends StatelessWidget {
     required this.lastName,
     required this.id,
     required this.selectFile,
-    required this.image,
+    required this.imagePath,
     Key? key,
   }) : super(key: key);
 
@@ -136,9 +135,9 @@ class UserMakerPalette extends StatelessWidget {
           ),
           height: Palette.paletteHeight - 4.0,
           width: Palette.paletteHeight - 4.0, // borderWidth x2
-          child: image.isNotEmpty
-              ? Image.memory(
-                  Uint8List.fromList(image),
+          child: imagePath.isNotEmpty
+              ? Image.file(
+                  File(imagePath),
                   fit: BoxFit.cover,
                   gaplessPlayback: true,
                 )
@@ -196,7 +195,7 @@ class UserMakerPalette extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: Palette.gapSize),
       decoration: BoxDecoration(
         // borderRadius: BorderRadius.circular(4.0),
-        boxShadow:  [
+        boxShadow: [
           BoxShadow(
             color: Palette.shadowColor,
             blurRadius: Palette.blurRadius,
@@ -274,7 +273,7 @@ class PaletteMaker extends StatelessWidget {
   final void Function() imagePress;
   final String name, id;
   final String hintText;
-  final Down4Media? image;
+  final Media? image;
   final void Function(Identifier)? go;
   final NodesColor colorCode;
   final Nodes type;
@@ -311,7 +310,7 @@ class PaletteMaker extends StatelessWidget {
         ),
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-            boxShadow:  [
+            boxShadow: [
               BoxShadow(
                   color: Palette.shadowColor,
                   blurRadius: Palette.blurRadius,
@@ -444,8 +443,8 @@ class PaletteMaker extends StatelessWidget {
           width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image == null
               ? _defaultImage
-              : Image.memory(
-                  image!.data,
+              : Image.file(
+                  File(image!.path!),
                   gaplessPlayback: true,
                   fit: BoxFit.cover,
                 ),

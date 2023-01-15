@@ -331,13 +331,14 @@ class _MoneyPageState extends State<MoneyPage> {
     final raw = bc.rawValue;
     print("Trying to scan some good stuff right here!");
     if (raw != null) {
-      final prefixEnd = raw.indexOf(";");
-      if (prefixEnd != -1) {
+      final isFirst = raw[0] == "_";
+      if (!isFirst) {
+        final prefixEnd = raw.indexOf(";");
         final ix = int.parse(raw.substring(0, prefixEnd));
         scannedData.putIfAbsent(ix, () => raw.substring(prefixEnd + 1));
       } else {
         final countPrefixEnd = raw.indexOf(",");
-        scannedDataLength = int.parse(raw.substring(0, countPrefixEnd));
+        scannedDataLength = int.parse(raw.substring(1, countPrefixEnd));
         scannedData.putIfAbsent(0, () => raw.substring(countPrefixEnd + 1));
       }
 

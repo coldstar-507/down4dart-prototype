@@ -38,7 +38,7 @@ class Wallet {
 
   Future<void> updateAllStatus() async {
     for (final payment in payments) {
-      _updateStatus(payment);
+      if (payment.lastConfirmations < 100) _updateStatus(payment);
     }
   }
 

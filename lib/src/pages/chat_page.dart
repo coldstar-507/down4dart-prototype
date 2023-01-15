@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:video_player/video_player.dart';
 // import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -53,13 +56,14 @@ class _ChatPageState extends State<ChatPage> {
   Console? _console;
   ConsoleInput? _consoleInput;
   var tec = TextEditingController();
-  Down4Media? _cameraInput;
+  CameraController? ctrl;
+  MessageMedia? _cameraInput;
   Map<Identifier, ChatMessage> _cachedMessages = {};
-  Map<Identifier, Down4Message?> _cachedDown4Message = {};
+  Map<Identifier, Message?> _cachedDown4Message = {};
   String? idOfLastMessageRead;
 
-  Map<Identifier, Down4Media> _cachedImages = {};
-  Map<Identifier, Down4Media> _cachedVideos = {};
+  Map<Identifier, MessageMedia> _cachedImages = {};
+  Map<Identifier, MessageMedia> _cachedVideos = {};
 
   late var theNode = widget.node;
   late final bool isGroupChat = theNode is GroupNode;
@@ -69,7 +73,7 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     asyncImageLoad();
     loadMessages();
-    baseConsole();
+    loadBaseConsole();
   }
 
   @override
@@ -94,16 +98,16 @@ class _ChatPageState extends State<ChatPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          precacheImage(MemoryImage(image.data), context);
+          precacheImage(FileImage(File(image.path!)), context);
         }
       }).then((value) => print("precached all images"));
     });
   }
 
-  Iterable<Down4Media> get savedImages => b.images.keys
+  Iterable<MessageMedia> get savedImages => b.images.keys
       .map((mediaID) => _cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
 
-  Iterable<Down4Media> get savedVideos => b.videos.keys
+  Iterable<MessageMedia> get savedVideos => b.videos.keys
       .map((mediaID) => _cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
@@ -130,15 +134,20 @@ class _ChatPageState extends State<ChatPage> {
 
       var down4Message = _cachedDown4Message[msgID] ??= b.loadMessage(msgID);
       if (down4Message == null) return;
-      Down4Media? media;
+      Media? media;
       if (down4Message.mediaID != null) {
-        media = await getMessageMediaFromEverywhere(down4Message.mediaID!);
+        media = b.loadMessageMediaFromLocal(down4Message.mediaID!);
+        if (media?.path == null) {
+          media = await downloadAndWriteMedia(down4Message.mediaID!);
+        }
         if (media != null) {
           mediaWidth = maxWidth - messageBorder;
-          mediaHeight = mediaWidth * (media.metadata.aspectRatio ?? 1.0);
+          mediaHeight = mediaWidth *
+              (media.metadata.isSquared
+                  ? 1.0
+                  : media.metadata.elementAspectRatio);
         }
       }
-
       if (!down4Message.read) {
         down4Message
           ..read = true
@@ -365,16 +374,21 @@ class _ChatPageState extends State<ChatPage> {
         requestFullMetadata: false,
       );
       for (final file in files) {
-        final bytes = await file.readAsBytes();
-        final decodedImage = await decodeImageFromList(bytes);
-        final mediaID = u.generateMediaID(bytes);
-        final down4Media = Down4Media(
+        // final bytes = await file.readAsBytes();
+        // final decodedImage = await decodeImageFromList(bytes);
+        final mediaID = u.randomMediaID();
+        // final appPath = b.writeToDocs(cachedPath: file.path, mediaID: mediaID);
+        final size = calculateImageDimension(f: File(file.path));
+        final down4Media = MessageMedia(
           id: mediaID,
-          data: bytes,
+          path: file.path,
           metadata: MediaMetadata(
+            isSquared: false,
+            isVideo: false,
+            isReversed: false,
             timestamp: u.timeStamp(),
             owner: widget.self.id,
-            aspectRatio: decodedImage.height / decodedImage.width,
+            elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
           ),
         )..save(toPersonal: true);
         _cachedImages[mediaID] = down4Media;
@@ -385,15 +399,21 @@ class _ChatPageState extends State<ChatPage> {
         maxDuration: const Duration(seconds: 15),
       );
       if (video == null) return;
-      final bytes = await video.readAsBytes();
-      final mediaID = u.generateMediaID(bytes);
-      final down4Media = Down4Media(
+      final videoInfoGetter = FlutterVideoInfo();
+      final videoInfo = await videoInfoGetter.getVideoInfo(video.path);
+      final mediaID = u.randomMediaID();
+      // final appPath = b.writeToDocs(cachedPath: video.path, mediaID: mediaID);
+      final down4Media = MessageMedia(
         id: mediaID,
-        data: bytes,
+        path: video.path,
         metadata: MediaMetadata(
+          isReversed: false,
+          isSquared: false,
+          isVideo: true,
           timestamp: u.timeStamp(),
           owner: widget.self.id,
-          isVideo: true,
+          elementAspectRatio:
+              (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0),
         ),
       );
       _cachedVideos[mediaID] = down4Media;
@@ -424,205 +444,174 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void send2({Down4Media? mediaInput}) {
-    if (tec.value.text != "" || mediaInput != null || _cameraInput != null) {
-      final ts = u.timeStamp();
-      final targets = widget.node.calculateTargets(widget.self.id);
-
-      var msg = Down4Message(
-        root: widget.node is GroupNode ? widget.node.id : null,
-        type: Messages.chat,
-        id: messagePushId(),
-        timestamp: ts,
-        senderID: widget.self.id,
-        mediaID: mediaInput?.id ?? _cameraInput?.id,
-        text: tec.value.text,
-        replies: _cachedMessages.values
-            .where((msg) => msg.selected)
-            .map((msg) => msg.message.id)
-            .toList(growable: false),
-      );
-
-      unselectSelectedMessage();
-
-      var req = r.ChatRequest(
-        message: msg,
-        targets: targets,
-        media: mediaInput ?? _cameraInput,
-      );
-
-      widget.send(req);
-      tec.clear();
-      _cameraInput = null;
+  void send2({MessageMedia? mediaInput}) {
+    if (tec.value.text == "" && mediaInput == null && _cameraInput == null) {
+      return;
     }
+    final ts = u.timeStamp();
+    final targets = widget.node.calculateTargets(widget.self.id);
+
+    var msg = Message(
+      root: widget.node is GroupNode ? widget.node.id : null,
+      type: Messages.chat,
+      id: messagePushId(),
+      timestamp: ts,
+      senderID: widget.self.id,
+      mediaID: mediaInput?.id ?? _cameraInput?.id,
+      text: tec.value.text,
+      replies: _cachedMessages.values
+          .where((msg) => msg.selected)
+          .map((msg) => msg.message.id)
+          .toList(growable: false),
+    );
+
+    unselectSelectedMessage();
+
+    var req = r.ChatRequest(
+      message: msg,
+      targets: targets,
+      media: mediaInput ?? _cameraInput,
+    );
+
+    widget.send(req);
+    tec.clear();
+    _cameraInput = null;
   }
 
-  Future<void> camConsole([
-    CameraController? ctrl,
-    int cameraIdx = 0,
-    ResolutionPreset resolution = ResolutionPreset.medium,
-    FlashMode flashMode = FlashMode.off,
+  Future<void> loadFullCamera() async {
+    // TODO
+  }
+
+  Future<void> loadSquaredCameraPreview({
+    required String cachedPath,
+    required bool isVideo,
+    required bool isReversed,
+    required double aspectRatio,
+  }) async {
+    VideoPlayerController? vpc;
+    if (isVideo) {
+      vpc = VideoPlayerController.file(File(cachedPath));
+      await vpc.initialize();
+    }
+    _console = Console(
+      inputs: [consoleInput],
+      toMirror: isReversed,
+      videoPlayerController: vpc,
+      imagePreviewPath: cachedPath,
+      topButtons: [
+        ConsoleButton(
+            name: "Accept",
+            onPress: () {
+              _cameraInput = MessageMedia(
+                path: cachedPath,
+                id: u.randomMediaID(),
+                metadata: MediaMetadata(
+                  isReversed: isReversed,
+                  isVideo: isVideo,
+                  isSquared: true,
+                  canSkipCheck: true,
+                  owner: widget.self.id,
+                  elementAspectRatio: aspectRatio,
+                  timestamp: u.timeStamp(),
+                ),
+              );
+              loadBaseConsole();
+            }),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+            name: "Back",
+            onPress: () {
+              _cameraInput = null;
+              loadSquaredCameraConsole();
+            }),
+        ConsoleButton(
+            name: "Cancel",
+            onPress: () {
+              _cameraInput = null;
+              loadBaseConsole();
+            }),
+      ],
+    );
+
+    setState(() {});
+  }
+
+  Future<void> loadSquaredCameraConsole([
+    int cam = 0,
+    FlashMode fm = FlashMode.off,
     bool reloadCtrl = false,
   ]) async {
     if (ctrl == null || reloadCtrl) {
       try {
-        ctrl = CameraController(
-          widget.cameras[cameraIdx],
-          resolution,
-          enableAudio: true,
-        );
-        await ctrl.initialize();
-      } catch (err) {
-        baseConsole();
+        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
+        await ctrl?.initialize();
+      } catch (error) {
+        loadBaseConsole();
       }
     }
-
-    ctrl?.setFlashMode(flashMode);
-
-    void nextCam() =>
-        camConsole(ctrl, (cameraIdx + 1) % 2, resolution, FlashMode.off, true);
-
-    // void nextCam() => cameraIdx == 0
-    //     ? camConsole(ctrl, 1, resolution, FlashMode.off, true)
-    //     : camConsole(ctrl, 0, resolution, FlashMode.off, true);
-
-    void nextRes() async {
-      switch (resolution) {
-        case ResolutionPreset.low:
-          return camConsole(
-              ctrl, cameraIdx, ResolutionPreset.medium, flashMode, true);
-        case ResolutionPreset.medium:
-          return camConsole(
-              ctrl, cameraIdx, ResolutionPreset.high, flashMode, true);
-        case ResolutionPreset.high:
-          return camConsole(
-              ctrl, cameraIdx, ResolutionPreset.low, flashMode, true);
-        case ResolutionPreset.veryHigh:
-          // TODO: Handle this case.
-          break;
-        case ResolutionPreset.ultraHigh:
-          // TODO: Handle this case.
-          break;
-        case ResolutionPreset.max:
-          // TODO: Handle this case.
-          break;
-      }
-    }
-
-    void nextFlash() => flashMode == FlashMode.off
-        ? camConsole(ctrl, cameraIdx, resolution, FlashMode.torch)
-        : camConsole(ctrl, cameraIdx, resolution, FlashMode.off);
-
-    if (_cameraInput == null) {
-      _console = Console(
-        inputs: [_consoleInput ?? consoleInput],
-        cameraController: ctrl,
-        aspectRatio: ctrl?.value.aspectRatio,
-        topButtons: [
-          ConsoleButton(
-            name: cameraIdx == 0 ? "Front" : "Rear",
-            onPress: nextCam,
-            isMode: true,
-          ),
-          ConsoleButton(
-            name: "Capture",
-            onPress: () async {
-              XFile? f = await ctrl?.takePicture();
-              if (f != null) {
-                _cameraInput = Down4Media.fromCamera(
-                  f.path,
-                  MediaMetadata(
-                    owner: widget.self.id,
-                    timestamp: u.timeStamp(),
-                    isVideo: false,
-                    toReverse: cameraIdx == 1,
-                  ),
-                );
-                camConsole(ctrl, cameraIdx, resolution, FlashMode.off, false);
-              }
-            },
-            onLongPress: () async => await ctrl?.startVideoRecording(),
-            onLongPressUp: () async {
-              XFile? f = await ctrl?.stopVideoRecording();
-              if (f != null) {
-                _cameraInput = Down4Media.fromCamera(
-                  f.path,
-                  MediaMetadata(
-                    owner: widget.self.id,
-                    timestamp: u.timeStamp(),
-                    isVideo: true,
-                    toReverse: cameraIdx == 1,
-                  ),
-                );
-                camConsole(ctrl, cameraIdx, resolution, FlashMode.off, false);
-              }
-            },
-            shouldBeDownButIsnt: ctrl?.value.isRecordingVideo ?? false,
-          ),
-        ],
-        bottomButtons: [
-          ConsoleButton(name: "Back", onPress: baseConsole),
-          ConsoleButton(
-            name: resolution.name.capitalize(),
-            onPress: nextRes,
-            isMode: true,
-          ),
-          ConsoleButton(
-            name: flashMode.name.capitalize(),
-            onPress: nextFlash,
-            isMode: true,
-          ),
-        ],
-      );
-    } else {
-      String? imPrev;
-      VideoPlayerController? videoCtrl;
-      if (_cameraInput!.metadata.isVideo) {
-        videoCtrl = VideoPlayerController.file(_cameraInput!.file!);
-        await videoCtrl.initialize();
-        await videoCtrl.setLooping(true);
-        await videoCtrl.play();
-      } else {
-        imPrev = _cameraInput!.path;
-      }
-      _console = Console(
-        inputs: [_consoleInput ?? consoleInput],
-        imagePreviewPath: imPrev,
-        toMirror: _cameraInput!.metadata.toReverse,
-        videoPlayerController: videoCtrl,
-        topButtons: [
-          ConsoleButton(
-            name: "Accept",
-            onPress: () {
-              videoCtrl?.dispose();
-              ctrl?.dispose();
-              baseConsole();
-            },
-          ),
-        ],
-        bottomButtons: [
-          ConsoleButton(
+    ctrl?.setFlashMode(fm);
+    _console = Console(
+      inputs: [consoleInput],
+      cameraController: ctrl,
+      aspectRatio: ctrl?.value.aspectRatio,
+      topButtons: [
+        ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
+        ConsoleButton(
+          name: "Capture",
+          isSpecial: true,
+          shouldBeDownButIsnt: ctrl?.value.isRecordingVideo == true,
+          onPress: () async {
+            var file = await ctrl?.takePicture();
+            if (file == null) loadBaseConsole();
+            loadSquaredCameraPreview(
+              cachedPath: file!.path,
+              aspectRatio: ctrl!.value.aspectRatio,
+              isReversed: ctrl?.cameraId == 1,
+              isVideo: false,
+            );
+          },
+          onLongPress: () async {
+            await ctrl?.startVideoRecording();
+            loadSquaredCameraConsole(cam, fm);
+          },
+          onLongPressUp: () async {
+            var file = await ctrl?.stopVideoRecording();
+            if (file == null) loadBaseConsole();
+            loadSquaredCameraPreview(
+              cachedPath: file!.path,
+              aspectRatio: ctrl!.value.aspectRatio,
+              isReversed: ctrl?.cameraId == 1,
+              isVideo: true,
+            );
+          },
+        ),
+      ],
+      bottomButtons: [
+        ConsoleButton(
             name: "Back",
-            onPress: () {
-              videoCtrl?.dispose();
-              _cameraInput = null;
-              camConsole(ctrl, cameraIdx, resolution, flashMode, false);
-            },
-          ),
-          ConsoleButton(
-              name: "Cancel",
-              onPress: () {
-                videoCtrl?.dispose();
-                ctrl?.dispose();
-                baseConsole();
-              }),
-        ],
-      );
-    }
+            onPress: () async {
+              await ctrl?.dispose();
+              ctrl = null;
+              loadBaseConsole();
+            }),
+        ConsoleButton(
+          name: cam == 0 ? "Rear" : "Front",
+          isMode: true,
+          onPress: () => loadSquaredCameraConsole((cam + 1) % 2, fm, true),
+        ),
+        ConsoleButton(
+          isMode: true,
+          name: fm.name.capitalize(),
+          onPress: () => loadSquaredCameraConsole(
+              cam, fm == FlashMode.off ? FlashMode.torch : FlashMode.off),
+        ),
+      ],
+    );
     setState(() {});
   }
 
-  void baseConsole() {
+  void loadBaseConsole() {
     _console = Console(
       inputs: [_consoleInput ?? consoleInput],
       topButtons: [
@@ -631,7 +620,7 @@ class _ChatPageState extends State<ChatPage> {
           name: "Send",
           onPress: () {
             send2();
-            baseConsole();
+            loadBaseConsole();
           },
         ),
       ],
@@ -639,7 +628,7 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
           name: _cameraInput == null ? "Camera" : "@Camera",
-          onPress: camConsole,
+          onPress: loadSquaredCameraConsole,
         ),
         ConsoleButton(
           name: "Medias",
@@ -663,7 +652,7 @@ class _ChatPageState extends State<ChatPage> {
         ),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: baseConsole),
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
         ConsoleButton(
           isMode: true,
           name: images ? "Images" : "Videos",

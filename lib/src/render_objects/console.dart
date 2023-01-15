@@ -1,6 +1,9 @@
 import 'dart:io' as io;
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 
+import 'package:flutter/rendering.dart';
 import 'package:video_player/video_player.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -269,8 +272,8 @@ class Console extends StatelessWidget {
   final CameraController? cameraController;
   final double? aspectRatio;
   final bool? toMirror, images;
-  final List<Down4Media>? medias;
-  final void Function(Down4Media)? selectMedia;
+  final List<MessageMedia>? medias;
+  final void Function(MessageMedia)? selectMedia;
   final String? imagePreviewPath;
   final bool animatedInputs;
   final VideoPlayerController? videoPlayerController;
@@ -279,6 +282,8 @@ class Console extends StatelessWidget {
   final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
   final List<Palette>? forwardingPalette;
   final bool invertedColors;
+
+  static GlobalKey get widgetCaptureKey => GlobalKey();
 
   int get nImageRows => (b.images.keys.length / 5).round();
   double get rowHeight => (consoleWidth / 5);
@@ -394,6 +399,11 @@ class Console extends StatelessWidget {
 
   double get consoleWidth => Sizes.w - (2.0 * consoleGap);
 
+  Size get cameraSize => Size(consoleWidth - 2, consoleWidth - 2);
+
+  Size get cameraTrueSize => Size(
+      cameraSize.width, cameraSize.width * cameraController!.value.aspectRatio);
+
   bool get bb =>
       images == true ||
       cameraController != null ||
@@ -423,6 +433,21 @@ class Console extends StatelessWidget {
   })  : _bottomButtons = bottomButtons,
         _topButtons = topButtons,
         super(key: key);
+
+  Future<Uint8List?> captureWidget() async {
+    final RenderRepaintBoundary? boundary = widgetCaptureKey.currentContext!
+        .findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null) return null;
+    final ui.Image image = await boundary.toImage();
+    final ByteData? byteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) return null;
+    return byteData.buffer.asUint8List();
+  }
+
+  Widget widgetCapture({required Widget child}) {
+    return RepaintBoundary(key: widgetCaptureKey, child: child);
+  }
 
   Widget mainContainer({required List<Widget> children}) => Container(
         margin: EdgeInsets.only(
@@ -492,17 +517,15 @@ class Console extends StatelessWidget {
                 ? SizedBox(
                     height: (consoleWidth - 2) / 5,
                     width: (consoleWidth - 2) / 5,
-                    child: Down4VideoPlayer(
-                      vid: medias![i].file!,
-                    ),
+                    child: Down4VideoPlayer(media: medias![i]),
                   )
                 : GestureDetector(
                     onTap: () => selectMedia?.call(medias![i]),
                     child: SizedBox(
                       height: (consoleWidth - 2) / 5,
                       width: (consoleWidth - 2) / 5,
-                      child: Image.memory(
-                        medias![i].data,
+                      child: Image.file(
+                        io.File(medias![i].path!),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -523,31 +546,81 @@ class Console extends StatelessWidget {
         );
       }));
 
-  Widget consoleCamera() => Transform.scale(
-        alignment: Alignment.center,
-        scaleY: aspectRatio,
-        child: AspectRatio(
-          aspectRatio: aspectRatio!,
-          child: CameraPreview(cameraController!),
-        ),
-      );
+  // Widget consoleCamera() => DisplayMediaBody(
+  //       shouldScale: false,
+  //       isReversed: false,
+  //       renderRect: Size(consoleWidth - 2, consoleWidth - 2),
+  //       mediaCaptureSize: Size(consoleWidth - 2, (consoleWidth - 2) * aspectRatio!),
+  //       child: CameraPreview(cameraController!),
+  //     );
 
-  Widget consoleImagePreview({bool? toMirror = false}) => Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.rotationY(toMirror == true ? math.pi : 0),
-      child: Image.file(
-        io.File(imagePreviewPath!),
-        fit: BoxFit.cover,
-      ));
+  Widget consoleCamera() {
+    var scale = aspectRatio! * 1.0;
+    scale = scale > 1 ? scale : 1 / scale;
 
-  Widget consoleVideoPreview({bool? toMirror = false}) => Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.rotationY(toMirror == true ? math.pi : 0),
-        child: Transform.scale(
-          scaleY: aspectRatio,
-          child: VideoPlayer(videoPlayerController!),
-        ),
+    return Down4Display(
+      displayType: DisplayType.camera,
+      isReversed: false,
+      renderRect: cameraSize,
+      captureAspectRatio: aspectRatio!,
+      child: CameraPreview(cameraController!),
+    );
+
+    return Center(
+      child: Transform.scale(
+        scale: scale,
+        child: CameraPreview(cameraController!),
+      ),
+    );
+  }
+  //
+  // Widget consoleCamera() =>DisplayMediaBody(
+  //   shouldScale: false,
+  //   isReversed: false,
+  //   renderRect: Size(consoleWidth - 2, consoleWidth - 2),
+  //   mediaCaptureSize: Size(consoleWidth - 2,
+  //       (consoleWidth - 2) * cameraController!.value.aspectRatio),
+  //   child: CameraPreview(cameraController!),
+  // );
+  // Transform.scale(
+  //   alignment: Alignment.center,
+  //   scaleY: aspectRatio,
+  //   child: AspectRatio(
+  //     aspectRatio: aspectRatio!,
+  //     child: CameraPreview(cameraController!),
+  //   ),
+  // );
+
+  Widget consoleImagePreview({bool? toMirror = false}) => Down4Display(
+        displayType: DisplayType.image,
+        isReversed: toMirror == true,
+        renderRect: cameraSize,
+        captureAspectRatio: aspectRatio!,
+        child: Image.file(io.File(imagePreviewPath!)),
       );
+  // Transform(
+  // alignment: Alignment.center,
+  // transform: Matrix4.rotationY(toMirror == true ? math.pi : 0),
+  // child: Image.file(
+  //   io.File(imagePreviewPath!),
+  //   fit: BoxFit.cover,
+  // ));
+
+  Widget consoleVideoPreview({bool? toMirror = false}) => Down4Display(
+        displayType: DisplayType.video,
+        isReversed: toMirror == true,
+        renderRect: cameraSize,
+        captureAspectRatio: aspectRatio!,
+        child: VideoPlayer(videoPlayerController!),
+      );
+  // Transform(
+  //   alignment: Alignment.center,
+  //   transform: Matrix4.rotationY(toMirror == true ? math.pi : 0),
+  //   child: Transform.scale(
+  //     scaleY: aspectRatio,
+  //     child: VideoPlayer(videoPlayerController!),
+  //   ),
+  // );
 
   Widget bbContainer({required Widget child}) => Container(
       clipBehavior: Clip.hardEdge,
@@ -640,12 +713,12 @@ class Console extends StatelessWidget {
             child: bbContainer(
               child: images == true
                   ? consoleMedias()
-                  : cameraController != null
-                      ? consoleCamera()
-                      : imagePreviewPath != null
-                          ? consoleImagePreview(toMirror: toMirror)
-                          : videoPlayerController != null
-                              ? consoleVideoPreview(toMirror: toMirror)
+                  : imagePreviewPath != null
+                      ? consoleImagePreview(toMirror: toMirror)
+                      : videoPlayerController != null
+                          ? consoleVideoPreview(toMirror: toMirror)
+                          : cameraController != null
+                              ? consoleCamera()
                               : scanController != null
                                   ? consoleScanner()
                                   : const SizedBox.shrink(),

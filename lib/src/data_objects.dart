@@ -45,54 +45,82 @@ enum NodesColor {
   unsafeTx,
 }
 
-class Down4Media {
-  Identifier id;
-  MediaMetadata metadata;
-  Uint8List data;
-  String? networkUrl;
+abstract class Media {
+  final Identifier id;
   String? path;
-  File? file;
-  Uint8List? thumbnail;
-
-  Down4Media({
+  MediaMetadata metadata;
+  Media({
     required this.id,
     required this.metadata,
-    required this.data,
-    this.thumbnail,
-    this.networkUrl,
     this.path,
-    this.file,
   });
 
-  factory Down4Media.fromJson(Map<String, dynamic> decodedJson) {
-    final metadata = MediaMetadata.fromJson(decodedJson["md"]);
-    return Down4Media(
+  String get url;
+}
+
+class MessageMedia extends Media {
+  MessageMedia({
+    required Identifier id,
+    required MediaMetadata metadata,
+    String? path,
+  }) : super(id: id, metadata: metadata, path: path);
+
+  NodeMedia asNodeMedia() {
+    return NodeMedia(id: id, metadata: metadata, path: path);
+  }
+
+  factory MessageMedia.fromJson(dynamic decodedJson) {
+    return MessageMedia(
       id: decodedJson["id"],
-      metadata: metadata,
-      data: base64Decode(decodedJson["d"]),
-      thumbnail: decodedJson["tn"] != null && decodedJson["tn"] != ""
-          ? base64Decode(decodedJson["tn"])
-          : null,
+      metadata: MediaMetadata.fromJson(decodedJson["md"]),
+      path: decodedJson["p"],
     );
   }
 
-  factory Down4Media.fromCamera(String filePath, MediaMetadata md) {
-    final file = File(filePath);
-    final data = file.readAsBytesSync();
-    return Down4Media(
-      id: d4utils.generateMediaID(data),
-      data: data,
-      metadata: md,
-      path: filePath,
-      file: file,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson([bool toLocal = false]) => {
         "id": id,
         "md": metadata.toJson(),
-        "d": base64Encode(data),
-        if (thumbnail != null) "tn": base64Encode(thumbnail!),
+        if (path != null && toLocal) "p": path!,
+      };
+
+  @override
+  String get url => "https://storage.googleapis.com/down4-26ee1-messages/$id";
+}
+
+class NodeMedia extends Media {
+  NodeMedia({
+    required Identifier id,
+    required MediaMetadata metadata,
+    String? path,
+    this.data,
+  }) : super(id: id, metadata: metadata, path: path);
+
+  Uint8List? data;
+
+  MessageMedia asMessageMedia() {
+    return MessageMedia(id: id, metadata: metadata, path: path);
+  }
+
+  factory NodeMedia.fromJson(dynamic decodedJson) {
+    final b64Data = decodedJson["d"];
+    return NodeMedia(
+      id: decodedJson["id"],
+      metadata: MediaMetadata.fromJson(decodedJson["md"]),
+      path: decodedJson["p"],
+      data: b64Data != "" || b64Data != null ? base64Decode(b64Data) : null,
+    );
+  }
+
+  @override
+  String get url => "https://storage.googleapis.com/down4-26ee1-nodes/$id";
+
+  @override
+  Map<String, dynamic> toJson({bool withData = true, bool withPath = false}) =>
+      {
+        "id": id,
+        "md": metadata.toJson(),
+        if (path != null && withPath) "p": path,
+        if (data != null && withData) "d": base64Encode(data!),
       };
 }
 
@@ -102,33 +130,32 @@ class MessageNotification {
   MessageNotification({required this.type, this.base64jsonData});
 }
 
-class Down4Message {
+class Message {
   final Messages type;
   final Identifier id;
   final Identifier senderID;
-  final Identifier? root, forwarderID, paymentID, mediaID;
+  final Identifier? root, forwarderID, mediaID;
   final String? text;
   final int timestamp;
   final List<Identifier>? replies, nodes; // reactions, nodes
   bool read;
 
-  Down4Message({
+  Message({
     required this.senderID,
     required this.type,
     required this.timestamp,
     required this.id,
+    this.mediaID,
     this.read = false,
     this.root,
-    this.mediaID,
-    this.paymentID,
     this.forwarderID,
     this.text,
     this.nodes,
     this.replies,
   });
 
-  Down4Message forwarded(BaseNode self) {
-    return Down4Message(
+  Message forwarded(BaseNode self) {
+    return Message(
       type: type,
       id: id,
       text: text,
@@ -136,15 +163,14 @@ class Down4Message {
       senderID: senderID,
       forwarderID: self.id != senderID ? self.id : null,
       mediaID: mediaID,
-      paymentID: paymentID,
       nodes: nodes,
       replies: replies,
     );
   }
 
-  factory Down4Message.fromJson(Map<String, dynamic> decodedJson) {
+  factory Message.fromJson(Map<String, dynamic> decodedJson) {
     print("decodedJson message: $decodedJson");
-    return Down4Message(
+    return Message(
       type: Messages.values.byName(decodedJson["t"]),
       id: decodedJson["id"],
       senderID: decodedJson["s"],
@@ -152,7 +178,8 @@ class Down4Message {
       read: decodedJson["rs"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
-      paymentID: decodedJson["p"],
+      // mediaID: decodedJson["m"],
+      // paymentID: decodedJson["p"],
       timestamp: decodedJson["ts"],
       root: decodedJson["rt"],
       replies: (decodedJson["r"] ?? "").isNotEmpty
@@ -171,12 +198,11 @@ class Down4Message {
         if (text != null) 'txt': text,
         's': senderID,
         'ts': timestamp,
+        if (mediaID != null) 'm': mediaID,
         if (withReadStatus) 'rs': read,
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
-        if (paymentID != null) 'p': paymentID,
-        if (mediaID != null) 'm': mediaID,
       };
 }
 
@@ -211,7 +237,7 @@ abstract class BaseNode {
           lastName: decodedJson["ln"],
           activity: decodedJson["a"],
           media: decodedJson["im"]?["d"] != null
-              ? Down4Media.fromJson(decodedJson["im"])
+              ? NodeMedia.fromJson(decodedJson["im"])
               : null,
         );
 
@@ -223,7 +249,7 @@ abstract class BaseNode {
           group: List<Identifier>.from(decodedJson["grp"] ?? []),
           messages: List<Identifier>.from(decodedJson["msg"] ?? []),
           snips: List<Identifier>.from(decodedJson["snp"] ?? []),
-          media: Down4Media.fromJson(decodedJson["im"]),
+          media: NodeMedia.fromJson(decodedJson["im"]),
           activity: decodedJson["a"],
         );
 
@@ -232,7 +258,7 @@ abstract class BaseNode {
           isPrivate: decodedJson["pv"],
           name: decodedJson["nm"],
           id: id,
-          media: Down4Media.fromJson(decodedJson["im"]),
+          media: NodeMedia.fromJson(decodedJson["im"]),
           group: List<Identifier>.from(decodedJson["grp"]),
           messages: List<Identifier>.from(decodedJson["msg"] ?? <Identifier>[]),
           snips: List<Identifier>.from(decodedJson["snp"] ?? <Identifier>[]),
@@ -283,7 +309,7 @@ abstract class ChatableNode extends BaseNode {
 abstract class GroupNode extends ChatableNode {
   List<Identifier> get group;
   set group(List<Identifier> group);
-  Down4Media get media;
+  Media get media;
   GroupNode({
     int? activity,
     required List<Identifier> messages,
@@ -301,7 +327,7 @@ class User extends ChatableNode implements BranchNode {
   final Down4Keys neuter;
   String firstName;
   List<Identifier> children;
-  Down4Media? media;
+  NodeMedia? media;
   String? lastName;
   bool isFriend;
   String description;
@@ -347,7 +373,7 @@ class User extends ChatableNode implements BranchNode {
 class Group extends GroupNode {
   Identifier id;
   bool isPrivate;
-  Down4Media media;
+  NodeMedia media;
   String name;
   List<Identifier> group;
   Group({
@@ -381,7 +407,7 @@ class Group extends GroupNode {
 class Hyperchat extends GroupNode {
   final Identifier id;
   final String firstWord, secondWord;
-  final Down4Media media;
+  final NodeMedia media;
   List<Identifier> group;
   Hyperchat({
     required this.id,
@@ -424,7 +450,8 @@ class Payment extends BaseNode {
 
   Down4Payment get payment => _payment;
 
-  String get displayID => "Confirmations: ${_payment.lastConfirmations}";
+  String get displayID =>
+      "Confirmations: ${_payment.lastConfirmations > 100 ? "100+" : _payment.lastConfirmations}";
 
   NodesColor get colorCode => _payment.lastConfirmations == 0
       ? NodesColor.unsafeTx
@@ -439,36 +466,59 @@ class Payment extends BaseNode {
 }
 
 class MediaMetadata {
-  final bool toReverse, shareable, payToView, isVideo, payToOwn;
+  final bool isReversed,
+      isLocked,
+      isPaidToView,
+      isPaidToOwn,
+      isSquared,
+      isVideo,
+      canSkipCheck;
   final Identifier owner;
-  final double? aspectRatio;
+  final double elementAspectRatio;
   final String? text;
   int timestamp;
   MediaMetadata({
     required this.owner,
     required this.timestamp,
+    required this.elementAspectRatio,
     this.isVideo = false,
-    this.shareable = true,
-    this.payToView = false,
-    this.toReverse = false,
-    this.payToOwn = false,
-    this.aspectRatio,
+    this.isLocked = false,
+    this.canSkipCheck = false,
+    this.isPaidToView = false,
+    this.isReversed = false,
+    this.isPaidToOwn = false,
+    this.isSquared = false,
     this.text,
   });
+
+  MediaMetadata updatedTimestamp(int newTimeStamp) {
+    return MediaMetadata(
+      owner: owner,
+      timestamp: newTimeStamp,
+      elementAspectRatio: elementAspectRatio,
+      isVideo: isVideo,
+      isReversed: isReversed,
+      isPaidToOwn: isPaidToOwn,
+      canSkipCheck: false,
+      isPaidToView: isPaidToView,
+      isSquared: isSquared,
+      isLocked: isLocked,
+      text: text,
+    );
+  }
 
   factory MediaMetadata.fromJson(Map<String, dynamic> decodedJson) {
     return MediaMetadata(
       owner: decodedJson["o"],
       timestamp: int.parse(decodedJson["ts"]),
-      isVideo: decodedJson["vid"] == "true",
-      toReverse: decodedJson["trv"] == "true",
-      shareable: decodedJson["shr"] == "true",
-      payToView: decodedJson["ptv"] == "true",
-      payToOwn: decodedJson["pto"] == "true",
+      isReversed: decodedJson["trv"] == "true",
+      isLocked: decodedJson["lck"] == "true",
+      isPaidToView: decodedJson["ptv"] == "true",
+      isPaidToOwn: decodedJson["pto"] == "true",
+      canSkipCheck: decodedJson["csc"] == "true",
       text: decodedJson["txt"],
-      aspectRatio: decodedJson["ar"] != "null" && decodedJson["ar"] != null
-          ? double.parse(decodedJson["ar"])
-          : null,
+      isSquared: decodedJson["sqr"] == "true",
+      elementAspectRatio: double.tryParse(decodedJson["ar"]) ?? 1.0,
     );
   }
 
@@ -476,12 +526,13 @@ class MediaMetadata {
     return {
       "o": owner,
       "ts": timestamp.toString(),
-      "vid": isVideo.toString(),
-      "trv": toReverse.toString(),
-      "shr": shareable.toString(),
-      "ptv": payToView.toString(),
-      "pto": payToOwn.toString(),
-      "ar": aspectRatio.toString(),
+      "trv": isReversed.toString(),
+      "sqr": isSquared.toString(),
+      "lck": isLocked.toString(),
+      "ptv": isPaidToView.toString(),
+      "csc": canSkipCheck.toString(),
+      "pto": isPaidToOwn.toString(),
+      "ar": elementAspectRatio.toString(),
       if (text != null) "txt": text!,
     };
   }

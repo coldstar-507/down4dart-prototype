@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:io';
 import 'dart:convert' show utf8;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/utils.dart';
 import 'package:down4/src/data_objects.dart';
+import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_picker/file_picker.dart';
@@ -60,8 +61,8 @@ class _GroupPageState extends State<GroupPage> {
   late var scrollController =
       ScrollController(initialScrollOffset: widget.initialOffset);
 
-  Map<Identifier, Down4Media> _cachedImages = {};
-  Map<Identifier, Down4Media> _cachedVideos = {};
+  Map<Identifier, MessageMedia> _cachedImages = {};
+  Map<Identifier, MessageMedia> _cachedVideos = {};
 
   Future<void> asyncImageLoad() async {
     Future(() {
@@ -78,22 +79,22 @@ class _GroupPageState extends State<GroupPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          precacheImage(MemoryImage(image.data), context);
+          precacheImage(FileImage(File(image.path!)), context);
         }
       }).then((value) => print("precached all images"));
     });
   }
 
-  Iterable<Down4Media> get savedImages => b.images.keys
+  Iterable<MessageMedia> get savedImages => b.images.keys
       .map((mediaID) => _cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
 
-  Iterable<Down4Media> get savedVideos => b.videos.keys
+  Iterable<MessageMedia> get savedVideos => b.videos.keys
       .map((mediaID) => _cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
 
-  Down4Media? groupImage;
+  NodeMedia? groupImage;
   String groupName = "";
 
-  Down4Media? cameraInput;
+  MessageMedia? cameraInput;
 
   @override
   void initState() {
@@ -125,9 +126,9 @@ class _GroupPageState extends State<GroupPage> {
         imagePress: () => loadMediaConsole(forGroupImage: true),
       );
 
-  ConsoleInput get singleInput => ConsoleInput(placeHolder: ":)", tec: tec);
+  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: tec);
 
-  void send({Down4Media? mediaInput}) {
+  Future<void> send({MessageMedia? mediaInput}) async {
     if (groupImage == null || groupName.isEmpty) return;
     if (cameraInput == null && tec.value.text.isEmpty && mediaInput == null) {
       return;
@@ -137,7 +138,7 @@ class _GroupPageState extends State<GroupPage> {
     final idd = utf8.encode(groupName + groupImage!.id + ts.toRadixString(16));
     final groupID = sha1(idd).toBase58();
 
-    final msg = Down4Message(
+    final msg = Message(
       root: groupID,
       type: Messages.chat,
       id: messagePushId(),
@@ -205,8 +206,10 @@ class _GroupPageState extends State<GroupPage> {
   //   loadMediaConsole();
   // }
 
-  Future<void> handleImport(
-      {bool groupImageImport = false, bool importImages = true}) async {
+  Future<void> handleImport({
+    bool groupImageImport = false,
+    bool importImages = true,
+  }) async {
     if (importImages) {
       final files = await ImagePicker().pickMultiImage(
         maxWidth: 512,
@@ -215,25 +218,27 @@ class _GroupPageState extends State<GroupPage> {
         requestFullMetadata: false,
       );
       for (final file in files) {
-        final bytes = await file.readAsBytes();
-        final decodedImage = await decodeImageFromList(bytes);
-        final mediaID = u.generateMediaID(bytes);
-        final down4Media = Down4Media(
-          id: mediaID,
-          data: bytes,
-          metadata: MediaMetadata(
-            timestamp: u.timeStamp(),
-            owner: widget.self.id,
-            aspectRatio: decodedImage.height / decodedImage.width,
-          ),
-        );
+        final mediaID = u.randomMediaID();
+        // final appPath = b.writeToDocs(cachedPath: file.path, mediaID: mediaID);
+        final size = calculateImageDimension(f: File(file.path));
+        final down4Media = NodeMedia(
+            path: file.path,
+            id: mediaID,
+            metadata: MediaMetadata(
+              isSquared: false,
+              isVideo: false,
+              isReversed: false,
+              timestamp: u.timeStamp(),
+              owner: widget.self.id,
+              elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
+            ));
         if (groupImageImport) {
           groupImage = down4Media;
           loadBaseConsole();
-          animatedTransition();
+          animatedTransition(); // hack
         } else {
           down4Media.save(toPersonal: true);
-          _cachedImages[mediaID] = down4Media;
+          _cachedImages[mediaID] = down4Media.asMessageMedia();
           loadMediaConsole();
         }
       }
@@ -243,17 +248,24 @@ class _GroupPageState extends State<GroupPage> {
         maxDuration: const Duration(seconds: 15),
       );
       if (video == null) return;
-      final bytes = await video.readAsBytes();
-      final mediaID = u.generateMediaID(bytes);
-      final down4Media = Down4Media(
-        id: mediaID,
-        data: bytes,
-        metadata: MediaMetadata(
-          timestamp: u.timeStamp(),
-          owner: widget.self.id,
-          isVideo: true,
-        ),
-      )..save(toPersonal: true);
+      final fvi = FlutterVideoInfo();
+      final mediaID = u.randomMediaID();
+      // final appPath = b.writeToDocs(cachedPath: video.path, mediaID: mediaID);
+      final videoInfo = await fvi.getVideoInfo(video.path);
+
+      final down4Media = MessageMedia(
+          id: mediaID,
+          path: video.path,
+          metadata: MediaMetadata(
+            isSquared: false,
+            isReversed: false,
+            elementAspectRatio:
+                (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0),
+            timestamp: u.timeStamp(),
+            owner: widget.self.id,
+            isVideo: true,
+          ))
+        ..save(toPersonal: true);
       _cachedVideos[mediaID] = down4Media;
       loadMediaConsole(images: false);
     }
@@ -261,11 +273,11 @@ class _GroupPageState extends State<GroupPage> {
 
   void loadMediaConsole({bool images = true, bool forGroupImage = false}) {
     console = Console(
-      inputs: [singleInput],
+      inputs: [consoleInput],
       images: true,
       selectMedia: (media) {
         if (forGroupImage) {
-          groupImage = media;
+          groupImage = media.asNodeMedia();
           loadBaseConsole();
           animatedTransition();
         } else {
@@ -296,7 +308,7 @@ class _GroupPageState extends State<GroupPage> {
 
   void loadBaseConsole() {
     console = Console(
-      inputs: [singleInput],
+      inputs: [consoleInput],
       topButtons: [
         ConsoleButton(
           isMode: true,
@@ -320,23 +332,41 @@ class _GroupPageState extends State<GroupPage> {
     setState(() {});
   }
 
-  Future<void> loadSquaredCameraPreview() async {
-    if (cameraInput == null) return loadBaseConsole();
+  Future<void> loadSquaredCameraPreview({
+    required String cachedPath,
+    required bool isVideo,
+    required bool isReversed,
+    required double aspectRatio,
+  }) async {
     VideoPlayerController? vpc;
-    String? path;
-    if (cameraInput!.metadata.isVideo) {
-      vpc = VideoPlayerController.file(cameraInput!.file!);
+    if (isVideo) {
+      vpc = VideoPlayerController.file(File(cachedPath));
       await vpc.initialize();
-    } else {
-      path = cameraInput!.path;
     }
-
     console = Console(
-      inputs: [singleInput],
+      inputs: [consoleInput],
+      toMirror: isReversed,
       videoPlayerController: vpc,
-      imagePreviewPath: path,
+      imagePreviewPath: cachedPath,
       topButtons: [
-        ConsoleButton(name: "Accept", onPress: loadBaseConsole),
+        ConsoleButton(
+            name: "Accept",
+            onPress: () {
+              cameraInput = MessageMedia(
+                id: u.randomMediaID(),
+                path: cachedPath,
+                metadata: MediaMetadata(
+                  isReversed: isReversed,
+                  isVideo: isVideo,
+                  isSquared: true,
+                  canSkipCheck: true,
+                  owner: widget.self.id,
+                  elementAspectRatio: aspectRatio,
+                  timestamp: u.timeStamp(),
+                ),
+              );
+              loadBaseConsole();
+            }),
       ],
       bottomButtons: [
         ConsoleButton(
@@ -372,9 +402,9 @@ class _GroupPageState extends State<GroupPage> {
     }
     ctrl?.setFlashMode(fm);
     console = Console(
-      inputs: [singleInput],
-      aspectRatio: ctrl?.value.aspectRatio,
+      inputs: [consoleInput],
       cameraController: ctrl,
+      aspectRatio: ctrl?.value.aspectRatio,
       topButtons: [
         ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
         ConsoleButton(
@@ -384,15 +414,12 @@ class _GroupPageState extends State<GroupPage> {
           onPress: () async {
             var file = await ctrl?.takePicture();
             if (file == null) loadBaseConsole();
-            cameraInput = Down4Media.fromCamera(
-                file!.path,
-                MediaMetadata(
-                  owner: widget.self.id,
-                  isVideo: false,
-                  timestamp: u.timeStamp(),
-                  toReverse: cam == 1,
-                ));
-            loadSquaredCameraPreview();
+            loadSquaredCameraPreview(
+              cachedPath: file!.path,
+              aspectRatio: ctrl!.value.aspectRatio,
+              isReversed: ctrl?.cameraId == 1,
+              isVideo: false,
+            );
           },
           onLongPress: () async {
             await ctrl?.startVideoRecording();
@@ -401,20 +428,23 @@ class _GroupPageState extends State<GroupPage> {
           onLongPressUp: () async {
             var file = await ctrl?.stopVideoRecording();
             if (file == null) loadBaseConsole();
-            cameraInput = Down4Media.fromCamera(
-                file!.path,
-                MediaMetadata(
-                  owner: widget.self.id,
-                  isVideo: true,
-                  timestamp: u.timeStamp(),
-                  toReverse: cam == 1,
-                ));
-            loadSquaredCameraPreview();
+            loadSquaredCameraPreview(
+              cachedPath: file!.path,
+              aspectRatio: ctrl!.value.aspectRatio,
+              isReversed: ctrl?.cameraId == 1,
+              isVideo: true,
+            );
           },
         ),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+            name: "Back",
+            onPress: () async {
+              await ctrl?.dispose();
+              ctrl = null;
+              loadBaseConsole();
+            }),
         ConsoleButton(
           name: cam == 0 ? "Rear" : "Front",
           isMode: true,

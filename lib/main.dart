@@ -1,3 +1,4 @@
+import 'package:down4/src/boxes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,10 +10,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'firebase_options.dart';
 import 'src/login.dart';
 
 String docDirPath = "";
+String tempDirPath = "";
 
 Future<void> _initBox() async {
   await Hive.openBox("User");
@@ -110,8 +111,8 @@ Future<void> main() async {
     // TODO kIsWeb
   }
 
-  final dir = await getApplicationDocumentsDirectory();
-  docDirPath = dir.path;
+  docDirPath = (await getApplicationDocumentsDirectory()).path;
+  tempDirPath = (await getTemporaryDirectory()).path;
   Hive.init(docDirPath);
   await _initBox();
 
