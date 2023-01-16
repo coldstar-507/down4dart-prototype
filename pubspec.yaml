@@ -37,6 +37,7 @@ dependencies:
 
   # Packages
   qr: ^3.0.1
+  isar: ^3.0.5
   mobile_scanner: ^2.0.0
   path_provider: ^2.0.9
   base85: ^1.0.3

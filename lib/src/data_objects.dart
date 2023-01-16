@@ -77,7 +77,7 @@ class MessageMedia extends Media {
     );
   }
 
-  Map<String, dynamic> toJson([bool toLocal = false]) => {
+  Map<String, dynamic> toJson({bool toLocal = false}) => {
         "id": id,
         "md": metadata.toJson(),
         if (path != null && toLocal) "p": path!,
