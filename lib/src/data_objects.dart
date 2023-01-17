@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'down4_utility.dart' as d4utils;
+// import 'package:isar/isar.dart';
+
+import 'down4_utility.dart' as u;
 import 'bsv/types.dart';
+
+// part 'data_objects.g.dart';
 
 typedef Identifier = String;
 
@@ -26,6 +30,7 @@ enum Nodes {
   event,
   ticket,
   payment,
+  self,
 }
 
 enum NodesColor {
@@ -43,6 +48,7 @@ enum NodesColor {
   safeTx,
   mediumTx,
   unsafeTx,
+  self,
 }
 
 abstract class Media {
@@ -63,7 +69,14 @@ class MessageMedia extends Media {
     required Identifier id,
     required MediaMetadata metadata,
     String? path,
+    this.references = 1,
   }) : super(id: id, metadata: metadata, path: path);
+
+  bool get isVideo => metadata.isVideo;
+
+  int references;
+  void incrementLinks() => references++;
+  void decrementLinks() => references--;
 
   NodeMedia asNodeMedia() {
     return NodeMedia(id: id, metadata: metadata, path: path);
@@ -71,15 +84,16 @@ class MessageMedia extends Media {
 
   factory MessageMedia.fromJson(dynamic decodedJson) {
     return MessageMedia(
-      id: decodedJson["id"],
-      metadata: MediaMetadata.fromJson(decodedJson["md"]),
-      path: decodedJson["p"],
-    );
+        id: decodedJson["id"],
+        metadata: MediaMetadata.fromJson(decodedJson["md"]),
+        path: decodedJson["p"],
+        references: decodedJson["lc"]);
   }
 
   Map<String, dynamic> toJson({bool toLocal = false}) => {
         "id": id,
         "md": metadata.toJson(),
+        if (toLocal) "lc": references,
         if (path != null && toLocal) "p": path!,
       };
 
@@ -131,7 +145,7 @@ class MessageNotification {
 }
 
 class Message {
-  final Messages type;
+  // final Messages type;
   final Identifier id;
   final Identifier senderID;
   final Identifier? root, forwarderID, mediaID;
@@ -142,7 +156,7 @@ class Message {
 
   Message({
     required this.senderID,
-    required this.type,
+    // required this.type,
     required this.timestamp,
     required this.id,
     this.mediaID,
@@ -156,7 +170,7 @@ class Message {
 
   Message forwarded(BaseNode self) {
     return Message(
-      type: type,
+      // type: type,
       id: id,
       text: text,
       timestamp: timestamp,
@@ -171,7 +185,7 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> decodedJson) {
     print("decodedJson message: $decodedJson");
     return Message(
-      type: Messages.values.byName(decodedJson["t"]),
+      // type: Messages.values.byName(decodedJson["t"]),
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
@@ -191,15 +205,15 @@ class Message {
     );
   }
 
-  Map<String, dynamic> toJson({bool withReadStatus = false}) => {
-        't': type.name,
+  Map<String, dynamic> toJson({bool toLocal = false}) => {
+        // 't': type.name,
         'id': id,
         if (root != null) 'rt': root!,
         if (text != null) 'txt': text,
         's': senderID,
         'ts': timestamp,
         if (mediaID != null) 'm': mediaID,
-        if (withReadStatus) 'rs': read,
+        if (toLocal) 'rs': read,
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
@@ -208,20 +222,15 @@ class Message {
 
 abstract class BaseNode {
   NodesColor get colorCode;
-  Identifier get id;
+  Identifier id;
   String get name;
   String get displayID;
   Map toJson();
   int activity;
-  BaseNode({int? activity}) : activity = activity ?? 0;
+  BaseNode({required this.id, int? activity}) : activity = activity ?? 0;
   void updateActivity([int? newActivity]) =>
-      activity = newActivity ?? d4utils.timeStamp();
+      activity = newActivity ?? u.timeStamp();
   factory BaseNode.fromJson(dynamic decodedJson) {
-    print("""
-    ================================================
-    decodedJson: $decodedJson
-    ================================================
-    """);
     final type = Nodes.values.byName(decodedJson["t"]);
     final id = decodedJson["id"];
     switch (type) {
@@ -295,8 +304,12 @@ abstract class BaseNode {
 
 abstract class ChatableNode extends BaseNode {
   List<Identifier> messages, snips;
-  ChatableNode({int? activity, required this.messages, required this.snips})
-      : super(activity: activity);
+  ChatableNode({
+    required Identifier id,
+    int? activity,
+    required this.messages,
+    required this.snips,
+  }) : super(id: id, activity: activity);
 
   List<Identifier> calculateTargets(Identifier selfID) {
     if (this is GroupNode) {
@@ -307,53 +320,76 @@ abstract class ChatableNode extends BaseNode {
 }
 
 abstract class GroupNode extends ChatableNode {
-  List<Identifier> get group;
-  set group(List<Identifier> group);
-  Media get media;
+  List<Identifier> group;
+  NodeMedia media;
   GroupNode({
+    required Identifier id,
+    required this.group,
+    required this.media,
     int? activity,
     required List<Identifier> messages,
     required List<Identifier> snips,
-  }) : super(activity: activity, messages: messages, snips: snips);
+  }) : super(id: id, activity: activity, messages: messages, snips: snips);
 }
 
-abstract class BranchNode extends BaseNode {
-  List<Identifier> get children;
-  set children(List<Identifier> children);
+mixin Branchable {
+  List<Identifier> get children; // can we remove that if we have set
+  set children(List<Identifier> c);
 }
 
-class User extends ChatableNode implements BranchNode {
-  final Identifier id;
-  final Down4Keys neuter;
+abstract class Person extends ChatableNode with Branchable {
   String firstName;
-  List<Identifier> children;
+  String? lastName, description;
+  Person({
+    required this.firstName,
+    this.lastName,
+    this.description,
+    int? activity,
+    required Identifier id,
+    required List<Identifier> messages,
+    required List<Identifier> snips,
+  }) : super(id: id, messages: messages, snips: snips, activity: activity);
+}
+
+class User extends Person {
+  final Down4Keys neuter;
   NodeMedia? media;
-  String? lastName;
   bool isFriend;
-  String description;
+  @override
+  List<Identifier> children;
 
   User({
     this.isFriend = false,
-    required this.id,
-    required this.firstName,
+    required Identifier id,
+    required String firstName,
     this.media,
-    this.lastName,
+    String? lastName,
+    String? description,
     required this.neuter,
     required List<Identifier> messages,
     required List<Identifier> snips,
     required this.children,
-    String? description,
     int? activity,
-  })  : description = description ?? "",
-        super(activity: activity, messages: messages, snips: snips);
+  }) : super(
+          id: id,
+          activity: activity,
+          messages: messages,
+          snips: snips,
+          firstName: firstName,
+          lastName: lastName,
+        );
 
+  @override
   String get displayID => "@$id";
 
+  @override
   String get name => firstName + ((lastName != null) ? " $lastName" : "");
 
+  @override
   NodesColor get colorCode =>
       isFriend ? NodesColor.friend : NodesColor.nonFriend;
 
+  @override
   Map toJson({bool toLocal = true, bool withMedia = true}) => {
         "t": Nodes.user.name,
         "id": id,
@@ -370,27 +406,88 @@ class User extends ChatableNode implements BranchNode {
       };
 }
 
-class Group extends GroupNode {
-  Identifier id;
-  bool isPrivate;
+class Self extends Person {
+  List<Identifier> images, videos, nfts;
   NodeMedia media;
+
+  @override
+  List<Identifier> children;
+
+  Self({
+    required String firstName,
+    String? lastName,
+    required this.images,
+    required this.videos,
+    required this.nfts,
+    required Identifier id,
+    int? activity,
+    required this.media,
+    required List<Identifier> messages,
+    required this.children,
+    required List<Identifier> snips,
+  }) : super(
+          id: id,
+          messages: messages,
+          snips: snips,
+          firstName: firstName,
+          lastName: lastName,
+          activity: activity,
+        );
+
+  @override
+  Map<String, dynamic> toJson({bool toLocal = true}) => {
+        "t": toLocal ? Nodes.self.name : Nodes.user.name,
+        "id": id,
+        "nm": firstName,
+        if (lastName != null) "ln": lastName,
+        "chl": children,
+        if (toLocal) "im": images,
+        if (toLocal) "vd": videos,
+        if (toLocal) "nf": nfts,
+        if (toLocal) "msg": messages,
+        if (toLocal) "snp": snips,
+        if (toLocal) "a": activity,
+        if (toLocal) "m": media.toJson(withData: true, withPath: true);
+      };
+
+  @override
+  NodesColor get colorCode => NodesColor.self;
+
+  @override
+  String get displayID => id;
+
+  @override
+  String get name => "$firstName${lastName == null ? "" : " $lastName"}";
+}
+
+class Group extends GroupNode {
+  @override
   String name;
-  List<Identifier> group;
+  bool isPrivate;
   Group({
     required this.isPrivate,
     required this.name,
-    required this.id,
-    required this.media,
-    required this.group,
+    required Identifier id,
+    required NodeMedia media,
+    required List<Identifier> group,
     required List<Identifier> messages,
     required List<Identifier> snips,
     int? activity,
-  }) : super(activity: activity, messages: messages, snips: snips);
+  }) : super(
+            id: id,
+            media: media,
+            group: group,
+            activity: activity,
+            messages: messages,
+            snips: snips);
 
-  String get displayID => group.map((id) => "@" + id).join(" ");
+  @override
+  String get displayID => group.map((id) => "@$id").join(" ");
 
+  @override
   NodesColor get colorCode => NodesColor.group;
 
+  @override
   Map toJson({bool withMedia = true, bool toLocal = true}) => {
         "t": Nodes.group.name,
         "pv": isPrivate,
@@ -405,27 +502,34 @@ class Group extends GroupNode {
 }
 
 class Hyperchat extends GroupNode {
-  final Identifier id;
   final String firstWord, secondWord;
-  final NodeMedia media;
-  List<Identifier> group;
   Hyperchat({
-    required this.id,
+    required Identifier id,
     required this.firstWord,
     required this.secondWord,
-    required this.group,
+    required List<Identifier> group,
     required List<Identifier> messages,
     required List<Identifier> snips,
-    required this.media,
+    required NodeMedia media,
     int? activity,
-  }) : super(activity: activity, messages: messages, snips: snips);
+  }) : super(
+            id: id,
+            media: media,
+            group: group,
+            activity: activity,
+            messages: messages,
+            snips: snips);
 
-  String get displayID => group.map((id) => "@" + id).join(" ");
+  @override
+  String get displayID => group.map((id) => "@$id").join(" ");
 
-  String get name => firstWord + " " + secondWord;
+  @override
+  String get name => "$firstWord $secondWord";
 
+  @override
   NodesColor get colorCode => NodesColor.hyperchat;
 
+  @override
   Map toJson() => {
         "t": Nodes.hyperchat.name,
         "id": id,
@@ -441,24 +545,27 @@ class Hyperchat extends GroupNode {
 
 class Payment extends BaseNode {
   final Down4Payment _payment;
-  final Identifier id;
-  final String name;
   Payment({required Down4Payment payment})
       : _payment = payment,
-        id = payment.id,
-        name = payment.formattedName;
+        super(id: payment.id);
+
+  @override
+  String get name => payment.formattedName;
 
   Down4Payment get payment => _payment;
 
+  @override
   String get displayID =>
       "Confirmations: ${_payment.lastConfirmations > 100 ? "100+" : _payment.lastConfirmations}";
 
+  @override
   NodesColor get colorCode => _payment.lastConfirmations == 0
       ? NodesColor.unsafeTx
       : _payment.lastConfirmations < 6
           ? NodesColor.mediumTx
           : NodesColor.safeTx;
 
+  @override
   Map toJson() => {
         "t": Nodes.payment.name,
         "pay": _payment.toYouKnow(),
@@ -475,7 +582,7 @@ class MediaMetadata {
       canSkipCheck;
   final Identifier owner;
   final double elementAspectRatio;
-  final String? text;
+  final String text;
   int timestamp;
   MediaMetadata({
     required this.owner,
@@ -488,7 +595,7 @@ class MediaMetadata {
     this.isReversed = false,
     this.isPaidToOwn = false,
     this.isSquared = false,
-    this.text,
+    this.text = "",
   });
 
   MediaMetadata updatedTimestamp(int newTimeStamp) {
@@ -533,7 +640,7 @@ class MediaMetadata {
       "csc": canSkipCheck.toString(),
       "pto": isPaidToOwn.toString(),
       "ar": elementAspectRatio.toString(),
-      if (text != null) "txt": text!,
+      "txt": text,
     };
   }
 }

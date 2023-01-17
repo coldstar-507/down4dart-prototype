@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:down4/src/down4_utility.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
+// import 'package:sqflite/sql.dart' as sql;
 
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -64,7 +65,7 @@ Future<MessageMedia?> getMessageMediaFromEverywhere(Identifier mediaID) async {
     return MessageMedia.fromJson(jsonDecode(b.images.get(mediaID)));
   } else if (b.videos.containsKey(mediaID)) {
     return MessageMedia.fromJson(jsonDecode(b.videos.get(mediaID)));
-  } else if (b.savedMessageMedias.containsKey(mediaID)){
+  } else if (b.savedMessageMedias.containsKey(mediaID)) {
     return MessageMedia.fromJson(jsonDecode(b.savedMessageMedias.get(mediaID)));
   } else {
     return downloadAndWriteMedia(mediaID) as Future<MessageMedia?>;
@@ -169,35 +170,33 @@ Future<void> uploadOrUpdateMedia(
 //   }
 // }
 
+extension Getters on Identifier {
+  MessageMedia? getMessageMedia() {
+    final String? jsonEncoded = b.medias.get(this);
+    if (jsonEncoded == null) return null;
+    return MessageMedia.fromJson(jsonDecode(jsonEncoded));
+  }
+
+  Message? getMessage() {
+    final String? jsonEncoded = b.medias.get(this);
+    if (jsonEncoded == null) return null;
+    return Message.fromJson(jsonDecode(jsonEncoded));
+  }
+
+  BaseNode? getNode() {
+    final String? jsonEncoded = b.medias.get(this);
+    if (jsonEncoded == null) return null;
+    return BaseNode.fromJson(jsonDecode(jsonEncoded));
+  }
+}
+
 extension MessageSave on Message {
   Future<void> save({bool toSavedMessage = false}) async {
-    if (toSavedMessage) {
-      b.savedMessages.put(id, jsonEncode(toJson(withReadStatus: true)));
-      if (mediaID != null) {
-        final media = await getMessageMediaFromEverywhere(mediaID!);
-        if (media != null) {b.savedMessageMedias.put(mediaID!, jsonEncode(media.toJson(toLocal: true)));}
-      }
-    } else {
-      b.messages.put(id, jsonEncode(toJson(withReadStatus: true)));
-    }
+    b.messages.put(id, jsonEncode(toJson(toLocal: true)));
   }
 
   Future<void> delete({bool isSavedMessage = false}) async {
-    if (isSavedMessage) {
-      b.savedMessages.delete(id);
-      if (mediaID != null) {
-        b.savedMessageMedias.delete(mediaID!);
-        final isElseWhere = b.messageMedias.containsKey(mediaID) || b.images.containsKey(mediaID) || b.videos.containsKey(mediaID);
-        if (!isElseWhere) deleteMediaFile(mediaID!);
-      }
-    } else {
-      b.messages.delete(id);
-      if (mediaID != null) {
-        b.messageMedias.delete(mediaID!);
-        final isElseWhere = b.savedMessageMedias.containsKey(mediaID!) || b.images.containsKey(mediaID) || b.videos.containsKey(mediaID);
-        if (!isElseWhere) deleteMediaFile(mediaID!);
-      }
-    }
+    b.messages.delete(id);
   }
 }
 
@@ -205,24 +204,26 @@ extension NodeSave on BaseNode {
   Future<void> save({bool isSelf = false}) => isSelf
       ? b.user.put(id, jsonEncode(this))
       : b.home.put(id, jsonEncode(this));
-  Future<void> saveUser() => b.user.put(id, jsonEncode(this));
 }
 
 extension MediaSave on MessageMedia {
   void delete({required bool fromSavedMedias}) {
-      if (fromSavedMedias) {
-        if (metadata.isVideo) {b.videos.delete(id); } else {b.images.delete(id);}
-        final isElseWhere = b.savedMessageMedias.containsKey(id) || b.messageMedias.containsKey(id);
-        if (!isElseWhere) deleteMediaFile(id);
-      } else  {
-        b.snipMedias.delete(id);
-        deleteMediaFile(id);
+    if (fromSavedMedias) {
+      if (metadata.isVideo) {
+        b.videos.delete(id);
+      } else {
+        b.images.delete(id);
       }
+      final isElseWhere = b.savedMessageMedias.containsKey(id) ||
+          b.messageMedias.containsKey(id);
+      if (!isElseWhere) deleteMediaFile(id);
+    } else {
+      b.snipMedias.delete(id);
+      deleteMediaFile(id);
+    }
   }
 
-  void save({
-    bool toSavedMedias = true
-  }) {
+  void save({bool toSavedMedias = true}) {
     if (toSavedMedias) {
       if (metadata.isVideo) {
         b.videos.put(id, jsonEncode(toJson(toLocal: true)));
@@ -246,45 +247,55 @@ extension WalletSave on Wallet {
 
 class Boxes {
   static Boxes? _instance;
-  List<String> fileIDs;
+  // List<String> fileIDs;
   String dirPath;
-  Box images,
-      videos,
+  Box
+      // images,
+      //     videos,
       user,
-      reactions,
+      imageIDs,
+      videoIDs,
+      nftIDs,
+      // reactions,
       home,
       messages,
+      medias,
       messageQueue,
       bills,
-      payments,
-      savedMessages,
-      savedMessageMedias,
-      messageMedias,
-      snipMedias;
-      // messageImages,
-      // messageVideos,
-      // snipImages,
-      // snipVideos;
+      payments;
+  // savedMessages,
+  // savedMessageMedias,
+  // messageMedias,
+  // snipMedias;
+  // messageImages,
+  // messageVideos,
+  // snipImages,
+  // snipVideos;
   Boxes()
       : dirPath = main.docDirPath,
-        fileIDs = [],
+        imageIDs = Hive.box("ImageIDs"),
+        videoIDs = Hive.box("VideoIDs"),
+        nftIDs = Hive.box("NftIDs"),
+        medias = Hive.box("Medias"),
+
+        // fileIDs = [],
         user = Hive.box("User"),
-        images = Hive.box("Images"),
-        videos = Hive.box("Videos"),
+        // images = Hive.box("Images"),
+        // videos = Hive.box("Videos"),
         home = Hive.box("Home"),
-        reactions = Hive.box("Reactions"),
+        // reactions = Hive.box("Reactions"),
         messages = Hive.box("Messages"),
         messageQueue = Hive.box("MessageQueue"),
         bills = Hive.box("Bills"),
-        payments = Hive.box("Payments"),
-        savedMessages = Hive.box("SavedMessages"),
-        snipMedias = Hive.box('SnipMedias'),
-        savedMessageMedias = Hive.box('SavedMessageMedias'),
-        // snipImages = Hive.box("SnipImages"),
-        // snipVideos = Hive.box("SnipVideos"),
-        messageMedias = Hive.box('MessageMedias');
-        // messageImages = Hive.box("MessageImages"),
-        // messageVideos = Hive.box("MessageVideos");
+        payments = Hive.box("Payments");
+  // savedMessages = Hive.box("SavedMessages"),
+  // snipMedias = Hive.box('SnipMedias'),
+  // savedMessageMedias = Hive.box('SavedMessageMedias'),
+  // snipImages = Hive.box("SnipImages"),
+  // snipVideos = Hive.box("SnipVideos"),
+  // messageMedias = Hive.box('MessageMedias');
+  // messageImages = Hive.box("MessageImages"),
+  // messageVideos = Hive.box("MessageVideos");
 
   // File writeMediaToFile(Down4Media m) {
   //   var f = File(dirPath + "/" + m.id);

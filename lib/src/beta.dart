@@ -9,17 +9,23 @@ import 'dart:math' as math;
 
 // import 'package:flutter/foundation.dart';
 
+mixin Lol {
+  lol() => print("LOL");
+}
+
+class Jeff with Lol {
+  String name;
+  Jeff({required this.name});
+}
+
 void main() async {
-  final maxInt = 1 << 32;
-  final maxIntBuf = Uint8List(4).buffer.asByteData()
-    ..setUint32(0, (1 << 32) - 1);
+  final jeff = Jeff(name: "jeff");
 
-  final unsafeBuf = Uint8List(4).buffer.asByteData()
-    ..setUint32(0, math.Random().nextInt(1 << 32));
+  jeff.lol();
 
-  print("MAX INT = $maxInt");
-  print("MAX INT BUF = ${maxIntBuf.buffer.asUint8List()}");
-  print("UNSAFE BUF = ${unsafeBuf.buffer.asUint8List()}");
+  print(jeff is Jeff);
+
+  print(jeff is Lol);
 
   // var noun = w.
   // var adjective = w.adjectives.take(1);

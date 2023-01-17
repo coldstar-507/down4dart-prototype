@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:down4/src/down4_utility.dart';
 import 'package:hive/hive.dart';
+import 'dart:async';
 import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -115,7 +116,6 @@ Future<void> main() async {
   tempDirPath = (await getTemporaryDirectory()).path;
   Hive.init(docDirPath);
   await _initBox();
-
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   List<CameraDescription> cameras = [];
