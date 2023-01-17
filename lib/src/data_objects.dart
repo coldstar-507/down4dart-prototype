@@ -152,7 +152,7 @@ class Message {
   final String? text;
   final int timestamp;
   final List<Identifier>? replies, nodes; // reactions, nodes
-  bool read;
+  bool isRead, isSaved;
 
   Message({
     required this.senderID,
@@ -160,7 +160,8 @@ class Message {
     required this.timestamp,
     required this.id,
     this.mediaID,
-    this.read = false,
+    this.isRead = false,
+    this.isSaved = false,
     this.root,
     this.forwarderID,
     this.text,
@@ -189,7 +190,8 @@ class Message {
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
-      read: decodedJson["rs"] ?? false,
+      isRead: decodedJson["rs"],
+      isSaved: decodedJson["sv"],
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
       // mediaID: decodedJson["m"],
@@ -213,7 +215,8 @@ class Message {
         's': senderID,
         'ts': timestamp,
         if (mediaID != null) 'm': mediaID,
-        if (toLocal) 'rs': read,
+        if (toLocal) 'rs': isRead,
+        if (toLocal) 'sv': isSaved,
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
@@ -600,7 +603,7 @@ class MediaMetadata {
       canSkipCheck;
   final Identifier owner;
   final double elementAspectRatio;
-  final String text;
+  final String? text;
   int timestamp;
   MediaMetadata({
     required this.owner,
@@ -613,7 +616,7 @@ class MediaMetadata {
     this.isReversed = false,
     this.isPaidToOwn = false,
     this.isSquared = false,
-    this.text = "",
+    this.text,
   });
 
   MediaMetadata updatedTimestamp(int newTimeStamp) {
@@ -658,7 +661,7 @@ class MediaMetadata {
       "csc": canSkipCheck.toString(),
       "pto": isPaidToOwn.toString(),
       "ar": elementAspectRatio.toString(),
-      "txt": text,
+      if (text != null) "txt": text!,
     };
   }
 }

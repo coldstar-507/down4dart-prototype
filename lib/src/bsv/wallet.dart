@@ -185,7 +185,7 @@ class Wallet {
     return Down4Payment(_chainedTxs(theTx), true, textNote: textNote);
   }
 
-  void parsePayment(User self, Down4Payment pay) {
+  void parsePayment(Identifier selfID, Down4Payment pay) {
     for (final tx in pay.txs) {
       tx.writeTxInfosToUTXOs();
     }
@@ -193,16 +193,16 @@ class Wallet {
     // print("RELEVENT TX MSG = ${releventTx.}")
     for (final utxo in releventTx.txsOut) {
       final spent = _spent[utxo.id] ?? false;
-      if (utxo.receiver == self.id && !spent) _utxos[utxo.id] = utxo;
+      if (utxo.receiver == selfID && !spent) _utxos[utxo.id] = utxo;
     }
     for (final txin in releventTx.txsIn) {
-      if (txin.spender == self.id) _utxos.remove(txin.utxoID);
+      if (txin.spender == selfID) _utxos.remove(txin.utxoID);
     }
     _payments[pay.id] = pay;
     _trySettlement(pay);
   }
 
-  Future<Down4Payment?> importMoney(String pkBase68, User self) async {
+  Future<Down4Payment?> importMoney(String pkBase68, Identifier selfID) async {
     final rawKey = BigInt.parse(base58.decode(pkBase68).toHex(), radix: 16);
 
     final keys = Down4Keys.fromPrivateKey(rawKey);
@@ -224,7 +224,7 @@ class Wallet {
     if (encaissement.asInt <= 0) return null;
 
     _ix = _ix + 1;
-    final down4Secret = makeUint32(_ix) + utf8.encode(self.id);
+    final down4Secret = makeUint32(_ix) + utf8.encode(selfID);
     final down4Keys = DOWN4_NEUTER.derive(down4Secret);
     if (down4Keys == null) return null;
     var down4Out = Down4TXOUT(
@@ -233,10 +233,10 @@ class Wallet {
       scriptPubKey: p2pkh(down4Keys.rawAddress),
     );
 
-    final selfKeys = self.neuter.derive(down4Secret);
+    final selfKeys = keys.derive(down4Secret);
     if (selfKeys == null) return null;
     var selfOut = Down4TXOUT(
-      receiver: self.id,
+      receiver: selfID,
       sats: encaissement,
       scriptPubKey: p2pkh(selfKeys.rawAddress),
     );

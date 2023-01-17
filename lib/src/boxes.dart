@@ -185,11 +185,36 @@ extension Getters on Identifier {
 }
 
 extension MessageSave on Message {
-  Future<void> save({bool toSavedMessage = false}) async {
+  Future<void> onReceipt() async {
+    save();
+    if (mediaID != null) {
+      MessageMedia? localMedia = mediaID?.getMessageMedia();
+      if (localMedia == null) {
+        // try and download it
+        (await downloadAndWriteMedia(mediaID!) as MessageMedia?)
+          ?..references.add(id)
+          ..save();
+      } else {
+        localMedia
+          ..references.add(id)
+          ..save();
+      }
+    }
+  }
+
+  Future<void> save() async {
     b.messages.put(id, jsonEncode(toJson(toLocal: true)));
   }
 
-  Future<void> delete({bool isSavedMessage = false}) async {
+  Future<void> delete() async {
+    final MessageMedia? media = mediaID?.getMessageMedia();
+    if (media != null) {
+      media.references.remove(id);
+      if (media.references.isEmpty && !media.isSaved) {
+        b.medias.delete(media.id);
+        deleteMediaFile(media.id);
+      }
+    }
     b.messages.delete(id);
   }
 }
@@ -201,23 +226,8 @@ extension NodeSave on BaseNode {
 }
 
 extension MediaSave on MessageMedia {
-  void remove() {
-    isSavedInMedias = false;
-    if ((!isSavedInMedias || !isSavedInSavedMessages) && references == 0) {
-
-    }
-  }
-
-  void save({bool toSavedMedias = true}) {
-    if (toSavedMedias) {
-      if (metadata.isVideo) {
-        b.videos.put(id, jsonEncode(toJson(toLocal: true)));
-      } else {
-        b.images.put(id, jsonEncode(toJson(toLocal: true)));
-      }
-    } else {
-      b.snipMedias.put(id, jsonEncode(toJson(toLocal: true)));
-    }
+  void save() {
+    b.medias.put(id, jsonEncode(toJson(toLocal: true)));
   }
 }
 

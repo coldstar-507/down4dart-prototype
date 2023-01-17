@@ -140,7 +140,7 @@ class _HomeState extends State<Home> {
         // PAYLOAD OF A PAYMENT IS SIMPLY p
         final payment = await r.getPayment(eventKey);
         if (payment == null) return;
-        widget.wallet.parsePayment(widget.self, payment);
+        widget.wallet.parsePayment(widget.self.id, payment);
         loadPayments();
         return;
       } else if (eventPayload == "m") {
@@ -153,68 +153,19 @@ class _HomeState extends State<Home> {
         ChatableNode? rootNode = nodeAt(theRoot) as ChatableNode?;
         if (rootNode == null) {
           // need to download it
-
-        }
-
-        if (theRoot == null) {
-          print("There is a root in that message: ${msg.root}");
-          var rootNode = nodeAt(msg.root!) as ChatableNode?;
-          if (rootNode != null) {
-            print("root is local, adding the message to it");
-            rootNode.messages.add(msg.id);
-            // if root is group of hyperchat, we download the media right away
-            if (rootNode.isFriendOrGroup && msg.mediaID != null) {
-              final media = await downloadAndWriteMedia(msg.mediaID!);
-              media?.save();
-            }
-            writePalette(rootNode
-              ..updateActivity()
-              ..save());
-          } else {
-            print("root is not local, downloading it");
-            // root node is not in home
-            // final newNode = await getSingleNode(msg.root!);
-            final fetchedNodes = await r.getNodes([msg.root!]);
-            if (fetchedNodes == null || fetchedNodes.length != 1) return;
-            var newNode = fetchedNodes.first as ChatableNode;
-            newNode.messages.add(msg.id);
-            if (newNode is GroupNode) {
-              // need to get the palettes from the guys who are not friends in this new group
-              var idsToFetch =
-                  newNode.group.toSet().difference(palettes().asIds().toSet());
-              var newNodes = await r.getNodes(idsToFetch);
-              for (var node in newNodes ?? []) {
-                writePalette(node, fold: true, fade: true);
-              }
-            }
-            writePalette(newNode
+          final singleNodeList = await r.getNodes([theRoot]);
+          if (singleNodeList != null && singleNodeList.length == 1) {
+            var theNewNode = singleNodeList.first as ChatableNode;
+            writePalette(theNewNode
+              ..messages.add(msg.id)
               ..updateActivity()
               ..save());
           }
         } else {
-          // msg.root == null
-          var userNode = nodeAt(msg.senderID) as User?;
-          if (userNode != null) {
-            // user is in home
-            userNode.messages.add(msg.id);
-            // if is friend, we download the media right away
-            if (userNode.isFriendOrGroup && msg.mediaID != null) {
-              final media = await downloadAndWriteMedia(msg.mediaID!);
-              media?.save();
-            }
-            writePalette(userNode
-              ..updateActivity()
-              ..save());
-          } else {
-            // userNode is not in home
-            final newUserNodes = await r.getNodes([msg.senderID]);
-            if (newUserNodes == null || newUserNodes.length != 1) return;
-            var newUserNode = newUserNodes.first as User;
-            newUserNode.messages.add(msg.id);
-            writePalette(newUserNode
-              ..updateActivity()
-              ..save());
-          }
+          writePalette(rootNode
+            ..messages.add(msg.id)
+            ..updateActivity()
+            ..save());
         }
         msg.save();
         if (_page is HomePage) {
@@ -246,7 +197,7 @@ class _HomeState extends State<Home> {
   }
 
   void parsePayment(Down4Payment payment) {
-    widget.wallet.parsePayment(widget.self, payment);
+    widget.wallet.parsePayment(widget.self.id, payment);
     widget.wallet.save();
     writePalette(Payment(payment: payment), at: "Payments");
   }
@@ -309,7 +260,7 @@ class _HomeState extends State<Home> {
       if (node.messages.isNotEmpty) {
         var msg = b.loadMessage(node.messages.last);
         lastMessagePreview = msg?.text ?? "&attachment";
-        messagePreviewWasRead = msg?.read ?? true;
+        messagePreviewWasRead = msg?.isRead ?? true;
       }
       return Palette(
           node: node,
@@ -353,7 +304,7 @@ class _HomeState extends State<Home> {
           return null;
         }
         lastMessagePreview = msg?.text ?? "&attachment";
-        messagePreviewWasRead = msg?.read ?? false;
+        messagePreviewWasRead = msg?.isRead ?? false;
       }
       return Palette(
         node: node,
@@ -381,7 +332,7 @@ class _HomeState extends State<Home> {
       if (node.messages.isNotEmpty) {
         var msg = b.loadMessage(node.messages.last);
         lastMessagePreview = msg?.text ?? "&attachment";
-        messagePreviewWasRead = msg?.read ?? false;
+        messagePreviewWasRead = msg?.isRead ?? false;
       }
       return Palette(
         node: node,
@@ -684,19 +635,16 @@ class _HomeState extends State<Home> {
       BaseNode node;
       if (at == "Home") {
         final nodes = await r.getNodes([id]);
-        if (nodes == null) {
-          return;
-        }
+        if (nodes == null) return;
         node = nodes.first;
       } else {
         node = nodeAt(id, at)!;
       }
-      if (node is! BranchNode) return;
-      final childNodes = await r.getNodes(node.children);
-      if (childNodes != null) {
-        for (final node in childNodes) {
-          writePalette(node, at: id, onlyIfAbsent: true);
-        }
+      if (node is! Branchable) return;
+      final childNodes = await r.getNodes((node as Branchable).children);
+      if (childNodes == null) return;
+      for (final node in childNodes) {
+        writePalette(node, at: id, onlyIfAbsent: true);
       }
     }
     _locations.add(Location(type: "Node", id: id, at: at));

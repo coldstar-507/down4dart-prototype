@@ -37,7 +37,7 @@ class Down4 extends StatefulWidget {
 
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
-  User? _user;
+  Self? _self;
   Wallet? _wallet;
   Widget? _view;
 
@@ -61,7 +61,7 @@ class _Down4State extends State<Down4> {
   Future<void> loadUser() async {
     final userData = b.user.get('user');
     if (userData != null) {
-      _user = BaseNode.fromJson(jsonDecode(userData)) as User;
+      _self = BaseNode.fromJson(jsonDecode(userData)) as Self;
       final moneyData = b.user.get('wallet');
       _wallet = Wallet.fromJson(jsonDecode(moneyData)); // if this crashes gg
       home();
@@ -128,8 +128,7 @@ class _Down4State extends State<Down4> {
     //
     // image.thumbnail = thumbnail;
 
-    _user = User(
-      neuter: neutered,
+    _self = Self(
       id: id,
       media: image,
       firstName: name,
@@ -137,12 +136,14 @@ class _Down4State extends State<Down4> {
       children: [],
       messages: [],
       snips: [],
-      isFriend: true,
+      images: [],
+      videos: [],
+      nfts: [],
     );
 
     b.user.putAll({
       'token': token,
-      'user': jsonEncode(_user),
+      'self': jsonEncode(_self),
       'wallet': jsonEncode(_wallet),
     });
 
@@ -155,7 +156,7 @@ class _Down4State extends State<Down4> {
     _view = Home(
       wallet: _wallet!,
       cameras: widget.cameras,
-      self: _user!,
+      self: _self!,
     );
     setState(() {});
   }

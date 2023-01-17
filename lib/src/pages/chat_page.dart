@@ -148,9 +148,9 @@ class _ChatPageState extends State<ChatPage> {
                   : media.metadata.elementAspectRatio);
         }
       }
-      if (!down4Message.read) {
+      if (!down4Message.isRead) {
         down4Message
-          ..read = true
+          ..isRead = true
           ..save();
       } else {
         idOfLastMessageRead ??= down4Message.id;
