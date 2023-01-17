@@ -1,13 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
-
-// import 'package:isar/isar.dart';
 
 import 'down4_utility.dart' as u;
 import 'bsv/types.dart';
-
-// part 'data_objects.g.dart';
 
 typedef Identifier = String;
 
@@ -69,14 +64,16 @@ class MessageMedia extends Media {
     required Identifier id,
     required MediaMetadata metadata,
     String? path,
-    this.references = 1,
-  }) : super(id: id, metadata: metadata, path: path);
+    this.isSaved = false,
+    Set<Identifier>? references,
+  })  : references = references ?? Set<Identifier>.identity(),
+        super(id: id, metadata: metadata, path: path);
 
   bool get isVideo => metadata.isVideo;
 
-  int references;
-  void incrementLinks() => references++;
-  void decrementLinks() => references--;
+  Set<Identifier> references;
+
+  bool isSaved;
 
   NodeMedia asNodeMedia() {
     return NodeMedia(id: id, metadata: metadata, path: path);
@@ -87,13 +84,16 @@ class MessageMedia extends Media {
         id: decodedJson["id"],
         metadata: MediaMetadata.fromJson(decodedJson["md"]),
         path: decodedJson["p"],
-        references: decodedJson["lc"]);
+        isSaved: decodedJson["sv"],
+        references: Set<Identifier>.from(decodedJson["ref"]));
   }
 
   Map<String, dynamic> toJson({bool toLocal = false}) => {
         "id": id,
         "md": metadata.toJson(),
         if (toLocal) "lc": references,
+        if (toLocal) "sv": isSaved,
+        if (toLocal) "ref": references.toList(),
         if (path != null && toLocal) "p": path!,
       };
 
@@ -274,6 +274,21 @@ abstract class BaseNode {
           activity: decodedJson["a"],
         );
 
+      case Nodes.self:
+        return Self(
+          firstName: decodedJson["nm"],
+          lastName: decodedJson["ln"],
+          activity: decodedJson["a"],
+          images: List.from(decodedJson["img"]),
+          videos: List.from(decodedJson["vid"]),
+          nfts: List.from(decodedJson["nft"]),
+          id: id,
+          media: NodeMedia.fromJson(decodedJson["m"]),
+          children: List.from(decodedJson["chl"]),
+          messages: List.from(decodedJson["msg"]),
+          snips: List.from(decodedJson["snp"]),
+        );
+
       case Nodes.root:
         // TODO: Handle this case.
         break;
@@ -377,6 +392,7 @@ class User extends Person {
           snips: snips,
           firstName: firstName,
           lastName: lastName,
+          description: description,
         );
 
   @override
@@ -416,14 +432,15 @@ class Self extends Person {
   Self({
     required String firstName,
     String? lastName,
+    String? description,
     required this.images,
     required this.videos,
     required this.nfts,
     required Identifier id,
     int? activity,
     required this.media,
-    required List<Identifier> messages,
     required this.children,
+    required List<Identifier> messages,
     required List<Identifier> snips,
   }) : super(
           id: id,
@@ -432,6 +449,7 @@ class Self extends Person {
           firstName: firstName,
           lastName: lastName,
           activity: activity,
+          description: description,
         );
 
   @override
@@ -441,13 +459,13 @@ class Self extends Person {
         "nm": firstName,
         if (lastName != null) "ln": lastName,
         "chl": children,
-        if (toLocal) "im": images,
-        if (toLocal) "vd": videos,
-        if (toLocal) "nf": nfts,
+        if (toLocal) "img": images,
+        if (toLocal) "vid": videos,
+        if (toLocal) "nft": nfts,
         if (toLocal) "msg": messages,
         if (toLocal) "snp": snips,
         if (toLocal) "a": activity,
-        if (toLocal) "m": media.toJson(withData: true, withPath: true);
+        if (toLocal) "m": media.toJson(withData: true, withPath: true),
       };
 
   @override

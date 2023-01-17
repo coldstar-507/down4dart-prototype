@@ -59,17 +59,11 @@ Future<void> deleteMediaFile(String mediaID) async {
 String messagePushId() => db.child("Messages").push().key!;
 
 Future<MessageMedia?> getMessageMediaFromEverywhere(Identifier mediaID) async {
-  if (b.messageMedias.containsKey(mediaID)) {
-    return MessageMedia.fromJson(jsonDecode(b.messageMedias.get(mediaID)));
-  } else if (b.images.containsKey(mediaID)) {
-    return MessageMedia.fromJson(jsonDecode(b.images.get(mediaID)));
-  } else if (b.videos.containsKey(mediaID)) {
-    return MessageMedia.fromJson(jsonDecode(b.videos.get(mediaID)));
-  } else if (b.savedMessageMedias.containsKey(mediaID)) {
-    return MessageMedia.fromJson(jsonDecode(b.savedMessageMedias.get(mediaID)));
-  } else {
-    return downloadAndWriteMedia(mediaID) as Future<MessageMedia?>;
+  final String? jsonEncodedMedia = b.medias.get(mediaID);
+  if (jsonEncodedMedia != null) {
+    return MessageMedia.fromJson(jsonDecode(jsonEncodedMedia));
   }
+  return downloadAndWriteMedia(mediaID) as Future<MessageMedia?>;
 }
 
 Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
@@ -98,7 +92,7 @@ Future<Media?> downloadAndWriteMedia(
 
     final mediaData = await futureMediaData;
     if (mediaData != null) {
-      File(path).writeAsBytesSync(mediaData);
+      File(path).writeAsBytes(mediaData);
     }
     return isNodeMedia
         ? NodeMedia(id: mediaID, path: path, metadata: mediaMetadata)
@@ -207,19 +201,10 @@ extension NodeSave on BaseNode {
 }
 
 extension MediaSave on MessageMedia {
-  void delete({required bool fromSavedMedias}) {
-    if (fromSavedMedias) {
-      if (metadata.isVideo) {
-        b.videos.delete(id);
-      } else {
-        b.images.delete(id);
-      }
-      final isElseWhere = b.savedMessageMedias.containsKey(id) ||
-          b.messageMedias.containsKey(id);
-      if (!isElseWhere) deleteMediaFile(id);
-    } else {
-      b.snipMedias.delete(id);
-      deleteMediaFile(id);
+  void remove() {
+    isSavedInMedias = false;
+    if ((!isSavedInMedias || !isSavedInSavedMessages) && references == 0) {
+
     }
   }
 

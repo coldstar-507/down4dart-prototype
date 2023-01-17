@@ -37,7 +37,7 @@ import 'render_objects/console.dart';
 
 class Home extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final User self;
+  final Self self;
   final Wallet wallet;
 
   const Home({
