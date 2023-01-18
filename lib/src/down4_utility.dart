@@ -85,7 +85,7 @@ String randomMediaID() {
   return randomBytes().toBase64();
 }
 
-int timeStamp() => DateTime.now().millisecondsSinceEpoch;
+int timeStamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
 extension IterableNodes on Iterable<BaseNode> {
   List<BaseNode> formatted() =>
@@ -123,14 +123,11 @@ extension StringExtension on String {
 extension Down4TimestampExpiration on int {
   bool get isExpired {
     final now = DateTime.now();
-    final expirationDate = DateTime.fromMillisecondsSinceEpoch(this).add(
-      const Duration(days: 4),
-    );
+    final expirationDate =
+        DateTime.fromMillisecondsSinceEpoch(this).add(const Duration(days: 4));
     return now.isAfter(expirationDate);
   }
-}
 
-extension Down4TimestampUnder16HoursLeft on int {
   bool get shouldBeUpdated {
     final now = DateTime.now().millisecondsSinceEpoch;
     final diff = now - this;

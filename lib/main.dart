@@ -17,18 +17,13 @@ String docDirPath = "";
 String tempDirPath = "";
 
 Future<void> _initBox() async {
-  await Hive.openBox("User");
+  await Hive.openBox("Personal");
   await Hive.openBox("MessageQueue");
-  await Hive.openBox("Home");
-  await Hive.openBox("Images");
-  await Hive.openBox("Videos");
-  await Hive.openBox("Reactions");
+  await Hive.openBox("Nodes");
   await Hive.openBox("Messages");
   await Hive.openBox("Bills");
   await Hive.openBox("Payments");
-  await Hive.openBox("SavedMessages");
-  await Hive.openBox("Snips");
-  await Hive.openBox("MessageMedias");
+  await Hive.openBox("Medias");
 }
 
 // Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {

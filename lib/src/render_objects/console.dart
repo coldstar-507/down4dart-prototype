@@ -116,8 +116,11 @@ class ConsoleButton extends StatelessWidget {
         height: buttonHeight,
         decoration: BoxDecoration(
             shape: BoxShape.rectangle,
-            color: invertColors ? null : PinkTheme.black,
-            border: Border.all(color: Colors.black, width: 0.5)),
+            color: invertColors ? null : null,// PinkTheme.black,
+            border: Border.all(
+              color: Console.contourColor,
+              width: Console.contourWidth,
+            )),
         child: TouchableOpacity(
           shouldBeDownButIsnt: shouldBeDownButIsnt,
           onPress: isActivated ? onPress : () {},
@@ -238,7 +241,8 @@ class ConsoleInput extends StatelessWidget {
       decoration: BoxDecoration(
         color:
             activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
-        border: Border.all(color: Colors.black, width: b ?? false ? 0 : 0.5),
+        border: Border.all(
+            color: Console.contourColor, width: Console.contourWidth),
       ),
       child: child);
 
@@ -252,7 +256,8 @@ class ConsoleInput extends StatelessWidget {
       decoration: BoxDecoration(
         color:
             activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
-        border: Border.all(color: Colors.black, width: 0.5),
+        border: Border.all(
+            color: Console.contourColor, width: Console.contourWidth),
       ),
       child: child);
 
@@ -395,7 +400,11 @@ class Console extends StatelessWidget {
     // return extras;
   }
 
-  double get consoleGap => Sizes.w * 0.028;
+  double get consoleGap => Sizes.w *  0.022;
+
+  static double get contourWidth => 0.6;
+
+  static Color get contourColor => PinkTheme.black;
 
   double get consoleWidth => Sizes.w - (2.0 * consoleGap);
 
@@ -689,8 +698,8 @@ class Console extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         border: Border.all(
-          width: 0.5,
-          color: Colors.black,
+          width: contourWidth,
+          color: contourColor,
         ), // Color.fromRGBO(0, 0, 0, 0.05)),
       ),
       child: Column(

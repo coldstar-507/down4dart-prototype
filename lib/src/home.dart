@@ -53,7 +53,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   Widget? _page;
-  var _exchangeRate;
+  ExchangeRate _exchangeRate = loadExchangeRate();
 
   List<r.Request> _requests = [];
 
@@ -84,12 +84,12 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    loadExchangeRate();
     loadHomePalettes();
     loadPayments();
     widget.wallet.printWalletInfo();
     connectToMessages();
     processWebRequests();
+    updateExchangeRate();
   }
 
   @override
@@ -98,15 +98,10 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  void loadAndUpdateExchangeRate() async {
-    _exchangeRate = loadExchangeRate();
-    updateExchangeRate();
-  }
-
   Future<void> loadHomePalettes() async {
     writePalette(widget.self);
 
-    final jsonEncodedHomeNodes = b.home.values;
+    final jsonEncodedHomeNodes = b.nodes.values;
     var groupPeopleIDs = Set<Identifier>.identity();
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = BaseNode.fromJson(jsonDecode(jsonEncodedHomeNode));
@@ -116,8 +111,8 @@ class _HomeState extends State<Home> {
       writePalette(node);
     }
 
-    final homeUsers = palettes().users().asIds().toSet();
-    final toFetchIDs = groupPeopleIDs.difference(homeUsers);
+    final homePeople = palettes().people().asIds().toSet();
+    final toFetchIDs = groupPeopleIDs.difference(homePeople);
     final fetchedNodes = await r.getNodes(toFetchIDs);
     for (final fetchedNode in fetchedNodes ?? <BaseNode>[]) {
       writePalette(fetchedNode, fold: true, fade: true);
@@ -154,30 +149,39 @@ class _HomeState extends State<Home> {
         if (rootNode == null) {
           // need to download it
           final singleNodeList = await r.getNodes([theRoot]);
-          if (singleNodeList != null && singleNodeList.length == 1) {
-            var theNewNode = singleNodeList.first as ChatableNode;
-            writePalette(theNewNode
-              ..messages.add(msg.id)
-              ..updateActivity()
-              ..save());
+          if (singleNodeList == null || singleNodeList.length != 1) return;
+          rootNode = singleNodeList.first as ChatableNode;
+          if (rootNode is GroupNode) {
+            final userIDs = palettes().people().asIds().toSet();
+            final toFetch = rootNode.group.difference(userIDs);
+            if (toFetch.isNotEmpty) {
+              final fetchNodes = await r.getNodes(toFetch);
+              if (fetchNodes != null) {
+                for (var fetchedNode in fetchNodes) {
+                  writePalette(fetchedNode, fold: true, fade: true);
+                }
+              }
+            }
           }
-        } else {
-          writePalette(rootNode
-            ..messages.add(msg.id)
-            ..updateActivity()
-            ..save());
         }
+
         await msg.onReceipt();
+
+        writePalette(rootNode
+          ..messages.add(msg.id)
+          ..updateActivity()
+          ..save());
+
         if (_page is HomePage) {
           homePage();
         } else if (_page is ChatPage && curLoc.id == theRoot) {
-          var n = nodeAt(theRoot) as ChatableNode?;
-          if (n != null) chatPage(n);
+          chatPage(rootNode);
         }
-        // PAYLOAD OF SNIP IS THE ROOT OF THE SNIP
       } else {
-        final root = eventPayload;
-        final mediaID = eventKey;
+        // SNIP! The payload is senderID OR senderID@root
+        final String root = eventPayload;
+        final String mediaID = eventKey;
+
         ChatableNode? nodeRoot;
         nodeRoot = nodeAt(root) as ChatableNode?;
         if (nodeRoot == null) {
@@ -186,8 +190,27 @@ class _HomeState extends State<Home> {
           if (newRootNodes == null || newRootNodes.length != 1) return;
           nodeRoot = newRootNodes.first as ChatableNode;
         }
-        nodeRoot.snips.add(mediaID);
+
+        Future<void> getOrUpdateMedia(String refID) async {
+          (mediaID.getLocalMessageMedia() ??
+              await downloadAndWriteMedia(mediaID))
+            ?..references.add(refID)
+            ..save();
+        }
+
+        if (nodeRoot is User && nodeRoot.isFriend) {
+          await getOrUpdateMedia(nodeRoot.id);
+        } else if (nodeRoot is Self) {
+          await getOrUpdateMedia(nodeRoot.id);
+        } else if (nodeRoot is GroupNode) {
+          await getOrUpdateMedia(nodeRoot.id);
+        }
+
+        print(
+            "MEDIA ID=$mediaID\nMEDIA REFERECES=${mediaID.getLocalMessageMedia()?.references}");
+
         writePalette(nodeRoot
+          ..snips.add(mediaID)
           ..updateActivity()
           ..save());
 
@@ -266,7 +289,6 @@ class _HomeState extends State<Home> {
           node: node,
           at: at,
           fold: fold,
-          isSelf: widget.self.id == node.id,
           fade: fade,
           snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
           messagePreview: lastMessagePreview,
@@ -296,6 +318,7 @@ class _HomeState extends State<Home> {
         return null;
       } else {
         final msg = node.messages.last.getLocalMessage();
+        if (msg == null) print("Message is NULL, but it shouldn't be!");
         if (msg?.timestamp.isExpired ?? true) {
           // put false for test
           print("Last message is expired, deleting hyperchat!");
@@ -369,6 +392,34 @@ class _HomeState extends State<Home> {
           )
         ],
       );
+    } else if (node is Self) {
+      String? lastMessagePreview;
+      if (node.messages.isNotEmpty) {
+        var msg = node.messages.last.getLocalMessage();
+        lastMessagePreview = msg?.text ?? "&attachment";
+      }
+      return Palette(
+          node: node,
+          at: at,
+          messagePreview: lastMessagePreview,
+          messagePreviewWasRead: true,
+          snipOrMessageToRead: node.snips.isNotEmpty,
+          imPress: select,
+          bodyPress: select,
+          buttonsInfo: [
+            ButtonsInfo(
+              assetPath: at == "Home" && node.snips.isNotEmpty
+                  ? "lib/src/assets/redArrow.png"
+                  : "lib/src/assets/50.png",
+              pressFunc: at == "Home"
+                  ? node.snips.isNotEmpty
+                      ? checkSnips
+                      : openChat
+                  : openNode,
+              longPressFunc: openNode,
+              rightMost: true,
+            )
+          ]);
     }
     return null;
   }
@@ -383,7 +434,7 @@ class _HomeState extends State<Home> {
         node
           ..messages.add(req.message.id)
           ..updateActivity()
-          ..save(isSelf: widget.self.id == node.id);
+          ..save();
         writePalette(node);
         if (_page is ChatPage && _locations.last.id == root) {
           chatPage(node);
@@ -727,10 +778,10 @@ class _HomeState extends State<Home> {
         .map((g) => g.group)
         .expand((id) => id)
         .toSet();
-    final selectedUsers = selected.users();
+    final selectedUsers = selected.people();
     final selectedGroups = selected.groups();
     final unselectedGroups = unselected.groups();
-    final unselectedUsers = unselected.users();
+    final unselectedUsers = unselected.people();
     final unHide = hidden.those(idsInGroups);
     final keepHiding = hidden.notThose(idsInGroups);
     final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
@@ -752,9 +803,8 @@ class _HomeState extends State<Home> {
           .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
       ...unselectedUsersNotInGroups
           .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
-      ...unHide
-          .deactivated()
-          .map((e) => e.animated(fold: false, fade: false).withoutButton()),
+      ...unHide.deactivated().map((e) =>
+          e.animated(fold: false, fade: false, fadeMS: 600).withoutButton()),
       ...keepHiding
     };
 
@@ -1120,19 +1170,17 @@ class _HomeState extends State<Home> {
       ..snips.remove(snip)
       ..save();
 
-    final mediaMetadata = await r.getMediaMetadata(snip);
-    if (mediaMetadata == null) {
-      writePalette(node);
-      return homePage();
-    }
-    final media = MessageMedia(id: snip, metadata: mediaMetadata);
+    MessageMedia? media = snip.getLocalMessageMedia();
+    media ??= await downloadAndWriteMedia(snip);
+    if (media == null) return snipView(node);
+    // final media = MessageMedia(id: snip, metadata: mediaMetadata);
 
     final scale = media.metadata.elementAspectRatio * Sizes.fullAspectRatio;
     Widget displayMediaBody(Widget child) => Center(
           child: Transform(
             alignment: Alignment.center,
             transform: Matrix4.rotationY(
-              media.metadata.isReversed ? math.pi : 0,
+              media!.metadata.isReversed ? math.pi : 0,
             ),
             child: Transform.scale(
               scale: scale > 1 ? scale : 1 / scale,
@@ -1149,7 +1197,7 @@ class _HomeState extends State<Home> {
     void Function() back;
     void Function() next;
     if (media.metadata.isVideo) {
-      var ctrl = VideoPlayerController.network(media.url);
+      var ctrl = VideoPlayerController.file(media.file!);
       await ctrl.initialize();
       await ctrl.setLooping(true);
       await ctrl.play();
@@ -1159,20 +1207,34 @@ class _HomeState extends State<Home> {
         await ctrl.dispose();
         writePalette(node);
         homePage();
+        media
+          ?..references.remove(node.id)
+          ..delete();
       };
       next = () async {
         await ctrl.dispose();
         snipView(node);
+        media
+          ?..references.remove(node.id)
+          ..delete();
       };
     } else {
-      await precacheImage(NetworkImage(media.url), context);
-      displayMedia = displayMediaBody(Image.network(media.url));
+      await precacheImage(FileImage(media.file!), context);
+      displayMedia = displayMediaBody(Image.file(media.file!));
 
-      back = () {
+      back = () async {
         writePalette(node);
         homePage();
+        media
+          ?..references.remove(node.id)
+          ..delete();
       };
-      next = () => snipView(node);
+      next = () async {
+        snipView(node);
+        media
+          ?..references.remove(node.id)
+          ..delete();
+      };
     }
 
     _page = SnipViewPage(
@@ -1187,8 +1249,7 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return _page!;
-
+    return _page ?? const LoadingPage2();
     // print(widget.wallet.payments.length);
     // return _page ?? const LoadingPage();
   }

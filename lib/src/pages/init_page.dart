@@ -42,6 +42,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   dynamic _inputs;
   double _imageAspectRatio = 1.0;
   bool _toReverse = false;
+  List<Future<bool>> _readyUsernameCalls = [];
   bool _isValidUsername = false;
   bool _errorTryAgain = false;
   var tec1 = TextEditingController();
@@ -64,7 +65,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
       ConsoleInput(
         tec: tec1,
         inputCallBack: (id) async {
-          _isValidUsername = await r.usernameIsValid(id);
+          _readyUsernameCalls.add(r.usernameIsValid(id));
+          _isValidUsername = await _readyUsernameCalls.last;
           _id = id.toLowerCase();
           baseConsole();
         },
@@ -174,6 +176,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
     } else {
       _console = Console(
         imagePreviewPath: path,
+        aspectRatio: ctrl?.value.aspectRatio ?? 1.0,
         toMirror: cam == 1,
         topButtons: [
           ConsoleButton(

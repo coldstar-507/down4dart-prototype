@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
-import 'package:down4/src/boxes.dart';
+import 'dart:io';
 
 import 'down4_utility.dart' as u;
 import 'bsv/types.dart';
@@ -73,6 +72,8 @@ class MessageMedia extends Media {
 
   bool get isVideo => metadata.isVideo;
 
+  File? get file => path != null ? File(path!) : null;
+
   Set<Identifier> references;
 
   bool isSaved;
@@ -86,14 +87,13 @@ class MessageMedia extends Media {
         id: decodedJson["id"],
         metadata: MediaMetadata.fromJson(decodedJson["md"]),
         path: decodedJson["p"],
-        isSaved: decodedJson["sv"],
+        isSaved: decodedJson["sv"] ?? false,
         references: Set<Identifier>.from(decodedJson["ref"]));
   }
 
   Map<String, dynamic> toJson({bool toLocal = false}) => {
         "id": id,
         "md": metadata.toJson(),
-        if (toLocal) "lc": references,
         if (toLocal) "sv": isSaved,
         if (toLocal) "ref": references.toList(),
         if (path != null && toLocal) "p": path!,
@@ -123,7 +123,7 @@ class NodeMedia extends Media {
       id: decodedJson["id"],
       metadata: MediaMetadata.fromJson(decodedJson["md"]),
       path: decodedJson["p"],
-      data: b64Data != "" || b64Data != null ? base64Decode(b64Data) : null,
+      data: b64Data != "" && b64Data != null ? base64Decode(b64Data) : null,
     );
   }
 
@@ -192,8 +192,8 @@ class Message {
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
-      isRead: decodedJson["rs"],
-      isSaved: decodedJson["sv"],
+      isRead: decodedJson["rs"] ?? false,
+      isSaved: decodedJson["sv"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
       // mediaID: decodedJson["m"],
@@ -230,7 +230,7 @@ abstract class BaseNode {
   Identifier id;
   String get name;
   String get displayID;
-  Map toJson();
+  Map toJson({bool toLocal});
   int activity;
   BaseNode({required this.id, int? activity}) : activity = activity ?? 0;
   void updateActivity([int? newActivity]) =>
@@ -284,6 +284,7 @@ abstract class BaseNode {
           firstName: decodedJson["nm"],
           lastName: decodedJson["ln"],
           activity: decodedJson["a"],
+          neuter: Down4Keys.fromYouKnow(decodedJson["nt"]),
           savedMessages: Set.from(decodedJson["svm"]),
           images: Set.from(decodedJson["img"]),
           videos: Set.from(decodedJson["vid"]),
@@ -361,8 +362,10 @@ mixin Branchable {
 abstract class Person extends ChatableNode with Branchable {
   String firstName;
   String? lastName, description;
+  final Down4Keys neuter;
   Person({
     required this.firstName,
+    required this.neuter,
     this.lastName,
     this.description,
     int? activity,
@@ -370,10 +373,15 @@ abstract class Person extends ChatableNode with Branchable {
     required Set<Identifier> messages,
     required Set<Identifier> snips,
   }) : super(id: id, messages: messages, snips: snips, activity: activity);
+
+  @override
+  String get displayID => "@$id";
+
+  @override
+  String get name => firstName + ((lastName != null) ? " $lastName" : "");
 }
 
 class User extends Person {
-  final Down4Keys neuter;
   NodeMedia? media;
   bool isFriend;
   @override
@@ -386,13 +394,14 @@ class User extends Person {
     this.media,
     String? lastName,
     String? description,
-    required this.neuter,
+    required Down4Keys neuter,
     required Set<Identifier> messages,
     required Set<Identifier> snips,
     required this.children,
     int? activity,
   }) : super(
           id: id,
+          neuter: neuter,
           activity: activity,
           messages: messages,
           snips: snips,
@@ -400,12 +409,6 @@ class User extends Person {
           lastName: lastName,
           description: description,
         );
-
-  @override
-  String get displayID => "@$id";
-
-  @override
-  String get name => firstName + ((lastName != null) ? " $lastName" : "");
 
   @override
   NodesColor get colorCode =>
@@ -439,6 +442,7 @@ class Self extends Person {
     required String firstName,
     String? lastName,
     String? description,
+    required Down4Keys neuter,
     required this.images,
     required this.videos,
     required this.nfts,
@@ -452,6 +456,7 @@ class Self extends Person {
   }) : super(
           id: id,
           messages: messages,
+          neuter: neuter,
           snips: snips,
           firstName: firstName,
           lastName: lastName,
@@ -466,6 +471,7 @@ class Self extends Person {
         "nm": firstName,
         if (lastName != null) "ln": lastName,
         "chl": children.toList(),
+        "nt": neuter.toYouKnow(),
         if (toLocal) "img": images.toList(),
         if (toLocal) "vid": videos.toList(),
         if (toLocal) "nft": nfts.toList(),
@@ -478,12 +484,6 @@ class Self extends Person {
 
   @override
   NodesColor get colorCode => NodesColor.self;
-
-  @override
-  String get displayID => id;
-
-  @override
-  String get name => "$firstName${lastName == null ? "" : " $lastName"}";
 }
 
 class Group extends GroupNode {
@@ -557,7 +557,7 @@ class Hyperchat extends GroupNode {
   NodesColor get colorCode => NodesColor.hyperchat;
 
   @override
-  Map toJson() => {
+  Map toJson({bool toLocal = true}) => {
         "t": Nodes.hyperchat.name,
         "id": id,
         "nm": firstWord,
@@ -593,7 +593,7 @@ class Payment extends BaseNode {
           : NodesColor.safeTx;
 
   @override
-  Map toJson() => {
+  Map toJson({bool toLocal = true}) => {
         "t": Nodes.payment.name,
         "pay": _payment.toYouKnow(),
       };
@@ -646,6 +646,7 @@ class MediaMetadata {
       owner: decodedJson["o"],
       timestamp: int.parse(decodedJson["ts"]),
       isReversed: decodedJson["trv"] == "true",
+      isVideo: decodedJson["vid"] == "true",
       isLocked: decodedJson["lck"] == "true",
       isPaidToView: decodedJson["ptv"] == "true",
       isPaidToOwn: decodedJson["pto"] == "true",

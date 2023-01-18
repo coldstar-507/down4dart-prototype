@@ -59,11 +59,9 @@ class _Down4State extends State<Down4> {
   }
 
   Future<void> loadUser() async {
-    final userData = b.personal.get('user');
-    if (userData != null) {
-      _self = BaseNode.fromJson(jsonDecode(userData)) as Self;
-      final moneyData = b.personal.get('wallet');
-      _wallet = Wallet.fromJson(jsonDecode(moneyData)); // if this crashes gg
+    _self = loadSelf();
+    if (_self != null) {
+      _wallet = loadWallet();
       home();
     } else {
       // returns false if user hasn't been initialized
@@ -93,13 +91,14 @@ class _Down4State extends State<Down4> {
 
     NodeMedia image = NodeMedia(
       id: d4utils.randomMediaID(),
+      path: imPath,
+      data: File(imPath).readAsBytesSync(),
       metadata: MediaMetadata(
         owner: id,
         timestamp: d4utils.timeStamp(),
         elementAspectRatio: imAspectRatio,
         isReversed: toReverse,
       ),
-      path: imPath,
     );
 
     final userInfo = {
@@ -133,6 +132,7 @@ class _Down4State extends State<Down4> {
       media: image,
       firstName: name,
       lastName: lastName,
+      neuter: neutered,
       children: {},
       messages: {},
       snips: {},
@@ -155,9 +155,9 @@ class _Down4State extends State<Down4> {
 
   void home() {
     _view = Home(
-      wallet: _wallet!,
+      wallet: _wallet!..save(),
       cameras: widget.cameras,
-      self: _self!,
+      self: _self!..save(),
     );
     setState(() {});
   }
@@ -191,6 +191,6 @@ class _Down4State extends State<Down4> {
     Sizes.h =
         size.height - truePadding.top - truePadding.bottom - Sizes.headerHeight;
     Sizes.w = size.width - truePadding.left - truePadding.right;
-    return _view ?? const LoadingPage();
+    return _view ?? const LoadingPage2();
   }
 }

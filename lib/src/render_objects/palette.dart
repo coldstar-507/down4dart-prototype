@@ -97,23 +97,19 @@ class Palette extends StatelessWidget {
   final bool selected, messagePreviewWasRead, snipOrMessageToRead;
   final List<ButtonsInfo> buttonsInfo;
   final String? messagePreview;
-  final bool squish, alignedRight, fold, fadeButton, fade, isSelf;
+  final bool squish, alignedRight, fold, fadeButton, fade;
   final int containerMS, fadeMS, fadeButtonMS;
 
   Image get nodeImage {
-    Object n = node;
+    BaseNode n = node;
     if (n is User) {
       return n.media != null
-          ? n.isFriend
-              ? Image.file(File(n.media!.path!), fit: BoxFit.cover)
-              : Image.network(n.media!.url)
+          ? Image.memory(n.media!.data!,
+              fit: BoxFit.cover, gaplessPlayback: true)
           : Image.asset('lib/src/assets/hashirama.jpg', fit: BoxFit.cover);
     } else if (n is GroupNode) {
-      return Image.file(
-        File(n.media.path!),
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-      );
+      return Image.memory(n.media.data!,
+          fit: BoxFit.cover, gaplessPlayback: true);
     } else if (n is Payment) {
       return n.payment.independentGets < 2000000
           ? Image.asset('lib/src/assets/Dollar_Sign_1.png', fit: BoxFit.cover)
@@ -122,6 +118,9 @@ class Palette extends StatelessWidget {
                   fit: BoxFit.cover)
               : Image.asset('lib/src/assets/Dollar_Sign_3.png',
                   fit: BoxFit.cover);
+    } else if (n is Self) {
+      return Image.memory(n.media.data!,
+          fit: BoxFit.cover, gaplessPlayback: true);
     }
     throw 'stop breaking my app';
   }
@@ -143,7 +142,6 @@ class Palette extends StatelessWidget {
     this.snipOrMessageToRead = false,
     this.squish = true,
     this.fold = false,
-    this.isSelf = false,
     this.alignedRight = false,
     this.fadeButton = false,
     this.fade = false,
@@ -157,7 +155,6 @@ class Palette extends StatelessWidget {
       squish: squish,
       node: node,
       at: at,
-      isSelf: isSelf,
       fade: fade,
       fadeButton: fadeButton,
       fadeButtonMS: fadeButtonMS,
@@ -192,7 +189,6 @@ class Palette extends StatelessWidget {
       fold: fold ?? this.fold,
       node: node,
       at: at,
-      isSelf: isSelf,
       snipOrMessageToRead: snipOrMessageToRead,
       messagePreviewWasRead: messagePreviewWasRead,
       messagePreview: messagePreview,
@@ -213,7 +209,6 @@ class Palette extends StatelessWidget {
     return Palette(
       squish: squish,
       fold: fold,
-      isSelf: isSelf,
       alignedRight: alignedRight,
       messagePreview: messagePreview,
       node: node,
@@ -228,7 +223,6 @@ class Palette extends StatelessWidget {
     return Palette(
       squish: squish,
       fold: fold,
-      isSelf: isSelf,
       alignedRight: alignedRight,
       node: node,
       at: at,

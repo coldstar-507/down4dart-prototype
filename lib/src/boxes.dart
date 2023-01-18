@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:down4/src/down4_utility.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
 // import 'package:sqflite/sql.dart' as sql;
@@ -58,16 +59,16 @@ Future<void> deleteMediaFile(String mediaID) async {
 
 String messagePushId() => db.child("Messages").push().key!;
 
-Future<MessageMedia?> getMessageMediaFromEverywhere(Identifier mediaID) async {
-  final String? jsonEncodedMedia = b.medias.get(mediaID);
-  if (jsonEncodedMedia != null) {
-    return MessageMedia.fromJson(jsonDecode(jsonEncodedMedia));
-  }
-  return downloadAndWriteMedia(mediaID) as Future<MessageMedia?>;
-}
+// Future<MessageMedia?> getMessageMediaFromEverywhere(Identifier mediaID) async {
+//   final String? jsonEncodedMedia = b.medias.get(mediaID);
+//   if (jsonEncodedMedia != null) {
+//     return MessageMedia.fromJson(jsonDecode(jsonEncodedMedia));
+//   }
+//   return downloadAndWriteMedia(mediaID) as Future<MessageMedia?>;
+// }
 
 Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
-  final locals = ids.where((id) => b.home.containsKey(id)).toList();
+  final locals = ids.where((id) => b.nodes.containsKey(id)).toList();
   final externals = ids.toSet().difference(locals.toSet()).toList();
   var externalNodes = r.getNodes(externals);
   List<BaseNode> localNodes = [];
@@ -77,7 +78,7 @@ Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
   return localNodes + (await externalNodes ?? <BaseNode>[]);
 }
 
-Future<Media?> downloadAndWriteMedia(
+Future<MessageMedia?> downloadAndWriteMedia(
   String mediaID, {
   bool isNodeMedia = false,
 }) async {
@@ -94,9 +95,7 @@ Future<Media?> downloadAndWriteMedia(
     if (mediaData != null) {
       File(path).writeAsBytes(mediaData);
     }
-    return isNodeMedia
-        ? NodeMedia(id: mediaID, path: path, metadata: mediaMetadata)
-        : MessageMedia(id: mediaID, path: path, metadata: mediaMetadata);
+    return MessageMedia(id: mediaID, path: path, metadata: mediaMetadata);
   } catch (e) {
     return null;
   }
@@ -178,42 +177,37 @@ extension Getters on Identifier {
   }
 
   Message? getLocalMessage() {
-    final String? jsonEncoded = b.medias.get(this);
+    final String? jsonEncoded = b.messages.get(this);
     if (jsonEncoded == null) return null;
     return Message.fromJson(jsonDecode(jsonEncoded));
   }
 
   BaseNode? getLocalNode() {
-    final String? jsonEncoded = b.medias.get(this);
+    final String? jsonEncoded = b.nodes.get(this);
     if (jsonEncoded == null) return null;
     return BaseNode.fromJson(jsonDecode(jsonEncoded));
   }
 
   void deleteLocalNode() {
-    b.home.delete(this);
+    b.nodes.delete(this);
   }
 }
 
 extension MessageSave on Message {
   Future<void> onReceipt() async {
-    save();
+    await save();
     if (mediaID != null) {
-      MessageMedia? localMedia = mediaID?.getLocalMessageMedia();
-      if (localMedia == null) {
-        // try and download it
-        (await downloadAndWriteMedia(mediaID!) as MessageMedia?)
-          ?..references.add(id)
-          ..save();
-      } else {
-        localMedia
-          ..references.add(id)
-          ..save();
-      }
+      MessageMedia? media = mediaID?.getLocalMessageMedia();
+      media ??= await downloadAndWriteMedia(mediaID!) as MessageMedia?;
+      media
+        ?..references.add(id)
+        ..save();
     }
+    return;
   }
 
   Future<void> save() async {
-    b.messages.put(id, jsonEncode(toJson(toLocal: true)));
+    return b.messages.put(id, jsonEncode(toJson(toLocal: true)));
   }
 
   Future<void> delete() async {
@@ -230,9 +224,13 @@ extension MessageSave on Message {
 }
 
 extension NodeSave on BaseNode {
-  Future<void> save({bool isSelf = false}) => isSelf
-      ? b.personal.put(id, jsonEncode(this))
-      : b.home.put(id, jsonEncode(this));
+  void save() {
+    if (this is Self) {
+      b.personal.put("self", jsonEncode(toJson(toLocal: true)));
+    } else {
+      b.nodes.put(id, jsonEncode(toJson(toLocal: true)));
+    }
+  }
 
   void delete() {
     var node = this;
@@ -241,7 +239,7 @@ extension NodeSave on BaseNode {
         var msg = messageID.getLocalMessage();
         if (msg != null && !msg.isSaved) msg.delete();
       }
-      b.home.delete(id);
+      b.nodes.delete(id);
     }
   }
 }
@@ -249,6 +247,15 @@ extension NodeSave on BaseNode {
 extension MediaSave on MessageMedia {
   void save() {
     b.medias.put(id, jsonEncode(toJson(toLocal: true)));
+  }
+
+  Future<void> delete() async {
+    b.medias.delete(id);
+    if (references.isEmpty && path != null) {
+      print("References are empty, deleting the file!");
+      return deleteMediaFile(id);
+    }
+    return;
   }
 }
 
@@ -273,7 +280,7 @@ class Boxes {
       // videoIDs,
       // nftIDs,
       // reactions,
-      home,
+      nodes,
       messages,
       medias,
       messageQueue,
@@ -293,12 +300,11 @@ class Boxes {
         // videoIDs = Hive.box("VideoIDs"),
         // nftIDs = Hive.box("NftIDs"),
         medias = Hive.box("Medias"),
-
         // fileIDs = [],
-        personal = Hive.box("User"),
+        personal = Hive.box("Personal"),
         // images = Hive.box("Images"),
         // videos = Hive.box("Videos"),
-        home = Hive.box("Home"),
+        nodes = Hive.box("Nodes"),
         // reactions = Hive.box("Reactions"),
         messages = Hive.box("Messages"),
         messageQueue = Hive.box("MessageQueue"),
@@ -485,10 +491,23 @@ class Sizes2 {
   Sizes2 get instance => _instance ??= Sizes2._();
 }
 
-Self loadSelf() =>
-    BaseNode.fromJson(jsonDecode(b.personal.get("self"))) as Self;
+Self? loadSelf() {
+  final String? jsonEncodedSelf = b.personal.get("self");
+  if (jsonEncodedSelf == null) return null;
+  return BaseNode.fromJson(jsonDecode(jsonEncodedSelf)) as Self;
+}
 
-Wallet loadWallet() => Wallet.fromJson(jsonDecode(b.personal.get("wallet")));
+Wallet? loadWallet() {
+  final String? jsonEncodedWallet = b.personal.get("wallet");
+  if (jsonEncodedWallet == null) return null;
+  return Wallet.fromJson(jsonDecode(jsonEncodedWallet));
+}
 
-ExchangeRate loadExchangeRate() =>
-    ExchangeRate.fromJson(jsonDecode(b.personal.get("exchangeRate")));
+ExchangeRate loadExchangeRate() {
+  final String? jsonEncodedExchangeRate = b.personal.get("exchangeRate");
+  if (jsonEncodedExchangeRate != null) {
+    return ExchangeRate.fromJson(jsonDecode(jsonEncodedExchangeRate));
+  } else {
+    return ExchangeRate(lastUpdate: 0, rate: 0.0);
+  }
+}

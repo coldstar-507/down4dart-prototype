@@ -174,6 +174,7 @@ extension PaletteExtensions on Iterable<Palette> {
   Iterable<Identifier> asIds() => map((e) => e.node.id);
   Iterable<Palette> chatables() => where((p) => p.node is ChatableNode);
   Iterable<Palette> users() => where((p) => p.node is User);
+  Iterable<Palette> people() => where((p) => p.node is Person);
   Iterable<Palette> groups() => where((p) => p.node is GroupNode);
   Iterable<Palette> those(Iterable<Identifier> ids) =>
       where((p) => ids.contains(p.node.id));

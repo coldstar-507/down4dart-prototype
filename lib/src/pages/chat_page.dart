@@ -134,6 +134,7 @@ class _ChatPageState extends State<ChatPage> {
       double mediaWidth = 0;
 
       var down4Message = _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
+      print("THE DOWN4MESSAGE = $down4Message");
       if (down4Message == null) return;
       Media? media;
       if (down4Message.mediaID != null) {
