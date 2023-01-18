@@ -52,10 +52,10 @@ class ProfileWidget extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8.0),
-          node.description.isNotEmpty
+          (node.description ?? "").isNotEmpty
               ? Container(
                   padding: const EdgeInsets.all(8.0),
-                  child: Text(node.description, textAlign: TextAlign.justify))
+                  child: Text(node.description!, textAlign: TextAlign.justify))
               : const SizedBox.shrink(),
         ],
       ),

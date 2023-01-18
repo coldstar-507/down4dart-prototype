@@ -28,7 +28,7 @@ void printWrapped(String text) {
 }
 
 class PaymentPage extends StatefulWidget {
-  final User self;
+  final Self self;
   final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentAsList;
@@ -192,7 +192,7 @@ class MoneyPage extends StatefulWidget {
   final List<Palette> paymentAsPalettes;
   final Iterable<Palette> homePalettes;
   final Iterable<User> trueTargets;
-  final User self;
+  final Self self;
   final List<Palette> transitioned;
   final void Function() back;
   final void Function(Down4Payment) makePayment, scanOrImport;
@@ -496,7 +496,7 @@ class _MoneyPageState extends State<MoneyPage> {
     void confirmPayment() {
       final pay = widget.wallet.payUsers(
         users: widget.trueTargets.toList(growable: false),
-        self: widget.self,
+        selfID: widget.self.id,
         amount: Sats(asSats),
         textNote: textNoteTec.value.text,
       );
@@ -559,7 +559,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
     void import() async {
       final payment =
-          await widget.wallet.importMoney(importTec.value.text, widget.self);
+          await widget.wallet.importMoney(importTec.value.text, widget.self.id);
 
       if (payment == null) return;
       widget.scanOrImport(payment);

@@ -27,7 +27,7 @@ class HyperchatPage extends StatefulWidget {
   final void Function(r.HyperchatRequest) hyperchatRequest;
   final void Function(r.ChatRequest) ping;
   final void Function() back;
-  final User self;
+  final Self self;
 
   const HyperchatPage({
     required this.initialOffset,
@@ -76,12 +76,13 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   Future<void> asyncImageLoad() async {
     Future(() {
-      final keys = b.images.keys;
+      final keys = widget.self.images;
       final nImages = keys.length;
       final nImagesToLoad = nImages <= 25 ? nImages : 25;
       for (int i = 0; i < nImagesToLoad; i++) {
         final mediaID = keys.elementAt(i);
-        _cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        final media = mediaID.getLocalMessageMedia();
+        if (media != null) _cachedImages[mediaID] = media;
         print("load media id=$mediaID");
       }
     }).then((value) {
@@ -95,11 +96,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
     });
   }
 
-  Iterable<MessageMedia> get savedImages => b.images.keys
-      .map((mediaID) => _cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+  Iterable<MessageMedia> get savedImages => widget.self.images.map(
+      (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
-  Iterable<MessageMedia> get savedVideos => b.videos.keys
-      .map((mediaID) => _cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
+  Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
+      (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
   void send({MessageMedia? mediaInput}) {
     if (cameraInput == null && tec.value.text.isEmpty && mediaInput == null) {
@@ -113,7 +114,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
     final msg = Message(
       root: randomRoot,
-      type: Messages.chat,
       id: messageID,
       senderID: widget.self.id,
       timestamp: u.timeStamp(),
@@ -126,11 +126,10 @@ class _HyperchatPageState extends State<HyperchatPage> {
         .map((e) => "${e.first} ${e.second}")
         .toList(growable: false);
 
+    final targets = widget.userTargets.asIds().toSet()..remove(widget.self.id);
     final hcReq = r.HyperchatRequest(
       message: msg,
-      targets: widget.userTargets.asIds().toList()
-        ..noDuplicates()
-        ..remove(widget.self.id),
+      targets: targets.toList(),
       wordPairs: pairs,
       media: mediaInput ?? cameraInput,
     );
@@ -158,6 +157,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         final down4Media = MessageMedia(
           id: mediaID,
           path: file.path,
+          isSaved: true,
           metadata: MediaMetadata(
             timestamp: u.timeStamp(),
             isSquared: false,
@@ -166,8 +166,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
             owner: widget.self.id,
             elementAspectRatio: size?.aspectRatio ?? 1.0,
           ),
-        )..save(toPersonal: true);
+        )..save();
         _cachedImages[mediaID] = down4Media;
+        widget.self
+          ..images.add(mediaID)
+          ..save();
       }
     } else {
       final video = await ImagePicker().pickVideo(
@@ -181,6 +184,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
       final down4Media = MessageMedia(
         id: mediaID,
         path: video.path,
+        isSaved: true,
         metadata: MediaMetadata(
           isSquared: false,
           isReversed: false,
@@ -191,6 +195,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ),
       );
       _cachedVideos[mediaID] = down4Media;
+      widget.self
+        ..videos.add(mediaID)
+        ..save();
     }
     loadMediaConsole();
   }

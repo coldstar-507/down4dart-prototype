@@ -24,7 +24,7 @@ import '../render_objects/render_utils.dart';
 
 class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final User self;
+  final Self self;
   // final List<Palette> Function() transition;
   final List<Palette> palettes, transitioned;
   final Iterable<User> userTargets;
@@ -66,12 +66,13 @@ class _GroupPageState extends State<GroupPage> {
 
   Future<void> asyncImageLoad() async {
     Future(() {
-      final keys = b.images.keys;
+      final keys = widget.self.images;
       final nImages = keys.length;
       final nImagesToLoad = nImages <= 25 ? nImages : 25;
       for (int i = 0; i < nImagesToLoad; i++) {
         final mediaID = keys.elementAt(i);
-        _cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        final media = mediaID.getLocalMessageMedia();
+        if (media != null) _cachedImages[mediaID] = media;
         print("load media id=$mediaID");
       }
     }).then((value) {
@@ -85,11 +86,11 @@ class _GroupPageState extends State<GroupPage> {
     });
   }
 
-  Iterable<MessageMedia> get savedImages => b.images.keys
-      .map((mediaID) => _cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+  Iterable<MessageMedia> get savedImages => widget.self.images.map(
+      (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
-  Iterable<MessageMedia> get savedVideos => b.videos.keys
-      .map((mediaID) => _cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
+  Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
+      (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
   NodeMedia? groupImage;
   String groupName = "";
@@ -140,7 +141,6 @@ class _GroupPageState extends State<GroupPage> {
 
     final msg = Message(
       root: groupID,
-      type: Messages.chat,
       id: messagePushId(),
       senderID: widget.self.id,
       timestamp: u.timeStamp(),
@@ -148,13 +148,14 @@ class _GroupPageState extends State<GroupPage> {
       text: tec.value.text,
     );
 
+    final targets = widget.userTargets.asIds().toSet()..remove(widget.self.id);
     final grpReq = r.GroupRequest(
       groupID: groupID,
       name: groupName,
       groupMedia: groupImage!,
       message: msg,
       private: private,
-      targets: widget.userTargets.asIds().toList()..remove(widget.self.id),
+      targets: targets.toList(),
       media: mediaInput ?? cameraInput,
     );
 
@@ -221,7 +222,7 @@ class _GroupPageState extends State<GroupPage> {
         final mediaID = u.randomMediaID();
         // final appPath = b.writeToDocs(cachedPath: file.path, mediaID: mediaID);
         final size = calculateImageDimension(f: File(file.path));
-        final down4Media = NodeMedia(
+        final down4Media = MessageMedia(
             path: file.path,
             id: mediaID,
             metadata: MediaMetadata(
@@ -233,13 +234,17 @@ class _GroupPageState extends State<GroupPage> {
               elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
             ));
         if (groupImageImport) {
-          groupImage = down4Media;
+          groupImage = down4Media.asNodeMedia();
           loadBaseConsole();
           animatedTransition(); // hack
         } else {
-          down4Media.save(toPersonal: true);
-          _cachedImages[mediaID] = down4Media.asMessageMedia();
+          _cachedImages[mediaID] = down4Media
+            ..isSaved = true
+            ..save();
           loadMediaConsole();
+          widget.self
+            ..images.add(mediaID)
+            ..save();
         }
       }
     } else {
@@ -256,6 +261,7 @@ class _GroupPageState extends State<GroupPage> {
       final down4Media = MessageMedia(
           id: mediaID,
           path: video.path,
+          isSaved: true,
           metadata: MediaMetadata(
             isSquared: false,
             isReversed: false,
@@ -265,8 +271,11 @@ class _GroupPageState extends State<GroupPage> {
             owner: widget.self.id,
             isVideo: true,
           ))
-        ..save(toPersonal: true);
+        ..save();
       _cachedVideos[mediaID] = down4Media;
+      widget.self
+        ..videos.add(mediaID)
+        ..save();
       loadMediaConsole(images: false);
     }
   }

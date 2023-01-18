@@ -86,7 +86,7 @@ class Wallet {
 
   Down4Payment? payUsers({
     required List<User> users,
-    required User self,
+    required Identifier selfID,
     required Sats amount,
     String textNote = "",
   }) {
@@ -99,7 +99,7 @@ class Wallet {
     // know size = nOuts(var) + outs(nOuts * 34) + version(4) + nSeq(4)
     var knownTxSize = varOutSize + (nOuts * 34) + 8;
 
-    final inInfos = _unsignedIns(self, amount, knownTxSize);
+    final inInfos = _unsignedIns(selfID, amount, knownTxSize);
     if (inInfos == null) return null;
     List<Down4TXIN> ins = inInfos[0];
     Sats minerFees = inInfos[1];
@@ -113,7 +113,7 @@ class Wallet {
     List<Down4TXOUT> outs = [];
     _ix = _ix + 1;
     // the goal here is simply having a unique id everytime
-    final d4Secret = makeUint32(_ix) + utf8.encode(self.id);
+    final d4Secret = makeUint32(_ix) + utf8.encode(selfID);
     final d4Keys = DOWN4_NEUTER.derive(d4Secret);
     // except for here possibly? must be fucking rare tho
     if (d4Keys == null) return null;
@@ -149,7 +149,7 @@ class Wallet {
         isChange: true,
         sats: change,
         scriptPubKey: p2pkh(selfKeys.rawAddress),
-        receiver: self.id,
+        receiver: selfID,
       );
       outs.add(changeOut);
     }
@@ -308,7 +308,7 @@ class Wallet {
     return copy.reversed.toList(growable: false);
   }
 
-  List<dynamic>? _unsignedIns(User self, Sats pay, int currentTxSize) {
+  List<dynamic>? _unsignedIns(Identifier selfID, Sats pay, int currentTxSize) {
     const inSize = 148;
     List<Down4TXIN> ins = [];
     var cumSize = currentTxSize;
@@ -321,7 +321,7 @@ class Wallet {
       var txin = Down4TXIN(
         utxoTXID: utxo.txid!,
         utxoIndex: FourByteInt(utxo.outIndex!),
-        spender: self.id,
+        spender: selfID,
         sequenceNo: 0,
         dependance: uTXID.contains(utxo.txid) ? utxo.txid : null,
       );

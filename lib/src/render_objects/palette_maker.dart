@@ -150,9 +150,9 @@ class UserMakerPalette extends StatelessWidget {
 
   Widget get body => Expanded(
         child: Container(
-          decoration: const BoxDecoration(
-            color: PinkTheme.selfPaletteColor,
-            borderRadius: BorderRadius.horizontal(
+          decoration: BoxDecoration(
+            color: PinkTheme.nodeColors[NodesColor.self],
+            borderRadius: const BorderRadius.horizontal(
               right: Radius.circular(4.0),
             ),
           ),
@@ -365,6 +365,15 @@ class PaletteMaker extends StatelessWidget {
           height: Palette.paletteHeight - 4,
         );
 
+      case Nodes.self:
+        return Image.asset(
+          'lib/src/assets/picture_place_holder_2.png',
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          width: Palette.paletteHeight - 4,
+          height: Palette.paletteHeight - 4,
+        );
+
       case Nodes.root:
         return Image.asset(
           'lib/src/assets/picture_place_holder_2.png',
@@ -481,7 +490,7 @@ class PaletteMaker extends StatelessWidget {
           //         topRight: Radius.circular(4.0),
           //         bottomRight: Radius.circular(4.0))),
           child: go != null
-              ? Image.asset('lib/src/assets/rightBlackArrow.png')
+              ? Image.asset('lib/src/assets/filled.png')
               : const SizedBox.shrink()));
 
   @override

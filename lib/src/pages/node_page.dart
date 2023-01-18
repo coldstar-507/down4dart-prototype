@@ -15,7 +15,7 @@ class NodePage extends StatefulWidget {
   final List<Palette>? palettes;
   // final MessageList4? messageList;
   final Palette palette;
-  final User self;
+  final Self self;
   final Palette? Function(BaseNode, {String at}) nodeToPalette;
   final void Function(String, String) openNode, openChat;
   final void Function() back;

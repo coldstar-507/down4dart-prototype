@@ -72,7 +72,7 @@ Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
   var externalNodes = r.getNodes(externals);
   List<BaseNode> localNodes = [];
   for (final localNodeID in locals) {
-    localNodes.add(b.loadNode(localNodeID));
+    localNodes.add(localNodeID.getLocalNode()!);
   }
   return localNodes + (await externalNodes ?? <BaseNode>[]);
 }
@@ -164,23 +164,33 @@ Future<void> uploadOrUpdateMedia(
 //   }
 // }
 
+extension Saver on ExchangeRate {
+  void save() {
+    b.personal.put("exchangeRate", jsonEncode(this));
+  }
+}
+
 extension Getters on Identifier {
-  MessageMedia? getMessageMedia() {
+  MessageMedia? getLocalMessageMedia() {
     final String? jsonEncoded = b.medias.get(this);
     if (jsonEncoded == null) return null;
     return MessageMedia.fromJson(jsonDecode(jsonEncoded));
   }
 
-  Message? getMessage() {
+  Message? getLocalMessage() {
     final String? jsonEncoded = b.medias.get(this);
     if (jsonEncoded == null) return null;
     return Message.fromJson(jsonDecode(jsonEncoded));
   }
 
-  BaseNode? getNode() {
+  BaseNode? getLocalNode() {
     final String? jsonEncoded = b.medias.get(this);
     if (jsonEncoded == null) return null;
     return BaseNode.fromJson(jsonDecode(jsonEncoded));
+  }
+
+  void deleteLocalNode() {
+    b.home.delete(this);
   }
 }
 
@@ -188,7 +198,7 @@ extension MessageSave on Message {
   Future<void> onReceipt() async {
     save();
     if (mediaID != null) {
-      MessageMedia? localMedia = mediaID?.getMessageMedia();
+      MessageMedia? localMedia = mediaID?.getLocalMessageMedia();
       if (localMedia == null) {
         // try and download it
         (await downloadAndWriteMedia(mediaID!) as MessageMedia?)
@@ -207,7 +217,7 @@ extension MessageSave on Message {
   }
 
   Future<void> delete() async {
-    final MessageMedia? media = mediaID?.getMessageMedia();
+    final MessageMedia? media = mediaID?.getLocalMessageMedia();
     if (media != null) {
       media.references.remove(id);
       if (media.references.isEmpty && !media.isSaved) {
@@ -221,8 +231,19 @@ extension MessageSave on Message {
 
 extension NodeSave on BaseNode {
   Future<void> save({bool isSelf = false}) => isSelf
-      ? b.user.put(id, jsonEncode(this))
+      ? b.personal.put(id, jsonEncode(this))
       : b.home.put(id, jsonEncode(this));
+
+  void delete() {
+    var node = this;
+    if (node is ChatableNode && node is! Self) {
+      for (var messageID in node.messages) {
+        var msg = messageID.getLocalMessage();
+        if (msg != null && !msg.isSaved) msg.delete();
+      }
+      b.home.delete(id);
+    }
+  }
 }
 
 extension MediaSave on MessageMedia {
@@ -237,7 +258,7 @@ extension PaymentSave on Down4Payment {
 }
 
 extension WalletSave on Wallet {
-  Future<void> save() => b.user.put("wallet", jsonEncode(this));
+  Future<void> save() => b.personal.put("wallet", jsonEncode(this));
 }
 
 class Boxes {
@@ -247,10 +268,10 @@ class Boxes {
   Box
       // images,
       //     videos,
-      user,
-      imageIDs,
-      videoIDs,
-      nftIDs,
+      personal,
+      // imageIDs,
+      // videoIDs,
+      // nftIDs,
       // reactions,
       home,
       messages,
@@ -268,13 +289,13 @@ class Boxes {
   // snipVideos;
   Boxes()
       : dirPath = main.docDirPath,
-        imageIDs = Hive.box("ImageIDs"),
-        videoIDs = Hive.box("VideoIDs"),
-        nftIDs = Hive.box("NftIDs"),
+        // imageIDs = Hive.box("ImageIDs"),
+        // videoIDs = Hive.box("VideoIDs"),
+        // nftIDs = Hive.box("NftIDs"),
         medias = Hive.box("Medias"),
 
         // fileIDs = [],
-        user = Hive.box("User"),
+        personal = Hive.box("User"),
         // images = Hive.box("Images"),
         // videos = Hive.box("Videos"),
         home = Hive.box("Home"),
@@ -305,100 +326,100 @@ class Boxes {
   //   return f.path;
   // }
 
-  void saveImage(Media im) {
-    images.put(im.id, jsonEncode(im));
-  }
-
-  MessageMedia loadSavedImage(Identifier id) {
-    return MessageMedia.fromJson(jsonDecode(images.get(id)));
-  }
-
-  void deleteSavedImage(Identifier id) {
-    try {
-      File("$dirPath/$id").delete();
-    } catch (_) {}
-    images.delete(id);
-  }
-
-  void saveVideo(Media im) {
-    videos.put(im.id, jsonEncode(im));
-  }
-
-  MessageMedia loadSavedVideo(Identifier id) {
-    return MessageMedia.fromJson(jsonDecode(videos.get(id)));
-  }
-
-  ExchangeRate loadExchangeRate() {
-    final rate = user.get("exchangeRate");
-    if (rate == null) return ExchangeRate(lastUpdate: 0, rate: 0.0);
-    return ExchangeRate.fromJson(jsonDecode(rate));
-  }
-
-  void saveExchangeRate(ExchangeRate exchangeRate) {
-    user.put("exchangeRate", jsonEncode(exchangeRate));
-  }
-
-  void deleteVideo(Identifier id) {
-    videos.delete(id);
-  }
-
-  void saveSnip(Media snip) {
-    snipMedias.put(snip.id, jsonEncode(snip));
-  }
-
-  Media loadSnip(Identifier id) {
-    return MessageMedia.fromJson(jsonDecode(snipMedias.get(id)));
-  }
+  // void saveImage(Media im) {
+  //   images.put(im.id, jsonEncode(im));
+  // }
+  //
+  // MessageMedia loadSavedImage(Identifier id) {
+  //   return MessageMedia.fromJson(jsonDecode(images.get(id)));
+  // }
+  //
+  // void deleteSavedImage(Identifier id) {
+  //   try {
+  //     File("$dirPath/$id").delete();
+  //   } catch (_) {}
+  //   images.delete(id);
+  // }
+  //
+  // void saveVideo(Media im) {
+  //   videos.put(im.id, jsonEncode(im));
+  // }
+  //
+  // MessageMedia loadSavedVideo(Identifier id) {
+  //   return MessageMedia.fromJson(jsonDecode(videos.get(id)));
+  // }
+  //
+  // ExchangeRate loadExchangeRate() {
+  //   final rate = user.get("exchangeRate");
+  //   if (rate == null) return ExchangeRate(lastUpdate: 0, rate: 0.0);
+  //   return ExchangeRate.fromJson(jsonDecode(rate));
+  // }
+  //
+  // void saveExchangeRate(ExchangeRate exchangeRate) {
+  //   user.put("exchangeRate", jsonEncode(exchangeRate));
+  // }
+  //
+  // void deleteVideo(Identifier id) {
+  //   videos.delete(id);
+  // }
+  //
+  // void saveSnip(Media snip) {
+  //   snipMedias.put(snip.id, jsonEncode(snip));
+  // }
+  //
+  // Media loadSnip(Identifier id) {
+  //   return MessageMedia.fromJson(jsonDecode(snipMedias.get(id)));
+  // }
 
   // void deleteSnip(Identifier id) {
   //   snipImages.delete(id);
   // }
 
-  void saveUser(User u) {
-    user.put("user", jsonEncode(u));
-  }
-
-  User loadUser() {
-    return BaseNode.fromJson(jsonDecode(user.get("user"))) as User;
-  }
-
-  void saveWallet(Wallet w) {
-    user.put("wallet", jsonEncode(w));
-  }
-
-  Wallet loadWallet() {
-    return Wallet.fromJson(jsonDecode(user.get("wallet")));
-  }
-
-  void saveNode(BaseNode p) {
-    home.put(p.id, jsonEncode(p));
-  }
-
-  BaseNode loadNode(Identifier id) {
-    return BaseNode.fromJson(jsonDecode(home.get(id)));
-  }
-
-  void deleteNode(Identifier id) {
-    final node = loadNode(id);
-    if (node is ChatableNode) {
-      for (final msgID in node.messages) {
-        messages.delete(msgID);
-      }
-    }
-    home.delete(id);
-  }
-
-  void saveMessage(Message msg) {
-    messages.put(msg.id, jsonEncode(msg));
-  }
-
-  Message? loadMessage(Identifier id) {
-    var msg = messages.get(id);
-    if (msg is! String) return null;
-    var msgJson = jsonDecode(messages.get(id));
-    if (msgJson == null) return null;
-    return Message.fromJson(msgJson);
-  }
+  // void saveUser(User u) {
+  //   user.put("user", jsonEncode(u));
+  // }
+  //
+  // User loadUser() {
+  //   return BaseNode.fromJson(jsonDecode(user.get("user"))) as User;
+  // }
+  //
+  // void saveWallet(Wallet w) {
+  //   user.put("wallet", jsonEncode(w));
+  // }
+  //
+  // Wallet loadWallet() {
+  //   return Wallet.fromJson(jsonDecode(user.get("wallet")));
+  // }
+  //
+  // void saveNode(BaseNode p) {
+  //   home.put(p.id, jsonEncode(p));
+  // }
+  //
+  // BaseNode loadNode(Identifier id) {
+  //   return BaseNode.fromJson(jsonDecode(home.get(id)));
+  // }
+  //
+  // void deleteNode(Identifier id) {
+  //   final node = loadNode(id);
+  //   if (node is ChatableNode) {
+  //     for (final msgID in node.messages) {
+  //       messages.delete(msgID);
+  //     }
+  //   }
+  //   home.delete(id);
+  // }
+  //
+  // void saveMessage(Message msg) {
+  //   messages.put(msg.id, jsonEncode(msg));
+  // }
+  //
+  // Message? loadMessage(Identifier id) {
+  //   var msg = messages.get(id);
+  //   if (msg is! String) return null;
+  //   var msgJson = jsonDecode(messages.get(id));
+  //   if (msgJson == null) return null;
+  //   return Message.fromJson(msgJson);
+  // }
 
   // void deleteMessage(Identifier id) {
   //   final msgJson = jsonDecode(messages.get(id));
@@ -463,3 +484,11 @@ class Sizes2 {
   static Sizes2? _instance;
   Sizes2 get instance => _instance ??= Sizes2._();
 }
+
+Self loadSelf() =>
+    BaseNode.fromJson(jsonDecode(b.personal.get("self"))) as Self;
+
+Wallet loadWallet() => Wallet.fromJson(jsonDecode(b.personal.get("wallet")));
+
+ExchangeRate loadExchangeRate() =>
+    ExchangeRate.fromJson(jsonDecode(b.personal.get("exchangeRate")));

@@ -285,7 +285,7 @@ class Console extends StatelessWidget {
 
   static GlobalKey get widgetCaptureKey => GlobalKey();
 
-  int get nImageRows => (b.images.keys.length / 5).round();
+  int get nImageRows => ((medias?.length ?? 0) / 5).ceil();
   double get rowHeight => (consoleWidth / 5);
   double get mediasHeight => nImageRows == 0
       ? rowHeight

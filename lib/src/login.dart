@@ -59,10 +59,10 @@ class _Down4State extends State<Down4> {
   }
 
   Future<void> loadUser() async {
-    final userData = b.user.get('user');
+    final userData = b.personal.get('user');
     if (userData != null) {
       _self = BaseNode.fromJson(jsonDecode(userData)) as Self;
-      final moneyData = b.user.get('wallet');
+      final moneyData = b.personal.get('wallet');
       _wallet = Wallet.fromJson(jsonDecode(moneyData)); // if this crashes gg
       home();
     } else {
@@ -133,15 +133,16 @@ class _Down4State extends State<Down4> {
       media: image,
       firstName: name,
       lastName: lastName,
-      children: [],
-      messages: [],
-      snips: [],
-      images: [],
-      videos: [],
-      nfts: [],
+      children: {},
+      messages: {},
+      snips: {},
+      savedMessages: {},
+      images: {},
+      videos: {},
+      nfts: {},
     );
 
-    b.user.putAll({
+    b.personal.putAll({
       'token': token,
       'self': jsonEncode(_self),
       'wallet': jsonEncode(_wallet),

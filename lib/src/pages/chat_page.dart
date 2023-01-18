@@ -24,7 +24,7 @@ import '../render_objects/navigator.dart';
 
 class ChatPage extends StatefulWidget {
   final Map<Identifier, Palette> senders;
-  final User self;
+  final Self self;
   final ChatableNode node;
   // final List<Palette> group;
   final List<CameraDescription> cameras;
@@ -85,12 +85,13 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> asyncImageLoad() async {
     Future(() {
-      final keys = b.images.keys;
+      final keys = widget.self.images;
       final nImages = keys.length;
       final nImagesToLoad = nImages <= 25 ? nImages : 25;
       for (int i = 0; i < nImagesToLoad; i++) {
         final mediaID = keys.elementAt(i);
-        _cachedImages[mediaID] = b.loadSavedImage(mediaID);
+        var media = mediaID.getLocalMessageMedia();
+        if (media != null) _cachedImages[mediaID] = media;
         print("load media id=$mediaID");
       }
     }).then((value) {
@@ -104,11 +105,11 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Iterable<MessageMedia> get savedImages => b.images.keys
-      .map((mediaID) => _cachedImages[mediaID] ??= b.loadSavedImage(mediaID));
+  Iterable<MessageMedia> get savedImages => widget.self.images.map(
+      (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
-  Iterable<MessageMedia> get savedVideos => b.videos.keys
-      .map((mediaID) => _cachedVideos[mediaID] ??= b.loadSavedVideo(mediaID));
+  Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
+      (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
         tec: tec,
@@ -132,14 +133,11 @@ class _ChatPageState extends State<ChatPage> {
       double mediaHeight = 0;
       double mediaWidth = 0;
 
-      var down4Message = _cachedDown4Message[msgID] ??= b.loadMessage(msgID);
+      var down4Message = _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
       if (down4Message == null) return;
       Media? media;
       if (down4Message.mediaID != null) {
-        media = b.loadMessageMediaFromLocal(down4Message.mediaID!);
-        if (media?.path == null) {
-          media = await downloadAndWriteMedia(down4Message.mediaID!);
-        }
+        media = down4Message.mediaID!.getLocalMessageMedia();
         if (media != null) {
           mediaWidth = maxWidth - messageBorder;
           mediaHeight = mediaWidth *
@@ -277,7 +275,7 @@ class _ChatPageState extends State<ChatPage> {
       final List<ReplyData>? repliesData = down4Message.replies
           ?.map((msgID) {
             final replyMsg =
-                _cachedDown4Message[msgID] ??= b.loadMessage(msgID);
+                _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
             final replyUser = widget.senders[replyMsg?.senderID];
             if (replyMsg == null || replyUser == null) return null;
             final String replyBody = replyMsg.text?.isNotEmpty ?? false
@@ -381,6 +379,7 @@ class _ChatPageState extends State<ChatPage> {
         final size = calculateImageDimension(f: File(file.path));
         final down4Media = MessageMedia(
           id: mediaID,
+          isSaved: true,
           path: file.path,
           metadata: MediaMetadata(
             isSquared: false,
@@ -390,8 +389,11 @@ class _ChatPageState extends State<ChatPage> {
             owner: widget.self.id,
             elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
           ),
-        )..save(toPersonal: true);
+        )..save();
         _cachedImages[mediaID] = down4Media;
+        widget.self
+          ..images.add(mediaID)
+          ..save();
       }
     } else {
       final video = await ImagePicker().pickVideo(
@@ -425,13 +427,13 @@ class _ChatPageState extends State<ChatPage> {
     for (final msg in _cachedMessages.values) {
       if (msg.selected) {
         _cachedMessages[msg.message.id] = msg.invertedSelection();
-        final media = msg.media;
-        if (media != null) {
-          final save = media.metadata.isVideo ? b.saveVideo : b.saveImage;
-          save(media);
-        }
+        widget.self.savedMessages.add(msg.message.id);
+        msg.message
+          ..isSaved = true
+          ..save();
       }
     }
+    widget.self.save();
     setState(() {});
   }
 
@@ -453,7 +455,6 @@ class _ChatPageState extends State<ChatPage> {
 
     var msg = Message(
       root: widget.node is GroupNode ? widget.node.id : null,
-      type: Messages.chat,
       id: messagePushId(),
       timestamp: ts,
       senderID: widget.self.id,
@@ -469,7 +470,7 @@ class _ChatPageState extends State<ChatPage> {
 
     var req = r.ChatRequest(
       message: msg,
-      targets: targets,
+      targets: targets.toList(),
       media: mediaInput ?? _cameraInput,
     );
 

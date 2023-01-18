@@ -1,9 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:down4/src/down4_utility.dart';
-import 'package:hive/hive.dart';
 
 import '../data_objects.dart';
 import '../boxes.dart';
@@ -294,23 +291,18 @@ class Palette extends StatelessWidget {
         child: child,
       );
 
-  Widget row({required List<Widget> children}) {
-    print("is self name: ${node.name}\n$isSelf");
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: isSelf
-            ? PinkTheme.selfPaletteColor
-            : PinkTheme.nodeColors[node.colorCode],
-        borderRadius: const BorderRadius.all(Radius.circular(4.0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        textDirection: TextDirection.ltr,
-        children: children,
-      ),
-    );
-  }
+  Widget row({required List<Widget> children}) => Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: PinkTheme.nodeColors[node.colorCode],
+          borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          textDirection: TextDirection.ltr,
+          children: children,
+        ),
+      );
 
   Widget get image => GestureDetector(
         onTap: () => imPress?.call(node.id, at),
@@ -332,9 +324,7 @@ class Palette extends StatelessWidget {
                 left: BorderSide(
                   color: selected
                       ? PinkTheme.black
-                      : isSelf
-                          ? PinkTheme.selfPaletteColor
-                          : PinkTheme.nodeColors[node.colorCode]!,
+                      : PinkTheme.nodeColors[node.colorCode]!,
                   width: 1.0,
                 ),
               ),

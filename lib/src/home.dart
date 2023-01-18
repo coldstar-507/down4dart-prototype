@@ -53,7 +53,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   Widget? _page;
-  var _exchangeRate = b.loadExchangeRate();
+  var _exchangeRate;
 
   List<r.Request> _requests = [];
 
@@ -90,7 +90,6 @@ class _HomeState extends State<Home> {
     widget.wallet.printWalletInfo();
     connectToMessages();
     processWebRequests();
-    homePage();
   }
 
   @override
@@ -99,8 +98,8 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  void loadExchangeRate() async {
-    _exchangeRate = b.loadExchangeRate();
+  void loadAndUpdateExchangeRate() async {
+    _exchangeRate = loadExchangeRate();
     updateExchangeRate();
   }
 
@@ -123,6 +122,7 @@ class _HomeState extends State<Home> {
     for (final fetchedNode in fetchedNodes ?? <BaseNode>[]) {
       writePalette(fetchedNode, fold: true, fade: true);
     }
+    homePage();
   }
 
   void connectToMessages() {
@@ -167,7 +167,7 @@ class _HomeState extends State<Home> {
             ..updateActivity()
             ..save());
         }
-        msg.save();
+        await msg.onReceipt();
         if (_page is HomePage) {
           homePage();
         } else if (_page is ChatPage && curLoc.id == theRoot) {
@@ -222,7 +222,7 @@ class _HomeState extends State<Home> {
       if (rate != null) {
         _exchangeRate.rate = rate;
         _exchangeRate.lastUpdate = rightNow;
-        b.saveExchangeRate(_exchangeRate);
+        _exchangeRate.save();
         if (_page is MoneyPage) moneyPage();
       }
     }
@@ -258,7 +258,7 @@ class _HomeState extends State<Home> {
       String? lastMessagePreview;
       bool messagePreviewWasRead = true;
       if (node.messages.isNotEmpty) {
-        var msg = b.loadMessage(node.messages.last);
+        var msg = node.messages.last.getLocalMessage();
         lastMessagePreview = msg?.text ?? "&attachment";
         messagePreviewWasRead = msg?.isRead ?? true;
       }
@@ -295,12 +295,11 @@ class _HomeState extends State<Home> {
       if (node.messages.isEmpty) {
         return null;
       } else {
-        final lastMessageID = node.messages.last;
-        final msg = b.loadMessage(lastMessageID);
+        final msg = node.messages.last.getLocalMessage();
         if (msg?.timestamp.isExpired ?? true) {
           // put false for test
           print("Last message is expired, deleting hyperchat!");
-          b.deleteNode(node.id);
+          node.delete();
           return null;
         }
         lastMessagePreview = msg?.text ?? "&attachment";
@@ -330,7 +329,7 @@ class _HomeState extends State<Home> {
       String? lastMessagePreview;
       bool messagePreviewWasRead = false;
       if (node.messages.isNotEmpty) {
-        var msg = b.loadMessage(node.messages.last);
+        var msg = node.messages.last.getLocalMessage();
         lastMessagePreview = msg?.text ?? "&attachment";
         messagePreviewWasRead = msg?.isRead ?? false;
       }
@@ -361,7 +360,7 @@ class _HomeState extends State<Home> {
         messagePreview: node.payment.textNote,
         buttonsInfo: [
           ButtonsInfo(
-            assetPath: 'lib/src/assets/rightBlackArrow.png',
+            assetPath: 'lib/src/assets/filled.png',
             pressFunc: (id, at) {
               _locations.add(Location(id: "Payment"));
               paymentPage(node.payment);
@@ -494,12 +493,13 @@ class _HomeState extends State<Home> {
 
     for (final node in palettes().selected().asNodes()) {
       if (node is GroupNode) {
+        final targets = node.group..remove(widget.self.id);
         final sr = r.SnipRequest(
           mediaID: media.id,
           root: node.id,
           groupName: node.name,
           senderID: widget.self.id,
-          targets: node.group..remove(widget.self.id),
+          targets: targets.toList(),
         );
         snipRequests.add(sr);
       } else {
@@ -527,18 +527,19 @@ class _HomeState extends State<Home> {
   void addPalettes(List<Palette> palettes) {
     for (final node in palettes.asNodes()) {
       if (node is User) {
-        node
-          ..updateActivity()
-          ..isFriend = true;
-        writePalette(node, at: "Search");
+        writePalette(
+            node
+              ..updateActivity()
+              ..isFriend = true,
+            at: "Search");
 
         User? homeNode;
         if ((homeNode = nodeAt(node.id) as User?) == null) {
-          writePalette(node);
-          b.saveNode(node);
+          writePalette(node..save());
         } else {
-          writePalette(homeNode!..isFriend = true);
-          b.saveNode(homeNode);
+          writePalette(homeNode!
+            ..isFriend = true
+            ..save());
         }
       } else {
         writePalette(node, at: "Search");
@@ -555,7 +556,7 @@ class _HomeState extends State<Home> {
   void delete({String at = "Home"}) {
     final nodeIDsToRemove = palettes(at: at).selected().asIds();
     for (final nodeID in List<Identifier>.from(nodeIDsToRemove)) {
-      b.deleteNode(nodeID);
+      nodeID.deleteLocalNode();
       paletteMap(at).remove(nodeID);
     }
     // TODO for other places than home
@@ -986,6 +987,7 @@ class _HomeState extends State<Home> {
     _page = AddFriendPage(
       forwardNodes: forward,
       putNodeOffline: putNodeOffLine,
+      neuteredKeys: widget.wallet.keys.neutered(),
       self: widget.self,
       search: search,
       palettes: _paletteMap["Search"]?.values.toList().reversed.toList() ?? [],
