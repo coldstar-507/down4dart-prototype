@@ -19,7 +19,6 @@ import '../render_objects/qr.dart';
 
 class AddFriendPage extends StatefulWidget {
   final Self self;
-  final Down4Keys neuteredKeys;
   final List<Palette> palettes;
   final Future<bool> Function(List<String>) search;
   final void Function(User node) putNodeOffline;
@@ -30,7 +29,6 @@ class AddFriendPage extends StatefulWidget {
     required this.palettes,
     required this.search,
     required this.self,
-    required this.neuteredKeys,
     required this.putNodeOffline,
     required this.addCallback,
     required this.backCallback,
@@ -73,7 +71,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         widget.self.id,
         widget.self.name,
         widget.self.lastName,
-        widget.neuteredKeys.toYouKnow(),
+        widget.self.neuter.toYouKnow(),
       ].join("~");
 
   double get dimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);

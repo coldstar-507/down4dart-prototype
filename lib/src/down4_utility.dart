@@ -10,6 +10,8 @@ import 'package:bs58/bs58.dart';
 import 'dart:math' as math;
 import 'package:english_words/english_words.dart' as w;
 
+const golden = 1.618;
+
 final listEqual = const ListEquality().equals;
 
 class Pair<E, F> {
@@ -52,7 +54,7 @@ String deterministicGroupRoot(List<String> ids) {
 }
 
 String generateMessageID(String senderID, num timeStamp) {
-  return sha1(utf8.encode(senderID + timeStamp.toString())).toBase64();
+  return sha1(utf8.encode(senderID + timeStamp.toString())).toBase58();
 }
 
 /// FNV-1a 64bit hash algorithm optimized for Dart Strings
@@ -72,7 +74,7 @@ int fastHash(String string) {
 }
 
 String deterministicMediaID(Uint8List mediaData) {
-  return sha1(mediaData).toBase64();
+  return sha1(mediaData).toBase58();
 }
 
 Uint8List randomBytes({int size = 16}) {
@@ -82,7 +84,7 @@ Uint8List randomBytes({int size = 16}) {
 }
 
 String randomMediaID() {
-  return randomBytes().toBase64();
+  return randomBytes().toBase58();
 }
 
 int timeStamp() => DateTime.now().toUtc().millisecondsSinceEpoch;

@@ -87,11 +87,10 @@ class _Down4State extends State<Down4> {
     final seed2 = unsafeSeed(32);
     final secret = hash256(seed1 + seed2);
     _wallet = Wallet.fromSeed(seed1, seed2);
-    final neutered = _wallet!.keys.neutered();
+    final neutered = _wallet!.neuter;
 
     NodeMedia image = NodeMedia(
       id: d4utils.randomMediaID(),
-      path: imPath,
       data: File(imPath).readAsBytesSync(),
       metadata: MediaMetadata(
         owner: id,
@@ -136,7 +135,6 @@ class _Down4State extends State<Down4> {
       children: {},
       messages: {},
       snips: {},
-      savedMessages: {},
       images: {},
       videos: {},
       nfts: {},

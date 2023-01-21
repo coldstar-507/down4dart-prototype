@@ -104,11 +104,11 @@ class Palette extends StatelessWidget {
     BaseNode n = node;
     if (n is User) {
       return n.media != null
-          ? Image.memory(n.media!.data!,
+          ? Image.memory(n.media!.data,
               fit: BoxFit.cover, gaplessPlayback: true)
           : Image.asset('lib/src/assets/hashirama.jpg', fit: BoxFit.cover);
     } else if (n is GroupNode) {
-      return Image.memory(n.media.data!,
+      return Image.memory(n.media.data,
           fit: BoxFit.cover, gaplessPlayback: true);
     } else if (n is Payment) {
       return n.payment.independentGets < 2000000
@@ -119,7 +119,7 @@ class Palette extends StatelessWidget {
               : Image.asset('lib/src/assets/Dollar_Sign_3.png',
                   fit: BoxFit.cover);
     } else if (n is Self) {
-      return Image.memory(n.media.data!,
+      return Image.memory(n.media.data,
           fit: BoxFit.cover, gaplessPlayback: true);
     }
     throw 'stop breaking my app';

@@ -18,8 +18,6 @@ import 'bsv/wallet.dart';
 
 import '../main.dart' as main;
 
-const golden = 1.618;
-
 var b = Boxes.instance;
 var db = FirebaseDatabase.instance.ref();
 var fs = FirebaseFirestore.instance;
@@ -112,14 +110,14 @@ Future<MediaMetadata?> downloadMediaMetadata(String mediaID) async {
 }
 
 Future<void> uploadOrUpdateMedia(
-  Media media, {
+  MessageMedia media, {
   bool skipCheck = false, // usually for camera uploads
 }) async {
-  if (media.path == null) return;
+  if (media.file == null) return;
   final mediaRef = st.ref(media.id);
   if (skipCheck) {
     mediaRef.putFile(
-      File(media.path!),
+      media.file!,
       SettableMetadata(customMetadata: media.metadata.toJson()),
     );
   } else {
@@ -129,24 +127,30 @@ Future<void> uploadOrUpdateMedia(
       if (down4Metadata.timestamp.shouldBeUpdated) {
         final newTimeStamp = timeStamp();
         if (newTimeStamp > down4Metadata.timestamp) {
-          mediaRef.updateMetadata(
+          await mediaRef.updateMetadata(
             SettableMetadata(
               customMetadata:
                   down4Metadata.updatedTimestamp(timeStamp()).toJson(),
             ),
           );
+          print("Updated the metadata");
         }
       }
+      print("No need to update the metadata right away!");
     } catch (e) {
       // TODO, find the actual exception we are looking for, docs aren't clear
       // If there's an exception, it should mean that there is no media, so we
       // do the full upload
-      mediaRef.putFile(
-        File(media.path!),
-        SettableMetadata(
-          customMetadata: media.metadata.updatedTimestamp(timeStamp()).toJson(),
-        ),
-      );
+      try {
+        await mediaRef.putFile(
+          media.file!,
+          SettableMetadata(
+              customMetadata:
+                  media.metadata.updatedTimestamp(timeStamp()).toJson()),
+        );
+      } on FirebaseException catch (e) {
+        print("Error uploading file $e");
+      }
     }
   }
 }
@@ -251,7 +255,7 @@ extension MediaSave on MessageMedia {
 
   Future<void> delete() async {
     b.medias.delete(id);
-    if (references.isEmpty && path != null) {
+    if (references.isEmpty && path != null && !isSaved) {
       print("References are empty, deleting the file!");
       return deleteMediaFile(id);
     }
@@ -265,7 +269,7 @@ extension PaymentSave on Down4Payment {
 }
 
 extension WalletSave on Wallet {
-  Future<void> save() => b.personal.put("wallet", jsonEncode(this));
+  Future<void> save() => b.personal.put("wallet", jsonEncode(toJson()));
 }
 
 class Boxes {

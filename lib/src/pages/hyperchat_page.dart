@@ -10,6 +10,7 @@ import 'package:down4/src/data_objects.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
+import 'package:english_words/english_words.dart' as w;
 
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
@@ -23,7 +24,7 @@ class HyperchatPage extends StatefulWidget {
   final double initialOffset;
   final List<CameraDescription> cameras;
   final List<Palette> palettes, transitioned;
-  final Iterable<User> userTargets;
+  final Iterable<Person> people;
   final void Function(r.HyperchatRequest) hyperchatRequest;
   final void Function(r.ChatRequest) ping;
   final void Function() back;
@@ -31,7 +32,7 @@ class HyperchatPage extends StatefulWidget {
 
   const HyperchatPage({
     required this.initialOffset,
-    required this.userTargets,
+    required this.people,
     required this.transitioned,
     required this.self,
     required this.palettes,
@@ -90,7 +91,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          precacheImage(FileImage(File(image.path!)), context);
+          if (image.file != null) {
+            precacheImage(FileImage(image.file!), context);
+          }
         }
       }).then((value) => print("precached all images"));
     });
@@ -121,12 +124,13 @@ class _HyperchatPageState extends State<HyperchatPage> {
       mediaID: mediaInput?.id ?? cameraInput?.id,
     );
 
-    final pairs = u
-        .randomPairs(10)
+    final pairs = w
+        .generateWordPairs(safeOnly: false)
+        .take(10)
         .map((e) => "${e.first} ${e.second}")
         .toList(growable: false);
 
-    final targets = widget.userTargets.asIds().toSet()..remove(widget.self.id);
+    final targets = widget.people.asIds().toSet()..remove(widget.self.id);
     final hcReq = r.HyperchatRequest(
       message: msg,
       targets: targets.toList(),
@@ -164,7 +168,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
             isVideo: false,
             isReversed: false,
             owner: widget.self.id,
-            elementAspectRatio: size?.aspectRatio ?? 1.0,
+            elementAspectRatio: 1 / (size?.aspectRatio ?? 1.0),
           ),
         )..save();
         _cachedImages[mediaID] = down4Media;
@@ -272,6 +276,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
             name: "Accept",
             onPress: () {
               cameraInput = MessageMedia(
+                path: cachedPath,
                 id: u.randomMediaID(),
                 metadata: MediaMetadata(
                   isReversed: isReversed,

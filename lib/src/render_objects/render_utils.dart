@@ -65,7 +65,7 @@ class _Down4InputState extends State<Down4Input> {
 }
 
 class Down4VideoPlayer extends StatefulWidget {
-  final Media media;
+  final MessageMedia media;
   const Down4VideoPlayer({required this.media, Key? key}) : super(key: key);
 
   @override
@@ -82,8 +82,8 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   }
 
   Future<void> initController() async {
-    _videoController = widget.media.path != null
-        ? VideoPlayerController.file(File(widget.media.path!))
+    _videoController = widget.media.file != null
+        ? VideoPlayerController.file(widget.media.file!)
         : VideoPlayerController.network(widget.media.url);
     await _videoController?.initialize();
     setState(() {});
@@ -115,14 +115,13 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
 }
 
 class Down4ImageViewer extends StatelessWidget {
-  final Media media;
+  final MessageMedia media;
   const Down4ImageViewer({required this.media, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return media.path != null
-        ? Image.file(File(media.path!),
-            fit: BoxFit.cover, gaplessPlayback: true)
+    return media.file != null
+        ? Image.file(media.file!, fit: BoxFit.cover, gaplessPlayback: true)
         : Image.network(media.url, fit: BoxFit.cover, gaplessPlayback: true);
   }
 }

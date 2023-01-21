@@ -27,7 +27,7 @@ class GroupPage extends StatefulWidget {
   final Self self;
   // final List<Palette> Function() transition;
   final List<Palette> palettes, transitioned;
-  final Iterable<User> userTargets;
+  final Iterable<Person> people;
   // final void Function(Group) afterMessageCallback;
   final void Function() back;
   final void Function(r.GroupRequest) groupRequest;
@@ -35,7 +35,7 @@ class GroupPage extends StatefulWidget {
 
   const GroupPage({
     // required this.transition,
-    required this.userTargets,
+    required this.people,
     required this.transitioned,
     required this.self,
     // required this.afterMessageCallback,
@@ -48,7 +48,7 @@ class GroupPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _GroupPageState createState() => _GroupPageState();
+  State<GroupPage> createState() => _GroupPageState();
 }
 
 class _GroupPageState extends State<GroupPage> {
@@ -80,7 +80,9 @@ class _GroupPageState extends State<GroupPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          precacheImage(FileImage(File(image.path!)), context);
+          if (image.file != null) {
+            precacheImage(FileImage(File(image.path)), context);
+          }
         }
       }).then((value) => print("precached all images"));
     });
@@ -148,7 +150,7 @@ class _GroupPageState extends State<GroupPage> {
       text: tec.value.text,
     );
 
-    final targets = widget.userTargets.asIds().toSet()..remove(widget.self.id);
+    final targets = widget.people.asIds().toSet()..remove(widget.self.id);
     final grpReq = r.GroupRequest(
       groupID: groupID,
       name: groupName,
@@ -231,7 +233,7 @@ class _GroupPageState extends State<GroupPage> {
               isReversed: false,
               timestamp: u.timeStamp(),
               owner: widget.self.id,
-              elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
+              elementAspectRatio: 1 / ((await size)?.aspectRatio ?? 1.0),
             ));
         if (groupImageImport) {
           groupImage = down4Media.asNodeMedia();
@@ -295,7 +297,13 @@ class _GroupPageState extends State<GroupPage> {
       },
       medias: images ? savedImages.toList() : savedVideos.toList(),
       topButtons: [
-        ConsoleButton(name: "Import", onPress: handleImport),
+        ConsoleButton(
+          name: "Import",
+          onPress: () => handleImport(
+            groupImageImport: forGroupImage,
+            importImages: images || forGroupImage,
+          ),
+        ),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: loadBaseConsole),

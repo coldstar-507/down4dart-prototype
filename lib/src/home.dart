@@ -132,14 +132,14 @@ class _HomeState extends State<Home> {
       msgQueue.child(eventKey).remove(); // consume it
 
       if (eventPayload == "p") {
-        // PAYLOAD OF A PAYMENT IS SIMPLY p
+        // PAYMENT!
         final payment = await r.getPayment(eventKey);
         if (payment == null) return;
         widget.wallet.parsePayment(widget.self.id, payment);
         loadPayments();
         return;
       } else if (eventPayload == "m") {
-        // PAYLOAD OF A CHAT MESSAGE IS m
+        // MESSAGE!
         final snapshot = await messagesRef.child(eventKey).get();
         if (!snapshot.exists) return;
         final msgJson = Map<String, dynamic>.from(snapshot.value as Map);
@@ -206,9 +206,6 @@ class _HomeState extends State<Home> {
           await getOrUpdateMedia(nodeRoot.id);
         }
 
-        print(
-            "MEDIA ID=$mediaID\nMEDIA REFERECES=${mediaID.getLocalMessageMedia()?.references}");
-
         writePalette(nodeRoot
           ..snips.add(mediaID)
           ..updateActivity()
@@ -271,25 +268,84 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Palette? nodeToPalette(
+  Palette nodeToPalette(
     BaseNode node, {
     String at = "Home",
     bool fold = false,
     bool fade = false,
   }) {
-    if (node is User) {
+    if (node is ChatableNode) {
       String? lastMessagePreview;
       bool messagePreviewWasRead = true;
       if (node.messages.isNotEmpty) {
         var msg = node.messages.last.getLocalMessage();
-        lastMessagePreview = msg?.text ?? "&attachment";
+        lastMessagePreview =
+            ((msg?.text ?? "").isNotEmpty) ? msg!.text : "&attachment";
         messagePreviewWasRead = msg?.isRead ?? true;
+        if (node is GroupNode) {
+          lastMessagePreview = "@${msg?.senderID}: $lastMessagePreview";
+        }
       }
-      return Palette(
+      if (node is User) {
+        if (node.id == widget.self.id) {
+          return nodeToPalette(node as Self, at: at, fade: fade, fold: fold);
+        }
+        return Palette(
+            node: node,
+            at: at,
+            fold: fold,
+            fade: fade,
+            snipOrMessageToRead:
+                node.snips.isNotEmpty || !messagePreviewWasRead,
+            messagePreview: lastMessagePreview,
+            messagePreviewWasRead: messagePreviewWasRead,
+            imPress: select,
+            bodyPress: select,
+            buttonsInfo: [
+              ButtonsInfo(
+                assetPath: at == "Home"
+                    ? node.snips.isNotEmpty
+                        ? "lib/src/assets/redArrow.png"
+                        : messagePreviewWasRead
+                            ? "lib/src/assets/50.png"
+                            : "lib/src/assets/filled.png"
+                    : "lib/src/assets/50.png",
+                pressFunc: at == "Home"
+                    ? node.snips.isNotEmpty
+                        ? checkSnips
+                        : openChat
+                    : openNode,
+                longPressFunc: openNode,
+                rightMost: true,
+              )
+            ]);
+      } else if (node is Self) {
+        return Palette(
+            node: node,
+            at: at,
+            messagePreview: lastMessagePreview,
+            messagePreviewWasRead: true,
+            snipOrMessageToRead: node.snips.isNotEmpty,
+            imPress: select,
+            bodyPress: select,
+            buttonsInfo: [
+              ButtonsInfo(
+                assetPath: at == "Home" && node.snips.isNotEmpty
+                    ? "lib/src/assets/redArrow.png"
+                    : "lib/src/assets/50.png",
+                pressFunc: at == "Home"
+                    ? node.snips.isNotEmpty
+                        ? checkSnips
+                        : openChat
+                    : openNode,
+                longPressFunc: openNode,
+                rightMost: true,
+              )
+            ]);
+      } else if (node is Hyperchat) {
+        return Palette(
           node: node,
           at: at,
-          fold: fold,
-          fade: fade,
           snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
           messagePreview: lastMessagePreview,
           messagePreviewWasRead: messagePreviewWasRead,
@@ -297,85 +353,40 @@ class _HomeState extends State<Home> {
           bodyPress: select,
           buttonsInfo: [
             ButtonsInfo(
+              rightMost: true,
+              pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
               assetPath: at == "Home" && node.snips.isNotEmpty
                   ? "lib/src/assets/redArrow.png"
                   : messagePreviewWasRead
                       ? "lib/src/assets/50.png"
                       : "lib/src/assets/filled.png",
-              pressFunc: at == "Home"
-                  ? node.snips.isNotEmpty
-                      ? checkSnips
-                      : openChat
-                  : openNode,
-              longPressFunc: openNode,
-              rightMost: true,
             )
-          ]);
-    } else if (node is Hyperchat) {
-      String? lastMessagePreview;
-      bool messagePreviewWasRead = false;
-      if (node.messages.isEmpty) {
-        return null;
+          ],
+        );
+      } else if (node is Group) {
+        return Palette(
+          node: node,
+          snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
+          messagePreview: lastMessagePreview,
+          messagePreviewWasRead: messagePreviewWasRead,
+          at: at,
+          imPress: select,
+          bodyPress: select,
+          buttonsInfo: [
+            ButtonsInfo(
+              rightMost: true,
+              pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
+              assetPath: at == "Home" && node.snips.isNotEmpty
+                  ? "lib/src/assets/redArrow.png"
+                  : messagePreviewWasRead
+                      ? "lib/src/assets/50.png"
+                      : "lib/src/assets/filled.png",
+            )
+          ],
+        );
       } else {
-        final msg = node.messages.last.getLocalMessage();
-        if (msg == null) print("Message is NULL, but it shouldn't be!");
-        if (msg?.timestamp.isExpired ?? true) {
-          // put false for test
-          print("Last message is expired, deleting hyperchat!");
-          node.delete();
-          return null;
-        }
-        lastMessagePreview = msg?.text ?? "&attachment";
-        messagePreviewWasRead = msg?.isRead ?? false;
+        throw "You broke my app!";
       }
-      return Palette(
-        node: node,
-        at: at,
-        snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
-        messagePreview: lastMessagePreview,
-        messagePreviewWasRead: messagePreviewWasRead,
-        imPress: select,
-        bodyPress: select,
-        buttonsInfo: [
-          ButtonsInfo(
-            rightMost: true,
-            pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
-            assetPath: at == "Home" && node.snips.isNotEmpty
-                ? "lib/src/assets/redArrow.png"
-                : messagePreviewWasRead
-                    ? "lib/src/assets/50.png"
-                    : "lib/src/assets/filled.png",
-          )
-        ],
-      );
-    } else if (node is Group) {
-      String? lastMessagePreview;
-      bool messagePreviewWasRead = false;
-      if (node.messages.isNotEmpty) {
-        var msg = node.messages.last.getLocalMessage();
-        lastMessagePreview = msg?.text ?? "&attachment";
-        messagePreviewWasRead = msg?.isRead ?? false;
-      }
-      return Palette(
-        node: node,
-        snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
-        messagePreview: lastMessagePreview,
-        messagePreviewWasRead: messagePreviewWasRead,
-        at: at,
-        imPress: select,
-        bodyPress: select,
-        buttonsInfo: [
-          ButtonsInfo(
-            rightMost: true,
-            pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
-            assetPath: at == "Home" && node.snips.isNotEmpty
-                ? "lib/src/assets/redArrow.png"
-                : messagePreviewWasRead
-                    ? "lib/src/assets/50.png"
-                    : "lib/src/assets/filled.png",
-          )
-        ],
-      );
     } else if (node is Payment) {
       return Palette(
         node: node,
@@ -392,42 +403,15 @@ class _HomeState extends State<Home> {
           )
         ],
       );
-    } else if (node is Self) {
-      String? lastMessagePreview;
-      if (node.messages.isNotEmpty) {
-        var msg = node.messages.last.getLocalMessage();
-        lastMessagePreview = msg?.text ?? "&attachment";
-      }
-      return Palette(
-          node: node,
-          at: at,
-          messagePreview: lastMessagePreview,
-          messagePreviewWasRead: true,
-          snipOrMessageToRead: node.snips.isNotEmpty,
-          imPress: select,
-          bodyPress: select,
-          buttonsInfo: [
-            ButtonsInfo(
-              assetPath: at == "Home" && node.snips.isNotEmpty
-                  ? "lib/src/assets/redArrow.png"
-                  : "lib/src/assets/50.png",
-              pressFunc: at == "Home"
-                  ? node.snips.isNotEmpty
-                      ? checkSnips
-                      : openChat
-                  : openNode,
-              longPressFunc: openNode,
-              rightMost: true,
-            )
-          ]);
     }
-    return null;
+    throw "You broke my app again!";
   }
 
   Future<void> processWebRequests() async {
     Future<bool> processWebRequest(r.Request req) async {
       if (req is r.ChatRequest) {
-        // req as r.ChatRequest;
+        // first, save the message
+        req.message.save();
         final root = req.message.root ?? req.targets.first;
         var node = nodeAt(root) as ChatableNode?;
         if (node == null) return false;
@@ -464,6 +448,14 @@ class _HomeState extends State<Home> {
         return success;
       } else if (req is r.HyperchatRequest) {
         loadingPage();
+
+        if (req.media != null) {
+          await uploadOrUpdateMedia(
+            req.media!,
+            skipCheck: req.media!.metadata.canSkipCheck,
+          );
+        }
+
         var node = await req.send();
         if (node == null) {
           homePage();
@@ -480,20 +472,26 @@ class _HomeState extends State<Home> {
         return true;
       } else if (req is r.GroupRequest) {
         loadingPage();
+
+        if (req.media != null) {
+          await uploadOrUpdateMedia(
+            req.media!,
+            skipCheck: req.media!.metadata.canSkipCheck,
+          );
+        }
+
         var node = await req.send();
         if (node == null) {
           homePage();
           return false;
         }
         unselectSelectedPalettes();
-        node
+        req.message.save();
+        writePalette(node
           ..messages.add(req.message.id)
           ..updateActivity()
-          ..save();
+          ..save());
 
-        req.message.save();
-
-        writePalette(node);
         openChat(node.id, "Home");
         return true;
       } else if (req is r.PaymentRequest) {
@@ -634,7 +632,7 @@ class _HomeState extends State<Home> {
     return false;
   }
 
-  void putNodeOffLine(User node) {
+  void putNodeOffLine(Person node) {
     final p = nodeToPalette(node, at: "Search");
     if (p != null) {
       _paletteMap["Search"]?.putIfAbsent(node.id, () => p);
@@ -765,7 +763,7 @@ class _HomeState extends State<Home> {
     _paletteMap[at]![id] = _paletteMap[at]![id]!.invertedSelection();
   }
 
-  Pair<List<Palette>, Iterable<User>>
+  Pair<List<Palette>, Iterable<Person>>
       homeToMoneyOrHyperchatOrGroupTransition() {
     final allHomePalettes = formattedHomePalettes;
     final originalOrder = allHomePalettes.asIds();
@@ -812,7 +810,7 @@ class _HomeState extends State<Home> {
     return Pair(
       // pals.inReversedOrder(originalOrder),
       pals.inThatOrder(originalOrder),
-      pals.unfolded().asNodes<User>(),
+      pals.unfolded().asNodes<Person>(),
     );
   }
 
@@ -998,7 +996,7 @@ class _HomeState extends State<Home> {
       self: widget.self,
       palettes: formattedHomePalettes,
       transitioned: transition.first,
-      userTargets: transition.second,
+      people: transition.second,
       hyperchatRequest: (hyperchatRequest) {
         _requests.add(hyperchatRequest);
         processWebRequests();
@@ -1025,7 +1023,7 @@ class _HomeState extends State<Home> {
         processWebRequests();
       },
       transitioned: transition.first,
-      userTargets: transition.second,
+      people: transition.second,
       palettes: formattedHomePalettes,
       cameras: widget.cameras,
     );
@@ -1037,7 +1035,6 @@ class _HomeState extends State<Home> {
     _page = AddFriendPage(
       forwardNodes: forward,
       putNodeOffline: putNodeOffLine,
-      neuteredKeys: widget.wallet.keys.neutered(),
       self: widget.self,
       search: search,
       palettes: _paletteMap["Search"]?.values.toList().reversed.toList() ?? [],
@@ -1142,6 +1139,7 @@ class _HomeState extends State<Home> {
         node.id: palette(node.id)!,
       };
     }
+    print(senders.toString());
     _page = ChatPage(
       nodeToPalette: nodeToPalette,
       senders: senders,

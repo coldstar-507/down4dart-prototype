@@ -15,9 +15,11 @@ class Wallet {
   Map<Identifier, bool> _spent;
   int _ix;
 
-  Down4Keys get keys => _keys;
+  Down4Keys get neuter => _keys.neutered();
 
-  Map<Identifier, Down4TXOUT> get utxos => _utxos;
+  // Down4Keys get keys => _keys;
+
+  // Map<Identifier, Down4TXOUT> get utxos => _utxos;
 
   int get balance => _utxos.values.fold(0, (bal, tx) => bal + tx.sats.asInt);
 
@@ -46,9 +48,10 @@ class Wallet {
     for (final p in _payments.entries) {
       print("============PAYMENT============");
       print("""
-      id       = ${p.key}
-      lastTxID = ${p.value.txs.last.txID.asHex}
-      message  = ${p.value.textNote}
+      id           = ${p.key}
+      lastTxID     = ${p.value.txs.last.txID.asHex}
+      message      = ${p.value.textNote}
+      lasTX secret = ${p.value.txs.last.down4Secret}
       """);
       print("============TXIN===========");
       for (final txin in p.value.txs.last.txsIn) {
@@ -66,6 +69,7 @@ class Wallet {
         txid     = ${utxo.txid!.asHex}
         id       = ${utxo.id}
         receiver = ${utxo.receiver}
+        secret   = ${utxo.secret}
         """);
       }
     }
@@ -84,17 +88,17 @@ class Wallet {
   //   }
   // }
 
-  Down4Payment? payUsers({
-    required List<User> users,
+  Down4Payment? payPeople({
+    required List<Person> people,
     required Identifier selfID,
     required Sats amount,
     String textNote = "",
   }) {
-    final nUsers = users.length;
-    final payPerUser = Sats((amount.asInt / nUsers).floor());
+    final nPeople = people.length;
+    final payPerPerson = Sats((amount.asInt / nPeople).floor());
 
     // outs being script(25) + scriptLen(1) + sats(8) == 34
-    final nOuts = nUsers + 2;
+    final nOuts = nPeople + 2;
     final varOutSize = VarInt.fromInt(nOuts).data.length;
     // know size = nOuts(var) + outs(nOuts * 34) + version(4) + nSeq(4)
     var knownTxSize = varOutSize + (nOuts * 34) + 8;
@@ -104,8 +108,10 @@ class Wallet {
     List<Down4TXIN> ins = inInfos[0];
     Sats minerFees = inInfos[1];
     Sats down4Fees = inInfos[2];
-    Sats inSats =
-        ins.fold(Sats(0), (tot, txin) => tot + utxos[txin.utxoID]!.sats);
+    Sats inSats = ins.fold(
+      Sats(0),
+      (tot, txin) => tot + _utxos[txin.utxoID]!.sats,
+    );
 
     // at this point, there is no reason for the payment to fail
     // except if a key derivation returns, and in that case, calling the
@@ -113,29 +119,24 @@ class Wallet {
     List<Down4TXOUT> outs = [];
     _ix = _ix + 1;
     // the goal here is simply having a unique id everytime
-    final d4Secret = makeUint32(_ix) + utf8.encode(selfID);
-    final d4Keys = DOWN4_NEUTER.derive(d4Secret);
+    final txSecret = makeUint32(_ix) + utf8.encode(selfID);
+    final d4Keys = DOWN4_NEUTER.derive(txSecret);
     // except for here possibly? must be fucking rare tho
     if (d4Keys == null) return null;
     var d4out = Down4TXOUT(
       isFee: true,
       sats: down4Fees,
-      // secret: d4Secret,
-      // outIndex: outs.length,
       scriptPubKey: p2pkh(d4Keys.rawAddress),
     );
     outs.add(d4out);
 
-    for (int i = 0; i < users.length; i++) {
-      // final userSecret = makeUint32(_ix) + utf8.encode(users[i].id);
-      final userKeys = users[i].neuter.derive(d4Secret);
+    for (int i = 0; i < people.length; i++) {
+      final userKeys = people[i].neuter.derive(txSecret);
       if (userKeys == null) return null;
       var uOut = Down4TXOUT(
-        sats: payPerUser,
-        // secret: userSecret,
-        // outIndex: outs.length,
+        sats: payPerPerson,
         scriptPubKey: p2pkh(userKeys.rawAddress),
-        receiver: users[i].id,
+        receiver: people[i].id,
       );
       outs.add(uOut);
     }
@@ -143,7 +144,7 @@ class Wallet {
     // change
     final change = inSats - down4Fees - minerFees - amount;
     if (change.asInt > 0) {
-      final selfKeys = keys.derive(d4Secret);
+      final selfKeys = _keys.derive(txSecret);
       if (selfKeys == null) return null;
       var changeOut = Down4TXOUT(
         isChange: true,
@@ -155,17 +156,17 @@ class Wallet {
     }
 
     for (var i = 0; i < ins.length; i++) {
-      final spentUtxo = utxos[ins[i].utxoID];
+      final spentUtxo = _utxos[ins[i].utxoID];
       if (spentUtxo == null) return null;
 
-      final secret = spentUtxo.secret;
-      if (secret == null) return null;
-
-      final keysForSig = keys.derive(secret);
-      if (keysForSig == null) return null;
+      final utxoSecret = spentUtxo.secret;
+      if (utxoSecret == null) return null;
 
       final sData = sigData(txsIn: ins, txsOut: outs, nIn: i, utxo: spentUtxo);
       if (sData == null) return null;
+
+      final keysForSig = _keys.derive(utxoSecret);
+      if (keysForSig == null) return null;
 
       final scriptSig = p2pkhSig(keys: keysForSig, sigData: sData);
       if (scriptSig == null) return null;
@@ -174,13 +175,7 @@ class Wallet {
       _spent[spentUtxo.id] = true;
     }
 
-    // This is now done after payments parsing
-    // final theTxID = theTx.genTxID();
-    // for (var txout in theTx.txsOut) {
-    //   txout.txid = theTxID;
-    // }
-
-    final theTx = Down4TX(down4Secret: d4Secret, txsIn: ins, txsOut: outs);
+    final theTx = Down4TX(down4Secret: txSecret, txsIn: ins, txsOut: outs);
 
     return Down4Payment(_chainedTxs(theTx), true, textNote: textNote);
   }
@@ -189,13 +184,11 @@ class Wallet {
     for (final tx in pay.txs) {
       tx.writeTxInfosToUTXOs();
     }
-    final releventTx = pay.txs.last;
-    // print("RELEVENT TX MSG = ${releventTx.}")
-    for (final utxo in releventTx.txsOut) {
+    for (final utxo in pay.txs.last.txsOut) {
       final spent = _spent[utxo.id] ?? false;
       if (utxo.receiver == selfID && !spent) _utxos[utxo.id] = utxo;
     }
-    for (final txin in releventTx.txsIn) {
+    for (final txin in pay.txs.last.txsIn) {
       if (txin.spender == selfID) _utxos.remove(txin.utxoID);
     }
     _payments[pay.id] = pay;
@@ -205,9 +198,9 @@ class Wallet {
   Future<Down4Payment?> importMoney(String pkBase68, Identifier selfID) async {
     final rawKey = BigInt.parse(base58.decode(pkBase68).toHex(), radix: 16);
 
-    final keys = Down4Keys.fromPrivateKey(rawKey);
-    final address = testnetAddress(keys.rawCompressedPub).toBase58();
-    final fetchedUtxos = await getUtxos(address);
+    final importedKeys = Down4Keys.fromPrivateKey(rawKey);
+    final importedAddress = testnetAddress(importedKeys.rawCompressedPub);
+    final fetchedUtxos = await getUtxos(importedAddress.toBase58());
     if (fetchedUtxos == null) return null;
 
     final availSats =
@@ -224,8 +217,8 @@ class Wallet {
     if (encaissement.asInt <= 0) return null;
 
     _ix = _ix + 1;
-    final down4Secret = makeUint32(_ix) + utf8.encode(selfID);
-    final down4Keys = DOWN4_NEUTER.derive(down4Secret);
+    final txSecret = makeUint32(_ix) + utf8.encode(selfID);
+    final down4Keys = DOWN4_NEUTER.derive(txSecret);
     if (down4Keys == null) return null;
     var down4Out = Down4TXOUT(
       isFee: true,
@@ -233,7 +226,7 @@ class Wallet {
       scriptPubKey: p2pkh(down4Keys.rawAddress),
     );
 
-    final selfKeys = keys.derive(down4Secret);
+    final selfKeys = _keys.derive(txSecret);
     if (selfKeys == null) return null;
     var selfOut = Down4TXOUT(
       receiver: selfID,
@@ -254,17 +247,17 @@ class Wallet {
     }
 
     for (var i = 0; i < ins.length; i++) {
-      final theUtxo = fetchedUtxos.firstWhere((element) {
-        return element.id == ins[i].utxoID;
-      });
+      final theUtxo = fetchedUtxos.firstWhere(
+        (element) => element.id == ins[i].utxoID,
+      );
       final sData = sigData(txsIn: ins, txsOut: outs, nIn: i, utxo: theUtxo);
       if (sData == null) return null;
-      final scriptSig = p2pkhSig(keys: keys, sigData: sData);
+      final scriptSig = p2pkhSig(keys: importedKeys, sigData: sData);
       if (scriptSig == null) return null;
       ins[i].script = scriptSig;
     }
 
-    final theTx = Down4TX(txsIn: ins, txsOut: outs, down4Secret: down4Secret);
+    final theTx = Down4TX(txsIn: ins, txsOut: outs, down4Secret: txSecret);
 
     return Down4Payment([theTx], true, textNote: "Imported");
   }
@@ -311,7 +304,7 @@ class Wallet {
   List<dynamic>? _unsignedIns(Identifier selfID, Sats pay, int currentTxSize) {
     const inSize = 148;
     List<Down4TXIN> ins = [];
-    var cumSize = currentTxSize;
+    var cumulSize = currentTxSize;
     final randSats = randomSats();
     var currentMinerFees = (currentTxSize * SATS_PER_BYTE);
     var currentDown4Fees = (currentMinerFees * 1.2) + randSats;
@@ -326,9 +319,9 @@ class Wallet {
         dependance: uTXID.contains(utxo.txid) ? utxo.txid : null,
       );
       ins.add(txin);
-      cumSize += inSize;
+      cumulSize += inSize;
       iUtxo = iUtxo + 1;
-      currentTxSize = VarInt.fromInt(iUtxo).data.length + cumSize;
+      currentTxSize = VarInt.fromInt(iUtxo).data.length + cumulSize;
       currentMinerFees = currentTxSize * SATS_PER_BYTE;
       currentDown4Fees = (currentMinerFees * 1.2) + randSats;
 
@@ -384,8 +377,8 @@ class Wallet {
 }
 
 void main() {
-  // var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
-  var f = io.File("/home/scott/jeff.txt");
+  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  // var f = io.File("/home/scott/jeff.txt");
   var pkHex = f.readAsStringSync();
 
   // final seed1 = safeSeed(32);

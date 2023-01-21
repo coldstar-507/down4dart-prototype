@@ -49,37 +49,41 @@ enum NodesColor {
 
 abstract class Media {
   final Identifier id;
-  String? path;
   MediaMetadata metadata;
   Media({
     required this.id,
     required this.metadata,
-    this.path,
   });
 
   String get url;
 }
 
 class MessageMedia extends Media {
+  String path;
   MessageMedia({
     required Identifier id,
     required MediaMetadata metadata,
-    String? path,
+    required this.path,
     this.isSaved = false,
     Set<Identifier>? references,
   })  : references = references ?? Set<Identifier>.identity(),
-        super(id: id, metadata: metadata, path: path);
+        super(id: id, metadata: metadata);
 
   bool get isVideo => metadata.isVideo;
 
-  File? get file => path != null ? File(path!) : null;
+  File? get file => File(path).existsSync() ? File(path) : null;
 
   Set<Identifier> references;
 
   bool isSaved;
 
-  NodeMedia asNodeMedia() {
-    return NodeMedia(id: id, metadata: metadata, path: path);
+  NodeMedia? asNodeMedia() {
+    if (file == null) return null;
+    return NodeMedia(
+      id: id,
+      metadata: metadata,
+      data: file!.readAsBytesSync(),
+    );
   }
 
   factory MessageMedia.fromJson(dynamic decodedJson) {
@@ -96,7 +100,7 @@ class MessageMedia extends Media {
         "md": metadata.toJson(),
         if (toLocal) "sv": isSaved,
         if (toLocal) "ref": references.toList(),
-        if (path != null && toLocal) "p": path!,
+        if (toLocal) "p": path,
       };
 
   @override
@@ -107,38 +111,36 @@ class NodeMedia extends Media {
   NodeMedia({
     required Identifier id,
     required MediaMetadata metadata,
-    String? path,
-    this.data,
-  }) : super(id: id, metadata: metadata, path: path);
+    required this.data,
+  }) : super(id: id, metadata: metadata);
 
-  Uint8List? data;
+  Uint8List data;
 
-  MessageMedia asMessageMedia() {
-    return MessageMedia(id: id, metadata: metadata, path: path);
-  }
+  // MessageMedia asMessageMedia() {
+  //   return MessageMedia(id: id, metadata: metadata, path: path);
+  // }
 
   factory NodeMedia.fromJson(dynamic decodedJson) {
     final b64Data = decodedJson["d"];
     return NodeMedia(
       id: decodedJson["id"],
       metadata: MediaMetadata.fromJson(decodedJson["md"]),
-      path: decodedJson["p"],
-      data: b64Data != "" && b64Data != null ? base64Decode(b64Data) : null,
+      data: base64Decode(b64Data),
     );
   }
 
   @override
   String get url => "https://storage.googleapis.com/down4-26ee1-nodes/$id";
 
-  @override
-  Map<String, dynamic> toJson({bool withData = true, bool withPath = false}) =>
-      {
+  Map<String, dynamic> toJson() => {
         "id": id,
         "md": metadata.toJson(),
-        if (path != null && withPath) "p": path,
-        if (data != null && withData) "d": base64Encode(data!),
+        "d": base64Encode(data),
       };
 }
+
+// TODO online media, maybe for posts nodes type
+// class OnlineMedia extends Media {}
 
 class MessageNotification {
   final Messages type;
@@ -285,7 +287,6 @@ abstract class BaseNode {
           lastName: decodedJson["ln"],
           activity: decodedJson["a"],
           neuter: Down4Keys.fromYouKnow(decodedJson["nt"]),
-          savedMessages: Set.from(decodedJson["svm"]),
           images: Set.from(decodedJson["img"]),
           videos: Set.from(decodedJson["vid"]),
           nfts: Set.from(decodedJson["nft"]),
@@ -432,7 +433,7 @@ class User extends Person {
 }
 
 class Self extends Person {
-  Set<Identifier> images, videos, nfts, savedMessages;
+  Set<Identifier> images, videos, nfts;
   NodeMedia media;
 
   @override
@@ -446,7 +447,6 @@ class Self extends Person {
     required this.images,
     required this.videos,
     required this.nfts,
-    required this.savedMessages,
     required Identifier id,
     int? activity,
     required this.media,
@@ -477,9 +477,8 @@ class Self extends Person {
         if (toLocal) "nft": nfts.toList(),
         if (toLocal) "msg": messages.toList(),
         if (toLocal) "snp": snips.toList(),
-        if (toLocal) "svm": savedMessages.toList(),
         if (toLocal) "a": activity,
-        if (toLocal) "m": media.toJson(withData: true, withPath: true),
+        if (toLocal) "m": media.toJson() else "m": media.id,
       };
 
   @override
@@ -515,10 +514,10 @@ class Group extends GroupNode {
   NodesColor get colorCode => NodesColor.group;
 
   @override
-  Map toJson({bool withMedia = true, bool toLocal = true}) => {
+  Map toJson({bool toLocal = true}) => {
         "t": Nodes.group.name,
         "pv": isPrivate,
-        "im": withMedia ? media.toJson() : media.id,
+        "im": toLocal ? media.toJson() : media.id,
         "nm": name,
         "id": id,
         "grp": group.toList(),
@@ -663,6 +662,7 @@ class MediaMetadata {
       "ts": timestamp.toString(),
       "trv": isReversed.toString(),
       "sqr": isSquared.toString(),
+      "vid": isVideo.toString(),
       "lck": isLocked.toString(),
       "ptv": isPaidToView.toString(),
       "csc": canSkipCheck.toString(),

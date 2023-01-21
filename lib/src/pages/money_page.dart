@@ -191,7 +191,7 @@ class MoneyPage extends StatefulWidget {
   final Wallet wallet;
   final List<Palette> paymentAsPalettes;
   final Iterable<Palette> homePalettes;
-  final Iterable<User> trueTargets;
+  final Iterable<Person> trueTargets;
   final Self self;
   final List<Palette> transitioned;
   final void Function() back;
@@ -494,8 +494,8 @@ class _MoneyPageState extends State<MoneyPage> {
     }
 
     void confirmPayment() {
-      final pay = widget.wallet.payUsers(
-        users: widget.trueTargets.toList(growable: false),
+      final pay = widget.wallet.payPeople(
+        people: widget.trueTargets.toList(growable: false),
         selfID: widget.self.id,
         amount: Sats(asSats),
         textNote: textNoteTec.value.text,

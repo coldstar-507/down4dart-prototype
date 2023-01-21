@@ -116,7 +116,7 @@ class ConsoleButton extends StatelessWidget {
         height: buttonHeight,
         decoration: BoxDecoration(
             shape: BoxShape.rectangle,
-            color: invertColors ? null : null,// PinkTheme.black,
+            color: invertColors ? null : null, // PinkTheme.black,
             border: Border.all(
               color: Console.contourColor,
               width: Console.contourWidth,
@@ -400,7 +400,7 @@ class Console extends StatelessWidget {
     // return extras;
   }
 
-  double get consoleGap => Sizes.w *  0.022;
+  double get consoleGap => Sizes.w * 0.022;
 
   static double get contourWidth => 0.6;
 
@@ -531,12 +531,11 @@ class Console extends StatelessWidget {
                 : GestureDetector(
                     onTap: () => selectMedia?.call(medias![i]),
                     child: SizedBox(
-                      height: (consoleWidth - 2) / 5,
-                      width: (consoleWidth - 2) / 5,
-                      child: Image.file(
-                        io.File(medias![i].path!),
-                        fit: BoxFit.cover,
-                      ),
+                      height: (consoleWidth - (4 * contourWidth)) / 5,
+                      width: (consoleWidth - (4 * contourWidth)) / 5,
+                      child: medias![i].file != null
+                          ? Image.file(medias![i].file!, fit: BoxFit.cover)
+                          : const SizedBox.shrink(),
                     ),
                   );
           } else {

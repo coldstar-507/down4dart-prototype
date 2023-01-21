@@ -15,6 +15,7 @@ import 'package:image_picker/image_picker.dart';
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
 import '../web_requests.dart' as r;
+import '../down4_utility.dart' show golden;
 
 import '../render_objects/console.dart';
 import '../render_objects/chat_message.dart';
@@ -99,7 +100,9 @@ class _ChatPageState extends State<ChatPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          precacheImage(FileImage(File(image.path!)), context);
+          if (image.file != null) {
+            precacheImage(FileImage(image.file!), context);
+          }
         }
       }).then((value) => print("precached all images"));
     });
@@ -127,16 +130,73 @@ class _ChatPageState extends State<ChatPage> {
     const textPadding = 12;
     const messageBorder = 4;
     final maxTextWidth = maxWidth - textPadding - messageBorder;
-    for (var msgID in messageToLoad.toList(growable: false).reversed) {
-      TextStyle ts = const TextStyle(fontFamily: "Alice");
+
+    // Useful functions to calculate things we might render in chat messages
+    bool calculateIfShouldShowTimestamp(Message m1, Message m2) =>
+        m1.senderID != m2.senderID ||
+        isUpdate ||
+        DateTime.fromMillisecondsSinceEpoch(m1.timestamp)
+                .difference(DateTime.fromMillisecondsSinceEpoch(m2.timestamp))
+                .inMinutes >
+            30;
+    String timeString(Message msg) {
+      final ts = DateTime.fromMillisecondsSinceEpoch(msg.timestamp).toLocal();
+      final now = DateTime.now().toLocal();
+      String timeStr;
+      final yearStr = ts.year.toString();
+      final yearDigits =
+          int.parse(yearStr.substring(yearStr.length - 2, yearStr.length));
+      String tsDay, tsMonth, tsYear, tsHour, tsMin;
+      tsDay = ts.day < 10 ? "0${ts.day}" : "${ts.day}";
+      tsMonth = ts.month < 10 ? "0${ts.month}" : "${ts.month}";
+      tsYear = yearDigits < 10 ? "0$yearDigits" : "$yearDigits";
+      tsHour = ts.hour < 10 ? "0${ts.hour}" : "${ts.hour}";
+      tsMin = ts.minute < 10 ? "0${ts.minute}" : "${ts.minute}";
+
+      if (ts.add(const Duration(days: 1)).isBefore(now)) {
+        var yearStr = ts.year.toString();
+        yearStr = yearStr.substring(yearStr.length - 2, yearStr.length);
+        timeStr = "$tsDay/$tsMonth/$tsYear $tsHour:$tsMin";
+      } else {
+        timeStr = "$tsHour:$tsMin";
+      }
+      return timeStr;
+    }
+
+    final reversedMessageToLoad =
+        messageToLoad.toList(growable: false).reversed;
+    TextStyle textStyle = const TextStyle(fontFamily: "Alice");
+    TextStyle dateStyle = const TextStyle(fontFamily: "Alice", fontSize: 10);
+
+    for (var i = 0; i < messageToLoad.length; i++) {
       double oneTextLineHeight = 0;
       double mediaHeight = 0;
       double mediaWidth = 0;
 
-      var down4Message = _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
+      final msgID = reversedMessageToLoad.elementAt(i);
+      Message? prevMsg = isUpdate
+          ? _cachedDown4Message.isEmpty
+              ? null
+              : _cachedDown4Message.values.last
+          : i < messageToLoad.length - 1
+              ? reversedMessageToLoad.elementAt(i + 1).getLocalMessage()
+              : null;
+      Message? nextMessage = !isUpdate && i > 0
+          ? reversedMessageToLoad.elementAt(i - 1).getLocalMessage()
+          : null;
+
+      if (nextMessage != null) {
+        _cachedDown4Message[nextMessage.id] ??= nextMessage;
+      }
+      Message? down4Message =
+          _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
+      if (prevMsg != null) {
+        _cachedDown4Message[prevMsg.id] ??= prevMsg;
+      }
+
       print("THE DOWN4MESSAGE = $down4Message");
       if (down4Message == null) return;
-      Media? media;
+      MessageMedia? media;
       if (down4Message.mediaID != null) {
         media = down4Message.mediaID!.getLocalMessageMedia();
         if (media != null) {
@@ -155,10 +215,13 @@ class _ChatPageState extends State<ChatPage> {
         idOfLastMessageRead ??= down4Message.id;
       }
 
-      String? prevMsgSender = _cachedMessages.isEmpty
-          ? null
-          : _cachedMessages.values.last.message.senderID;
+      // Message? prevMessage = isUpdate ? _cachedDown4Message.isEmpty ? null : _cachedDown4Message.values.last :
+      // Message? prevMsg =
+      //     _cachedDown4Message.isEmpty ? null : _cachedDown4Message.values.last;
+      String? prevMsgSender = prevMsg?.senderID;
 
+      bool lastStringAndDateOnSameLine = false;
+      double heightIfNotOnSameLine = 0.0;
       List<dynamic>? textAsStringList() {
         List<String>? specialDisplayText;
         double? neededWidth;
@@ -173,15 +236,44 @@ class _ChatPageState extends State<ChatPage> {
         final transform2 = transform1.join(" \n ");
 
         // var words = down4Message.text!.split(" ");
-        final words = transform2.split(" ");
+        final words = transform2.split(" ")..add(timeString(down4Message));
         var previousString = "";
 
         // pervious string should always be < max
         for (final word in words) {
-          if (word == "\n") {
+          if (word == words.last) {
+            double dateWidth;
+            double prevWidth = 0;
+            String dateString = "      $word";
+            final timeTp = TextPainter(
+              text: TextSpan(text: dateString, style: dateStyle),
+              textDirection: TextDirection.ltr,
+            )..layout();
+            dateWidth = timeTp.width;
+            if (previousString.isNotEmpty) {
+              final prevTp = TextPainter(
+                text: TextSpan(text: previousString, style: textStyle),
+                textDirection: TextDirection.ltr,
+              )..layout();
+              prevWidth = prevTp.width;
+            }
+            specialDisplayText.add(previousString);
+            specialDisplayText.add(dateString);
+            if (dateWidth + prevWidth > maxTextWidth) {
+              // in this case, prevString + date is too wide
+              if (prevWidth > neededWidth!) neededWidth = prevWidth;
+              lastStringAndDateOnSameLine = false;
+              heightIfNotOnSameLine = timeTp.height;
+            } else {
+              if (prevWidth + dateWidth > neededWidth!) {
+                neededWidth = prevWidth + dateWidth;
+              }
+              lastStringAndDateOnSameLine = true;
+            }
+          } else if (word == "\n") {
             specialDisplayText.add(previousString);
             final specialTp = TextPainter(
-              text: TextSpan(text: previousString, style: ts),
+              text: TextSpan(text: previousString, style: textStyle),
               textDirection: TextDirection.ltr,
             )..layout();
             if (specialTp.width > neededWidth!) {
@@ -190,20 +282,20 @@ class _ChatPageState extends State<ChatPage> {
             previousString = "";
           } else if (word.isNotEmpty) {
             final wordTp = TextPainter(
-              text: TextSpan(text: word, style: ts),
+              text: TextSpan(text: word, style: textStyle),
               textDirection: TextDirection.ltr,
             )..layout();
-            var wordlen = wordTp.width;
+            var wordLen = wordTp.width;
             var words = [word];
-            while (wordlen > maxTextWidth) {
+            while (wordLen > maxTextWidth) {
               final splitLen = (words.first.length / 2).ceil();
               words = words
                   .map((w) => [w.substring(0, splitLen), w.substring(splitLen)])
                   .expand((element) => element)
                   .toList();
-              wordlen = words
+              wordLen = words
                   .map((w) => TextPainter(
-                      text: TextSpan(text: w, style: ts),
+                      text: TextSpan(text: w, style: textStyle),
                       textDirection: TextDirection.ltr)
                     ..layout())
                   .map((e) => e.width)
@@ -218,19 +310,19 @@ class _ChatPageState extends State<ChatPage> {
                 specialDisplayText.add(word);
               }
               oneTextLineHeight = wordTp.height;
-              if (wordlen > neededWidth!) neededWidth = wordlen;
+              if (wordLen > neededWidth!) neededWidth = wordLen;
               previousString = "";
             } else {
               final currentString =
                   previousString.isEmpty ? word : "$previousString $word";
 
               final previousTp = TextPainter(
-                text: TextSpan(text: previousString, style: ts),
+                text: TextSpan(text: previousString, style: textStyle),
                 textDirection: TextDirection.ltr,
               )..layout();
 
               final currentTp = TextPainter(
-                text: TextSpan(text: currentString, style: ts),
+                text: TextSpan(text: currentString, style: textStyle),
                 textDirection: TextDirection.ltr,
               )..layout();
 
@@ -255,19 +347,18 @@ class _ChatPageState extends State<ChatPage> {
             }
           }
         }
-
         // don't leave out the last string
-        if (previousString.isNotEmpty && previousString != "\n") {
-          final lastLiner = TextPainter(
-            text: TextSpan(text: previousString, style: ts),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          if (lastLiner.width > neededWidth!) {
-            neededWidth = lastLiner.width;
-          }
-          print("last String = $previousString");
-          specialDisplayText.add(previousString);
-        }
+        // if (previousString.isNotEmpty && previousString != "\n") {
+        //   final lastLiner = TextPainter(
+        //     text: TextSpan(text: previousString, style: textStyle),
+        //     textDirection: TextDirection.ltr,
+        //   )..layout();
+        //   if (lastLiner.width > neededWidth!) {
+        //     neededWidth = lastLiner.width;
+        //   }
+        //   print("last String = $previousString");
+        //   specialDisplayText.add(previousString);
+        // }
 
         return [specialDisplayText, neededWidth];
       }
@@ -283,6 +374,7 @@ class _ChatPageState extends State<ChatPage> {
                 ? replyMsg.text!
                 : "&attachment";
             return ReplyData(
+              senderID: replyMsg.senderID,
               senderName: replyUser.node.name,
               messageRefID: replyMsg.id,
               thumbnail: replyUser.nodeImage,
@@ -293,11 +385,52 @@ class _ChatPageState extends State<ChatPage> {
           .whereType<ReplyData>()
           .toList(growable: false);
 
-      final bool hasHeader = !isGroupChat || senderIsSelf
-          ? false
-          : isUpdate
-              ? true
-              : prevMsgSender != down4Message.senderID;
+      double minWidth = 0;
+      final bool hasReplies = (repliesData?.length ?? 0) > 0;
+      final bool hasHeader = (!senderIsSelf &&
+          theNode is GroupNode &&
+          nextMessage?.senderID != down4Message.senderID);
+
+      double minReplyDisplayLen(List<ReplyData> rds) {
+        var lens = <double>[];
+        for (final r in rds) {
+          final firstWordInReply = r.body.split(" ").first;
+          final tp = TextPainter(
+            text: TextSpan(
+                text: "${r.senderID}: $firstWordInReply",
+                style: const TextStyle(fontSize: 12, fontFamily: "Alice")),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          lens.add(tp.width);
+        }
+        return lens.fold<double>(double.maxFinite, (p, e) => min(p, e));
+      }
+
+      String? headerText;
+      if (hasReplies) {
+        final minRepLen = minReplyDisplayLen(repliesData!);
+        print("""
+        =====================================
+        MIN REP LEN OF REP = $minRepLen
+        MAX LEN = $maxWidth
+        REP FIRST = ${repliesData.first.body}
+        """);
+        minWidth = minRepLen > maxWidth ? maxWidth / golden : minRepLen;
+      }
+      if (hasHeader) {
+        headerText = "-${down4Message.senderID}";
+        final tp = TextPainter(
+          text: TextSpan(
+              text: "-${down4Message.senderID}   ",
+              style: const TextStyle(fontFamily: "Alice", fontSize: 13)),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        if (minWidth < tp.width && tp.width < maxWidth / golden) {
+          print("AAAAA");
+          minWidth = tp.width;
+        }
+      }
+
       final textData = textAsStringList();
       final lineStrings = textData?[0] as List<String>?;
       final textWidth = textData?[1] as double?;
@@ -305,17 +438,20 @@ class _ChatPageState extends State<ChatPage> {
       final repliesHeight =
           (repliesData?.length ?? 0) * ChatMessage.headerHeight;
       final messageHeight = lineStrings != null
-          ? (lineStrings.length * oneTextLineHeight + textPadding) +
+          ? ((lineStrings.length - (lastStringAndDateOnSameLine ? 1 : 0)) *
+                      oneTextLineHeight +
+                  textPadding) +
               mediaHeight +
               messageBorder +
               headerSize +
               repliesHeight
           : mediaHeight + messageBorder + headerSize + repliesHeight;
-      final messageWidth = media != null
+      var messageWidth = media != null
           ? maxWidth
           : lineStrings != null
               ? textWidth! + textPadding + messageBorder
               : 0.0; // TODO, will be forwarding nodes, or messages
+      messageWidth = messageWidth < minWidth ? minWidth : messageWidth;
 
       print("Textwidth=$textWidth");
       print("Number of lines=${lineStrings?.length}");
@@ -328,13 +464,15 @@ class _ChatPageState extends State<ChatPage> {
         sender: widget.senders[down4Message.senderID]!,
         message: down4Message,
         myMessage: widget.self.id == down4Message.senderID,
+        lastStringOnSameLine: lastStringAndDateOnSameLine,
+        heightIfNotOnSameLine: heightIfNotOnSameLine,
         at: "",
         precalculatedSize: Size(messageWidth, messageHeight),
         precalculatedMediaSize:
             media != null ? Size(mediaWidth, mediaHeight) : null,
         specialDisplayTexts: lineStrings,
         // if is update, means it's a single new message with a header
-        hasHeader: hasHeader,
+        headerText: headerText,
         media: media,
         select: (id, _) => setState(() {
           _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
@@ -352,7 +490,7 @@ class _ChatPageState extends State<ChatPage> {
             final newSize = Size(
                 lastMessageSize.width, lastMessageSize.height - headerSize);
             _cachedMessages[lastMessage.message.id] =
-                lastMessage.withHeader(withHeader: false, newSize: newSize);
+                lastMessage.withHeader(header: "", newSize: newSize);
           }
         }
         _cachedMessages = {down4Message.id: chatMessage, ..._cachedMessages};
@@ -388,7 +526,7 @@ class _ChatPageState extends State<ChatPage> {
             isReversed: false,
             timestamp: u.timeStamp(),
             owner: widget.self.id,
-            elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
+            elementAspectRatio: 1 / ((await size)?.aspectRatio ?? 1.0),
           ),
         )..save();
         _cachedImages[mediaID] = down4Media;
@@ -424,11 +562,57 @@ class _ChatPageState extends State<ChatPage> {
     mediasConsole();
   }
 
+  void loadSavingConsole() {
+    _console = Console(
+      inputs: [_consoleInput ?? consoleInput],
+      topButtons: [
+        ConsoleButton(
+            name: "To Saved Messages",
+            onPress: () {
+              for (var msg in _cachedMessages.values) {
+                if (msg.selected) {
+                  widget.self.messages.add(msg.message.id);
+                  msg.message
+                    ..isSaved = true
+                    ..save();
+                }
+              }
+              widget.self.save();
+              unselectSelectedMessage();
+            })
+      ],
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+            name: "To Medias",
+            onPress: () {
+              for (var msg in _cachedMessages.values) {
+                if (msg.selected) {
+                  if (msg.media != null) {
+                    if (msg.media!.isVideo) {
+                      widget.self.videos.add(msg.media!.id);
+                    } else {
+                      widget.self.images.add(msg.media!.id);
+                    }
+                    msg.media!
+                      ..isSaved = true
+                      ..save();
+                  }
+                }
+              }
+              widget.self.save();
+              unselectSelectedMessage();
+            }),
+      ],
+    );
+    setState(() {});
+  }
+
   void saveSelectedMessages() async {
     for (final msg in _cachedMessages.values) {
       if (msg.selected) {
         _cachedMessages[msg.message.id] = msg.invertedSelection();
-        widget.self.savedMessages.add(msg.message.id);
+        widget.self.messages.add(msg.message.id);
         msg.message
           ..isSaved = true
           ..save();
@@ -617,7 +801,7 @@ class _ChatPageState extends State<ChatPage> {
     _console = Console(
       inputs: [_consoleInput ?? consoleInput],
       topButtons: [
-        ConsoleButton(name: "Save", onPress: saveSelectedMessages),
+        ConsoleButton(name: "Save", onPress: loadSavingConsole),
         ConsoleButton(
           name: "Send",
           onPress: () {

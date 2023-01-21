@@ -371,7 +371,10 @@ class GroupRequest extends MessageRequest {
     );
     final res = await http.post(url, body: jsonEncode(this));
     if (res.statusCode == 200) {
-      return BaseNode.fromJson(jsonDecode(res.body)) as Group;
+      final jsonDecodedBody = jsonDecode(res.body) as Map;
+      print("JSON KEYS = ${jsonDecodedBody.keys.toList()}");
+      print("JSON DATA IMAGE DATA = ${jsonDecodedBody["d"]}");
+      return BaseNode.fromJson(jsonDecodedBody) as Group;
     } else {
       return null;
     }

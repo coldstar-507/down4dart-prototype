@@ -273,7 +273,7 @@ class PaletteMaker extends StatelessWidget {
   final void Function() imagePress;
   final String name, id;
   final String hintText;
-  final Media? image;
+  final NodeMedia? image;
   final void Function(Identifier)? go;
   final NodesColor colorCode;
   final Nodes type;
@@ -444,7 +444,7 @@ class PaletteMaker extends StatelessWidget {
 
   Widget get paletteImage => GestureDetector(
         onTap: imagePress,
-        child: Container(
+        child: SizedBox(
           // clipBehavior: Clip.hardEdge,
           // decoration: const BoxDecoration(
           //   borderRadius: BorderRadius.horizontal(left: Radius.circular(4.0)),
@@ -452,8 +452,8 @@ class PaletteMaker extends StatelessWidget {
           width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image == null
               ? _defaultImage
-              : Image.file(
-                  File(image!.path!),
+              : Image.memory(
+                  image!.data,
                   gaplessPlayback: true,
                   fit: BoxFit.cover,
                 ),
