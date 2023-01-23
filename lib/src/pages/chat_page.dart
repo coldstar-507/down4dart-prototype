@@ -6,10 +6,9 @@ import 'package:camera/camera.dart';
 import 'package:down4/src/render_objects/render_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:video_player/video_player.dart';
-// import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../boxes.dart';
@@ -132,13 +131,13 @@ class _ChatPageState extends State<ChatPage> {
     final maxTextWidth = maxWidth - textPadding - messageBorder;
 
     // Useful functions to calculate things we might render in chat messages
-    bool calculateIfShouldShowTimestamp(Message m1, Message m2) =>
-        m1.senderID != m2.senderID ||
-        isUpdate ||
-        DateTime.fromMillisecondsSinceEpoch(m1.timestamp)
-                .difference(DateTime.fromMillisecondsSinceEpoch(m2.timestamp))
-                .inMinutes >
-            30;
+    // bool calculateIfShouldShowTimestamp(Message m1, Message m2) =>
+    //     m1.senderID != m2.senderID ||
+    //     isUpdate ||
+    //     DateTime.fromMillisecondsSinceEpoch(m1.timestamp)
+    //             .difference(DateTime.fromMillisecondsSinceEpoch(m2.timestamp))
+    //             .inMinutes >
+    //         30;
     String timeString(Message msg) {
       final ts = DateTime.fromMillisecondsSinceEpoch(msg.timestamp).toLocal();
       final now = DateTime.now().toLocal();
@@ -218,7 +217,7 @@ class _ChatPageState extends State<ChatPage> {
       // Message? prevMessage = isUpdate ? _cachedDown4Message.isEmpty ? null : _cachedDown4Message.values.last :
       // Message? prevMsg =
       //     _cachedDown4Message.isEmpty ? null : _cachedDown4Message.values.last;
-      String? prevMsgSender = prevMsg?.senderID;
+      // String? prevMsgSender = prevMsg?.senderID;
 
       bool lastStringAndDateOnSameLine = false;
       double heightIfNotOnSameLine = 0.0;
@@ -504,22 +503,28 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> handleImport({required bool importImages}) async {
     if (importImages) {
-      final files = await ImagePicker().pickMultiImage(
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 70,
-        requestFullMetadata: false,
+      final results = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'gif'],
+        allowMultiple: true,
+        allowCompression: true,
       );
-      for (final file in files) {
-        // final bytes = await file.readAsBytes();
-        // final decodedImage = await decodeImageFromList(bytes);
+
+      // final files = await ImagePicker().pickMultiImage(
+      //   maxWidth: 512,
+      //   maxHeight: 512,
+      //   imageQuality: 70,
+      //   requestFullMetadata: false,
+      // );
+      if (results == null) return;
+      for (final file in results.files) {
+        if (file.path == null) continue;
         final mediaID = u.randomMediaID();
-        // final appPath = b.writeToDocs(cachedPath: file.path, mediaID: mediaID);
-        final size = calculateImageDimension(f: File(file.path));
+        final size = calculateImageDimension(f: File(file.path!));
         final down4Media = MessageMedia(
           id: mediaID,
           isSaved: true,
-          path: file.path,
+          path: file.path!,
           metadata: MediaMetadata(
             isSquared: false,
             isVideo: false,

@@ -12,6 +12,12 @@ void main() async {
   // print(randomWordPair.map((e) => "${e.first} ${e.second}\n").toList());
 
   var prompts = randomPrompts(10);
-  prompts.forEach(print);
+  // print(prompts);
+
+  // for (int i = 0; i < prompts.length; i++) {
+  //   if (i % 2 == 0) continue;
+  //   print(prompts[i]);
+  // }
+
   return;
 }

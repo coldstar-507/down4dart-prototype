@@ -349,12 +349,14 @@ class ChatMessage extends StatelessWidget {
                                   const Spacer(),
                                   Text(
                                     dateText,
-                                    style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                    style: const TextStyle(
+                                        fontSize: 10, color: Colors.black54),
                                   )
                                 ],
                               )
                             : Column(
                                 textDirection: TextDirection.ltr,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(str),
                                   Row(
@@ -362,7 +364,9 @@ class ChatMessage extends StatelessWidget {
                                       const Spacer(),
                                       Text(
                                         dateText,
-                                        style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                        style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.black54),
                                       )
                                     ],
                                   ),
