@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:down4/src/down4_utility.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
@@ -308,4 +309,19 @@ Future<Size>? calculateImageDimension({File? f, Uint8List? d, String? url}) {
     ),
   );
   return completer.future;
+}
+
+Future<List<String>> randomPrompts(int qty) async {
+  const String adjPath = "lib/src/assets/texts/descriptive_adjectives.txt";
+  const String nounsPath = "lib/src/assets/texts/concrete_nouns.txt";
+
+  final adjectives = (await rootBundle.loadString(adjPath)).split('\n');
+  final nouns = (await rootBundle.loadString(nounsPath)).split('\n');
+
+  final r = math.Random();
+  return List<String>.generate(qty, (_) {
+    final i = r.nextInt(adjectives.length);
+    final j = r.nextInt(nouns.length);
+    return "${adjectives[i]} ${nouns[j]}";
+  });
 }

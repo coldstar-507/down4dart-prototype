@@ -25,23 +25,19 @@ import '../render_objects/render_utils.dart';
 class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
   final Self self;
-  // final List<Palette> Function() transition;
-  final List<Palette> palettes, transitioned;
+  final List<Palette> homePalettes, transitionedHomePalettes;
   final Iterable<Person> people;
-  // final void Function(Group) afterMessageCallback;
   final void Function() back;
   final void Function(r.GroupRequest) groupRequest;
   final double initialOffset;
 
   const GroupPage({
-    // required this.transition,
     required this.people,
-    required this.transitioned,
+    required this.transitionedHomePalettes,
     required this.self,
-    // required this.afterMessageCallback,
     required this.back,
     required this.groupRequest,
-    required this.palettes,
+    required this.homePalettes,
     required this.cameras,
     required this.initialOffset,
     Key? key,
@@ -52,17 +48,38 @@ class GroupPage extends StatefulWidget {
 }
 
 class _GroupPageState extends State<GroupPage> {
-  Console? console;
-  CameraController? ctrl;
-  late List<Widget> items = [...widget.palettes, groupMaker(fold: true)];
-  var tec = TextEditingController();
-  var tec2 = TextEditingController();
-  bool private = true;
-  late var scrollController =
+  Console? _console;
+  CameraController? _ctrl;
+  late List<Widget> _items = [...widget.homePalettes, groupMaker(fold: true)];
+  var _tec = TextEditingController();
+  var _tec2 = TextEditingController();
+  bool _private = true;
+  late var _scrollController =
       ScrollController(initialScrollOffset: widget.initialOffset);
+
+  NodeMedia? _groupImage;
+  String _groupName = "";
+
+  MessageMedia? _cameraInput;
 
   Map<Identifier, MessageMedia> _cachedImages = {};
   Map<Identifier, MessageMedia> _cachedVideos = {};
+
+  Iterable<MessageMedia> get savedImages => widget.self.images.map(
+      (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
+
+  Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
+      (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
+
+  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: _tec);
+
+  @override
+  void initState() {
+    super.initState();
+    loadBaseConsole();
+    animatedTransition();
+    asyncImageLoad();
+  }
 
   Future<void> asyncImageLoad() async {
     Future(() {
@@ -80,37 +97,19 @@ class _GroupPageState extends State<GroupPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          if (image.file != null) {
-            precacheImage(FileImage(File(image.path)), context);
-          }
+          precacheImage(FileImage(File(image.path!)), context);
         }
       }).then((value) => print("precached all images"));
     });
   }
 
-  Iterable<MessageMedia> get savedImages => widget.self.images.map(
-      (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
-
-  Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
-      (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
-
-  NodeMedia? groupImage;
-  String groupName = "";
-
-  MessageMedia? cameraInput;
-
-  @override
-  void initState() {
-    super.initState();
-    loadBaseConsole();
-    animatedTransition();
-    asyncImageLoad();
-  }
-
   Future<void> animatedTransition() async {
     Future(() => setState(() {
-          items = [...widget.transitioned, groupMaker(fold: false)];
-          scrollController.animateTo(0,
+          _items = [
+            ...widget.transitionedHomePalettes,
+            groupMaker(fold: false)
+          ];
+          _scrollController.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
         }));
@@ -119,26 +118,25 @@ class _GroupPageState extends State<GroupPage> {
   PaletteMaker groupMaker({required bool fold}) => PaletteMaker(
         fold: fold,
         colorCode: NodesColor.group,
-        tec: tec2,
+        tec: _tec2,
         id: "",
-        name: groupName,
+        name: _groupName,
         hintText: "Group Name",
-        image: groupImage,
-        nameCallBack: (name) => setState(() => groupName = name),
+        image: _groupImage,
+        nameCallBack: (name) => setState(() => _groupName = name),
         type: Nodes.group,
         imagePress: () => loadMediaConsole(forGroupImage: true),
       );
 
-  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: tec);
-
   Future<void> send({MessageMedia? mediaInput}) async {
-    if (groupImage == null || groupName.isEmpty) return;
-    if (cameraInput == null && tec.value.text.isEmpty && mediaInput == null) {
+    if (_groupImage == null || _groupName.isEmpty) return;
+    if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
       return;
     }
 
     final ts = u.timeStamp();
-    final idd = utf8.encode(groupName + groupImage!.id + ts.toRadixString(16));
+    final idd =
+        utf8.encode(_groupName + _groupImage!.id + ts.toRadixString(16));
     final groupID = sha1(idd).toBase58();
 
     final msg = Message(
@@ -146,68 +144,23 @@ class _GroupPageState extends State<GroupPage> {
       id: messagePushId(),
       senderID: widget.self.id,
       timestamp: u.timeStamp(),
-      mediaID: mediaInput?.id ?? cameraInput?.id,
-      text: tec.value.text,
+      mediaID: mediaInput?.id ?? _cameraInput?.id,
+      text: _tec.value.text,
     );
 
-    final targets = widget.people.asIds().toSet()..remove(widget.self.id);
+    final targets = widget.people.whereType<User>().asIds().toSet();
     final grpReq = r.GroupRequest(
       groupID: groupID,
-      name: groupName,
-      groupMedia: groupImage!,
+      name: _groupName,
+      groupMedia: _groupImage!,
       message: msg,
-      private: private,
+      private: _private,
       targets: targets.toList(),
-      media: mediaInput ?? cameraInput,
+      media: mediaInput ?? _cameraInput,
     );
 
     widget.groupRequest(grpReq);
   }
-
-  // Future<void> handleImport({required bool importImages}) async {
-  //   if (importImages) {
-  //     final files = await ImagePicker().pickMultiImage(
-  //       maxWidth: 512,
-  //       maxHeight: 512,
-  //       imageQuality: 70,
-  //       requestFullMetadata: false,
-  //     );
-  //     for (final file in files) {
-  //       final bytes = await file.readAsBytes();
-  //       final decodedImage = await decodeImageFromList(bytes);
-  //       final mediaID = u.generateMediaID(bytes);
-  //       final down4Media = Down4Media(
-  //         id: mediaID,
-  //         data: bytes,
-  //         metadata: MediaMetadata(
-  //           timestamp: u.timeStamp(),
-  //           owner: widget.self.id,
-  //           aspectRatio: decodedImage.height / decodedImage.width,
-  //         ),
-  //       )..save(toPersonal: true);
-  //       _cachedImages[mediaID] = down4Media;
-  //     }
-  //   } else {
-  //     final video = await ImagePicker().pickVideo(
-  //       source: ImageSource.gallery,
-  //       maxDuration: const Duration(seconds: 15),
-  //     );
-  //     if (video == null) return;
-  //     final bytes = await video.readAsBytes();
-  //     final mediaID = u.generateMediaID(bytes);
-  //     final down4Media = Down4Media(
-  //       id: mediaID,
-  //       data: bytes,
-  //       metadata: MediaMetadata(
-  //         timestamp: u.timeStamp(),
-  //         owner: widget.self.id,
-  //         isVideo: true,
-  //       ),
-  //     );
-  //     _cachedVideos[mediaID] = down4Media;
-  //   }
-  //   loadMediaConsole();
-  // }
 
   Future<void> handleImport({
     bool groupImageImport = false,
@@ -233,10 +186,10 @@ class _GroupPageState extends State<GroupPage> {
               isReversed: false,
               timestamp: u.timeStamp(),
               owner: widget.self.id,
-              elementAspectRatio: 1 / ((await size)?.aspectRatio ?? 1.0),
+              elementAspectRatio: (await size)?.aspectRatio ?? 1.0,
             ));
         if (groupImageImport) {
-          groupImage = down4Media.asNodeMedia();
+          _groupImage = down4Media.asNodeMedia();
           loadBaseConsole();
           animatedTransition(); // hack
         } else {
@@ -283,12 +236,12 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   void loadMediaConsole({bool images = true, bool forGroupImage = false}) {
-    console = Console(
+    _console = Console(
       inputs: [consoleInput],
       images: true,
       selectMedia: (media) {
         if (forGroupImage) {
-          groupImage = media.asNodeMedia();
+          _groupImage = media.asNodeMedia();
           loadBaseConsole();
           animatedTransition();
         } else {
@@ -297,13 +250,7 @@ class _GroupPageState extends State<GroupPage> {
       },
       medias: images ? savedImages.toList() : savedVideos.toList(),
       topButtons: [
-        ConsoleButton(
-          name: "Import",
-          onPress: () => handleImport(
-            groupImageImport: forGroupImage,
-            importImages: images || forGroupImage,
-          ),
-        ),
+        ConsoleButton(name: "Import", onPress: handleImport),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: loadBaseConsole),
@@ -324,14 +271,14 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   void loadBaseConsole() {
-    console = Console(
+    _console = Console(
       inputs: [consoleInput],
       topButtons: [
         ConsoleButton(
           isMode: true,
-          name: private ? "Private" : "Public",
+          name: _private ? "Private" : "Public",
           onPress: () {
-            private = !private;
+            _private = !_private;
             loadBaseConsole();
           },
         ),
@@ -340,7 +287,7 @@ class _GroupPageState extends State<GroupPage> {
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
-          name: cameraInput == null ? "Camera" : "@Camera",
+          name: _cameraInput == null ? "Camera" : "@Camera",
           onPress: loadSquaredCameraConsole,
         ),
         ConsoleButton(name: "Medias", onPress: loadMediaConsole),
@@ -360,7 +307,7 @@ class _GroupPageState extends State<GroupPage> {
       vpc = VideoPlayerController.file(File(cachedPath));
       await vpc.initialize();
     }
-    console = Console(
+    _console = Console(
       inputs: [consoleInput],
       toMirror: isReversed,
       videoPlayerController: vpc,
@@ -369,7 +316,7 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
             name: "Accept",
             onPress: () {
-              cameraInput = MessageMedia(
+              _cameraInput = MessageMedia(
                 id: u.randomMediaID(),
                 path: cachedPath,
                 metadata: MediaMetadata(
@@ -389,13 +336,13 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
             name: "Back",
             onPress: () {
-              cameraInput = null;
+              _cameraInput = null;
               loadSquaredCameraConsole();
             }),
         ConsoleButton(
             name: "Cancel",
             onPress: () {
-              cameraInput = null;
+              _cameraInput = null;
               loadBaseConsole();
             }),
       ],
@@ -409,46 +356,46 @@ class _GroupPageState extends State<GroupPage> {
     FlashMode fm = FlashMode.off,
     bool reloadCtrl = false,
   ]) async {
-    if (ctrl == null || reloadCtrl) {
+    if (_ctrl == null || reloadCtrl) {
       try {
-        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
-        await ctrl?.initialize();
+        _ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
+        await _ctrl?.initialize();
       } catch (error) {
         loadBaseConsole();
       }
     }
-    ctrl?.setFlashMode(fm);
-    console = Console(
+    _ctrl?.setFlashMode(fm);
+    _console = Console(
       inputs: [consoleInput],
-      cameraController: ctrl,
-      aspectRatio: ctrl?.value.aspectRatio,
+      cameraController: _ctrl,
+      aspectRatio: _ctrl?.value.aspectRatio,
       topButtons: [
         ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
         ConsoleButton(
           name: "Capture",
           isSpecial: true,
-          shouldBeDownButIsnt: ctrl?.value.isRecordingVideo == true,
+          shouldBeDownButIsnt: _ctrl?.value.isRecordingVideo == true,
           onPress: () async {
-            var file = await ctrl?.takePicture();
+            var file = await _ctrl?.takePicture();
             if (file == null) loadBaseConsole();
             loadSquaredCameraPreview(
               cachedPath: file!.path,
-              aspectRatio: ctrl!.value.aspectRatio,
-              isReversed: ctrl?.cameraId == 1,
+              aspectRatio: _ctrl!.value.aspectRatio,
+              isReversed: _ctrl?.cameraId == 1,
               isVideo: false,
             );
           },
           onLongPress: () async {
-            await ctrl?.startVideoRecording();
+            await _ctrl?.startVideoRecording();
             loadSquaredCameraConsole(cam, fm);
           },
           onLongPressUp: () async {
-            var file = await ctrl?.stopVideoRecording();
+            var file = await _ctrl?.stopVideoRecording();
             if (file == null) loadBaseConsole();
             loadSquaredCameraPreview(
               cachedPath: file!.path,
-              aspectRatio: ctrl!.value.aspectRatio,
-              isReversed: ctrl?.cameraId == 1,
+              aspectRatio: _ctrl!.value.aspectRatio,
+              isReversed: _ctrl?.cameraId == 1,
               isVideo: true,
             );
           },
@@ -458,8 +405,8 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
             name: "Back",
             onPress: () async {
-              await ctrl?.dispose();
-              ctrl = null;
+              await _ctrl?.dispose();
+              _ctrl = null;
               loadBaseConsole();
             }),
         ConsoleButton(
@@ -480,7 +427,7 @@ class _GroupPageState extends State<GroupPage> {
 
   @override
   void dispose() async {
-    ctrl?.dispose();
+    _ctrl?.dispose();
     super.dispose();
   }
 
@@ -488,11 +435,11 @@ class _GroupPageState extends State<GroupPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
-        scrollController: scrollController,
+        scrollController: _scrollController,
         staticList: true,
         title: "Group",
-        columnWidgets: items,
-        console: console!,
+        columnWidgets: _items,
+        console: _console!,
       ),
     ]);
   }

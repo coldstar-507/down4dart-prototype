@@ -506,14 +506,6 @@ class _MoneyPageState extends State<MoneyPage> {
 
     final satsString = "${formattedSats(asSats)} sat";
     final usdString = "${asUSD.toStringAsFixed(4)} \$";
-    // final satsStringLen = satsString.length;
-    // final usdStringLen = usdString.length;
-    // final usdGap = satsStringLen >= usdStringLen
-    //     ? "".padRight(satsStringLen - usdStringLen, " ")
-    //     : "";
-    // final satsGap = satsStringLen >= usdStringLen
-    //     ? ""
-    //     : "".padRight(usdStringLen - satsStringLen, " ");
 
     _console = Console(
       inputs: [
@@ -528,9 +520,9 @@ class _MoneyPageState extends State<MoneyPage> {
       ],
       topButtons: [
         ConsoleButton(
-            name: "-${currency == "USD" ? usdString : satsString}",
-            onPress: confirmPayment)
-        // ConsoleButton(name: "Confirm", onPress: confirmPayment),
+          name: "-${currency == "USD" ? usdString : satsString}",
+          onPress: confirmPayment,
+        ),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: loadMainViewConsole),

@@ -533,34 +533,36 @@ class _HomeState extends State<Home> {
           elementAspectRatio: aspectRatio,
         ));
 
-    uploadOrUpdateMedia(media, skipCheck: true);
+    final success = await uploadOrUpdateMedia(media, skipCheck: true);
+    if (!success) return print("Snip media upload unsucessful!");
 
-    st.ref(media.id).putFile(File(path));
-
-    var userTargets = <Identifier>[];
+    var personTargets = <Identifier>[];
     var snipRequests = <r.SnipRequest>[];
 
-    for (final node in palettes().selected().asNodes()) {
+    final selectedPalettes = palettes().selected();
+    for (final node in selectedPalettes.asNodes()) {
       if (node is GroupNode) {
-        final targets = node.group..remove(widget.self.id);
+        final targets =
+            palettes().those(node.group).asNodes().whereType<User>().asIds();
         final sr = r.SnipRequest(
           mediaID: media.id,
           root: node.id,
           groupName: node.name,
           senderID: widget.self.id,
-          targets: targets.toList(),
+          targets: targets.toList(growable: false),
         );
         snipRequests.add(sr);
       } else {
-        userTargets.add(node.id);
+        personTargets.add(node.id);
       }
     }
 
-    if (userTargets.isNotEmpty) {
+    if (personTargets.isNotEmpty) {
+      final targets = selectedPalettes.asNodes().whereType<Person>().asIds();
       final sr = r.SnipRequest(
         mediaID: media.id,
         senderID: widget.self.id,
-        targets: palettes().selected().users().asIds().toList(growable: false),
+        targets: targets.toList(growable: false),
       );
       snipRequests.add(sr);
     }
@@ -994,8 +996,8 @@ class _HomeState extends State<Home> {
     _page = HyperchatPage(
       initialOffset: _homeScrollController.offset,
       self: widget.self,
-      palettes: formattedHomePalettes,
-      transitioned: transition.first,
+      homePalettes: formattedHomePalettes,
+      transitionedHomePalettes: transition.first,
       people: transition.second,
       hyperchatRequest: (hyperchatRequest) {
         _requests.add(hyperchatRequest);
@@ -1022,9 +1024,9 @@ class _HomeState extends State<Home> {
         _requests.add(groupRequest);
         processWebRequests();
       },
-      transitioned: transition.first,
+      transitionedHomePalettes: transition.first,
       people: transition.second,
-      palettes: formattedHomePalettes,
+      homePalettes: formattedHomePalettes,
       cameras: widget.cameras,
     );
 

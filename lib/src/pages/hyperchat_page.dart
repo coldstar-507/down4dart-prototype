@@ -10,7 +10,6 @@ import 'package:down4/src/data_objects.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
-import 'package:english_words/english_words.dart' as w;
 
 import '../boxes.dart';
 import '../down4_utility.dart' as u;
@@ -23,7 +22,7 @@ import '../render_objects/navigator.dart';
 class HyperchatPage extends StatefulWidget {
   final double initialOffset;
   final List<CameraDescription> cameras;
-  final List<Palette> palettes, transitioned;
+  final List<Palette> homePalettes, transitionedHomePalettes;
   final Iterable<Person> people;
   final void Function(r.HyperchatRequest) hyperchatRequest;
   final void Function(r.ChatRequest) ping;
@@ -33,9 +32,9 @@ class HyperchatPage extends StatefulWidget {
   const HyperchatPage({
     required this.initialOffset,
     required this.people,
-    required this.transitioned,
+    required this.transitionedHomePalettes,
     required this.self,
-    required this.palettes,
+    required this.homePalettes,
     required this.hyperchatRequest,
     required this.cameras,
     required this.back,
@@ -48,14 +47,14 @@ class HyperchatPage extends StatefulWidget {
 }
 
 class _HyperchatPageState extends State<HyperchatPage> {
-  var tec = TextEditingController();
-  MessageMedia? cameraInput;
-  CameraController? ctrl;
-  Console? console;
+  var _tec = TextEditingController();
+  MessageMedia? _cameraInput;
+  CameraController? _ctrl;
+  Console? _console;
   Map<Identifier, MessageMedia> _cachedImages = {};
   Map<Identifier, MessageMedia> _cachedVideos = {};
-  late var palettes = widget.palettes;
-  late var scrollController =
+  late var _palettes = widget.homePalettes;
+  late var _scrollController =
       ScrollController(initialScrollOffset: widget.initialOffset);
 
   @override
@@ -68,8 +67,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   Future<void> delayed() async {
     Future(() => setState(() {
-          palettes = widget.transitioned;
-          scrollController.animateTo(0,
+          _palettes = widget.transitionedHomePalettes;
+          _scrollController.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
         }));
@@ -91,9 +90,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         print("loaded all images");
         for (final image in _cachedImages.values) {
           print("precached image id=${image.id}");
-          if (image.file != null) {
-            precacheImage(FileImage(image.file!), context);
-          }
+          precacheImage(FileImage(File(image.path!)), context);
         }
       }).then((value) => print("precached all images"));
     });
@@ -106,7 +103,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
       (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
   void send({MessageMedia? mediaInput}) {
-    if (cameraInput == null && tec.value.text.isEmpty && mediaInput == null) {
+    if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
       return;
     }
 
@@ -120,22 +117,21 @@ class _HyperchatPageState extends State<HyperchatPage> {
       id: messageID,
       senderID: widget.self.id,
       timestamp: u.timeStamp(),
-      text: tec.value.text,
-      mediaID: mediaInput?.id ?? cameraInput?.id,
+      text: _tec.value.text,
+      mediaID: mediaInput?.id ?? _cameraInput?.id,
     );
 
-    final pairs = w
-        .generateWordPairs(safeOnly: false)
-        .take(10)
+    final pairs = u
+        .randomPairs(10)
         .map((e) => "${e.first} ${e.second}")
         .toList(growable: false);
 
-    final targets = widget.people.asIds().toSet()..remove(widget.self.id);
+    final targets = widget.people.whereType<User>().asIds().toSet();
     final hcReq = r.HyperchatRequest(
       message: msg,
-      targets: targets.toList(),
+      targets: targets.toList(growable: false),
       wordPairs: pairs,
-      media: mediaInput ?? cameraInput,
+      media: mediaInput ?? _cameraInput,
     );
 
     widget.hyperchatRequest(hcReq);
@@ -168,7 +164,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
             isVideo: false,
             isReversed: false,
             owner: widget.self.id,
-            elementAspectRatio: 1 / (size?.aspectRatio ?? 1.0),
+            elementAspectRatio: size?.aspectRatio ?? 1.0,
           ),
         )..save();
         _cachedImages[mediaID] = down4Media;
@@ -206,10 +202,10 @@ class _HyperchatPageState extends State<HyperchatPage> {
     loadMediaConsole();
   }
 
-  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: tec);
+  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: _tec);
 
   void loadMediaConsole([bool images = true]) {
-    console = Console(
+    _console = Console(
       inputs: [consoleInput],
       selectMedia: (media) => send(mediaInput: media),
       images: true,
@@ -237,7 +233,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
   }
 
   void loadBaseConsole() {
-    console = Console(
+    _console = Console(
       inputs: [consoleInput],
       topButtons: [
         ConsoleButton(name: "Ping", onPress: ping),
@@ -246,7 +242,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
-          name: cameraInput == null ? "Camera" : "@Camera",
+          name: _cameraInput == null ? "Camera" : "@Camera",
           onPress: loadSquaredCameraConsole,
         ),
         ConsoleButton(name: "Medias", onPress: loadMediaConsole),
@@ -266,7 +262,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
       vpc = VideoPlayerController.file(File(cachedPath));
       await vpc.initialize();
     }
-    console = Console(
+    _console = Console(
       inputs: [consoleInput],
       toMirror: isReversed,
       videoPlayerController: vpc,
@@ -275,7 +271,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ConsoleButton(
             name: "Accept",
             onPress: () {
-              cameraInput = MessageMedia(
+              _cameraInput = MessageMedia(
                 path: cachedPath,
                 id: u.randomMediaID(),
                 metadata: MediaMetadata(
@@ -295,13 +291,13 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ConsoleButton(
             name: "Back",
             onPress: () {
-              cameraInput = null;
+              _cameraInput = null;
               loadSquaredCameraConsole();
             }),
         ConsoleButton(
             name: "Cancel",
             onPress: () {
-              cameraInput = null;
+              _cameraInput = null;
               loadBaseConsole();
             }),
       ],
@@ -315,46 +311,46 @@ class _HyperchatPageState extends State<HyperchatPage> {
     FlashMode fm = FlashMode.off,
     bool reloadCtrl = false,
   ]) async {
-    if (ctrl == null || reloadCtrl) {
+    if (_ctrl == null || reloadCtrl) {
       try {
-        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
-        await ctrl?.initialize();
+        _ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
+        await _ctrl?.initialize();
       } catch (error) {
         loadBaseConsole();
       }
     }
-    ctrl?.setFlashMode(fm);
-    console = Console(
+    _ctrl?.setFlashMode(fm);
+    _console = Console(
       inputs: [consoleInput],
-      cameraController: ctrl,
-      aspectRatio: ctrl?.value.aspectRatio,
+      cameraController: _ctrl,
+      aspectRatio: _ctrl?.value.aspectRatio,
       topButtons: [
         ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
         ConsoleButton(
           name: "Capture",
           isSpecial: true,
-          shouldBeDownButIsnt: ctrl?.value.isRecordingVideo == true,
+          shouldBeDownButIsnt: _ctrl?.value.isRecordingVideo == true,
           onPress: () async {
-            var file = await ctrl?.takePicture();
+            var file = await _ctrl?.takePicture();
             if (file == null) loadBaseConsole();
             loadSquaredCameraPreview(
               cachedPath: file!.path,
-              aspectRatio: ctrl!.value.aspectRatio,
-              isReversed: ctrl?.cameraId == 1,
+              aspectRatio: _ctrl!.value.aspectRatio,
+              isReversed: _ctrl?.cameraId == 1,
               isVideo: false,
             );
           },
           onLongPress: () async {
-            await ctrl?.startVideoRecording();
+            await _ctrl?.startVideoRecording();
             loadSquaredCameraConsole(cam, fm);
           },
           onLongPressUp: () async {
-            var file = await ctrl?.stopVideoRecording();
+            var file = await _ctrl?.stopVideoRecording();
             if (file == null) loadBaseConsole();
             loadSquaredCameraPreview(
               cachedPath: file!.path,
-              aspectRatio: ctrl!.value.aspectRatio,
-              isReversed: ctrl?.cameraId == 1,
+              aspectRatio: _ctrl!.value.aspectRatio,
+              isReversed: _ctrl?.cameraId == 1,
               isVideo: true,
             );
           },
@@ -364,8 +360,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ConsoleButton(
             name: "Back",
             onPress: () async {
-              await ctrl?.dispose();
-              ctrl = null;
+              await _ctrl?.dispose();
+              _ctrl = null;
               loadBaseConsole();
             }),
         ConsoleButton(
@@ -386,7 +382,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   @override
   void dispose() async {
-    if (ctrl != null) await ctrl!.dispose();
+    if (_ctrl != null) await _ctrl!.dispose();
     super.dispose();
   }
 
@@ -394,11 +390,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
-        scrollController: scrollController,
+        scrollController: _scrollController,
         staticList: true,
         title: "Hyperchat",
-        console: console!,
-        palettes: palettes,
+        console: _console!,
+        palettes: _palettes,
       ),
     ]);
   }

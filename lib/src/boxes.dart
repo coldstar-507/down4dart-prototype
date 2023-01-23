@@ -109,17 +109,23 @@ Future<MediaMetadata?> downloadMediaMetadata(String mediaID) async {
   }
 }
 
-Future<void> uploadOrUpdateMedia(
+Future<bool> uploadOrUpdateMedia(
   MessageMedia media, {
   bool skipCheck = false, // usually for camera uploads
 }) async {
-  if (media.file == null) return;
+  if (media.file == null) return false;
   final mediaRef = st.ref(media.id);
   if (skipCheck) {
-    mediaRef.putFile(
-      media.file!,
-      SettableMetadata(customMetadata: media.metadata.toJson()),
-    );
+    try {
+      mediaRef.putFile(
+        media.file!,
+        SettableMetadata(customMetadata: media.metadata.toJson()),
+      );
+      return true;
+    } on FirebaseException catch (e) {
+      print("Error uploading file $e");
+      return false;
+    }
   } else {
     try {
       final metadata = (await mediaRef.getMetadata());
@@ -134,9 +140,11 @@ Future<void> uploadOrUpdateMedia(
             ),
           );
           print("Updated the metadata");
+          return true;
         }
       }
       print("No need to update the metadata right away!");
+      return true;
     } catch (e) {
       // TODO, find the actual exception we are looking for, docs aren't clear
       // If there's an exception, it should mean that there is no media, so we
@@ -148,8 +156,10 @@ Future<void> uploadOrUpdateMedia(
               customMetadata:
                   media.metadata.updatedTimestamp(timeStamp()).toJson()),
         );
+        return true;
       } on FirebaseException catch (e) {
         print("Error uploading file $e");
+        return false;
       }
     }
   }

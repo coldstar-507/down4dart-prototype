@@ -5,9 +5,6 @@ import 'package:down4/src/render_objects/render_utils.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
-import '../render_objects/lists.dart';
-import '../themes.dart';
-import '../boxes.dart';
 
 class HomePage extends StatelessWidget {
   final ScrollController scrollController;
