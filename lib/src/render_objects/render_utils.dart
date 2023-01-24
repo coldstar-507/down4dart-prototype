@@ -311,6 +311,14 @@ Future<Size>? calculateImageDimension({File? f, Uint8List? d, String? url}) {
   return completer.future;
 }
 
+Future<Size> decodeImageSize(Uint8List d) async {
+  final decodedImage = await decodeImageFromList(d);
+  return Size(
+    decodedImage.width.toDouble(),
+    decodedImage.height.toDouble(),
+  );
+}
+
 Future<List<String>> randomPrompts(int qty) async {
   const String adjPath = "lib/src/assets/texts/descriptive_adjectives.txt";
   const String nounsPath = "lib/src/assets/texts/concrete_nouns.txt";

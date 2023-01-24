@@ -96,8 +96,8 @@ class _GroupPageState extends State<GroupPage> {
       Future(() {
         print("loaded all images");
         for (final image in _cachedImages.values) {
-          print("precached image id=${image.id}");
-          precacheImage(FileImage(File(image.path!)), context);
+          if (image.file == null) continue;
+          precacheImage(FileImage(image.file!), context);
         }
       }).then((value) => print("precached all images"));
     });

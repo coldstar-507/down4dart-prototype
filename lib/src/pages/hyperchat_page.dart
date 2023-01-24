@@ -89,8 +89,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
       Future(() {
         print("loaded all images");
         for (final image in _cachedImages.values) {
+          if (image.file == null) continue;
           print("precached image id=${image.id}");
-          precacheImage(FileImage(File(image.path!)), context);
+          precacheImage(FileImage(image.file!), context);
         }
       }).then((value) => print("precached all images"));
     });

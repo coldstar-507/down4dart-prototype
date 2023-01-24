@@ -505,9 +505,10 @@ class _ChatPageState extends State<ChatPage> {
     if (importImages) {
       final results = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['png', 'jpg', 'jpeg', 'gif'],
+        allowedExtensions: ['png', 'jpg', 'jpeg', 'gif', 'svg'],
         allowMultiple: true,
         allowCompression: true,
+        withData: true,
       );
 
       // final files = await ImagePicker().pickMultiImage(
@@ -516,11 +517,12 @@ class _ChatPageState extends State<ChatPage> {
       //   imageQuality: 70,
       //   requestFullMetadata: false,
       // );
+
       if (results == null) return;
       for (final file in results.files) {
-        if (file.path == null) continue;
-        final mediaID = u.randomMediaID();
-        final size = calculateImageDimension(f: File(file.path!));
+        if (file.bytes == null || file.path == null) continue;
+        final mediaID = u.deterministicMediaID(file.bytes!);
+        final size = await decodeImageSize(file.bytes!);
         final down4Media = MessageMedia(
           id: mediaID,
           isSaved: true,
@@ -531,7 +533,7 @@ class _ChatPageState extends State<ChatPage> {
             isReversed: false,
             timestamp: u.timeStamp(),
             owner: widget.self.id,
-            elementAspectRatio: 1 / ((await size)?.aspectRatio ?? 1.0),
+            elementAspectRatio: 1.0 / size.aspectRatio,
           ),
         )..save();
         _cachedImages[mediaID] = down4Media;
@@ -830,12 +832,30 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void mediasConsole([bool images = true]) {
+  void mediasConsole(
+      {bool images = true, String mode = "Send", bool extra = false}) {
+    void switchMode() => mode == "Send"
+        ? mediasConsole(images: images, mode: "Delete", extra: true)
+        : mediasConsole(images: images, mode: "Send", extra: true);
+
+    void selectMedia(MessageMedia media) {
+      if (mode == "Send") return send2(mediaInput: media);
+      if (!media.isVideo) {
+        widget.self.images.remove(media.id);
+      } else {
+        widget.self.videos.remove(media.id);
+      }
+      media
+        ..isSaved = false
+        ..delete();
+      mediasConsole(images: images, mode: mode, extra: extra);
+    }
+
     _console = Console(
       images: true,
       inputs: [_consoleInput ?? consoleInput],
       medias: images ? savedImages.toList() : savedVideos.toList(),
-      selectMedia: (media) => send2(mediaInput: media),
+      selectMedia: selectMedia,
       topButtons: [
         ConsoleButton(
           name: "Import",
@@ -843,11 +863,23 @@ class _ChatPageState extends State<ChatPage> {
         ),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+          showExtra: extra,
+          isSpecial: true,
+          name: "Back",
+          onPress: () => extra
+              ? mediasConsole(images: images, mode: mode, extra: !extra)
+              : loadBaseConsole(),
+          onLongPress: () =>
+              mediasConsole(images: images, mode: mode, extra: true),
+          extraButtons: [
+            ConsoleButton(name: mode, onPress: switchMode, isMode: true),
+          ],
+        ),
         ConsoleButton(
           isMode: true,
           name: images ? "Images" : "Videos",
-          onPress: () => mediasConsole(!images),
+          onPress: () => mediasConsole(images: !images),
         ),
       ],
     );
