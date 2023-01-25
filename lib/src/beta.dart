@@ -3,6 +3,10 @@ import 'down4_utility.dart' show randomPairs, timeStamp, randomPrompts;
 
 import 'dart:convert';
 
+var jeff = {1, 2, 3};
+
+var andrew = Iterable.castFrom([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
 void main() async {
   // var randomPair = randomPairs(1).first;
   // print("${randomPair.first} ${randomPair.second}");
@@ -11,7 +15,17 @@ void main() async {
 
   // print(randomWordPair.map((e) => "${e.first} ${e.second}\n").toList());
 
-  var prompts = randomPrompts(10);
+  // print(jeff is List);
+  // print(andrew is List);
+
+
+  for (int i = 0; i < 5; i = i + 2) {
+    print(andrew.skip(i).take(2));
+  }
+
+
+
+
   // print(prompts);
 
   // for (int i = 0; i < prompts.length; i++) {

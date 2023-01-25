@@ -24,7 +24,7 @@ class HomePage extends StatelessWidget {
         scrollController: scrollController,
         staticList: true,
         title: "Home",
-        palettes: palettes.toList(),
+        list: palettes.toList(),
         console: console,
       ),
     ]);

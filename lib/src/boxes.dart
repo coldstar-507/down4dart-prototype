@@ -57,24 +57,16 @@ Future<void> deleteMediaFile(String mediaID) async {
 
 String messagePushId() => db.child("Messages").push().key!;
 
-// Future<MessageMedia?> getMessageMediaFromEverywhere(Identifier mediaID) async {
-//   final String? jsonEncodedMedia = b.medias.get(mediaID);
-//   if (jsonEncodedMedia != null) {
-//     return MessageMedia.fromJson(jsonDecode(jsonEncodedMedia));
+// Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
+//   final locals = ids.where((id) => b.nodes.containsKey(id)).toList();
+//   final externals = ids.toSet().difference(locals.toSet()).toList();
+//   var externalNodes = r.getNodes(externals);
+//   List<BaseNode> localNodes = [];
+//   for (final localNodeID in locals) {
+//     localNodes.add(localNodeID.getLocalNode()!);
 //   }
-//   return downloadAndWriteMedia(mediaID) as Future<MessageMedia?>;
+//   return localNodes + (await externalNodes ?? <BaseNode>[]);
 // }
-
-Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
-  final locals = ids.where((id) => b.nodes.containsKey(id)).toList();
-  final externals = ids.toSet().difference(locals.toSet()).toList();
-  var externalNodes = r.getNodes(externals);
-  List<BaseNode> localNodes = [];
-  for (final localNodeID in locals) {
-    localNodes.add(localNodeID.getLocalNode()!);
-  }
-  return localNodes + (await externalNodes ?? <BaseNode>[]);
-}
 
 Future<MessageMedia?> downloadAndWriteMedia(
   String mediaID, {
@@ -95,6 +87,7 @@ Future<MessageMedia?> downloadAndWriteMedia(
     }
     return MessageMedia(id: mediaID, path: path, metadata: mediaMetadata);
   } catch (e) {
+    print("Error downloading mediaID: $mediaID, isNode: $isNodeMedia\n$e");
     return null;
   }
 }
@@ -117,7 +110,7 @@ Future<bool> uploadOrUpdateMedia(
   final mediaRef = st.ref(media.id);
   if (skipCheck) {
     try {
-      mediaRef.putFile(
+      await mediaRef.putFile(
         media.file!,
         SettableMetadata(customMetadata: media.metadata.toJson()),
       );
@@ -212,7 +205,7 @@ extension MessageSave on Message {
     await save();
     if (mediaID != null) {
       MessageMedia? media = mediaID?.getLocalMessageMedia();
-      media ??= await downloadAndWriteMedia(mediaID!) as MessageMedia?;
+      media ??= await downloadAndWriteMedia(mediaID!);
       media
         ?..references.add(id)
         ..save();
@@ -265,7 +258,7 @@ extension MediaSave on MessageMedia {
 
   Future<void> delete() async {
     b.medias.delete(id);
-    if (references.isEmpty && path != null && !isSaved) {
+    if (references.isEmpty && !isSaved) {
       print("References are empty, deleting the file!");
       return deleteMediaFile(id);
     }

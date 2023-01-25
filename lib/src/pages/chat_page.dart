@@ -26,7 +26,6 @@ class ChatPage extends StatefulWidget {
   final Map<Identifier, Palette> senders;
   final Self self;
   final ChatableNode node;
-  // final List<Palette> group;
   final List<CameraDescription> cameras;
   final void Function(r.ChatRequest) send;
   final void Function() back;
@@ -42,7 +41,6 @@ class ChatPage extends StatefulWidget {
     required this.back,
     required this.cameras,
     required this.nodeToPalette,
-    // required this.group,
     this.pageIndex = 0,
     this.onPageChange,
     Key? key,
@@ -55,31 +53,49 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   Console? _console;
   ConsoleInput? _consoleInput;
-  var tec = TextEditingController();
-  CameraController? ctrl;
+  var _tec = TextEditingController();
+  // CameraController? _ctrl;
   MessageMedia? _cameraInput;
   Map<Identifier, ChatMessage> _cachedMessages = {};
   Map<Identifier, Message?> _cachedDown4Message = {};
-  String? idOfLastMessageRead;
+  static const gap = 20;
+  int _takeLimit = 30;
+  String? _idOfLastMessageRead;
+
+  void _scrollListener() {
+    if (_scrollController.offset >=
+            _scrollController.position.maxScrollExtent &&
+        !_scrollController.position.outOfRange) {
+      print("REACHED THE TOP!!!!");
+      setState(() {
+        _takeLimit += gap;
+      });
+    }
+    if (_scrollController.offset <=
+            _scrollController.position.minScrollExtent &&
+        !_scrollController.position.outOfRange) {
+      print("REACHED THE BOTTOM");
+    }
+  }
+
+  late var _scrollController = ScrollController()..addListener(_scrollListener);
 
   Map<Identifier, MessageMedia> _cachedImages = {};
   Map<Identifier, MessageMedia> _cachedVideos = {};
-
-  late var theNode = widget.node;
-  late final bool isGroupChat = theNode is GroupNode;
 
   @override
   void initState() {
     super.initState();
     asyncImageLoad();
-    loadMessages();
+    messages.take(gap).toList();
+    // loadMessages();
     loadBaseConsole();
   }
 
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    loadMessages(isUpdate: true);
+    // loadMessages(isUpdate: true);
     print("Did update the chat page widget!");
   }
 
@@ -113,393 +129,728 @@ class _ChatPageState extends State<ChatPage> {
   Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
       (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
+  double get maxMessageWidth => Sizes.w * 0.76;
+
+  double get textPadding => 12.0;
+
+  double get messageBorder => 4.0;
+
+  double get maxTextWidth => maxMessageWidth - textPadding - messageBorder;
+
+  String timeString(Message msg) {
+    final ts = DateTime.fromMillisecondsSinceEpoch(msg.timestamp).toLocal();
+    final now = DateTime.now().toLocal();
+    String timeStr;
+    final yearStr = ts.year.toString();
+    final yearDigits =
+        int.parse(yearStr.substring(yearStr.length - 2, yearStr.length));
+    String tsDay, tsMonth, tsYear, tsHour, tsMin;
+    tsDay = ts.day < 10 ? "0${ts.day}" : "${ts.day}";
+    tsMonth = ts.month < 10 ? "0${ts.month}" : "${ts.month}";
+    tsYear = yearDigits < 10 ? "0$yearDigits" : "$yearDigits";
+    tsHour = ts.hour < 10 ? "0${ts.hour}" : "${ts.hour}";
+    tsMin = ts.minute < 10 ? "0${ts.minute}" : "${ts.minute}";
+
+    if (ts.add(const Duration(days: 1)).isBefore(now)) {
+      var yearStr = ts.year.toString();
+      yearStr = yearStr.substring(yearStr.length - 2, yearStr.length);
+      timeStr = "$tsDay/$tsMonth/$tsYear $tsHour:$tsMin";
+    } else {
+      timeStr = "$tsHour:$tsMin";
+    }
+    return timeStr;
+  }
+
+  bool displayGap(Message msg, Message prevMsg) {
+    final prevMsgTS = DateTime.fromMillisecondsSinceEpoch(prevMsg.timestamp);
+    final curMsgTS = DateTime.fromMillisecondsSinceEpoch(msg.timestamp);
+    if (curMsgTS.difference(prevMsgTS).inMinutes > 20) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  double minReplyDisplayLen(List<ReplyData> rds) {
+    var lens = <double>[];
+    for (final r in rds) {
+      final firstWordInReply = r.body.split(" ").first;
+      final tp = TextPainter(
+        text: TextSpan(
+            text: "${r.senderID}: $firstWordInReply",
+            style: const TextStyle(fontSize: 12, fontFamily: "Alice")),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      lens.add(tp.width);
+    }
+    return lens.fold<double>(double.maxFinite, (p, e) => min(p, e));
+  }
+
+  List<dynamic>? textAsStringList(Message msg) {
+    List<String>? specialDisplayText;
+    double? neededWidth;
+    bool lastStringAndDateOnSameLine = false;
+    double heightIfNotOnSameLine = 0.0;
+    double oneLineTextHeight = 0.0;
+
+    if (msg.text?.isEmpty ?? true) return null;
+
+    specialDisplayText = [];
+    neededWidth = 0.0;
+
+    final text = msg.text!;
+    final transform1 = text.split("\n");
+    final transform2 = transform1.join(" \n ");
+
+    final words = transform2.split(" ")..add(timeString(msg));
+    var previousString = "";
+
+    // pervious string should always be < max
+    for (final word in words) {
+      if (word == words.last) {
+        double dateWidth;
+        double prevWidth = 0;
+        String dateString = "      $word";
+        final timeTp = TextPainter(
+          text: TextSpan(text: dateString, style: dateStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        dateWidth = timeTp.width;
+        if (previousString.isNotEmpty) {
+          final prevTp = TextPainter(
+            text: TextSpan(text: previousString, style: textStyle),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          prevWidth = prevTp.width;
+        }
+        specialDisplayText.add(previousString);
+        specialDisplayText.add(dateString);
+        if (dateWidth + prevWidth > maxTextWidth) {
+          // in this case, prevString + date is too wide
+          if (prevWidth > neededWidth!) neededWidth = prevWidth;
+          lastStringAndDateOnSameLine = false;
+          heightIfNotOnSameLine = timeTp.height;
+        } else {
+          if (prevWidth + dateWidth > neededWidth!) {
+            neededWidth = prevWidth + dateWidth;
+          }
+          lastStringAndDateOnSameLine = true;
+        }
+      } else if (word == "\n") {
+        specialDisplayText.add(previousString);
+        final specialTp = TextPainter(
+          text: TextSpan(text: previousString, style: textStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        if (specialTp.width > neededWidth!) {
+          neededWidth = specialTp.width;
+        }
+        previousString = "";
+      } else if (word.isNotEmpty) {
+        final wordTp = TextPainter(
+          text: TextSpan(text: word, style: textStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        var wordLen = wordTp.width;
+        var words = [word];
+        while (wordLen > maxTextWidth) {
+          final splitLen = (words.first.length / 2).ceil();
+          words = words
+              .map((w) => [w.substring(0, splitLen), w.substring(splitLen)])
+              .expand((element) => element)
+              .toList();
+          wordLen = words
+              .map((w) => TextPainter(
+                  text: TextSpan(text: w, style: textStyle),
+                  textDirection: TextDirection.ltr)
+                ..layout())
+              .map((e) => e.width)
+              .reduce(max);
+        }
+        if (words.length > 1) {
+          // we have a word split
+          if (previousString.isNotEmpty) {
+            specialDisplayText.add(previousString);
+          }
+          for (final word in words) {
+            specialDisplayText.add(word);
+          }
+          oneLineTextHeight = wordTp.height;
+          if (wordLen > neededWidth!) neededWidth = wordLen;
+          previousString = "";
+        } else {
+          final currentString =
+              previousString.isEmpty ? word : "$previousString $word";
+
+          final previousTp = TextPainter(
+            text: TextSpan(text: previousString, style: textStyle),
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          final currentTp = TextPainter(
+            text: TextSpan(text: currentString, style: textStyle),
+            textDirection: TextDirection.ltr,
+          )..layout();
+
+          oneLineTextHeight = currentTp.height;
+
+          // if the current text is larger than the available width
+          if (currentTp.width >= maxTextWidth) {
+            // we add the previousString to the list of display text
+            specialDisplayText.add(previousString);
+            // if the previous layout is bigger than our current biggest width,
+            // it because the new biggest width
+            if (previousTp.width > neededWidth!) {
+              neededWidth = previousTp.width;
+            }
+            // now we set the previous string as the word
+            previousString = word;
+          } else {
+            // if the current text is not larger than available width
+            // we simply update it
+            previousString = currentString;
+          }
+        }
+      }
+    }
+
+    return [
+      specialDisplayText,
+      neededWidth,
+      oneLineTextHeight,
+      heightIfNotOnSameLine,
+      lastStringAndDateOnSameLine,
+    ];
+  }
+
+  TextStyle get textStyle => const TextStyle(fontFamily: "Alice");
+
+  TextStyle get dateStyle => const TextStyle(fontFamily: "Alice", fontSize: 10);
+
+  ChatMessage loadMessage(
+    Identifier msgID,
+    Identifier? prevMsgID,
+    Identifier? nextMsgID,
+    bool isLast,
+  ) {
+    Message msg;
+    Message? prevMsg, nextMsg;
+    ChatMessage? prevChatMessage;
+
+    // If new message while in chat, we might want to remove the header of the
+    // previous last message
+    if (isLast &&
+        prevMsgID != null &&
+        ((prevChatMessage = _cachedMessages[prevMsgID]) != null) &&
+        prevChatMessage!.hasHeader) {
+      msg = _cachedDown4Message[msgID] ??= msgID.getLocalMessage()!;
+      if (msg.senderID == prevChatMessage.message.senderID &&
+          msg.senderID != widget.self.id) {
+        // we need to remove its header
+        // and update it's size
+        final lastMessageSize = prevChatMessage.precalculatedSize;
+        final newSize = Size(lastMessageSize.width,
+            lastMessageSize.height - ChatMessage.headerHeight);
+        _cachedMessages[prevMsgID] =
+            prevChatMessage.withHeader(header: "", newSize: newSize);
+      }
+    }
+
+    if (_cachedMessages[msgID] != null) return _cachedMessages[msgID]!;
+
+    msg = _cachedDown4Message[msgID] ??= msgID.getLocalMessage()!;
+    prevMsg = prevMsgID != null
+        ? _cachedDown4Message[prevMsgID] ??= prevMsgID.getLocalMessage()
+        : null;
+    nextMsg = nextMsgID != null
+        ? _cachedDown4Message[nextMsgID] ??= nextMsgID.getLocalMessage()
+        : null;
+
+    double mediaHeight = 0;
+    double mediaWidth = 0;
+    bool hasGap = false;
+
+    if (prevMsg != null) hasGap = displayGap(msg, prevMsg);
+
+    MessageMedia? media;
+    if (msg.mediaID != null) {
+      media = msg.mediaID!.getLocalMessageMedia();
+      if (media != null) {
+        mediaWidth = maxMessageWidth - messageBorder;
+        mediaHeight = mediaWidth *
+            (media.metadata.isSquared
+                ? 1.0
+                : media.metadata.elementAspectRatio);
+      }
+    }
+    if (!msg.isRead) {
+      msg
+        ..isRead = true
+        ..save();
+    } else {
+      _idOfLastMessageRead ??= msg.id;
+    }
+
+    final bool senderIsSelf = msg.senderID == widget.self.id;
+    final List<ReplyData>? repliesData = msg.replies
+        ?.map((msgID) {
+          final replyMsg =
+              _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
+          final replyUser = widget.senders[replyMsg?.senderID];
+          if (replyMsg == null || replyUser == null) return null;
+          final String replyBody = replyMsg.text?.isNotEmpty ?? false
+              ? replyMsg.text!
+              : "&attachment";
+          return ReplyData(
+            senderID: replyMsg.senderID,
+            senderName: replyUser.node.name,
+            messageRefID: replyMsg.id,
+            thumbnail: replyUser.nodeImage,
+            body: replyBody,
+            type: replyUser.node.colorCode,
+          );
+        })
+        .whereType<ReplyData>()
+        .toList(growable: false);
+
+    double minWidth = 0;
+    final bool hasReplies = (repliesData?.length ?? 0) > 0;
+    final bool hasHeader = !senderIsSelf &&
+        widget.node is GroupNode &&
+        nextMsg?.senderID != msg.senderID;
+
+    String? headerText;
+    if (hasReplies) {
+      final minRepLen = minReplyDisplayLen(repliesData!);
+      print("""
+        =====================================
+        MIN REP LEN OF REP = $minRepLen
+        MAX LEN = $maxTextWidth
+        REP FIRST = ${repliesData.first.body}
+        """);
+      minWidth =
+          minRepLen > maxMessageWidth ? maxMessageWidth / golden : minRepLen;
+    }
+    if (hasHeader) {
+      headerText = "-${msg.senderID}";
+      final tp = TextPainter(
+        text: TextSpan(
+            text: "-${msg.senderID}   ",
+            style: const TextStyle(fontFamily: "Alice", fontSize: 13)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      if (minWidth < tp.width && tp.width < maxMessageWidth / golden) {
+        print("AAAAA");
+        minWidth = tp.width;
+      }
+    }
+
+    final textData = textAsStringList(msg);
+    final hasText = textData != null;
+
+    final lineStrings = textData?[0] as List<String>?;
+    final textWidth = textData?[1] as double?;
+    final oneTextLineHeight = textData?[2] ?? 0.0;
+    final heightIfNotOnSameLine = textData?[3] ?? 0.0;
+    final lastStringAndDateOnSameLine = textData?[4] ?? false;
+
+    final headerSize = hasHeader ? ChatMessage.headerHeight : 0;
+    final repliesHeight = (repliesData?.length ?? 0) * ChatMessage.headerHeight;
+    final nLines = hasText ? lineStrings!.length - 1 : 0;
+
+    var messageHeight =
+        mediaHeight + messageBorder + headerSize + repliesHeight;
+    messageHeight += hasText
+        ? (nLines * oneTextLineHeight) + textPadding + heightIfNotOnSameLine
+        : 0;
+
+    var messageWidth = media != null
+        ? maxMessageWidth
+        : lineStrings != null
+            ? textWidth! + textPadding + messageBorder
+            : 0.0; // TODO, will be forwarding nodes, or messages
+    messageWidth = messageWidth < minWidth ? minWidth : messageWidth;
+
+    return _cachedMessages[msg.id] = ChatMessage(
+      key: GlobalKey(),
+      hasGap: hasGap,
+      repliesData: repliesData,
+      sender: widget.senders[msg.senderID]!,
+      message: msg,
+      myMessage: widget.self.id == msg.senderID,
+      lastStringOnSameLine: lastStringAndDateOnSameLine,
+      heightIfNotOnSameLine: heightIfNotOnSameLine,
+      at: "",
+      precalculatedSize: Size(messageWidth, messageHeight),
+      precalculatedMediaSize:
+          media != null ? Size(mediaWidth, mediaHeight) : null,
+      specialDisplayTexts: lineStrings,
+      // if is update, means it's a single new message with a header
+      headerText: headerText,
+      media: media,
+      select: (id, _) => setState(() {
+        _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
+      }),
+    );
+  }
+
+  Iterable<ChatMessage> get messages sync* {
+    final msgs = widget.node.messages.toList(growable: false);
+    final int nMsg = msgs.length;
+    for (int i = nMsg - 1; i >= 0; i--) {
+      final Identifier msgID = msgs[i];
+      final Identifier? prevMsgID = i > 0 ? msgs[i - 1] : null;
+      final Identifier? nextMsgID = i < nMsg - 1 ? msgs[i + 1] : null;
+      final isFirst = i == nMsg - 1;
+      yield loadMessage(msgID, prevMsgID, nextMsgID, isFirst);
+    }
+  }
+
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
-        tec: tec,
+        tec: _tec,
         inputCallBack: (t) => null,
         placeHolder: ":)",
       );
 
-  Future<void> loadMessages({bool isUpdate = false}) async {
-    final loadedMessagesKeys = _cachedMessages.keys.toSet();
-    final allMessagesKeys = widget.node.messages.toSet();
-    final messageToLoad = allMessagesKeys.difference(loadedMessagesKeys);
-    print("Messages to load $messageToLoad");
-
-    final maxWidth = Sizes.w * 0.76;
-    const textPadding = 12;
-    const messageBorder = 4;
-    final maxTextWidth = maxWidth - textPadding - messageBorder;
-
-    // Useful functions to calculate things we might render in chat messages
-    // bool calculateIfShouldShowTimestamp(Message m1, Message m2) =>
-    //     m1.senderID != m2.senderID ||
-    //     isUpdate ||
-    //     DateTime.fromMillisecondsSinceEpoch(m1.timestamp)
-    //             .difference(DateTime.fromMillisecondsSinceEpoch(m2.timestamp))
-    //             .inMinutes >
-    //         30;
-    String timeString(Message msg) {
-      final ts = DateTime.fromMillisecondsSinceEpoch(msg.timestamp).toLocal();
-      final now = DateTime.now().toLocal();
-      String timeStr;
-      final yearStr = ts.year.toString();
-      final yearDigits =
-          int.parse(yearStr.substring(yearStr.length - 2, yearStr.length));
-      String tsDay, tsMonth, tsYear, tsHour, tsMin;
-      tsDay = ts.day < 10 ? "0${ts.day}" : "${ts.day}";
-      tsMonth = ts.month < 10 ? "0${ts.month}" : "${ts.month}";
-      tsYear = yearDigits < 10 ? "0$yearDigits" : "$yearDigits";
-      tsHour = ts.hour < 10 ? "0${ts.hour}" : "${ts.hour}";
-      tsMin = ts.minute < 10 ? "0${ts.minute}" : "${ts.minute}";
-
-      if (ts.add(const Duration(days: 1)).isBefore(now)) {
-        var yearStr = ts.year.toString();
-        yearStr = yearStr.substring(yearStr.length - 2, yearStr.length);
-        timeStr = "$tsDay/$tsMonth/$tsYear $tsHour:$tsMin";
-      } else {
-        timeStr = "$tsHour:$tsMin";
-      }
-      return timeStr;
-    }
-
-    final reversedMessageToLoad =
-        messageToLoad.toList(growable: false).reversed;
-    TextStyle textStyle = const TextStyle(fontFamily: "Alice");
-    TextStyle dateStyle = const TextStyle(fontFamily: "Alice", fontSize: 10);
-
-    for (var i = 0; i < messageToLoad.length; i++) {
-      double oneTextLineHeight = 0;
-      double mediaHeight = 0;
-      double mediaWidth = 0;
-
-      final msgID = reversedMessageToLoad.elementAt(i);
-      Message? prevMsg = isUpdate
-          ? _cachedDown4Message.isEmpty
-              ? null
-              : _cachedDown4Message.values.last
-          : i < messageToLoad.length - 1
-              ? reversedMessageToLoad.elementAt(i + 1).getLocalMessage()
-              : null;
-      Message? nextMessage = !isUpdate && i > 0
-          ? reversedMessageToLoad.elementAt(i - 1).getLocalMessage()
-          : null;
-
-      if (nextMessage != null) {
-        _cachedDown4Message[nextMessage.id] ??= nextMessage;
-      }
-      Message? down4Message =
-          _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
-      if (prevMsg != null) {
-        _cachedDown4Message[prevMsg.id] ??= prevMsg;
-      }
-
-      print("THE DOWN4MESSAGE = $down4Message");
-      if (down4Message == null) return;
-      MessageMedia? media;
-      if (down4Message.mediaID != null) {
-        media = down4Message.mediaID!.getLocalMessageMedia();
-        if (media != null) {
-          mediaWidth = maxWidth - messageBorder;
-          mediaHeight = mediaWidth *
-              (media.metadata.isSquared
-                  ? 1.0
-                  : media.metadata.elementAspectRatio);
-        }
-      }
-      if (!down4Message.isRead) {
-        down4Message
-          ..isRead = true
-          ..save();
-      } else {
-        idOfLastMessageRead ??= down4Message.id;
-      }
-
-      // Message? prevMessage = isUpdate ? _cachedDown4Message.isEmpty ? null : _cachedDown4Message.values.last :
-      // Message? prevMsg =
-      //     _cachedDown4Message.isEmpty ? null : _cachedDown4Message.values.last;
-      // String? prevMsgSender = prevMsg?.senderID;
-
-      bool lastStringAndDateOnSameLine = false;
-      double heightIfNotOnSameLine = 0.0;
-      List<dynamic>? textAsStringList() {
-        List<String>? specialDisplayText;
-        double? neededWidth;
-
-        if (down4Message.text?.isEmpty ?? true) return null;
-
-        specialDisplayText = [];
-        neededWidth = 0.0;
-
-        final text = down4Message.text!;
-        final transform1 = text.split("\n");
-        final transform2 = transform1.join(" \n ");
-
-        // var words = down4Message.text!.split(" ");
-        final words = transform2.split(" ")..add(timeString(down4Message));
-        var previousString = "";
-
-        // pervious string should always be < max
-        for (final word in words) {
-          if (word == words.last) {
-            double dateWidth;
-            double prevWidth = 0;
-            String dateString = "      $word";
-            final timeTp = TextPainter(
-              text: TextSpan(text: dateString, style: dateStyle),
-              textDirection: TextDirection.ltr,
-            )..layout();
-            dateWidth = timeTp.width;
-            if (previousString.isNotEmpty) {
-              final prevTp = TextPainter(
-                text: TextSpan(text: previousString, style: textStyle),
-                textDirection: TextDirection.ltr,
-              )..layout();
-              prevWidth = prevTp.width;
-            }
-            specialDisplayText.add(previousString);
-            specialDisplayText.add(dateString);
-            if (dateWidth + prevWidth > maxTextWidth) {
-              // in this case, prevString + date is too wide
-              if (prevWidth > neededWidth!) neededWidth = prevWidth;
-              lastStringAndDateOnSameLine = false;
-              heightIfNotOnSameLine = timeTp.height;
-            } else {
-              if (prevWidth + dateWidth > neededWidth!) {
-                neededWidth = prevWidth + dateWidth;
-              }
-              lastStringAndDateOnSameLine = true;
-            }
-          } else if (word == "\n") {
-            specialDisplayText.add(previousString);
-            final specialTp = TextPainter(
-              text: TextSpan(text: previousString, style: textStyle),
-              textDirection: TextDirection.ltr,
-            )..layout();
-            if (specialTp.width > neededWidth!) {
-              neededWidth = specialTp.width;
-            }
-            previousString = "";
-          } else if (word.isNotEmpty) {
-            final wordTp = TextPainter(
-              text: TextSpan(text: word, style: textStyle),
-              textDirection: TextDirection.ltr,
-            )..layout();
-            var wordLen = wordTp.width;
-            var words = [word];
-            while (wordLen > maxTextWidth) {
-              final splitLen = (words.first.length / 2).ceil();
-              words = words
-                  .map((w) => [w.substring(0, splitLen), w.substring(splitLen)])
-                  .expand((element) => element)
-                  .toList();
-              wordLen = words
-                  .map((w) => TextPainter(
-                      text: TextSpan(text: w, style: textStyle),
-                      textDirection: TextDirection.ltr)
-                    ..layout())
-                  .map((e) => e.width)
-                  .reduce(max);
-            }
-            if (words.length > 1) {
-              // we have a word split
-              if (previousString.isNotEmpty) {
-                specialDisplayText.add(previousString);
-              }
-              for (final word in words) {
-                specialDisplayText.add(word);
-              }
-              oneTextLineHeight = wordTp.height;
-              if (wordLen > neededWidth!) neededWidth = wordLen;
-              previousString = "";
-            } else {
-              final currentString =
-                  previousString.isEmpty ? word : "$previousString $word";
-
-              final previousTp = TextPainter(
-                text: TextSpan(text: previousString, style: textStyle),
-                textDirection: TextDirection.ltr,
-              )..layout();
-
-              final currentTp = TextPainter(
-                text: TextSpan(text: currentString, style: textStyle),
-                textDirection: TextDirection.ltr,
-              )..layout();
-
-              oneTextLineHeight = currentTp.height;
-
-              // if the current text is larger than the available width
-              if (currentTp.width >= maxTextWidth) {
-                // we add the previousString to the list of display text
-                specialDisplayText.add(previousString);
-                // if the previous layout is bigger than our current biggest width,
-                // it because the new biggest width
-                if (previousTp.width > neededWidth!) {
-                  neededWidth = previousTp.width;
-                }
-                // now we set the previous string as the word
-                previousString = word;
-              } else {
-                // if the current text is not larger than available width
-                // we simply update it
-                previousString = currentString;
-              }
-            }
-          }
-        }
-        // don't leave out the last string
-        // if (previousString.isNotEmpty && previousString != "\n") {
-        //   final lastLiner = TextPainter(
-        //     text: TextSpan(text: previousString, style: textStyle),
-        //     textDirection: TextDirection.ltr,
-        //   )..layout();
-        //   if (lastLiner.width > neededWidth!) {
-        //     neededWidth = lastLiner.width;
-        //   }
-        //   print("last String = $previousString");
-        //   specialDisplayText.add(previousString);
-        // }
-
-        return [specialDisplayText, neededWidth];
-      }
-
-      final bool senderIsSelf = down4Message.senderID == widget.self.id;
-      final List<ReplyData>? repliesData = down4Message.replies
-          ?.map((msgID) {
-            final replyMsg =
-                _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
-            final replyUser = widget.senders[replyMsg?.senderID];
-            if (replyMsg == null || replyUser == null) return null;
-            final String replyBody = replyMsg.text?.isNotEmpty ?? false
-                ? replyMsg.text!
-                : "&attachment";
-            return ReplyData(
-              senderID: replyMsg.senderID,
-              senderName: replyUser.node.name,
-              messageRefID: replyMsg.id,
-              thumbnail: replyUser.nodeImage,
-              body: replyBody,
-              type: replyUser.node.colorCode,
-            );
-          })
-          .whereType<ReplyData>()
-          .toList(growable: false);
-
-      double minWidth = 0;
-      final bool hasReplies = (repliesData?.length ?? 0) > 0;
-      final bool hasHeader = (!senderIsSelf &&
-          theNode is GroupNode &&
-          nextMessage?.senderID != down4Message.senderID);
-
-      double minReplyDisplayLen(List<ReplyData> rds) {
-        var lens = <double>[];
-        for (final r in rds) {
-          final firstWordInReply = r.body.split(" ").first;
-          final tp = TextPainter(
-            text: TextSpan(
-                text: "${r.senderID}: $firstWordInReply",
-                style: const TextStyle(fontSize: 12, fontFamily: "Alice")),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          lens.add(tp.width);
-        }
-        return lens.fold<double>(double.maxFinite, (p, e) => min(p, e));
-      }
-
-      String? headerText;
-      if (hasReplies) {
-        final minRepLen = minReplyDisplayLen(repliesData!);
-        print("""
-        =====================================
-        MIN REP LEN OF REP = $minRepLen
-        MAX LEN = $maxWidth
-        REP FIRST = ${repliesData.first.body}
-        """);
-        minWidth = minRepLen > maxWidth ? maxWidth / golden : minRepLen;
-      }
-      if (hasHeader) {
-        headerText = "-${down4Message.senderID}";
-        final tp = TextPainter(
-          text: TextSpan(
-              text: "-${down4Message.senderID}   ",
-              style: const TextStyle(fontFamily: "Alice", fontSize: 13)),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        if (minWidth < tp.width && tp.width < maxWidth / golden) {
-          print("AAAAA");
-          minWidth = tp.width;
-        }
-      }
-
-      final textData = textAsStringList();
-      final lineStrings = textData?[0] as List<String>?;
-      final textWidth = textData?[1] as double?;
-      final headerSize = hasHeader ? ChatMessage.headerHeight : 0;
-      final repliesHeight =
-          (repliesData?.length ?? 0) * ChatMessage.headerHeight;
-      final messageHeight = lineStrings != null
-          ? ((lineStrings.length - (lastStringAndDateOnSameLine ? 1 : 0)) *
-                      oneTextLineHeight +
-                  textPadding) +
-              mediaHeight +
-              messageBorder +
-              headerSize +
-              repliesHeight
-          : mediaHeight + messageBorder + headerSize + repliesHeight;
-      var messageWidth = media != null
-          ? maxWidth
-          : lineStrings != null
-              ? textWidth! + textPadding + messageBorder
-              : 0.0; // TODO, will be forwarding nodes, or messages
-      messageWidth = messageWidth < minWidth ? minWidth : messageWidth;
-
-      print("Textwidth=$textWidth");
-      print("Number of lines=${lineStrings?.length}");
-      final precalculatedSize = Size(messageWidth, messageHeight);
-      print("PrecalculatedSize=$precalculatedSize");
-      print("MaxWidth=$maxWidth");
-      var chatMessage = ChatMessage(
-        key: GlobalKey(),
-        repliesData: repliesData,
-        sender: widget.senders[down4Message.senderID]!,
-        message: down4Message,
-        myMessage: widget.self.id == down4Message.senderID,
-        lastStringOnSameLine: lastStringAndDateOnSameLine,
-        heightIfNotOnSameLine: heightIfNotOnSameLine,
-        at: "",
-        precalculatedSize: Size(messageWidth, messageHeight),
-        precalculatedMediaSize:
-            media != null ? Size(mediaWidth, mediaHeight) : null,
-        specialDisplayTexts: lineStrings,
-        // if is update, means it's a single new message with a header
-        headerText: headerText,
-        media: media,
-        select: (id, _) => setState(() {
-          _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
-        }),
-      );
-
-      if (isUpdate) {
-        if (_cachedMessages.isNotEmpty) {
-          // last message receive is the first in the list
-          final lastMessage = _cachedMessages.values.first;
-          if (lastMessage.message.senderID == down4Message.senderID) {
-            // we need to remove its header
-            // and update it's size
-            final lastMessageSize = lastMessage.precalculatedSize;
-            final newSize = Size(
-                lastMessageSize.width, lastMessageSize.height - headerSize);
-            _cachedMessages[lastMessage.message.id] =
-                lastMessage.withHeader(header: "", newSize: newSize);
-          }
-        }
-        _cachedMessages = {down4Message.id: chatMessage, ..._cachedMessages};
-        setState(() {});
-      } else {
-        _cachedMessages[down4Message.id] = chatMessage;
-        setState(() {});
-      }
-    }
-  }
+  // Future<void> loadMessages({bool isUpdate = false}) async {
+  //   final loadedMessagesKeys = _cachedMessages.keys.toSet();
+  //   final allMessagesKeys = widget.node.messages;
+  //   List<String> messageToLoad =
+  //       allMessagesKeys.difference(loadedMessagesKeys).toList(growable: false);
+  //   print("Messages to load $messageToLoad");
+  //
+  //   final maxWidth = Sizes.w * 0.76;
+  //   const textPadding = 12;
+  //   const messageBorder = 4;
+  //   final maxTextWidth = maxWidth - textPadding - messageBorder;
+  //
+  //   if (!isUpdate) messageToLoad = messageToLoad.reversed.toList();
+  //   TextStyle textStyle = const TextStyle(fontFamily: "Alice");
+  //   TextStyle dateStyle = const TextStyle(fontFamily: "Alice", fontSize: 10);
+  //
+  //   for (var i = 0; i < messageToLoad.length; i++) {
+  //     double oneTextLineHeight = 0;
+  //     double mediaHeight = 0;
+  //     double mediaWidth = 0;
+  //
+  //     final msgID = messageToLoad[i];
+  //     Message? prevMsg = isUpdate
+  //         ? _cachedDown4Message.isEmpty
+  //             ? null
+  //             : _cachedDown4Message.values.last
+  //         : i < messageToLoad.length - 1
+  //             ? messageToLoad[i + 1].getLocalMessage()
+  //             : null;
+  //     Message? nextMessage =
+  //         !isUpdate && i > 0 ? messageToLoad[i - 1].getLocalMessage() : null;
+  //
+  //     if (nextMessage != null) {
+  //       _cachedDown4Message[nextMessage.id] ??= nextMessage;
+  //     }
+  //     bool hasGap = false;
+  //     Message? down4Message =
+  //         _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
+  //     if (prevMsg != null) {
+  //       _cachedDown4Message[prevMsg.id] ??= prevMsg;
+  //       if (down4Message != null) {
+  //         final prevMsgTS =
+  //             DateTime.fromMillisecondsSinceEpoch(prevMsg.timestamp);
+  //         final curMsgTS =
+  //             DateTime.fromMillisecondsSinceEpoch(down4Message.timestamp);
+  //         if (curMsgTS.difference(prevMsgTS).inMinutes > 20) {
+  //           hasGap = true;
+  //         }
+  //       }
+  //     }
+  //
+  //     if (down4Message == null) return;
+  //     MessageMedia? media;
+  //     if (down4Message.mediaID != null) {
+  //       media = down4Message.mediaID!.getLocalMessageMedia();
+  //       if (media != null) {
+  //         mediaWidth = maxWidth - messageBorder;
+  //         mediaHeight = mediaWidth *
+  //             (media.metadata.isSquared
+  //                 ? 1.0
+  //                 : media.metadata.elementAspectRatio);
+  //       }
+  //     }
+  //     if (!down4Message.isRead) {
+  //       down4Message
+  //         ..isRead = true
+  //         ..save();
+  //     } else {
+  //       idOfLastMessageRead ??= down4Message.id;
+  //     }
+  //
+  //     bool lastStringAndDateOnSameLine = false;
+  //     double heightIfNotOnSameLine = 0.0;
+  //     List<dynamic>? textAsStringList() {
+  //       List<String>? specialDisplayText;
+  //       double? neededWidth;
+  //
+  //       if (down4Message.text?.isEmpty ?? true) return null;
+  //
+  //       specialDisplayText = [];
+  //       neededWidth = 0.0;
+  //
+  //       final text = down4Message.text!;
+  //       final transform1 = text.split("\n");
+  //       final transform2 = transform1.join(" \n ");
+  //
+  //       // var words = down4Message.text!.split(" ");
+  //       final words = transform2.split(" ")..add(timeString(down4Message));
+  //       var previousString = "";
+  //
+  //       // pervious string should always be < max
+  //       for (final word in words) {
+  //         if (word == words.last) {
+  //           double dateWidth;
+  //           double prevWidth = 0;
+  //           String dateString = "      $word";
+  //           final timeTp = TextPainter(
+  //             text: TextSpan(text: dateString, style: dateStyle),
+  //             textDirection: TextDirection.ltr,
+  //           )..layout();
+  //           dateWidth = timeTp.width;
+  //           if (previousString.isNotEmpty) {
+  //             final prevTp = TextPainter(
+  //               text: TextSpan(text: previousString, style: textStyle),
+  //               textDirection: TextDirection.ltr,
+  //             )..layout();
+  //             prevWidth = prevTp.width;
+  //           }
+  //           specialDisplayText.add(previousString);
+  //           specialDisplayText.add(dateString);
+  //           if (dateWidth + prevWidth > maxTextWidth) {
+  //             // in this case, prevString + date is too wide
+  //             if (prevWidth > neededWidth!) neededWidth = prevWidth;
+  //             lastStringAndDateOnSameLine = false;
+  //             heightIfNotOnSameLine = timeTp.height;
+  //           } else {
+  //             if (prevWidth + dateWidth > neededWidth!) {
+  //               neededWidth = prevWidth + dateWidth;
+  //             }
+  //             lastStringAndDateOnSameLine = true;
+  //           }
+  //         } else if (word == "\n") {
+  //           specialDisplayText.add(previousString);
+  //           final specialTp = TextPainter(
+  //             text: TextSpan(text: previousString, style: textStyle),
+  //             textDirection: TextDirection.ltr,
+  //           )..layout();
+  //           if (specialTp.width > neededWidth!) {
+  //             neededWidth = specialTp.width;
+  //           }
+  //           previousString = "";
+  //         } else if (word.isNotEmpty) {
+  //           final wordTp = TextPainter(
+  //             text: TextSpan(text: word, style: textStyle),
+  //             textDirection: TextDirection.ltr,
+  //           )..layout();
+  //           var wordLen = wordTp.width;
+  //           var words = [word];
+  //           while (wordLen > maxTextWidth) {
+  //             final splitLen = (words.first.length / 2).ceil();
+  //             words = words
+  //                 .map((w) => [w.substring(0, splitLen), w.substring(splitLen)])
+  //                 .expand((element) => element)
+  //                 .toList();
+  //             wordLen = words
+  //                 .map((w) => TextPainter(
+  //                     text: TextSpan(text: w, style: textStyle),
+  //                     textDirection: TextDirection.ltr)
+  //                   ..layout())
+  //                 .map((e) => e.width)
+  //                 .reduce(max);
+  //           }
+  //           if (words.length > 1) {
+  //             // we have a word split
+  //             if (previousString.isNotEmpty) {
+  //               specialDisplayText.add(previousString);
+  //             }
+  //             for (final word in words) {
+  //               specialDisplayText.add(word);
+  //             }
+  //             oneTextLineHeight = wordTp.height;
+  //             if (wordLen > neededWidth!) neededWidth = wordLen;
+  //             previousString = "";
+  //           } else {
+  //             final currentString =
+  //                 previousString.isEmpty ? word : "$previousString $word";
+  //
+  //             final previousTp = TextPainter(
+  //               text: TextSpan(text: previousString, style: textStyle),
+  //               textDirection: TextDirection.ltr,
+  //             )..layout();
+  //
+  //             final currentTp = TextPainter(
+  //               text: TextSpan(text: currentString, style: textStyle),
+  //               textDirection: TextDirection.ltr,
+  //             )..layout();
+  //
+  //             oneTextLineHeight = currentTp.height;
+  //
+  //             // if the current text is larger than the available width
+  //             if (currentTp.width >= maxTextWidth) {
+  //               // we add the previousString to the list of display text
+  //               specialDisplayText.add(previousString);
+  //               // if the previous layout is bigger than our current biggest width,
+  //               // it because the new biggest width
+  //               if (previousTp.width > neededWidth!) {
+  //                 neededWidth = previousTp.width;
+  //               }
+  //               // now we set the previous string as the word
+  //               previousString = word;
+  //             } else {
+  //               // if the current text is not larger than available width
+  //               // we simply update it
+  //               previousString = currentString;
+  //             }
+  //           }
+  //         }
+  //       }
+  //
+  //       return [specialDisplayText, neededWidth];
+  //     }
+  //
+  //     final bool senderIsSelf = down4Message.senderID == widget.self.id;
+  //     final List<ReplyData>? repliesData = down4Message.replies
+  //         ?.map((msgID) {
+  //           final replyMsg =
+  //               _cachedDown4Message[msgID] ??= msgID.getLocalMessage();
+  //           final replyUser = widget.senders[replyMsg?.senderID];
+  //           if (replyMsg == null || replyUser == null) return null;
+  //           final String replyBody = replyMsg.text?.isNotEmpty ?? false
+  //               ? replyMsg.text!
+  //               : "&attachment";
+  //           return ReplyData(
+  //             senderID: replyMsg.senderID,
+  //             senderName: replyUser.node.name,
+  //             messageRefID: replyMsg.id,
+  //             thumbnail: replyUser.nodeImage,
+  //             body: replyBody,
+  //             type: replyUser.node.colorCode,
+  //           );
+  //         })
+  //         .whereType<ReplyData>()
+  //         .toList(growable: false);
+  //
+  //     double minWidth = 0;
+  //     final bool hasReplies = (repliesData?.length ?? 0) > 0;
+  //     final bool hasHeader = !senderIsSelf &&
+  //         theNode is GroupNode &&
+  //         nextMessage?.senderID != down4Message.senderID;
+  //
+  //     double minReplyDisplayLen(List<ReplyData> rds) {
+  //       var lens = <double>[];
+  //       for (final r in rds) {
+  //         final firstWordInReply = r.body.split(" ").first;
+  //         final tp = TextPainter(
+  //           text: TextSpan(
+  //               text: "${r.senderID}: $firstWordInReply",
+  //               style: const TextStyle(fontSize: 12, fontFamily: "Alice")),
+  //           textDirection: TextDirection.ltr,
+  //         )..layout();
+  //         lens.add(tp.width);
+  //       }
+  //       return lens.fold<double>(double.maxFinite, (p, e) => min(p, e));
+  //     }
+  //
+  //     String? headerText;
+  //     if (hasReplies) {
+  //       final minRepLen = minReplyDisplayLen(repliesData!);
+  //       print("""
+  //       =====================================
+  //       MIN REP LEN OF REP = $minRepLen
+  //       MAX LEN = $maxWidth
+  //       REP FIRST = ${repliesData.first.body}
+  //       """);
+  //       minWidth = minRepLen > maxWidth ? maxWidth / golden : minRepLen;
+  //     }
+  //     if (hasHeader) {
+  //       headerText = "-${down4Message.senderID}";
+  //       final tp = TextPainter(
+  //         text: TextSpan(
+  //             text: "-${down4Message.senderID}   ",
+  //             style: const TextStyle(fontFamily: "Alice", fontSize: 13)),
+  //         textDirection: TextDirection.ltr,
+  //       )..layout();
+  //       if (minWidth < tp.width && tp.width < maxWidth / golden) {
+  //         print("AAAAA");
+  //         minWidth = tp.width;
+  //       }
+  //     }
+  //
+  //     final textData = textAsStringList();
+  //     final lineStrings = textData?[0] as List<String>?;
+  //     final textWidth = textData?[1] as double?;
+  //     final headerSize = hasHeader ? ChatMessage.headerHeight : 0;
+  //     final repliesHeight =
+  //         (repliesData?.length ?? 0) * ChatMessage.headerHeight;
+  //     final hasText = lineStrings != null;
+  //     final nLines = hasText ? lineStrings.length - 1 : 0;
+  //     var messageHeight =
+  //         mediaHeight + messageBorder + headerSize + repliesHeight;
+  //
+  //     messageHeight += hasText
+  //         ? (nLines * oneTextLineHeight) + textPadding + heightIfNotOnSameLine
+  //         : 0;
+  //
+  //     var messageWidth = media != null
+  //         ? maxWidth
+  //         : lineStrings != null
+  //             ? textWidth! + textPadding + messageBorder
+  //             : 0.0; // TODO, will be forwarding nodes, or messages
+  //     messageWidth = messageWidth < minWidth ? minWidth : messageWidth;
+  //
+  //     var chatMessage = ChatMessage(
+  //       key: GlobalKey(),
+  //       hasGap: hasGap,
+  //       repliesData: repliesData,
+  //       sender: widget.senders[down4Message.senderID]!,
+  //       message: down4Message,
+  //       myMessage: widget.self.id == down4Message.senderID,
+  //       lastStringOnSameLine: lastStringAndDateOnSameLine,
+  //       heightIfNotOnSameLine: heightIfNotOnSameLine,
+  //       at: "",
+  //       precalculatedSize: Size(messageWidth, messageHeight),
+  //       precalculatedMediaSize:
+  //           media != null ? Size(mediaWidth, mediaHeight) : null,
+  //       specialDisplayTexts: lineStrings,
+  //       // if is update, means it's a single new message with a header
+  //       headerText: headerText,
+  //       media: media,
+  //       select: (id, _) => setState(() {
+  //         _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
+  //       }),
+  //     );
+  //
+  //     if (isUpdate) {
+  //       if (_cachedMessages.isNotEmpty) {
+  //         // last message receive is the first in the list
+  //         final lastMessage = _cachedMessages.values.first;
+  //         if (lastMessage.message.senderID == down4Message.senderID) {
+  //           // we need to remove its header
+  //           // and update it's size
+  //           final lastMessageSize = lastMessage.precalculatedSize;
+  //           final newSize = Size(
+  //               lastMessageSize.width, lastMessageSize.height - headerSize);
+  //           _cachedMessages[lastMessage.message.id] =
+  //               lastMessage.withHeader(header: "", newSize: newSize);
+  //         }
+  //       }
+  //       _cachedMessages = {down4Message.id: chatMessage, ..._cachedMessages};
+  //       setState(() {});
+  //     } else {
+  //       _cachedMessages[down4Message.id] = chatMessage;
+  //       setState(() {
+  //         print("CACHED MESSAGE LEN = ${_cachedMessages.length}");
+  //         print("TOTAL MESSAGE LEN  = ${widget.node.messages.length}");
+  //       });
+  //     }
+  //   }
+  // }
 
   Future<void> handleImport({required bool importImages}) async {
     if (importImages) {
@@ -639,7 +990,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void send2({MessageMedia? mediaInput}) {
-    if (tec.value.text == "" && mediaInput == null && _cameraInput == null) {
+    if (_tec.value.text == "" && mediaInput == null && _cameraInput == null) {
       return;
     }
     final ts = u.timeStamp();
@@ -651,7 +1002,7 @@ class _ChatPageState extends State<ChatPage> {
       timestamp: ts,
       senderID: widget.self.id,
       mediaID: mediaInput?.id ?? _cameraInput?.id,
-      text: tec.value.text,
+      text: _tec.value.text,
       replies: _cachedMessages.values
           .where((msg) => msg.selected)
           .map((msg) => msg.message.id)
@@ -667,7 +1018,7 @@ class _ChatPageState extends State<ChatPage> {
     );
 
     widget.send(req);
-    tec.clear();
+    _tec.clear();
     _cameraInput = null;
   }
 
@@ -676,10 +1027,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> loadSquaredCameraPreview({
+    required int cam,
     required String cachedPath,
     required bool isVideo,
-    required bool isReversed,
-    required double aspectRatio,
+    required CameraController ctrl,
   }) async {
     VideoPlayerController? vpc;
     if (isVideo) {
@@ -688,7 +1039,8 @@ class _ChatPageState extends State<ChatPage> {
     }
     _console = Console(
       inputs: [consoleInput],
-      toMirror: isReversed,
+      toMirror: cam == 1,
+      aspectRatio: ctrl.value.aspectRatio,
       videoPlayerController: vpc,
       imagePreviewPath: cachedPath,
       topButtons: [
@@ -699,12 +1051,12 @@ class _ChatPageState extends State<ChatPage> {
                 path: cachedPath,
                 id: u.randomMediaID(),
                 metadata: MediaMetadata(
-                  isReversed: isReversed,
+                  isReversed: ctrl.cameraId == 1,
                   isVideo: isVideo,
                   isSquared: true,
                   canSkipCheck: true,
                   owner: widget.self.id,
-                  elementAspectRatio: aspectRatio,
+                  elementAspectRatio: ctrl.value.aspectRatio,
                   timestamp: u.timeStamp(),
                 ),
               );
@@ -716,11 +1068,12 @@ class _ChatPageState extends State<ChatPage> {
             name: "Back",
             onPress: () {
               _cameraInput = null;
-              loadSquaredCameraConsole();
+              loadSquaredCameraConsole(cam: cam, ctrl: ctrl);
             }),
         ConsoleButton(
             name: "Cancel",
-            onPress: () {
+            onPress: () async {
+              await ctrl.dispose();
               _cameraInput = null;
               loadBaseConsole();
             }),
@@ -730,51 +1083,81 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  Future<void> loadSquaredCameraConsole([
-    int cam = 0,
+  Future<void> loadSquaredCameraConsole({
+    required int cam,
+    CameraController? ctrl,
     FlashMode fm = FlashMode.off,
     bool reloadCtrl = false,
-  ]) async {
-    if (ctrl == null || reloadCtrl) {
+  }) async {
+    Future<void> nextFlashMode() => loadSquaredCameraConsole(
+          cam: cam,
+          ctrl: ctrl,
+          fm: fm == FlashMode.off ? FlashMode.torch : FlashMode.off,
+        );
+
+    Future<void> nextCam() async {
+      await ctrl?.dispose();
+      return loadSquaredCameraConsole(cam: (cam + 1) % 2);
+    }
+
+    Future<void> initCam(int cameraID) async {
       try {
-        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
-        await ctrl?.initialize();
+        ctrl = CameraController(
+          widget.cameras[cameraID],
+          ResolutionPreset.medium,
+        );
+        await ctrl!.initialize();
       } catch (error) {
+        print("Error initializing cam in chat_page: $e");
         loadBaseConsole();
       }
     }
-    ctrl?.setFlashMode(fm);
+
+    if (ctrl == null) await initCam(cam);
+    print("""
+    ============================
+    ${ctrl!.cameraId} is the camera id
+    ${ctrl!.description.sensorOrientation} is the sensor Orientation
+    $cam is the camera number
+    ============================
+    """);
+    ctrl!.setFlashMode(fm);
+
     _console = Console(
       inputs: [consoleInput],
       cameraController: ctrl,
-      aspectRatio: ctrl?.value.aspectRatio,
+      aspectRatio: ctrl!.value.aspectRatio,
       topButtons: [
-        ConsoleButton(name: "Squared", isMode: true, onPress: loadFullCamera),
+        ConsoleButton(
+          name: "Squared",
+          isMode: true,
+          onPress: loadFullCamera,
+          isActivated: false,
+          greyedOut: true,
+        ),
         ConsoleButton(
           name: "Capture",
           isSpecial: true,
-          shouldBeDownButIsnt: ctrl?.value.isRecordingVideo == true,
+          shouldBeDownButIsnt: ctrl!.value.isRecordingVideo == true,
           onPress: () async {
-            var file = await ctrl?.takePicture();
-            if (file == null) loadBaseConsole();
+            var file = await ctrl!.takePicture();
             loadSquaredCameraPreview(
-              cachedPath: file!.path,
-              aspectRatio: ctrl!.value.aspectRatio,
-              isReversed: ctrl?.cameraId == 1,
+              cam: cam,
+              cachedPath: file.path,
               isVideo: false,
+              ctrl: ctrl!,
             );
           },
           onLongPress: () async {
-            await ctrl?.startVideoRecording();
-            loadSquaredCameraConsole(cam, fm);
+            await ctrl!.startVideoRecording();
+            loadSquaredCameraConsole(cam: cam, ctrl: ctrl, fm: fm);
           },
           onLongPressUp: () async {
-            var file = await ctrl?.stopVideoRecording();
-            if (file == null) loadBaseConsole();
+            var file = await ctrl!.stopVideoRecording();
             loadSquaredCameraPreview(
-              cachedPath: file!.path,
-              aspectRatio: ctrl!.value.aspectRatio,
-              isReversed: ctrl?.cameraId == 1,
+              cam: cam,
+              cachedPath: file.path,
+              ctrl: ctrl!,
               isVideo: true,
             );
           },
@@ -785,19 +1168,17 @@ class _ChatPageState extends State<ChatPage> {
             name: "Back",
             onPress: () async {
               await ctrl?.dispose();
-              ctrl = null;
               loadBaseConsole();
             }),
         ConsoleButton(
           name: cam == 0 ? "Rear" : "Front",
           isMode: true,
-          onPress: () => loadSquaredCameraConsole((cam + 1) % 2, fm, true),
+          onPress: nextCam,
         ),
         ConsoleButton(
           isMode: true,
           name: fm.name.capitalize(),
-          onPress: () => loadSquaredCameraConsole(
-              cam, fm == FlashMode.off ? FlashMode.torch : FlashMode.off),
+          onPress: nextFlashMode,
         ),
       ],
     );
@@ -821,7 +1202,7 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
           name: _cameraInput == null ? "Camera" : "@Camera",
-          onPress: loadSquaredCameraConsole,
+          onPress: () => loadSquaredCameraConsole(cam: 0),
         ),
         ConsoleButton(
           name: "Medias",
@@ -832,8 +1213,11 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void mediasConsole(
-      {bool images = true, String mode = "Send", bool extra = false}) {
+  void mediasConsole({
+    bool images = true,
+    String mode = "Send",
+    bool extra = false,
+  }) {
     void switchMode() => mode == "Send"
         ? mediasConsole(images: images, mode: "Delete", extra: true)
         : mediasConsole(images: images, mode: "Send", extra: true);
@@ -894,12 +1278,14 @@ class _ChatPageState extends State<ChatPage> {
               isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              messages: _cachedMessages.values.toList(),
+              list: messages.take(_takeLimit).toList(),
+              scrollController: _scrollController,
+              // iterables: messages.take(10),
             ),
             Down4Page(
               title: "People",
               console: _console!,
-              palettes: widget.senders.values.toList(),
+              list: widget.senders.values.toList(),
             ),
           ]
         : [
@@ -907,7 +1293,10 @@ class _ChatPageState extends State<ChatPage> {
               isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              messages: _cachedMessages.values.toList(),
+              list: messages.take(_takeLimit).toList(),
+              scrollController: _scrollController,
+              // iterables: messages.take(10),
+              // messages: _cachedMessages.values.toList(),
             ),
           ];
 

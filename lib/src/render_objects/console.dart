@@ -565,20 +565,12 @@ class Console extends StatelessWidget {
   Widget consoleCamera() {
     var scale = aspectRatio! * 1.0;
     scale = scale > 1 ? scale : 1 / scale;
-
     return Down4Display(
       displayType: DisplayType.camera,
       isReversed: false,
       renderRect: cameraSize,
       captureAspectRatio: aspectRatio!,
       child: CameraPreview(cameraController!),
-    );
-
-    return Center(
-      child: Transform.scale(
-        scale: scale,
-        child: CameraPreview(cameraController!),
-      ),
     );
   }
   //
@@ -599,9 +591,9 @@ class Console extends StatelessWidget {
   //   ),
   // );
 
-  Widget consoleImagePreview({bool? toMirror = false}) => Down4Display(
+  Widget consoleImagePreview() => Down4Display(
         displayType: DisplayType.image,
-        isReversed: toMirror == true,
+        isReversed: toMirror!,// toMirror!,
         renderRect: cameraSize,
         captureAspectRatio: aspectRatio!,
         child: Image.file(io.File(imagePreviewPath!)),
@@ -614,9 +606,9 @@ class Console extends StatelessWidget {
   //   fit: BoxFit.cover,
   // ));
 
-  Widget consoleVideoPreview({bool? toMirror = false}) => Down4Display(
+  Widget consoleVideoPreview() => Down4Display(
         displayType: DisplayType.video,
-        isReversed: toMirror == true,
+        isReversed: toMirror!, //toMirror!,
         renderRect: cameraSize,
         captureAspectRatio: aspectRatio!,
         child: VideoPlayer(videoPlayerController!),
@@ -722,9 +714,9 @@ class Console extends StatelessWidget {
               child: images == true
                   ? consoleMedias()
                   : imagePreviewPath != null
-                      ? consoleImagePreview(toMirror: toMirror)
+                      ? consoleImagePreview()
                       : videoPlayerController != null
-                          ? consoleVideoPreview(toMirror: toMirror)
+                          ? consoleVideoPreview()
                           : cameraController != null
                               ? consoleCamera()
                               : scanController != null

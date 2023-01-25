@@ -438,7 +438,7 @@ class _GroupPageState extends State<GroupPage> {
         scrollController: _scrollController,
         staticList: true,
         title: "Group",
-        columnWidgets: _items,
+        list: _items,
         console: _console!,
       ),
     ]);

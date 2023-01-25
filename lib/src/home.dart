@@ -410,11 +410,24 @@ class _HomeState extends State<Home> {
   Future<void> processWebRequests() async {
     Future<bool> processWebRequest(r.Request req) async {
       if (req is r.ChatRequest) {
-        // first, save the message
-        req.message.save();
         final root = req.message.root ?? req.targets.first;
         var node = nodeAt(root) as ChatableNode?;
         if (node == null) return false;
+
+        final bool sendingToSelf = node.id == widget.self.id;
+
+        // first, save the message, if we are sending it to self,
+        // it's a saved message, hence isSaved will be true
+        req.message
+          ..isSaved = sendingToSelf
+          ..save();
+
+        // if there is a media, we need to save it, and obviously add
+        // the reference of the message to it
+        req.media
+          ?..references.add(req.message.id)
+          ..save();
+
         node
           ..messages.add(req.message.id)
           ..updateActivity()
@@ -423,8 +436,8 @@ class _HomeState extends State<Home> {
         if (_page is ChatPage && _locations.last.id == root) {
           chatPage(node);
         }
-        // we don't do the request if we are sending this message to ourself
-        if (node.id != widget.self.id) {
+        // we don't do the request if we are sending this message to self
+        if (!sendingToSelf) {
           if (req.media != null) {
             await uploadOrUpdateMedia(
               req.media!,

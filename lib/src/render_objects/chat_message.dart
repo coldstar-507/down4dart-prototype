@@ -34,7 +34,7 @@ class ChatMessage extends StatelessWidget {
   final void Function(Identifier)? pressReply;
   final List<ReplyData>? repliesData;
   final MessageMedia? media;
-  final bool show, transitionFromRight, lastStringOnSameLine;
+  final bool show, transitionFromRight, lastStringOnSameLine, hasGap;
   final double heightIfNotOnSameLine;
   // final double width;
   final List<String>? specialDisplayTexts;
@@ -50,6 +50,7 @@ class ChatMessage extends StatelessWidget {
     required this.at,
     required this.heightIfNotOnSameLine,
     required this.lastStringOnSameLine,
+    required this.hasGap,
     this.headerText,
     this.precalculatedMediaSize,
     this.specialDisplayTexts,
@@ -99,6 +100,7 @@ class ChatMessage extends StatelessWidget {
       headerText: header,
       message: message,
       myMessage: myMessage,
+      hasGap: hasGap,
       specialDisplayTexts: specialDisplayTexts,
       precalculatedMediaSize: precalculatedMediaSize,
       lastStringOnSameLine: lastStringOnSameLine,
@@ -121,6 +123,7 @@ class ChatMessage extends StatelessWidget {
       headerText: headerText,
       message: message,
       myMessage: myMessage,
+      hasGap: hasGap,
       specialDisplayTexts: specialDisplayTexts,
       lastStringOnSameLine: lastStringOnSameLine,
       heightIfNotOnSameLine: heightIfNotOnSameLine,
@@ -144,6 +147,7 @@ class ChatMessage extends StatelessWidget {
       message: message,
       myMessage: myMessage,
       select: select,
+      hasGap: hasGap,
       lastStringOnSameLine: lastStringOnSameLine,
       heightIfNotOnSameLine: heightIfNotOnSameLine,
       precalculatedMediaSize: precalculatedMediaSize,
@@ -176,6 +180,7 @@ class ChatMessage extends StatelessWidget {
                 ),
               ),
               Expanded(
+                flex: 1,
                 child: Container(
                   // color: PinkTheme.nodeColors[replyData.type],
                   padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -188,6 +193,7 @@ class ChatMessage extends StatelessWidget {
                 ),
               ),
               Expanded(
+                flex: 2,
                 child: Text(
                   replyData.body,
                   style: const TextStyle(fontSize: 11, color: Colors.black54),
@@ -405,10 +411,10 @@ class ChatMessage extends StatelessWidget {
 
   Widget get chatMessage => Align(
         alignment: isPost
-            ? Alignment.center
+            ? Alignment.bottomCenter
             : myMessage
-                ? Alignment.centerRight
-                : Alignment.centerLeft,
+                ? Alignment.bottomRight
+                : Alignment.bottomLeft,
         child: Container(
             margin: const EdgeInsets.only(left: 22.0, right: 22.0),
             height: precalculatedSize.height,
@@ -455,7 +461,11 @@ class ChatMessage extends StatelessWidget {
       duration: const Duration(milliseconds: 600),
       opacity: show ? 1 : 0,
       curve: Curves.easeInOut,
-      child: Column(children: [chatMessage, const SizedBox(height: 4)]),
+      child: Column(children: [
+        hasGap ? const SizedBox(height: 20) : const SizedBox.shrink(),
+        chatMessage,
+        const SizedBox(height: 4),
+      ]),
     );
   }
 }

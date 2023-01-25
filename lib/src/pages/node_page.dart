@@ -51,7 +51,7 @@ class _NodePageState extends State<NodePage> {
           reversedList: false,
           title: node.name,
           console: userPaletteConsole,
-          topDownColumnWidgets: [
+          list: [
             ProfileWidget(palette: widget.palette),
             ...?widget.palettes
           ],

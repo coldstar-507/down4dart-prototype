@@ -243,7 +243,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
       Down4Page(
         title: "Initialization",
         console: _console!,
-        columnWidgets: columnWidgets,
+        list: columnWidgets,
       )
     ]);
   }

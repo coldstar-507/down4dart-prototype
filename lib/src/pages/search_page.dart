@@ -152,7 +152,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         title: "Search",
         console: _console!,
         stackWidgets: [qr],
-        palettes: widget.palettes,
+        list: widget.palettes,
       )
     ]);
   }

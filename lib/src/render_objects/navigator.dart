@@ -8,77 +8,82 @@ import 'palette.dart';
 import 'chat_message.dart';
 import 'console.dart';
 
-class PageBody extends StatelessWidget {
-  final List<Widget>? stackWidgets;
-  final List<Palette>? palettes;
-  final List<ChatMessage>? messages;
-  // final MessageList4? messageList;
-  final List<Widget>? columnWidgets;
-  final List<Widget>? topDownColumnWidget;
-  final FutureNodesList? futureNodes;
-
-  const PageBody({
-    this.columnWidgets,
-    this.palettes,
-    this.stackWidgets,
-    // this.messageList,
-    this.messages,
-    this.topDownColumnWidget,
-    this.futureNodes,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ...(stackWidgets ?? []),
-        futureNodes ??
-            ((palettes != null || messages != null || columnWidgets != null)
-                ? DynamicList(list: palettes ?? messages ?? columnWidgets!)
-                : topDownColumnWidget != null
-                    ? DynamicList(list: topDownColumnWidget!, reversed: false)
-                    : const SizedBox.shrink()),
-      ],
-    );
-  }
-}
+// class PageBody extends StatelessWidget {
+//   final List<Widget>? stackWidgets;
+//   final Iterable<Widget>? itereables;
+//   // final List<Palette>? palettes;
+//   // final List<ChatMessage>? messages;
+//   // final MessageList4? messageList;
+//   // final List<Widget>? columnWidgets;
+//   // final List<Widget>? topDownColumnWidget;
+//   // final FutureNodesList? futureNodes;
+//
+//   const PageBody({
+//     // this.columnWidgets,
+//     // this.palettes,
+//     this.stackWidgets,
+//     // this.messageList,
+//     // this.messages,
+//     // this.topDownColumnWidget,
+//     // this.futureNodes,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Stack(
+//       children: [
+//         ...(stackWidgets ?? []),
+//         futureNodes ??
+//             ((palettes != null || messages != null || columnWidgets != null)
+//                 ? DynamicList(list: palettes ?? messages ?? columnWidgets!)
+//                 : topDownColumnWidget != null
+//                     ? DynamicList(list: topDownColumnWidget!, reversed: false)
+//                     : const SizedBox.shrink()),
+//       ],
+//     );
+//   }
+// }
 
 class Down4Page {
   final ScrollController? scrollController;
   final String title;
+  final List<Widget>? _list;
   final List<Widget>? stackWidgets;
-  final List<Palette>? palettes;
-  final FutureNodesList? futureNodes;
-  final List<ChatMessage>? messages;
+  // final List<Palette>? palettes;
+  // final FutureNodesList? futureNodes;
+  // final List<ChatMessage>? messages;
   // final MessageList4? messageList;
-  final List<Widget>? columnWidgets;
-  final List<Widget>? topDownColumnWidgets;
+  // final List<Widget>? columnWidgets;
+  // final List<Widget>? topDownColumnWidgets;
   final Console? console;
   final bool isChatPage, centerStackItems, reversedList, staticList;
   Down4Page({
     required this.title,
     this.scrollController,
     this.isChatPage = false,
-    this.futureNodes,
+    // this.futureNodes,
     this.stackWidgets,
-    this.palettes,
-    this.messages,
+    // this.palettes,
+    // this.messages,
     // this.messageList,
-    this.columnWidgets,
-    this.topDownColumnWidgets,
+    // this.columnWidgets,
+    // this.topDownColumnWidgets,
+    List<Widget>? list,
     this.console,
     this.reversedList = true,
     this.centerStackItems = false,
     this.staticList = false,
-  });
+  }) : _list = list;
 
-  List<Widget> get listItems =>
-      palettes ??
-      messages ??
-      columnWidgets ??
-      topDownColumnWidgets ??
-      <Widget>[];
+  Iterable<Widget> get list => _list ?? const [];
+
+  // List<Widget> get listItems =>
+  //     palettes ??
+  //     messages ??
+  //     columnWidgets ??
+  //     topDownColumnWidgets ??
+  //     <Widget>[];
 }
 
 // class Down4Page2 {
@@ -110,106 +115,106 @@ class Down4Page {
 //           topDownColumnWidgets!;
 // // }
 //
-class Jeff extends StatefulWidget {
-  final List<Down4Page> pages;
-  final int initialPageIndex;
-  final Function(int)? onPageChange;
-
-  const Jeff({
-    required this.pages,
-    this.onPageChange,
-    this.initialPageIndex = 0,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  _JeffState createState() => _JeffState();
-}
-
-class _JeffState extends State<Jeff> {
-  PageController? controller;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = PageController(initialPage: widget.initialPageIndex);
-  }
-
-  @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bodies = widget.pages
-        .map((e) => PageBody(
-              topDownColumnWidget: e.topDownColumnWidgets,
-              futureNodes: e.futureNodes,
-              palettes: e.palettes,
-              // messageList: e.messageList,
-              messages: e.messages,
-              stackWidgets: e.stackWidgets,
-              columnWidgets: e.columnWidgets,
-            ))
-        .toList(growable: false);
-    final titles = widget.pages.map((e) => e.title).toList(growable: false);
-
-    return Stack(
-      children: [
-        Scaffold(
-          body: Container(
-            color: PinkTheme.backGroundColor,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  decoration: const BoxDecoration(
-                    color: PinkTheme.qrColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black38,
-                        blurRadius: 3.0,
-                        spreadRadius: 3.0,
-                      ),
-                    ],
-                  ),
-                  height: 32,
-                  child: Row(
-                    textDirection: TextDirection.ltr,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: titles
-                        .map((e) => Text(" $e ",
-                            style: TextStyle(
-                              color: e == titles[widget.initialPageIndex]
-                                  ? Colors.white
-                                  : Colors.white38,
-                              fontSize: e == titles[widget.initialPageIndex]
-                                  ? 18
-                                  : 14,
-                            )))
-                        .toList(growable: false),
-                  ),
-                ),
-                Expanded(
-                  child: PageView(
-                    controller: controller,
-                    children: bodies,
-                    onPageChanged: widget.onPageChange,
-                  ),
-                ),
-                widget.pages[widget.initialPageIndex].console!,
-              ],
-            ),
-          ),
-        ),
-        ...widget.pages[widget.initialPageIndex].console!.extraTopButtons,
-        ...widget.pages[widget.initialPageIndex].console!.extraBottomButtons,
-      ],
-    );
-  }
-}
+// class Jeff extends StatefulWidget {
+//   final List<Down4Page> pages;
+//   final int initialPageIndex;
+//   final Function(int)? onPageChange;
+//
+//   const Jeff({
+//     required this.pages,
+//     this.onPageChange,
+//     this.initialPageIndex = 0,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   @override
+//   _JeffState createState() => _JeffState();
+// }
+//
+// class _JeffState extends State<Jeff> {
+//   PageController? controller;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     controller = PageController(initialPage: widget.initialPageIndex);
+//   }
+//
+//   @override
+//   void dispose() {
+//     controller?.dispose();
+//     super.dispose();
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     final bodies = widget.pages
+//         .map((e) => PageBody(
+//               topDownColumnWidget: e.topDownColumnWidgets,
+//               futureNodes: e.futureNodes,
+//               palettes: e.palettes,
+//               // messageList: e.messageList,
+//               messages: e.messages,
+//               stackWidgets: e.stackWidgets,
+//               columnWidgets: e.columnWidgets,
+//             ))
+//         .toList(growable: false);
+//     final titles = widget.pages.map((e) => e.title).toList(growable: false);
+//
+//     return Stack(
+//       children: [
+//         Scaffold(
+//           body: Container(
+//             color: PinkTheme.backGroundColor,
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.stretch,
+//               children: [
+//                 Container(
+//                   decoration: const BoxDecoration(
+//                     color: PinkTheme.qrColor,
+//                     boxShadow: [
+//                       BoxShadow(
+//                         color: Colors.black38,
+//                         blurRadius: 3.0,
+//                         spreadRadius: 3.0,
+//                       ),
+//                     ],
+//                   ),
+//                   height: 32,
+//                   child: Row(
+//                     textDirection: TextDirection.ltr,
+//                     mainAxisAlignment: MainAxisAlignment.center,
+//                     children: titles
+//                         .map((e) => Text(" $e ",
+//                             style: TextStyle(
+//                               color: e == titles[widget.initialPageIndex]
+//                                   ? Colors.white
+//                                   : Colors.white38,
+//                               fontSize: e == titles[widget.initialPageIndex]
+//                                   ? 18
+//                                   : 14,
+//                             )))
+//                         .toList(growable: false),
+//                   ),
+//                 ),
+//                 Expanded(
+//                   child: PageView(
+//                     controller: controller,
+//                     onPageChanged: widget.onPageChange,
+//                     children: bodies,
+//                   ),
+//                 ),
+//                 widget.pages[widget.initialPageIndex].console!,
+//               ],
+//             ),
+//           ),
+//         ),
+//         ...widget.pages[widget.initialPageIndex].console!.extraTopButtons,
+//         ...widget.pages[widget.initialPageIndex].console!.extraBottomButtons,
+//       ],
+//     );
+//   }
+// }
 
 class Andrew extends StatefulWidget {
   final List<Down4Page> pages;
@@ -301,7 +306,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                 reversed: page.value.reversedList,
                                 scrollController: page.value.scrollController,
                                 topPadding: page.value.isChatPage ? 4 : null,
-                                list: page.value.listItems
+                                list: page.value.list
                                     .map((p) => p is Palette
                                         ? p.animated(
                                             squish: page.key == curPos,
@@ -325,7 +330,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                 reversed: page.value.reversedList,
                                 scrollController: page.value.scrollController,
                                 topPadding: page.value.isChatPage ? 4 : null,
-                                list: page.value.listItems
+                                list: page.value.list
                                     .map((p) => p is Palette
                                         ? p.animated(
                                             squish: page.key == curPos,
@@ -344,7 +349,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                                             ? false
                                                             : null)
                                             : p)
-                                    .toList(growable: false))))
+                                    .toList())))
                     .toList(growable: false),
               ),
               // ),
@@ -394,4 +399,3 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
     );
   }
 }
-

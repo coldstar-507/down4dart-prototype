@@ -395,7 +395,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         staticList: true,
         title: "Hyperchat",
         console: _console!,
-        palettes: _palettes,
+        list: _palettes,
       ),
     ]);
   }

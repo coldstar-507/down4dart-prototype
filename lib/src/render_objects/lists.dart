@@ -139,7 +139,7 @@ class PaletteList extends StatelessWidget {
 
 class DynamicList extends StatelessWidget {
   final ScrollController? scrollController;
-  final List<dynamic> list;
+  final List<Widget> list;
   final bool reversed;
   final double? topPadding;
   const DynamicList({
@@ -185,15 +185,15 @@ class StaticList extends StatelessWidget {
       behavior: NoGlow(),
       child: Align(
         alignment: Alignment.bottomCenter,
-      child: SingleChildScrollView(
-        reverse: reversed,
-        controller: scrollController,
-        padding: EdgeInsets.only(top: topPadding ?? gapSize),
-        child: Column(
-          // mainAxisAlignment: MainAxisAlignment.end,
-          children: list,
+        child: SingleChildScrollView(
+          reverse: reversed,
+          controller: scrollController,
+          padding: EdgeInsets.only(top: topPadding ?? gapSize),
+          child: Column(
+            // mainAxisAlignment: MainAxisAlignment.end,
+            children: list,
+          ),
         ),
-      ),
       ),
     );
   }
@@ -229,34 +229,34 @@ class StaticList extends StatelessWidget {
 //   }
 // }
 
-class FutureNodesList extends StatelessWidget {
-  final String at;
-  final Palette? Function(BaseNode node, String at) nodeToPalette;
-  final List<Identifier> nodeIDs;
-  const FutureNodesList({
-    required this.at,
-    required this.nodeToPalette,
-    required this.nodeIDs,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-        future: getNodesFromEverywhere(nodeIDs),
-        builder: (context, asyncSnapshot) {
-          if (asyncSnapshot.connectionState == ConnectionState.done &&
-              asyncSnapshot.hasData) {
-            final palettes = (asyncSnapshot.data as List<BaseNode>)
-                .map((e) => nodeToPalette(e, at))
-                .whereType<Palette>()
-                .toList();
-            return PaletteList(palettes: palettes);
-          }
-          return const SizedBox.shrink();
-        });
-  }
-}
+// class FutureNodesList extends StatelessWidget {
+//   final String at;
+//   final Palette? Function(BaseNode node, String at) nodeToPalette;
+//   final List<Identifier> nodeIDs;
+//   const FutureNodesList({
+//     required this.at,
+//     required this.nodeToPalette,
+//     required this.nodeIDs,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return FutureBuilder(
+//         future: getNodesFromEverywhere(nodeIDs),
+//         builder: (context, asyncSnapshot) {
+//           if (asyncSnapshot.connectionState == ConnectionState.done &&
+//               asyncSnapshot.hasData) {
+//             final palettes = (asyncSnapshot.data as List<BaseNode>)
+//                 .map((e) => nodeToPalette(e, at))
+//                 .whereType<Palette>()
+//                 .toList();
+//             return PaletteList(palettes: palettes);
+//           }
+//           return const SizedBox.shrink();
+//         });
+//   }
+// }
 
 class PaletteMakerList extends StatelessWidget {
   final List<PaletteMaker> palettes;
