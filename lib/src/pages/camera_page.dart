@@ -146,10 +146,11 @@ class _SnipCameraState extends State<SnipCamera> {
     return vpc;
   }
 
-  Widget previewsContainer(Widget child) => Center(
+  Widget previewsContainer({bool reverse = false, required Widget child}) =>
+      Center(
         child: Transform(
           alignment: Alignment.center,
-          transform: Matrix4.rotationY(toReverse ? math.pi : 0),
+          transform: Matrix4.rotationY(reverse ? math.pi : 0),
           child: Transform.scale(
             scale: scale > 1 ? scale : 1 / scale,
             child: SizedBox(
@@ -193,7 +194,9 @@ class _SnipCameraState extends State<SnipCamera> {
             widget.ctrl.setZoomLevel(_scale);
           }
         },
-        child: previewsContainer(CameraPreview(widget.ctrl)),
+        child: previewsContainer(
+          child: CameraPreview(widget.ctrl),
+        ),
       ),
       consoleBody(
         Console(
@@ -230,7 +233,7 @@ class _SnipCameraState extends State<SnipCamera> {
     bool hasInput = false,
   ]) {
     _preview = Stack(children: [
-      previewsContainer(VideoPlayer(vpc)),
+      previewsContainer(child: VideoPlayer(vpc), reverse: toReverse),
       inputBody(hasInput),
       consoleBody(
         Console(
@@ -287,7 +290,7 @@ class _SnipCameraState extends State<SnipCamera> {
     bool hasInput = false,
   ]) {
     _preview = Stack(children: [
-      previewsContainer(Image.file(File(filePath))),
+      previewsContainer(reverse: toReverse, child: Image.file(File(filePath))),
       inputBody(hasInput),
       consoleBody(Console(
         invertedColors: true,
