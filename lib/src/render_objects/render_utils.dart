@@ -117,13 +117,44 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
 
 class Down4ImageViewer extends StatelessWidget {
   final MessageMedia media;
-  const Down4ImageViewer({required this.media, Key? key}) : super(key: key);
+  final Size displaySize;
+  const Down4ImageViewer({
+    required this.media,
+    required this.displaySize,
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return media.file != null
-        ? Image.file(media.file!, fit: BoxFit.cover, gaplessPlayback: true)
-        : Image.network(media.url, fit: BoxFit.cover, gaplessPlayback: true);
+    return Transform.scale(
+      scaleY:
+          media.metadata.isSquared ? media.metadata.elementAspectRatio : 1.0,
+      child: media.file != null
+          ? Image.file(
+              media.file!,
+              cacheHeight: displaySize.height.toInt(),
+              cacheWidth: displaySize.width.toInt(),
+              fit: BoxFit.cover,
+            )
+          : Image.network(
+              media.url,
+              cacheHeight: displaySize.height.toInt(),
+              cacheWidth: displaySize.width.toInt(),
+              fit: BoxFit.cover,
+            ),
+    );
+
+    // media.file != null
+    //     ? Image.file(
+    //         media.file!,
+    //         fit: BoxFit.cover,
+    //         gaplessPlayback: true,
+    //       )
+    //     : Image.network(
+    //         media.url,
+    //         fit: BoxFit.cover,
+    //         gaplessPlayback: true,
+    //       );
   }
 }
 

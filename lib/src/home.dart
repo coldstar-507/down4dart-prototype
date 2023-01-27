@@ -32,7 +32,7 @@ import 'pages/snipview_page.dart';
 
 import 'render_objects/palette.dart';
 import 'render_objects/chat_message.dart';
-import 'render_objects/render_utils.dart';
+import 'render_objects/render_utils.dart' as ru;
 import 'render_objects/console.dart';
 
 class Home extends StatefulWidget {
@@ -90,12 +90,28 @@ class _HomeState extends State<Home> {
     connectToMessages();
     processWebRequests();
     updateExchangeRate();
+    try {
+      printRandomPrompts();
+    } catch (e) {
+      print("ERROR PRINTING RANDOM PROMPTS $e");
+    }
   }
 
   @override
   void dispose() {
     _messageListener?.cancel();
     super.dispose();
+  }
+
+  Future<void> printRandomPrompts() async {
+    final rp = await ru.randomPrompts(10);
+    rp.forEach((element) {
+      print("""
+      =========
+      $element
+      =========
+      """);
+    });
   }
 
   Future<void> loadHomePalettes() async {

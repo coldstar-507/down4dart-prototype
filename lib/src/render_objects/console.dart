@@ -277,7 +277,7 @@ class Console extends StatelessWidget {
   final CameraController? cameraController;
   final double? aspectRatio;
   final bool? toMirror, images;
-  final List<MessageMedia>? medias;
+  final Iterable<MessageMedia>? medias;
   final void Function(MessageMedia)? selectMedia;
   final String? imagePreviewPath;
   final bool animatedInputs;
@@ -522,20 +522,27 @@ class Console extends StatelessWidget {
       itemBuilder: ((context, index) {
         Widget f(int i) {
           if ((medias?.length ?? 0) > i) {
-            return medias?[i].metadata.isVideo == true
+            return medias?.elementAt(i).metadata.isVideo == true
+                // return medias?[i].metadata.isVideo == true
                 ? SizedBox(
                     height: (consoleWidth - 2) / 5,
                     width: (consoleWidth - 2) / 5,
-                    child: Down4VideoPlayer(media: medias![i]),
-                  )
+                    child: Down4VideoPlayer(media: medias!.elementAt(i))
+                    // child: Down4VideoPlayer(media: medias![i]),
+                    )
                 : GestureDetector(
-                    onTap: () => selectMedia?.call(medias![i]),
+                    onTap: () => selectMedia?.call(medias!.elementAt(i)),
+                    // onTap: () => selectMedia?.call(medias![i]),
                     child: SizedBox(
                       height: (consoleWidth - (4 * contourWidth)) / 5,
                       width: (consoleWidth - (4 * contourWidth)) / 5,
-                      child: medias![i].file != null
-                          ? Image.file(medias![i].file!, fit: BoxFit.cover)
+                      child: medias!.elementAt(i).file != null
+                          ? Image.file(medias!.elementAt(i).file!,
+                              fit: BoxFit.cover)
                           : const SizedBox.shrink(),
+                      // child: medias![i].file != null
+                      //     ? Image.file(medias![i].file!, fit: BoxFit.cover)
+                      //     : const SizedBox.shrink(),
                     ),
                   );
           } else {
@@ -593,7 +600,7 @@ class Console extends StatelessWidget {
 
   Widget consoleImagePreview() => Down4Display(
         displayType: DisplayType.image,
-        isReversed: toMirror!,// toMirror!,
+        isReversed: toMirror!, // toMirror!,
         renderRect: cameraSize,
         captureAspectRatio: aspectRatio!,
         child: Image.file(io.File(imagePreviewPath!)),

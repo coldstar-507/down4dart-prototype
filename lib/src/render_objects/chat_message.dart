@@ -277,8 +277,20 @@ class ChatMessage extends StatelessWidget {
       ]));
 
   Widget get image {
-    print("METADATA = ${media!.metadata.toJson()}");
-    print("RENDERING IMAGE ${media!.id}");
+    // return GestureDetector(
+    //     onTap: () => select?.call(message.id, at),
+    //     child: ClipRect(
+    //       clipper: MediaSizeClipper(precalculatedMediaSize!),
+    //       child: DecoratedBox(
+    //         decoration: BoxDecoration(
+    //           borderRadius: BorderRadius.vertical(
+    //               top: const Radius.circular(4),
+    //               bottom: Radius.circular(hasText ? 0 : 4)),
+    //         ),
+    //         child: Image.file(media!.file!),
+    //       ),
+    //     ));
+
     return GestureDetector(
       onTap: () => select?.call(message.id, at),
       child: Container(
@@ -290,14 +302,26 @@ class ChatMessage extends StatelessWidget {
               top: const Radius.circular(4),
               bottom: Radius.circular(hasText ? 0 : 4)),
         ),
-        child: Down4ImageViewer(media: media!),
+        child: Down4ImageViewer(
+          media: media!,
+          displaySize: precalculatedMediaSize!,
+        ),
+        // child: Transform.scale(
+        //   scaleY: media!.metadata!.isSquared
+        //       ? media!.metadata!.elementAspectRatio!
+        //       : 1.0,
+        //   child: Image.file(
+        //     media!.file!,
+        //     cacheHeight: precalculatedMediaSize!.height!.toInt(),
+        //     cacheWidth: precalculatedMediaSize!.width!.toInt(),
+        //     fit: BoxFit.cover,
+        //   ),
+        // ),
       ),
     );
   }
 
   Widget get video {
-    print("PRECALC VIDEO SIZE = $precalculatedMediaSize");
-    print("VIDEO ID = ${media!.id}");
     return Container(
       clipBehavior: Clip.hardEdge,
       height: precalculatedMediaSize!.height,
@@ -314,6 +338,23 @@ class ChatMessage extends StatelessWidget {
         child: Down4VideoPlayer(media: media!, key: GlobalKey()),
       ),
     );
+  }
+
+  Widget get text2 {
+    return GestureDetector(
+        onTap: () => select?.call(message.id, at),
+        child: Container(
+          // alignment: AlignmentDirectional.centerStart,
+          padding: const EdgeInsets.all(6.0),
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+              color: myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(media != null ? 0 : 4),
+                bottom: const Radius.circular(4),
+              )),
+          child: Text(message.text!),
+        ));
   }
 
   Widget get text {
@@ -456,7 +497,6 @@ class ChatMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print(headerText);
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 600),
       opacity: show ? 1 : 0,

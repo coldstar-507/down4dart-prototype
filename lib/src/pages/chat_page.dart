@@ -58,70 +58,97 @@ class _ChatPageState extends State<ChatPage> {
   MessageMedia? _cameraInput;
   Map<Identifier, ChatMessage> _cachedMessages = {};
   Map<Identifier, Message?> _cachedDown4Message = {};
-  static const gap = 20;
-  int _takeLimit = 30;
-  String? _idOfLastMessageRead;
 
-  void _scrollListener() {
-    if (_scrollController.offset >=
-            _scrollController.position.maxScrollExtent &&
-        !_scrollController.position.outOfRange) {
-      print("REACHED THE TOP!!!!");
-      setState(() {
-        _takeLimit += gap;
-      });
-    }
-    if (_scrollController.offset <=
-            _scrollController.position.minScrollExtent &&
-        !_scrollController.position.outOfRange) {
-      print("REACHED THE BOTTOM");
-    }
+  Future<void> _onRefresh() async {
+    messages.skip(_cachedMessages.length).take(40).toList();
+    setState(() {});
   }
 
-  late var _scrollController = ScrollController()..addListener(_scrollListener);
+  // static const gap = 20;
+  // int _takeLimit = 30;
+
+  var _messageList = <ChatMessage>[];
+  late var _msgs = widget.node.messages.toList();
+  late var _reversedKeys = _msgs.reversed.toList();
+  late var _msgLen = _msgs.length;
+  late var _ix = _msgLen - 1;
+  var lastOffsetUpdate = 0.0;
+
+  String? _idOfLastMessageRead;
+
+  // void _scrollListener() {
+  //   final offset = _scrollController.offset;
+  //   final maxExtent = _scrollController.position.maxScrollExtent;
+  //   final newLen = maxExtent - lastOffsetUpdate;
+  //   final diffOffset = offset - lastOffsetUpdate;
+  //   // final isOutOfRange = _scrollController.position.outOfRange;
+  //   final newRatio = newLen / diffOffset;
+  //   // const amplifier = 7;
+  //   const powpow = golden * golden * golden * golden * golden * golden;
+  //
+  //   if (newRatio / powpow < golden && _ix >= 0) {
+  //     print("""
+  //     =================
+  //     LOADED $_ix
+  //     """);
+  //     lastOffsetUpdate = offset;
+  //     _messageList.add(getThisOne(_ix));
+  //     _ix--;
+  //     setState(() {});
+  //   }
+  //   // if (offset <= minExtent && !isOutOfRange) {
+  //   //   print("REACHED THE BOTTOM");
+  //   // }
+  // }
+  //
+  // late var _scrollController = ScrollController()..addListener(_scrollListener);
 
   Map<Identifier, MessageMedia> _cachedImages = {};
   Map<Identifier, MessageMedia> _cachedVideos = {};
 
+  // Future<void> jeff() => Future.microtask(() => _scrollController.jumpTo(2.0));
+
   @override
   void initState() {
     super.initState();
-    asyncImageLoad();
-    messages.take(gap).toList();
-    // loadMessages();
+    messages.take(30).toList();
     loadBaseConsole();
+    // jeff();
   }
 
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    // loadMessages(isUpdate: true);
+    setState(() {
+      _msgs = widget.node.messages.toList();
+      _msgLen = _msgs.length;
+    });
     print("Did update the chat page widget!");
   }
 
-  Future<void> asyncImageLoad() async {
-    Future(() {
-      final keys = widget.self.images;
-      final nImages = keys.length;
-      final nImagesToLoad = nImages <= 25 ? nImages : 25;
-      for (int i = 0; i < nImagesToLoad; i++) {
-        final mediaID = keys.elementAt(i);
-        var media = mediaID.getLocalMessageMedia();
-        if (media != null) _cachedImages[mediaID] = media;
-        print("load media id=$mediaID");
-      }
-    }).then((value) {
-      Future(() {
-        print("loaded all images");
-        for (final image in _cachedImages.values) {
-          print("precached image id=${image.id}");
-          if (image.file != null) {
-            precacheImage(FileImage(image.file!), context);
-          }
-        }
-      }).then((value) => print("precached all images"));
-    });
-  }
+  // Future<void> asyncImageLoad() async {
+  //   Future(() {
+  //     final keys = widget.self.images;
+  //     final nImages = keys.length;
+  //     final nImagesToLoad = nImages <= 25 ? nImages : 25;
+  //     for (int i = 0; i < nImagesToLoad; i++) {
+  //       final mediaID = keys.elementAt(i);
+  //       var media = mediaID.getLocalMessageMedia();
+  //       if (media != null) _cachedImages[mediaID] = media;
+  //       print("load media id=$mediaID");
+  //     }
+  //   }).then((value) {
+  //     Future(() {
+  //       print("loaded all images");
+  //       for (final image in _cachedImages.values) {
+  //         print("precached image id=${image.id}");
+  //         if (image.file != null) {
+  //           precacheImage(FileImage(image.file!), context);
+  //         }
+  //       }
+  //     }).then((value) => print("precached all images"));
+  //   });
+  // }
 
   Iterable<MessageMedia> get savedImages => widget.self.images.map(
       (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
@@ -422,12 +449,6 @@ class _ChatPageState extends State<ChatPage> {
     String? headerText;
     if (hasReplies) {
       final minRepLen = minReplyDisplayLen(repliesData!);
-      print("""
-        =====================================
-        MIN REP LEN OF REP = $minRepLen
-        MAX LEN = $maxTextWidth
-        REP FIRST = ${repliesData.first.body}
-        """);
       minWidth =
           minRepLen > maxMessageWidth ? maxMessageWidth / golden : minRepLen;
     }
@@ -485,7 +506,6 @@ class _ChatPageState extends State<ChatPage> {
       precalculatedMediaSize:
           media != null ? Size(mediaWidth, mediaHeight) : null,
       specialDisplayTexts: lineStrings,
-      // if is update, means it's a single new message with a header
       headerText: headerText,
       media: media,
       select: (id, _) => setState(() {
@@ -494,14 +514,20 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  ChatMessage getThisOne(int i) {
+    final Identifier msgID = _msgs[i];
+    final Identifier? prevMsgID = i > 0 ? _msgs[i - 1] : null;
+    final Identifier? nextMsgID = i < _msgs.length - 1 ? _msgs[i + 1] : null;
+    final isFirst = i == _msgs.length - 1;
+    return loadMessage(msgID, prevMsgID, nextMsgID, isFirst);
+  }
+
   Iterable<ChatMessage> get messages sync* {
-    final msgs = widget.node.messages.toList(growable: false);
-    final int nMsg = msgs.length;
-    for (int i = nMsg - 1; i >= 0; i--) {
-      final Identifier msgID = msgs[i];
-      final Identifier? prevMsgID = i > 0 ? msgs[i - 1] : null;
-      final Identifier? nextMsgID = i < nMsg - 1 ? msgs[i + 1] : null;
-      final isFirst = i == nMsg - 1;
+    for (int i = _msgLen - 1; i >= 0; i--) {
+      final Identifier msgID = _msgs[i];
+      final Identifier? prevMsgID = i > 0 ? _msgs[i - 1] : null;
+      final Identifier? nextMsgID = i < _msgLen - 1 ? _msgs[i + 1] : null;
+      final isFirst = i == _msgLen - 1;
       yield loadMessage(msgID, prevMsgID, nextMsgID, isFirst);
     }
   }
@@ -917,7 +943,7 @@ class _ChatPageState extends State<ChatPage> {
       );
       _cachedVideos[mediaID] = down4Media;
     }
-    mediasConsole();
+    loadMediasConsole();
   }
 
   void loadSavingConsole() {
@@ -1206,21 +1232,21 @@ class _ChatPageState extends State<ChatPage> {
         ),
         ConsoleButton(
           name: "Medias",
-          onPress: mediasConsole,
+          onPress: loadMediasConsole,
         ),
       ],
     );
     setState(() {});
   }
 
-  void mediasConsole({
+  void loadMediasConsole({
     bool images = true,
     String mode = "Send",
     bool extra = false,
   }) {
     void switchMode() => mode == "Send"
-        ? mediasConsole(images: images, mode: "Delete", extra: true)
-        : mediasConsole(images: images, mode: "Send", extra: true);
+        ? loadMediasConsole(images: images, mode: "Delete", extra: true)
+        : loadMediasConsole(images: images, mode: "Send", extra: true);
 
     void selectMedia(MessageMedia media) {
       if (mode == "Send") return send2(mediaInput: media);
@@ -1232,13 +1258,13 @@ class _ChatPageState extends State<ChatPage> {
       media
         ..isSaved = false
         ..delete();
-      mediasConsole(images: images, mode: mode, extra: extra);
+      loadMediasConsole(images: images, mode: mode, extra: extra);
     }
 
     _console = Console(
       images: true,
       inputs: [_consoleInput ?? consoleInput],
-      medias: images ? savedImages.toList() : savedVideos.toList(),
+      medias: images ? savedImages : savedVideos,
       selectMedia: selectMedia,
       topButtons: [
         ConsoleButton(
@@ -1252,10 +1278,10 @@ class _ChatPageState extends State<ChatPage> {
           isSpecial: true,
           name: "Back",
           onPress: () => extra
-              ? mediasConsole(images: images, mode: mode, extra: !extra)
+              ? loadMediasConsole(images: images, mode: mode, extra: !extra)
               : loadBaseConsole(),
           onLongPress: () =>
-              mediasConsole(images: images, mode: mode, extra: true),
+              loadMediasConsole(images: images, mode: mode, extra: true),
           extraButtons: [
             ConsoleButton(name: mode, onPress: switchMode, isMode: true),
           ],
@@ -1263,7 +1289,7 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(
           isMode: true,
           name: images ? "Images" : "Videos",
-          onPress: () => mediasConsole(images: !images),
+          onPress: () => loadMediasConsole(images: !images),
         ),
       ],
     );
@@ -1272,15 +1298,26 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    // print("Loaded ${_cachedMessages.length} messages!");
+    // print("THERE ARE $_msgLen MESSAGES!");
+
     List<Down4Page> pages = widget.node is GroupNode
         ? [
             Down4Page(
               isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              list: messages.take(_takeLimit).toList(),
-              scrollController: _scrollController,
-              // iterables: messages.take(10),
+              asMap: _cachedMessages,
+              orderedKeys: _reversedKeys,
+              iterableLen: _cachedMessages.length,
+              // refreshController: _refreshController,
+              onRefresh: _onRefresh,
+              // onLoading: _onLoading,
+              // list: _cachedMessages.values.toList(),
+              // list: _messageList,
+              // scrollController: _scrollController,
+              // iterableLen: _msgLen,
+              // iterables: messages,
             ),
             Down4Page(
               title: "People",
@@ -1293,10 +1330,11 @@ class _ChatPageState extends State<ChatPage> {
               isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              list: messages.take(_takeLimit).toList(),
-              scrollController: _scrollController,
-              // iterables: messages.take(10),
-              // messages: _cachedMessages.values.toList(),
+              list: _messageList,
+              // iterableLen: _msgLen,
+              // iterables: messages,
+              // iterableLen: _msgLen,
+              // scrollController: _scrollController,
             ),
           ];
 
