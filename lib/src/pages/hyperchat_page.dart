@@ -18,6 +18,7 @@ import '../web_requests.dart' as r;
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
+import '../render_objects/render_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget {
   final double initialOffset;
@@ -103,7 +104,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
   Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
       (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
-  void send({MessageMedia? mediaInput}) {
+  Future<void> send({MessageMedia? mediaInput}) async {
     if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
       return;
     }
@@ -122,9 +123,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
       mediaID: mediaInput?.id ?? _cameraInput?.id,
     );
 
-    final pairs = u
-        .randomPairs(10)
-        .map((e) => "${e.first} ${e.second}")
+    final pairs = (await ru.randomPrompts(10))
+        .map((pair) => "${pair.first} ${pair.second}")
         .toList(growable: false);
 
     final targets = widget.people.whereType<User>().asIds().toSet();

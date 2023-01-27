@@ -35,6 +35,10 @@ List<String> randomPrompts(int qty) {
 
   final adjectives = File(adjPath).readAsStringSync().split('\n');
   final nouns = File(nounsPath).readAsStringSync().split('\n');
+  nouns.forEach(print);
+  adjectives.forEach(print);
+
+  print(nouns);
 
   final r = math.Random();
   return List<String>.generate(qty, (_) {

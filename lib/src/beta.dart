@@ -1,7 +1,6 @@
 import 'package:english_words/english_words.dart' as w;
 import 'down4_utility.dart' show randomPairs, timeStamp, randomPrompts;
 
-
 class Jeff {
   int i;
   String asString;
@@ -9,32 +8,36 @@ class Jeff {
 }
 
 void main() async {
-  final n = 1000;
+  // final n = 1000;
+  //
+  // var it = Iterable.generate(n, (i) => Jeff(i));
+  // var l = List.generate(n, (i) => Jeff(i));
+  //
+  // var t1 = timeStamp();
+  // for (int i = 0; i < n; i++) {
+  //   var lol = l[i];
+  // }
+  // var t2 = timeStamp();
+  //
+  // var dt1 = DateTime.fromMillisecondsSinceEpoch(t1);
+  // var dt2 = DateTime.fromMillisecondsSinceEpoch(t2);
+  //
+  // print("LIST TOOK ${dt2.difference(dt1).inMicroseconds}");
+  //
+  // t1 = timeStamp();
+  // for (int i = 0; i < n; i++) {
+  //   var lol = it.elementAt(i);
+  // }
+  // t2 = timeStamp();
+  //
+  // dt1 = DateTime.fromMillisecondsSinceEpoch(t1);
+  // dt2 = DateTime.fromMillisecondsSinceEpoch(t2);
+  //
+  // print("ITERABLE TOOK ${dt2.difference(dt1).inMicroseconds}");
 
-  var it = Iterable.generate(n, (i) => Jeff(i));
-  var l = List.generate(n, (i) => Jeff(i));
-
-  var t1 = timeStamp();
-  for (int i = 0; i < n; i++) {
-    var lol = l[i];
+  for (final p in randomPrompts(1)) {
+    // print(p);
   }
-  var t2 = timeStamp();
-
-  var dt1 = DateTime.fromMillisecondsSinceEpoch(t1);
-  var dt2 = DateTime.fromMillisecondsSinceEpoch(t2);
-
-  print("LIST TOOK ${dt2.difference(dt1).inMicroseconds}");
-
-  t1 = timeStamp();
-  for (int i = 0; i < n; i++) {
-    var lol = it.elementAt(i);
-  }
-  t2 = timeStamp();
-
-  dt1 = DateTime.fromMillisecondsSinceEpoch(t1);
-  dt2 = DateTime.fromMillisecondsSinceEpoch(t2);
-
-  print("ITERABLE TOOK ${dt2.difference(dt1).inMicroseconds}");
 
   // var randomPair = randomPairs(1).first;
   // print("${randomPair.first} ${randomPair.second}");

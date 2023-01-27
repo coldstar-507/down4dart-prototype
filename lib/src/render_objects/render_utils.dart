@@ -350,7 +350,7 @@ Future<Size> decodeImageSize(Uint8List d) async {
   );
 }
 
-Future<List<String>> randomPrompts(int qty) async {
+Future<List<Pair<String, String>>> randomPrompts(int qty) async {
   const String adjPath = "lib/src/assets/texts/descriptive_adjectives.txt";
   const String nounsPath = "lib/src/assets/texts/concrete_nouns.txt";
 
@@ -358,9 +358,11 @@ Future<List<String>> randomPrompts(int qty) async {
   final nouns = (await rootBundle.loadString(nounsPath)).split('\n');
 
   final r = math.Random();
-  return List<String>.generate(qty, (_) {
+  return List<Pair<String, String>>.generate(qty, (_) {
     final i = r.nextInt(adjectives.length);
     final j = r.nextInt(nouns.length);
-    return "${adjectives[i]} ${nouns[j]}";
+    final adjective = adjectives[i];
+    final noun = nouns[j];
+    return Pair(adjective, noun);
   });
 }
