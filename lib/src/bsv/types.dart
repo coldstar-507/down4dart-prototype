@@ -62,26 +62,31 @@ class Down4Payment {
 
   List<int> get compressed => [
         safe ? 0x01 : 0x00,
-        textNote.length,
-        ...utf8.encode(textNote),
-        txs.length,
+        ...VarInt.fromInt(textNote.length).data,
+        ...utf8.encode(textNote), // this needs to be utf8 obviously
+        ...VarInt.fromInt(txs.length).data,
         ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
       ];
 
   factory Down4Payment.fromCompressed(Uint8List buf) {
     final safe = buf[0] == 0x01;
-    final textNoteLen = buf[1];
+    final textNoteLenVarInt = VarInt.fromRaw(buf.sublist(1));
+    final textNoteDataLen = textNoteLenVarInt.data.length;
+    final textNoteLen = textNoteLenVarInt.asInt;
+    final textOffset = 1 + textNoteDataLen;
+    final textOffsetEnd = textOffset + textNoteLen;
     List<int> textNoteData = [];
     String textNote = "";
     if (textNoteLen != 0) {
-      textNoteData = buf.sublist(2, 2 + textNoteLen);
+      textNoteData = buf.sublist(textOffset, textOffset + textNoteLen);
       textNote = utf8.decode(textNoteData);
     }
 
-    final nTx = buf[2 + textNoteLen];
+    final nTxVarInt = VarInt.fromRaw(buf.sublist(textOffsetEnd));
+    final nTxDataLen = nTxVarInt.data.length;
     List<Down4TX> txs = [];
-    int offset = 3 + textNoteLen;
-    for (int i = 0; i < nTx; i++) {
+    int offset = textOffsetEnd + nTxDataLen;
+    for (int i = 0; i < nTxVarInt.asInt; i++) {
       final pair = Down4TX.fromCompressed(buf.sublist(offset));
       txs.add(pair.first);
       offset = offset + pair.second;
@@ -102,6 +107,7 @@ class Down4Payment {
     while (comp.length % 4 != 0) {
       comp.add(0x00);
     }
+    // print("COMP\n${comp.sublist(300)}");
     print("COMPRESSED\n${comp.toHex()}");
 
     const maxSize = 550;
@@ -625,7 +631,7 @@ class Down4TX {
         ...nLockTime.data,
         down4Secret.length,
         ...down4Secret,
-        confirmations,
+        ...VarInt.fromInt(confirmations).data,
       ];
 
   static Pair<Down4TX, int> fromCompressed(Uint8List buf) {
@@ -651,7 +657,8 @@ class Down4TX {
     final nLockTime = FourByteInt.fromRaw(buf.sublist(offset, offset + 4));
     final down4SecretLen = buf[offset + 4];
     final down4Secret = buf.sublist(offset + 5, offset + 5 + down4SecretLen);
-    final confirmations = buf[offset + 5 + down4SecretLen];
+
+    final conf = VarInt.fromRaw(buf.sublist(offset + 5 + down4SecretLen));
 
     final finalOffset = offset + 5 + down4SecretLen + 1;
     final down4Tx = Down4TX(
@@ -662,7 +669,7 @@ class Down4TX {
       txsOut: txsOut,
       vNo: vNo,
       nLock: nLockTime,
-      confirmations: confirmations,
+      confirmations: conf.asInt,
     );
 
     return Pair(down4Tx, finalOffset);

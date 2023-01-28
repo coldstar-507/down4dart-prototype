@@ -130,7 +130,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                     .entries
                     .map((page) => AnimatedOpacity(
                         opacity: curPos == page.key ? 1 : 0,
-                        duration: const Duration(milliseconds: 600),
+                        duration: const Duration(milliseconds: 500),
                         curve: Curves.easeInOut,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 600),

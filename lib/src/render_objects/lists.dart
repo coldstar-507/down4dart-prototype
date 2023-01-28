@@ -89,7 +89,7 @@ class DynamicList extends StatelessWidget {
         controller: scrollController,
         padding: EdgeInsets.only(top: topPadding ?? gapSize),
         reverse: reversed,
-        itemBuilder: (_, i) => iterables?.elementAt(i) ?? list[i],
+        itemBuilder: (_, i) => asMap?[orderedKeys?[i]] ?? list[i],
         itemCount: iterableLen ?? iterables?.length ?? list.length,
       ),
     );

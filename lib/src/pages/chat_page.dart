@@ -58,6 +58,7 @@ class _ChatPageState extends State<ChatPage> {
   MessageMedia? _cameraInput;
   Map<Identifier, ChatMessage> _cachedMessages = {};
   Map<Identifier, Message?> _cachedDown4Message = {};
+  final _scollController = ScrollController();
 
   Future<void> _onRefresh() async {
     messages.skip(_cachedMessages.length).take(40).toList();
@@ -67,11 +68,9 @@ class _ChatPageState extends State<ChatPage> {
   // static const gap = 20;
   // int _takeLimit = 30;
 
-  var _messageList = <ChatMessage>[];
   late var _msgs = widget.node.messages.toList();
-  late var _reversedKeys = _msgs.reversed.toList();
+  late var _displayOrder = _msgs.reversed.toList();
   late var _msgLen = _msgs.length;
-  late var _ix = _msgLen - 1;
   var lastOffsetUpdate = 0.0;
 
   String? _idOfLastMessageRead;
@@ -106,14 +105,11 @@ class _ChatPageState extends State<ChatPage> {
   Map<Identifier, MessageMedia> _cachedImages = {};
   Map<Identifier, MessageMedia> _cachedVideos = {};
 
-  // Future<void> jeff() => Future.microtask(() => _scrollController.jumpTo(2.0));
-
   @override
   void initState() {
     super.initState();
     messages.take(30).toList();
     loadBaseConsole();
-    // jeff();
   }
 
   @override
@@ -121,7 +117,9 @@ class _ChatPageState extends State<ChatPage> {
     super.didUpdateWidget(cp);
     setState(() {
       _msgs = widget.node.messages.toList();
+      _displayOrder = _msgs.reversed.toList();
       _msgLen = _msgs.length;
+      messages.take(1).toList();
     });
     print("Did update the chat page widget!");
   }
@@ -534,7 +532,6 @@ class _ChatPageState extends State<ChatPage> {
 
   ConsoleInput get consoleInput => _consoleInput = ConsoleInput(
         tec: _tec,
-        inputCallBack: (t) => null,
         placeHolder: ":)",
       );
 
@@ -963,6 +960,7 @@ class _ChatPageState extends State<ChatPage> {
               }
               widget.self.save();
               unselectSelectedMessage();
+              loadBaseConsole();
             })
       ],
       bottomButtons: [
@@ -986,6 +984,7 @@ class _ChatPageState extends State<ChatPage> {
               }
               widget.self.save();
               unselectSelectedMessage();
+              loadBaseConsole();
             }),
       ],
     );
@@ -1298,9 +1297,12 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    // print("Loaded ${_cachedMessages.length} messages!");
-    // print("THERE ARE $_msgLen MESSAGES!");
-
+    // final Future<void> Function()? onRefresh = _cachedMessages.length < _msgLen
+    //     ? () async {
+    //         messages.skip(_cachedMessages.length).take(40).toList();
+    //         setState(() {});
+    //       }
+    //     : null;
     List<Down4Page> pages = widget.node is GroupNode
         ? [
             Down4Page(
@@ -1308,16 +1310,9 @@ class _ChatPageState extends State<ChatPage> {
               title: widget.node.name,
               console: _console!,
               asMap: _cachedMessages,
-              orderedKeys: _reversedKeys,
+              orderedKeys: _displayOrder,
               iterableLen: _cachedMessages.length,
-              // refreshController: _refreshController,
               onRefresh: _onRefresh,
-              // onLoading: _onLoading,
-              // list: _cachedMessages.values.toList(),
-              // list: _messageList,
-              // scrollController: _scrollController,
-              // iterableLen: _msgLen,
-              // iterables: messages,
             ),
             Down4Page(
               title: "People",
@@ -1330,11 +1325,10 @@ class _ChatPageState extends State<ChatPage> {
               isChatPage: true,
               title: widget.node.name,
               console: _console!,
-              list: _messageList,
-              // iterableLen: _msgLen,
-              // iterables: messages,
-              // iterableLen: _msgLen,
-              // scrollController: _scrollController,
+              asMap: _cachedMessages,
+              orderedKeys: _displayOrder,
+              iterableLen: _cachedMessages.length,
+              onRefresh: _onRefresh,
             ),
           ];
 
