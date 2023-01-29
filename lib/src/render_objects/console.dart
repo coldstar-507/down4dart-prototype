@@ -116,7 +116,7 @@ class ConsoleButton extends StatelessWidget {
         height: buttonHeight,
         decoration: BoxDecoration(
             shape: BoxShape.rectangle,
-            color: invertColors ? null : null, // PinkTheme.black,
+            color: invertColors ? null : PinkTheme.black, // PinkTheme.black,
             border: Border.all(
               color: Console.contourColor,
               width: Console.contourWidth,
@@ -274,29 +274,41 @@ class ConsoleInput extends StatelessWidget {
 class Console extends StatelessWidget {
   final List<ConsoleButton>? _topButtons;
   final List<ConsoleButton> _bottomButtons;
-  final CameraController? cameraController;
-  final double? aspectRatio;
-  final bool? toMirror, images;
-  final Iterable<MessageMedia>? medias;
-  final void Function(MessageMedia)? selectMedia;
-  final String? imagePreviewPath;
+  // final CameraController? _cameraController;
+  // final double? aspectRatio;
+  // final bool? toMirror, images;
+  // final Iterable<MessageMedia>? medias;
+  // final void Function(MessageMedia)? selectMedia;
+  // final String? imagePreviewPath;
   final bool animatedInputs;
   final VideoPlayerController? videoPlayerController;
   final List<ConsoleInput>? inputs, topInputs;
-  final MobileScannerController? scanController;
-  final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
+  // final MobileScannerController? scanController;
+  // final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
   final List<Palette>? forwardingPalette;
   final bool invertedColors;
+  final (Iterable<MessageMedia> medias, void Function(MessageMedia) onSelect, int nMedias)? mediasInfo;
+  final (String previewPath, bool toMirror, double aspectRatio)? previewInfo;
+  final (MobileScannerController scanner, Function(Barcode, dynamic) onScan)? scan;
+
+
 
   static GlobalKey get widgetCaptureKey => GlobalKey();
 
-  int get nImageRows => ((medias?.length ?? 0) / 5).ceil();
-  double get rowHeight => (consoleWidth / 5);
-  double get mediasHeight => nImageRows == 0
+  int get nMediaRow => mediasInfo == null ? 0  : (mediasInfo!.$2 / nMediaPerRow).floor();
+
+
+
+  // int get nImageRows => ((medias?.length ?? 0) / 5).ceil();
+
+  int get nMediaPerRow => 5;
+  int get maximumMediaRows => 3;
+  double get rowHeight => (consoleWidth / nMediaPerRow); // squared element
+  double get mediasHeight => nMediaRow == 0
       ? rowHeight
-      : nImageRows <= 3
-          ? rowHeight * nImageRows
-          : rowHeight * 3;
+      : nMediaRow <= maximumMediaRows
+          ? rowHeight * nMediaRow
+          : rowHeight * maximumMediaRows;
 
   List<Widget> get extraTopButtons {
     // final consoleHorizontalGap = Sizes.h * 0.023;
@@ -367,37 +379,6 @@ class Console extends StatelessWidget {
         return const SizedBox.shrink();
       }
     }).toList();
-
-    // final horizontalGap = Sizes.h * 0.023;
-    // final verticalGap = Sizes.h * 0.021;
-    // final nBottomButton = bottomButtons.length;
-    // final buttonWidth = (Sizes.w - (2 * horizontalGap)) / nBottomButton;
-    // List<Widget> extras = [];
-    // for (final b in bottomButtons) {
-    //   if (b.showExtra) {
-    //     final key = b.key as GlobalKey?;
-    //     final context = key!.currentContext;
-    //     final renderBox = context!.findRenderObject() as RenderBox;
-    //     final Offset position = renderBox.localToGlobal(Offset.zero);
-    //     final semantics = renderBox.semanticBounds;
-    //     final buttonWidth = semantics.width;
-    //     final buttonHeight = semantics.height;
-    //
-    //     extras.add(Positioned(
-    //       bottom: position.dy - 0.5,
-    //       left: position - 0.5,
-    //       child: Container(
-    //         width: buttonWidth + 0.5,
-    //         height: buttonHeight * bottomButtons.length + 0.5,
-    //         decoration: BoxDecoration(border: Border.all(width: 0.5)),
-    //         child: Column(children: b.extraButtons!),
-    //       ),
-    //     ));
-    //   } else {
-    //     extras.add(const SizedBox.shrink());
-    //   }
-    // }
-    // return extras;
   }
 
   double get consoleGap => Sizes.w * 0.022;
@@ -408,14 +389,16 @@ class Console extends StatelessWidget {
 
   double get consoleWidth => Sizes.w - (2.0 * consoleGap);
 
-  Size get cameraSize => Size(consoleWidth - 2, consoleWidth - 2);
+  // contour width is actually applied 2 times horizontally, (4 times)
+  // (it is also applied 2 times vertically)
+  Size get cameraSize => Size.square(consoleWidth - (4 * contourWidth));
 
   Size get cameraTrueSize => Size(
-      cameraSize.width, cameraSize.width * cameraController!.value.aspectRatio);
+      cameraSize.width, cameraSize.width * _cameraController!.value.aspectRatio);
 
   bool get bb =>
       images == true ||
-      cameraController != null ||
+      _cameraController != null ||
       imagePreviewPath != null ||
       videoPlayerController != null ||
       scanController != null;
@@ -432,14 +415,14 @@ class Console extends StatelessWidget {
     this.videoPlayerController,
     this.toMirror,
     this.aspectRatio,
-    this.cameraController,
+    CameraController? cameraController,
     this.inputs,
     this.topInputs,
     List<ConsoleButton>? topButtons,
     this.scanCallBack,
     this.scanController,
     Key? key,
-  })  : _bottomButtons = bottomButtons,
+  })  : _cameraController = cameraController, _bottomButtons = bottomButtons,
         _topButtons = topButtons,
         super(key: key);
 
@@ -517,28 +500,35 @@ class Console extends StatelessWidget {
           inputs?.map((input) => input.animated(bb)).toList(growable: false) ??
               []);
 
+  int get mediaPerRow => 5;
+
+  double get mediaCelSize => (consoleWidth - (4 * contourWidth)) / mediaPerRow;
+
   Widget consoleMedias() => ListView.builder(
-      itemCount: (medias?.length ?? 0 / 3.0).ceil(),
+      itemCount: nMediaRow,
       itemBuilder: ((context, index) {
         Widget f(int i) {
-          if ((medias?.length ?? 0) > i) {
-            return medias?.elementAt(i).metadata.isVideo == true
+          if (mediasInfo!.$2 > i) {
+            final theMedia = mediasInfo!.$0.elementAt(i);
+            return theMedia.metadata.isVideo == true
                 // return medias?[i].metadata.isVideo == true
                 ? SizedBox(
                     height: (consoleWidth - 2) / 5,
                     width: (consoleWidth - 2) / 5,
-                    child: Down4VideoPlayer(media: medias!.elementAt(i))
+                    child: Down4VideoPlayer(media: theMedia)
                     // child: Down4VideoPlayer(media: medias![i]),
                     )
                 : GestureDetector(
-                    onTap: () => selectMedia?.call(medias!.elementAt(i)),
+                    onTap: () => mediasInfo?.$1.call(theMedia),
                     // onTap: () => selectMedia?.call(medias![i]),
                     child: SizedBox(
                       height: (consoleWidth - (4 * contourWidth)) / 5,
                       width: (consoleWidth - (4 * contourWidth)) / 5,
                       child: medias!.elementAt(i).file != null
-                          ? Image.file(medias!.elementAt(i).file!,
-                              fit: BoxFit.cover)
+                          ? Down4ImageViewer(
+                              media: medias!.elementAt(i),
+                              forceSquareAnyways: true,
+                              displaySize: Size.square(mediaCelSize))
                           : const SizedBox.shrink(),
                       // child: medias![i].file != null
                       //     ? Image.file(medias![i].file!, fit: BoxFit.cover)
@@ -577,7 +567,7 @@ class Console extends StatelessWidget {
       isReversed: false,
       renderRect: cameraSize,
       captureAspectRatio: aspectRatio!,
-      child: CameraPreview(cameraController!),
+      child: CameraPreview(_cameraController!),
     );
   }
   //
@@ -724,7 +714,7 @@ class Console extends StatelessWidget {
                       ? consoleImagePreview()
                       : videoPlayerController != null
                           ? consoleVideoPreview()
-                          : cameraController != null
+                          : _cameraController != null
                               ? consoleCamera()
                               : scanController != null
                                   ? consoleScanner()

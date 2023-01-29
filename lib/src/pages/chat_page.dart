@@ -148,11 +148,19 @@ class _ChatPageState extends State<ChatPage> {
   //   });
   // }
 
-  Iterable<MessageMedia> get savedImages => widget.self.images.map(
-      (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
+  Iterable<MessageMedia> get savedImages2 => widget.self.images
+      .map((mediaID) => mediaID.getLocalMessageMedia())
+      .whereType<MessageMedia>();
 
-  Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
-      (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
+  Iterable<MessageMedia> get savedVideos2 => widget.self.videos
+      .map((mediaID) => mediaID.getLocalMessageMedia())
+      .whereType<MessageMedia>();
+
+  // Iterable<MessageMedia> get savedImages => widget.self.images.map(
+  //     (mediaID) => _cachedImages[mediaID] ??= mediaID.getLocalMessageMedia()!);
+  //
+  // Iterable<MessageMedia> get savedVideos => widget.self.videos.map(
+  //     (mediaID) => _cachedVideos[mediaID] ??= mediaID.getLocalMessageMedia()!);
 
   double get maxMessageWidth => Sizes.w * 0.76;
 
@@ -1076,7 +1084,7 @@ class _ChatPageState extends State<ChatPage> {
                 path: cachedPath,
                 id: u.randomMediaID(),
                 metadata: MediaMetadata(
-                  isReversed: ctrl.cameraId == 1,
+                  isReversed: cam == 1,
                   isVideo: isVideo,
                   isSquared: true,
                   canSkipCheck: true,
@@ -1263,7 +1271,7 @@ class _ChatPageState extends State<ChatPage> {
     _console = Console(
       images: true,
       inputs: [_consoleInput ?? consoleInput],
-      medias: images ? savedImages : savedVideos,
+      medias: images ? savedImages2 : savedVideos2,
       selectMedia: selectMedia,
       topButtons: [
         ConsoleButton(
@@ -1297,12 +1305,6 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    // final Future<void> Function()? onRefresh = _cachedMessages.length < _msgLen
-    //     ? () async {
-    //         messages.skip(_cachedMessages.length).take(40).toList();
-    //         setState(() {});
-    //       }
-    //     : null;
     List<Down4Page> pages = widget.node is GroupNode
         ? [
             Down4Page(
@@ -1315,7 +1317,7 @@ class _ChatPageState extends State<ChatPage> {
               onRefresh: _onRefresh,
             ),
             Down4Page(
-              title: "People",
+              title: "Members",
               console: _console!,
               list: widget.senders.values.toList(),
             ),
