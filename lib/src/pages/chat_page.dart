@@ -953,7 +953,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void loadSavingConsole() {
     _console = Console(
-      inputs: [_consoleInput ?? consoleInput],
+      bottomInputs: [_consoleInput ?? consoleInput],
       topButtons: [
         ConsoleButton(
             name: "To Saved Messages",
@@ -1071,7 +1071,7 @@ class _ChatPageState extends State<ChatPage> {
       await vpc.initialize();
     }
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       toMirror: cam == 1,
       aspectRatio: ctrl.value.aspectRatio,
       videoPlayerController: vpc,
@@ -1157,7 +1157,7 @@ class _ChatPageState extends State<ChatPage> {
     ctrl!.setFlashMode(fm);
 
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       cameraController: ctrl,
       aspectRatio: ctrl!.value.aspectRatio,
       topButtons: [
@@ -1220,7 +1220,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void loadBaseConsole() {
     _console = Console(
-      inputs: [_consoleInput ?? consoleInput],
+      bottomInputs: [_consoleInput ?? consoleInput],
       topButtons: [
         ConsoleButton(name: "Save", onPress: loadSavingConsole),
         ConsoleButton(
@@ -1270,7 +1270,7 @@ class _ChatPageState extends State<ChatPage> {
 
     _console = Console(
       images: true,
-      inputs: [_consoleInput ?? consoleInput],
+      bottomInputs: [_consoleInput ?? consoleInput],
       medias: images ? savedImages2 : savedVideos2,
       selectMedia: selectMedia,
       topButtons: [

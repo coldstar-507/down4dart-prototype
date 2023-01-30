@@ -237,7 +237,7 @@ class _GroupPageState extends State<GroupPage> {
 
   void loadMediaConsole({bool images = true, bool forGroupImage = false}) {
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       images: true,
       selectMedia: (media) {
         if (forGroupImage) {
@@ -272,7 +272,7 @@ class _GroupPageState extends State<GroupPage> {
 
   void loadBaseConsole() {
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(
           isMode: true,
@@ -308,7 +308,7 @@ class _GroupPageState extends State<GroupPage> {
       await vpc.initialize();
     }
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       toMirror: isReversed,
       videoPlayerController: vpc,
       imagePreviewPath: cachedPath,
@@ -366,7 +366,7 @@ class _GroupPageState extends State<GroupPage> {
     }
     _ctrl?.setFlashMode(fm);
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       cameraController: _ctrl,
       aspectRatio: _ctrl?.value.aspectRatio,
       topButtons: [

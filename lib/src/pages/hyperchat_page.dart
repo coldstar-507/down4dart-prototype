@@ -207,7 +207,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   void loadMediaConsole([bool images = true]) {
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       selectMedia: (media) => send(mediaInput: media),
       images: true,
       medias: images ? savedImages.toList() : savedVideos.toList(),
@@ -235,7 +235,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   void loadBaseConsole() {
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(name: "Ping", onPress: ping),
         ConsoleButton(name: "Send", onPress: send),
@@ -264,7 +264,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
       await vpc.initialize();
     }
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       toMirror: isReversed,
       videoPlayerController: vpc,
       imagePreviewPath: cachedPath,
@@ -322,7 +322,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
     }
     _ctrl?.setFlashMode(fm);
     _console = Console(
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       cameraController: _ctrl,
       aspectRatio: _ctrl?.value.aspectRatio,
       topButtons: [

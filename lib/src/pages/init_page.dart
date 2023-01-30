@@ -97,7 +97,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
     _console = Console(
       animatedInputs: false,
       topInputs: [_inputs[0]],
-      inputs: [_inputs[1], _inputs[2]],
+      bottomInputs: [_inputs[1], _inputs[2]],
       bottomButtons: [
         ConsoleButton(name: "Camera", onPress: camConsole),
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),

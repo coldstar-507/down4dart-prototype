@@ -396,7 +396,7 @@ class _MoneyPageState extends State<MoneyPage> {
     _console = Console(
       scanCallBack: scanning ? onScan : null,
       scanController: scanning ? scanner : null,
-      inputs: [_cachedMainViewInput!],
+      bottomInputs: [_cachedMainViewInput!],
       topButtons: [
         ConsoleButton(
           name: "Scan",
@@ -439,7 +439,7 @@ class _MoneyPageState extends State<MoneyPage> {
   void loadMainViewConsole([bool reloadInput = false, bool extra = false]) {
     loadMainViewInput(reloadInput);
     _console = Console(
-      inputs: [_cachedMainViewInput!],
+      bottomInputs: [_cachedMainViewInput!],
       topButtons: [
         ConsoleButton(name: "Bill", onPress: () => print("TODO")),
         ConsoleButton(
@@ -508,7 +508,7 @@ class _MoneyPageState extends State<MoneyPage> {
     final usdString = "${asUSD.toStringAsFixed(4)} \$";
 
     _console = Console(
-      inputs: [
+      bottomInputs: [
         ConsoleInput(placeHolder: "(Text Note)", tec: textNoteTec)
         // ConsoleInput(
         //   placeHolder: currency == "USD"
@@ -563,7 +563,7 @@ class _MoneyPageState extends State<MoneyPage> {
     }
 
     _console = Console(
-      inputs: [input],
+      bottomInputs: [input],
       topButtons: [
         ConsoleButton(name: "Import", onPress: import),
       ],

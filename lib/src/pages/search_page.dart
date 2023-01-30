@@ -116,7 +116,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     _console = Console(
       scanController: scanning ? scanner : null,
       scanCallBack: scanning ? scanCallBack : null,
-      inputs: [consoleInput],
+      bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(
           name: "Add",

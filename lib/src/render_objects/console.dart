@@ -228,46 +228,47 @@ class ConsoleInput extends StatelessWidget {
   //       ),
   //     );
 
-  Widget animatedContainer({required Widget child}) => AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      constraints: BoxConstraints(
-        minHeight: b ?? false ? 0 : ConsoleButton.buttonHeight,
-        maxHeight: b ?? false // ? 0 : buttonHeight,
-            ? 0
-            : activated
-                ? ConsoleButton.buttonHeight * 4
-                : ConsoleButton.buttonHeight,
-      ),
-      decoration: BoxDecoration(
-        color:
-            activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
-        border: Border.all(
-            color: Console.contourColor, width: Console.contourWidth),
-      ),
-      child: child);
-
-  Widget unanimatedContainer({required Widget child}) => Container(
-      constraints: BoxConstraints(
-        minHeight: b! ? 0 : ConsoleButton.buttonHeight,
-        maxHeight: activated
-            ? ConsoleButton.buttonHeight * 4
-            : ConsoleButton.buttonHeight,
-      ),
-      decoration: BoxDecoration(
-        color:
-            activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
-        border: Border.all(
-            color: Console.contourColor, width: Console.contourWidth),
-      ),
-      child: child);
+  // Widget animatedContainer({required Widget child}) => AnimatedContainer(
+  //     duration: const Duration(milliseconds: 200),
+  //     constraints: BoxConstraints(
+  //       minHeight: b ?? false ? 0 : ConsoleButton.buttonHeight,
+  //       maxHeight: b ?? false // ? 0 : buttonHeight,
+  //           ? 0
+  //           : activated
+  //               ? ConsoleButton.buttonHeight * 4
+  //               : ConsoleButton.buttonHeight,
+  //     ),
+  //     decoration: BoxDecoration(
+  //       color:
+  //           activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
+  //       border: Border.all(
+  //           color: Console.contourColor, width: Console.contourWidth),
+  //     ),
+  //     child: child);
+  //
+  // Widget unanimatedContainer({required Widget child}) => Container(
+  //     constraints: BoxConstraints(
+  //       minHeight: b! ? 0 : ConsoleButton.buttonHeight,
+  //       maxHeight: activated
+  //           ? ConsoleButton.buttonHeight * 4
+  //           : ConsoleButton.buttonHeight,
+  //     ),
+  //     decoration: BoxDecoration(
+  //       color:
+  //           activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
+  //       border: Border.all(
+  //           color: Console.contourColor, width: Console.contourWidth),
+  //     ),
+  //     child: child);
 
   @override
   Widget build(BuildContext context) {
-    print("Text field is animated: $b");
-    return Expanded(
-        child: b != null || activated
-            ? animatedContainer(child: activatedField)
-            : unanimatedContainer(child: unactivatedField));
+    return activated ? activatedField : unactivatedField;
+    // print("Text field is animated: $b");
+    // return Expanded(
+    //     child: b != null || activated
+    //         ? animatedContainer(child: activatedField)
+    //         : unanimatedContainer(child: unactivatedField));
   }
 }
 
@@ -282,22 +283,22 @@ class Console extends StatelessWidget {
   // final String? imagePreviewPath;
   final bool animatedInputs;
   final VideoPlayerController? videoPlayerController;
-  final List<ConsoleInput>? inputs, topInputs;
+  final List<ConsoleInput>? bottomInputs, topInputs;
   // final MobileScannerController? scanController;
   // final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
   final List<Palette>? forwardingPalette;
   final bool invertedColors;
-  final (Iterable<MessageMedia> medias, void Function(MessageMedia) onSelect, int nMedias)? mediasInfo;
-  final (String previewPath, bool toMirror, double aspectRatio)? previewInfo;
-  final (MobileScannerController scanner, Function(Barcode, dynamic) onScan)? scan;
+  final ({Iterable<MessageMedia> medias, void Function(MessageMedia) onSelect, int nMedias})? mediasInfo;
+  final MessageMedia? mediaForPreview;
+  final CameraController? cameraController;
+  final MobileScanner? scanner;
+  // final (MobileScannerController scanner, Function(Barcode, dynamic) onScan)? scan;
 
 
 
   static GlobalKey get widgetCaptureKey => GlobalKey();
 
-  int get nMediaRow => mediasInfo == null ? 0  : (mediasInfo!.$2 / nMediaPerRow).floor();
-
-
+  int get nMediaRow => mediasInfo == null ? 0  : (mediasInfo!.nMedias / nMediaPerRow).floor();
 
   // int get nImageRows => ((medias?.length ?? 0) / 5).ceil();
 
@@ -380,49 +381,56 @@ class Console extends StatelessWidget {
       }
     }).toList();
   }
-
+  
   double get consoleGap => Sizes.w * 0.022;
-
   static double get contourWidth => 0.6;
-
   static Color get contourColor => PinkTheme.black;
-
   double get consoleWidth => Sizes.w - (2.0 * consoleGap);
+  double get trueWidth => consoleWidth - (4 * contourWidth);
 
   // contour width is actually applied 2 times horizontally, (4 times)
   // (it is also applied 2 times vertically)
-  Size get cameraSize => Size.square(consoleWidth - (4 * contourWidth));
+  // Size get bbSize => Size.square(consoleWidth - (4 * contourWidth));
 
-  Size get cameraTrueSize => Size(
-      cameraSize.width, cameraSize.width * _cameraController!.value.aspectRatio);
+  // Size get cameraTrueSize => Size(
+  //     bbSize.width, bbSize.width * );
 
-  bool get bb =>
-      images == true ||
-      _cameraController != null ||
-      imagePreviewPath != null ||
-      videoPlayerController != null ||
-      scanController != null;
+  // bool get bb =>
+  //     images == true ||
+  //     _cameraController != null ||
+  //     imagePreviewPath != null ||
+  //     videoPlayerController != null ||
+  //     scanController != null;
+  
+  Duration get animationDuration => const Duration(milliseconds: 600);
+  
+  bool get hasBB => mediasInfo != null || mediaForPreview != null || scanner != null;
 
   const Console({
     required List<ConsoleButton> bottomButtons,
     this.invertedColors = false,
     this.forwardingPalette,
-    this.selectMedia,
-    this.images,
+    this.cameraController,
+    this.mediaForPreview,
+    this.mediasInfo,
+    this.scanner,
+    // this.selectMedia,
+    // this.images,
     this.animatedInputs = true,
-    this.medias,
-    this.imagePreviewPath,
+    // this.medias,
+    // this.imagePreviewPath,
     this.videoPlayerController,
-    this.toMirror,
-    this.aspectRatio,
-    CameraController? cameraController,
-    this.inputs,
+    // this.toMirror,
+    // this.aspectRatio,
+    // CameraController? cameraController,
+    this.bottomInputs,
     this.topInputs,
     List<ConsoleButton>? topButtons,
-    this.scanCallBack,
-    this.scanController,
+    // this.scanCallBack,
+    // this.scanController,
     Key? key,
-  })  : _cameraController = cameraController, _bottomButtons = bottomButtons,
+  })  : // _cameraController = cameraController,
+        _bottomButtons = bottomButtons,
         _topButtons = topButtons,
         super(key: key);
 
@@ -449,107 +457,116 @@ class Console extends StatelessWidget {
         ),
         decoration: BoxDecoration(
             border: Border.all(
-                width: 0.5,
+                width: contourWidth,
                 color: invertedColors ? PinkTheme.buttonColor : Colors.black)),
         child: Column(children: children),
       );
 
-  Widget forwardingPalettes() => SizedBox(
-        height: ConsoleButton.buttonHeight,
-        width: consoleWidth,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          textDirection: TextDirection.ltr,
-          children: forwardingPalette!
-              .map((palette) => Flexible(
-                  child: DecoratedBox(
-                      position: DecorationPosition.foreground,
-                      decoration: BoxDecoration(
-                        border: Border.all(width: 0.5),
-                      ),
-                      child: Row(
-                          textDirection: TextDirection.ltr,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                                width: ConsoleButton.buttonHeight,
-                                height: ConsoleButton.buttonHeight,
-                                child: palette.image),
-                            Expanded(
-                                child: Container(
-                                    padding: const EdgeInsets.all(2.0),
-                                    color: PinkTheme
-                                        .nodeColors[palette.node.colorCode],
-                                    child: Text(palette.node.name,
-                                        overflow: TextOverflow.clip)))
-                          ]))))
-              .toList(),
-        ),
-      );
+  Widget? forwardingPalettes() {
+    if (forwardingPalette == null) return null;
+    return SizedBox(
+      height: ConsoleButton.buttonHeight,
+      width: consoleWidth,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        textDirection: TextDirection.ltr,
+        children: forwardingPalette!
+            .map((palette) =>
+            Flexible(
+                child: DecoratedBox(
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 0.5),
+                    ),
+                    child: Row(
+                        textDirection: TextDirection.ltr,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                              width: ConsoleButton.buttonHeight,
+                              height: ConsoleButton.buttonHeight,
+                              child: palette.image),
+                          Expanded(
+                              child: Container(
+                                  padding: const EdgeInsets.all(2.0),
+                                  color: PinkTheme
+                                      .nodeColors[palette.node.colorCode],
+                                  child: Text(palette.node.name,
+                                      overflow: TextOverflow.clip)))
+                        ]))))
+            .toList(),
+      ),
+    );
+  }
 
   Widget topConsoleInputs() => Row(
       textDirection: TextDirection.ltr,
       children: topInputs
-              ?.map((input) => input.animated(bb))
+              ?.map((input) => input.animated(hasBB))
               .toList(growable: false) ??
           []);
 
   Widget bottomConsoleInputs() => Row(
       textDirection: TextDirection.ltr,
       children:
-          inputs?.map((input) => input.animated(bb)).toList(growable: false) ??
+          bottomInputs?.map((input) => input.animated(hasBB)).toList(growable: false) ??
               []);
 
   int get mediaPerRow => 5;
 
-  double get mediaCelSize => (consoleWidth - (4 * contourWidth)) / mediaPerRow;
+  double get mediaCelSize => trueWidth / mediaPerRow;
 
-  Widget consoleMedias() => ListView.builder(
-      itemCount: nMediaRow,
-      itemBuilder: ((context, index) {
-        Widget f(int i) {
-          if (mediasInfo!.$2 > i) {
-            final theMedia = mediasInfo!.$0.elementAt(i);
-            return theMedia.metadata.isVideo == true
-                // return medias?[i].metadata.isVideo == true
-                ? SizedBox(
-                    height: (consoleWidth - 2) / 5,
-                    width: (consoleWidth - 2) / 5,
-                    child: Down4VideoPlayer(media: theMedia)
-                    // child: Down4VideoPlayer(media: medias![i]),
-                    )
-                : GestureDetector(
-                    onTap: () => mediasInfo?.$1.call(theMedia),
-                    // onTap: () => selectMedia?.call(medias![i]),
-                    child: SizedBox(
-                      height: (consoleWidth - (4 * contourWidth)) / 5,
-                      width: (consoleWidth - (4 * contourWidth)) / 5,
-                      child: medias!.elementAt(i).file != null
-                          ? Down4ImageViewer(
-                              media: medias!.elementAt(i),
-                              forceSquareAnyways: true,
-                              displaySize: Size.square(mediaCelSize))
-                          : const SizedBox.shrink(),
-                      // child: medias![i].file != null
-                      //     ? Image.file(medias![i].file!, fit: BoxFit.cover)
-                      //     : const SizedBox.shrink(),
-                    ),
-                  );
-          } else {
-            return const SizedBox.shrink();
+  Widget? consoleMedias() {
+    final mi = mediasInfo;
+    if (mi == null) return null;
+    return ListView.builder(
+        itemCount: nMediaRow,
+        itemBuilder: ((context, index) {
+          Widget f(int i) {
+            if (i < mi.nMedias) {
+              return Down4MediaViewer(media: mi.medias.elementAt(i), displaySize: Size.square(mediaCelSize), forceSquareAnyways: true,);
+              
+              // final theMedia = mi.medias.elementAt(i);
+              // return theMedia.metadata.isVideo == true
+              // // return medias?[i].metadata.isVideo == true
+              //     ? SizedBox(
+              //     height: (consoleWidth - 2) / 5,
+              //     width: (consoleWidth - 2) / 5,
+              //     child: Down4VideoPlayer(media: theMedia)
+              //   // child: Down4VideoPlayer(media: medias![i]),
+              // )
+              //     : GestureDetector(
+              //   onTap: () => mi.onSelect.call(theMedia),
+              //   // onTap: () => selectMedia?.call(medias![i]),
+              //   child: SizedBox.fromSize(
+              //     size: Size.square(mediaCelSize),
+              //     child: theMedia.file != null
+              //         ? Down4ImageViewer(
+              //         media: theMedia,
+              //         forceSquareAnyways: true,
+              //         displaySize: Size.square(mediaCelSize))
+              //         : const SizedBox.shrink(),
+              //     // child: medias![i].file != null
+              //     //     ? Image.file(medias![i].file!, fit: BoxFit.cover)
+              //     //     : const SizedBox.shrink(),
+              //   ),
+              // );
+            } else {
+              return const SizedBox.shrink();
+            }
           }
-        }
 
-        return Row(
-          children: [
-            f((index * 5)),
-            f((index * 5) + 1),
-            f((index * 5) + 2),
-            f((index * 5) + 3),
-            f((index * 5) + 4)
-          ],
-        );
-      }));
+          return Row(
+            children: [
+              f((index * 5)),
+              f((index * 5) + 1),
+              f((index * 5) + 2),
+              f((index * 5) + 3),
+              f((index * 5) + 4)
+            ],
+          );
+        }));
+  }
 
   // Widget consoleCamera() => DisplayMediaBody(
   //       shouldScale: false,
@@ -559,16 +576,23 @@ class Console extends StatelessWidget {
   //       child: CameraPreview(cameraController!),
   //     );
 
-  Widget consoleCamera() {
-    var scale = aspectRatio! * 1.0;
-    scale = scale > 1 ? scale : 1 / scale;
-    return Down4Display(
-      displayType: DisplayType.camera,
-      isReversed: false,
-      renderRect: cameraSize,
-      captureAspectRatio: aspectRatio!,
-      child: CameraPreview(_cameraController!),
-    );
+  Widget? consoleCamera() {
+    final camCtrl = cameraController;
+    if (camCtrl == null) return null;
+    return AnimatedContainer(duration: animationDuration, height: trueWidth, width: trueWidth, child: Transform.scale(
+      scaleY: camCtrl.value.aspectRatio,
+      child: CameraPreview(camCtrl),),);
+    
+    
+    // var scale = camCtrl.value.aspectRatio * 1.0;
+    // scale = scale > 1 ? scale : 1 / scale;
+    // return Down4Display(
+    //   displayType: DisplayType.camera,
+    //   isReversed: false,
+    //   renderRect: bbSize,
+    //   captureAspectRatio: camCtrl.value.aspectRatio,
+    //   child: CameraPreview(camCtrl),
+    // );
   }
   //
   // Widget consoleCamera() =>DisplayMediaBody(
@@ -587,14 +611,21 @@ class Console extends StatelessWidget {
   //     child: CameraPreview(cameraController!),
   //   ),
   // );
+  
+  Widget? mediaPreview() {
+    final theMedia = mediaForPreview;
+    if (theMedia == null) return null;
+    return Down4MediaViewer(media: theMedia, displaySize: Size.square(trueWidth), forceSquareAnyways: true, autoPlayIfVideo: true,);
+  }
 
-  Widget consoleImagePreview() => Down4Display(
-        displayType: DisplayType.image,
-        isReversed: toMirror!, // toMirror!,
-        renderRect: cameraSize,
-        captureAspectRatio: aspectRatio!,
-        child: Image.file(io.File(imagePreviewPath!)),
-      );
+
+  // Widget consoleImagePreview() => Down4Display(
+  //       displayType: DisplayType.image,
+  //       isReversed: toMirror!, // toMirror!,
+  //       renderRect: bbSize,
+  //       captureAspectRatio: aspectRatio!,
+  //       child: Image.file(io.File(imagePreviewPath!)),
+  //     );
   // Transform(
   // alignment: Alignment.center,
   // transform: Matrix4.rotationY(toMirror == true ? math.pi : 0),
@@ -603,13 +634,13 @@ class Console extends StatelessWidget {
   //   fit: BoxFit.cover,
   // ));
 
-  Widget consoleVideoPreview() => Down4Display(
-        displayType: DisplayType.video,
-        isReversed: toMirror!, //toMirror!,
-        renderRect: cameraSize,
-        captureAspectRatio: aspectRatio!,
-        child: VideoPlayer(videoPlayerController!),
-      );
+  // Widget consoleVideoPreview() => Down4Display(
+  //       displayType: DisplayType.video,
+  //       isReversed: toMirror!, //toMirror!,
+  //       renderRect: bbSize,
+  //       captureAspectRatio: aspectRatio!,
+  //       child: VideoPlayer(videoPlayerController!),
+  //     );
   // Transform(
   //   alignment: Alignment.center,
   //   transform: Matrix4.rotationY(toMirror == true ? math.pi : 0),
@@ -623,26 +654,15 @@ class Console extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: Colors.black,
-        border: Border.all(color: Colors.black, width: 0.5),
+        border: Border.all(color: Colors.black, width: contourWidth),
       ),
-      child: child);
+      child: child,);
 
-  Widget consoleScanner() => Container(
-        width: consoleWidth - 1,
-        height: consoleWidth - 1,
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Colors.black,
-            width: 0.5,
-          ),
-          color: PinkTheme.buttonColor,
-        ),
-        child: MobileScanner(
-          controller: scanController,
-          onDetect: scanCallBack!,
-          allowDuplicates: false,
-        ),
-      );
+  Widget? consoleScanner() => AnimatedContainer(
+    duration: const Duration(milliseconds: 600),
+    height: trueWidth,
+    width: trueWidth,
+    child: scanner,);
 
   List<ConsoleButton> get bottomConsoleButtons => invertedColors
       ? _bottomButtons
@@ -675,6 +695,35 @@ class Console extends StatelessWidget {
               key, value.withKey(key: ButtonKeys.instance.topButtonKeys[key])))
           .values
           .toList(growable: false);
+  
+  Widget inputs() {
+    if (topInputs == null && bottomInputs == null) return const SizedBox.shrink();
+    return
+      AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            constraints: BoxConstraints(
+              minHeight: hasBB ? 0 : ConsoleButton.buttonHeight,
+              maxHeight: hasBB ? 0 : ConsoleButton.buttonHeight * 4 // ? 0 : buttonHeight,
+                  // ? 0
+                  // : activated
+                  //     ? ConsoleButton.buttonHeight * 4
+                  //     : ConsoleButton.buttonHeight,
+            ),
+            decoration: BoxDecoration(
+              color:
+                  activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
+              border: Border.all(
+                  color: Console.contourColor, width: Console.contourWidth),
+            ),
+            child: child);
+      
+    //   Column(
+    //   textDirection: TextDirection.ltr,
+    //   children: [
+    //     !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
+    //     !animatedInputs ? Row(children: bottomInputs ?? []) : bottomConsoleInputs(),],
+    // );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -694,33 +743,36 @@ class Console extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          forwardingPalette != null
-              ? forwardingPalettes()
-              : const SizedBox.shrink(),
-          !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
-          !animatedInputs ? Row(children: inputs ?? []) : bottomConsoleInputs(),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: consoleWidth,
-            height: images ?? false
-                ? mediasHeight
-                : bb
-                    ? consoleWidth
-                    : 0,
-            child: bbContainer(
-              child: images == true
-                  ? consoleMedias()
-                  : imagePreviewPath != null
-                      ? consoleImagePreview()
-                      : videoPlayerController != null
-                          ? consoleVideoPreview()
-                          : _cameraController != null
-                              ? consoleCamera()
-                              : scanController != null
-                                  ? consoleScanner()
-                                  : const SizedBox.shrink(),
-            ),
-          ),
+          bbContainer(child: inputs),
+          // forwardingPalette != null
+          //     ? forwardingPalettes()
+          //     : const SizedBox.shrink(),
+          // !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
+          // !animatedInputs ? Row(children: bottomInputs ?? []) : bottomConsoleInputs(),
+          // AnimatedContainer(
+          //   duration: const Duration(milliseconds: 200),
+          //   // width: consoleWidth,
+          //   // height: images ?? false
+          //   //     ? mediasHeight
+          //   //     : bb
+          //   //         ? consoleWidth
+          //   //         : 0,
+          //   child: bbContainer(
+          //     child: mediaPreview() ?? consoleScanner() ?? 
+          //    
+          //     images == true
+          //         ? consoleMedias()
+          //         : imagePreviewPath != null
+          //             ? consoleImagePreview()
+          //             : videoPlayerController != null
+          //                 ? consoleVideoPreview()
+          //                 : _cameraController != null
+          //                     ? consoleCamera()
+          //                     : scanController != null
+          //                         ? consoleScanner()
+          //                         : const SizedBox.shrink(),
+          //   ),
+          // ),
           Row(textDirection: TextDirection.ltr, children: topConsoleButtons),
           Row(textDirection: TextDirection.ltr, children: bottomConsoleButtons),
         ],

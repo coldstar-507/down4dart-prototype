@@ -67,14 +67,25 @@ class _Down4InputState extends State<Down4Input> {
 
 class Down4VideoPlayer extends StatefulWidget {
   final MessageMedia media;
-  const Down4VideoPlayer({required this.media, Key? key}) : super(key: key);
+  final Size displaySize;
+  final bool forceSquareAnyways;
+  final bool autoPlay;
+  const Down4VideoPlayer({
+    required this.media,
+    required this.autoPlay,
+    required this.displaySize,
+    this.forceSquareAnyways = false,
+    Key? key,
+  }) : super(key: key);
 
   @override
-  _Down4VideoPlayerState createState() => _Down4VideoPlayerState();
+  State<Down4VideoPlayer> createState() => _Down4VideoPlayerState();
 }
 
 class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
-  VideoPlayerController? _videoController;
+  late final VideoPlayerController _videoController = widget.media.file != null
+      ? VideoPlayerController.file(widget.media.file!)
+      : VideoPlayerController.network(widget.media.url);
 
   @override
   void initState() {
@@ -83,34 +94,37 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   }
 
   Future<void> initController() async {
-    _videoController = widget.media.file != null
-        ? VideoPlayerController.file(widget.media.file!)
-        : VideoPlayerController.network(widget.media.url);
-    await _videoController?.initialize();
+    await _videoController.initialize();
+    if (widget.autoPlay) await _videoController.play();
     setState(() {});
   }
 
-  void touch() {
-    if (_videoController?.value.isPlaying == true) {
-      _videoController?.pause();
-    } else {
-      _videoController?.play();
+  Future<void> touch() async {
+    if (!widget.autoPlay) {
+      if (_videoController.value.isPlaying == true) {
+        await _videoController.pause();
+      } else {
+        await _videoController.play();
+      }
     }
   }
 
   @override
   void dispose() {
     super.dispose();
-    _videoController?.dispose();
+    _videoController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: touch,
-      child: _videoController != null
-          ? VideoPlayer(_videoController!)
-          : const SizedBox.shrink(),
+    final isReversed = widget.media.metadata.isVideo;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.rotationY(isReversed ? math.pi : 0),
+      child: GestureDetector(
+        onTap: touch,
+        child: VideoPlayer(_videoController),
+      ),
     );
   }
 }
@@ -131,11 +145,6 @@ class Down4ImageViewer extends StatelessWidget {
     final forcedSquared = media.metadata.isSquared || forceSquareAnyways;
     final isReversed = media.metadata.isReversed;
     final aspectRatio = media.metadata.elementAspectRatio;
-    if (media.metadata.isSquared) {
-      print("""========== ASPECT RATIO ===========
-             ${media.metadata.elementAspectRatio}
-      """);
-    }
     return ClipRect(
       clipper: MediaSizeClipper(displaySize),
       child: Transform(
@@ -176,6 +185,36 @@ class Down4ImageViewer extends StatelessWidget {
     //         fit: BoxFit.cover,
     //         gaplessPlayback: true,
     //       );
+  }
+}
+
+class Down4MediaViewer extends StatelessWidget {
+  final MessageMedia media;
+  final Size displaySize;
+  final bool forceSquareAnyways;
+  final bool autoPlayIfVideo;
+  const Down4MediaViewer({
+    required this.media,
+    required this.displaySize,
+    this.forceSquareAnyways = false,
+    this.autoPlayIfVideo = false,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return media.isVideo
+        ? Down4VideoPlayer(
+            media: media,
+            displaySize: displaySize,
+            forceSquareAnyways: forceSquareAnyways,
+            autoPlay: autoPlayIfVideo,
+          )
+        : Down4ImageViewer(
+            media: media,
+            displaySize: displaySize,
+            forceSquareAnyways: forceSquareAnyways,
+          );
   }
 }
 

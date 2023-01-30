@@ -867,7 +867,7 @@ class _HomeState extends State<Home> {
       scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
       console: Console(
-        inputs: [
+        bottomInputs: [
           ConsoleInput(
             tec: _tec,
             placeHolder: ":)",
