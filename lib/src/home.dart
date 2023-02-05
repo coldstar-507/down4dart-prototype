@@ -108,7 +108,7 @@ class _HomeState extends State<Home> {
     rp.forEach((element) {
       print("""
       =========
-      $element
+      ${element.first} ${element.second}
       =========
       """);
     });
@@ -321,11 +321,11 @@ class _HomeState extends State<Home> {
               ButtonsInfo(
                 assetPath: at == "Home"
                     ? node.snips.isNotEmpty
-                        ? "lib/src/assets/redArrow.png"
+                        ? "lib/src/assets/images/redArrow.png"
                         : messagePreviewWasRead
-                            ? "lib/src/assets/50.png"
-                            : "lib/src/assets/filled.png"
-                    : "lib/src/assets/50.png",
+                            ? "lib/src/assets/images/50.png"
+                            : "lib/src/assets/images/filled.png"
+                    : "lib/src/assets/images/50.png",
                 pressFunc: at == "Home"
                     ? node.snips.isNotEmpty
                         ? checkSnips
@@ -347,8 +347,8 @@ class _HomeState extends State<Home> {
             buttonsInfo: [
               ButtonsInfo(
                 assetPath: at == "Home" && node.snips.isNotEmpty
-                    ? "lib/src/assets/redArrow.png"
-                    : "lib/src/assets/50.png",
+                    ? "lib/src/assets/images/redArrow.png"
+                    : "lib/src/assets/images/50.png",
                 pressFunc: at == "Home"
                     ? node.snips.isNotEmpty
                         ? checkSnips
@@ -372,10 +372,10 @@ class _HomeState extends State<Home> {
               rightMost: true,
               pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
               assetPath: at == "Home" && node.snips.isNotEmpty
-                  ? "lib/src/assets/redArrow.png"
+                  ? "lib/src/assets/images/redArrow.png"
                   : messagePreviewWasRead
-                      ? "lib/src/assets/50.png"
-                      : "lib/src/assets/filled.png",
+                      ? "lib/src/assets/images/50.png"
+                      : "lib/src/assets/images/filled.png",
             )
           ],
         );
@@ -393,10 +393,10 @@ class _HomeState extends State<Home> {
               rightMost: true,
               pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
               assetPath: at == "Home" && node.snips.isNotEmpty
-                  ? "lib/src/assets/redArrow.png"
+                  ? "lib/src/assets/images/redArrow.png"
                   : messagePreviewWasRead
-                      ? "lib/src/assets/50.png"
-                      : "lib/src/assets/filled.png",
+                      ? "lib/src/assets/images/50.png"
+                      : "lib/src/assets/images/filled.png",
             )
           ],
         );
@@ -410,7 +410,7 @@ class _HomeState extends State<Home> {
         messagePreview: node.payment.textNote,
         buttonsInfo: [
           ButtonsInfo(
-            assetPath: 'lib/src/assets/filled.png',
+            assetPath: 'lib/src/assets/images/filled.png',
             pressFunc: (id, at) {
               _locations.add(Location(id: "Payment"));
               paymentPage(node.payment);
@@ -537,14 +537,12 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<void> sendSnip(
-    String? path,
-    bool? isVideo,
-    bool? toReverse,
+  Future<void> sendSnip({
+    required String path,
+    required bool isReversed,
+    required double aspectRatio,
     String? text,
-    double aspectRatio,
-  ) async {
-    if (path == null) return;
+  }) async {
     final timestamp = timeStamp();
 
     print("The ASPECT RATIO = $aspectRatio");
@@ -555,9 +553,9 @@ class _HomeState extends State<Home> {
         metadata: MediaMetadata(
           isSquared: false,
           owner: widget.self.id,
+          extension: path.extension(),
           timestamp: timestamp,
-          isReversed: toReverse ?? false,
-          isVideo: isVideo ?? false,
+          isReversed: isReversed,
           text: text,
           elementAspectRatio: aspectRatio,
         ));
@@ -1072,7 +1070,8 @@ class _HomeState extends State<Home> {
       addCallback: addPalettes,
       backCallback: () {
         _paletteMap["Search"]?.clear();
-        back();
+        _locations.removeLast();
+        homePage();
       },
     );
     setState(() {});
@@ -1106,11 +1105,14 @@ class _HomeState extends State<Home> {
         maxZoom: await ctrl!.getMaxZoomLevel(),
         minZoom: await ctrl.getMinZoomLevel(),
         camNum: camera,
-        cameraBack: homePage,
         cameraCallBack: sendSnip,
         ctrl: ctrl,
         nextRes: nextRes,
         flip: nextCam,
+        cameraBack: () {
+          ctrl?.dispose();
+          homePage();
+        },
       );
       setState(() {});
     }
@@ -1225,7 +1227,7 @@ class _HomeState extends State<Home> {
     String? text = media.metadata.text;
     void Function() back;
     void Function() next;
-    if (media.metadata.isVideo) {
+    if (media.isVideo) {
       var ctrl = VideoPlayerController.file(media.file!);
       await ctrl.initialize();
       await ctrl.setLooping(true);

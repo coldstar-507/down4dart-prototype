@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:down4/src/render_objects/navigator.dart';
 
 import '../themes.dart';
 import '../boxes.dart';
+import '../render_objects/render_utils.dart' show down4Logo;
 
 class LoadingPage extends StatelessWidget {
   const LoadingPage({Key? key}) : super(key: key);
@@ -40,12 +40,6 @@ class _LoadingPage2State extends State<LoadingPage2>
     super.dispose();
   }
 
-  Image get down4Logo => Image.asset(
-        "lib/src/assets/down4_inverted.png",
-        height: 0.82 * Sizes.w,
-        width: 0.82 * Sizes.w,
-      );
-
   Widget get rotatingLogo => Center(
         child: AnimatedBuilder(
           animation: _controller,
@@ -55,7 +49,7 @@ class _LoadingPage2State extends State<LoadingPage2>
               child: child,
             );
           },
-          child: down4Logo,
+          child: down4Logo(0.82 * Sizes.w),
         ),
       );
 

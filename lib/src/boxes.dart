@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:down4/src/down4_utility.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -47,11 +48,14 @@ class ButtonKeys {
   static ButtonKeys get instance => _instance ??= ButtonKeys._();
 }
 
-String mediaPath(String mediaID) => "${b.dirPath}/$mediaID";
+String mediaPath(String mediaID, {bool temporary = false}) =>
+    "${temporary ? b.tempPath : b.docPath}/$mediaID";
 
 Future<void> deleteMediaFile(String mediaID) async {
   try {
-    File(mediaPath(mediaID)).delete();
+    await File(mediaPath(mediaID)).delete();
+  } on PathNotFoundException catch (e) {
+    print("Cannot delete, this file is external: $e");
   } catch (_) {}
 }
 
@@ -78,12 +82,10 @@ Future<MessageMedia?> downloadAndWriteMedia(
     final fullMetadata = await mediaRef.getMetadata();
     final customMetadata = fullMetadata.customMetadata as Map<String, String>;
     final mediaMetadata = MediaMetadata.fromJson(customMetadata);
-
-    final path = "${b.dirPath}/$mediaID";
-
+    final path = "${b.docPath}/$mediaID";
     final mediaData = await futureMediaData;
     if (mediaData != null) {
-      File(path).writeAsBytes(mediaData);
+      await File(path).writeAsBytes(mediaData);
     }
     return MessageMedia(id: mediaID, path: path, metadata: mediaMetadata);
   } catch (e) {
@@ -121,16 +123,15 @@ Future<bool> uploadOrUpdateMedia(
     }
   } else {
     try {
+      print("Checking if media ${media.id} is already on firebase!");
       final metadata = (await mediaRef.getMetadata());
       final down4Metadata = MediaMetadata.fromJson(metadata.customMetadata!);
       if (down4Metadata.timestamp.shouldBeUpdated) {
         final newTimeStamp = timeStamp();
         if (newTimeStamp > down4Metadata.timestamp) {
+          down4Metadata.timestamp = newTimeStamp;
           await mediaRef.updateMetadata(
-            SettableMetadata(
-              customMetadata:
-                  down4Metadata.updatedTimestamp(timeStamp()).toJson(),
-            ),
+            SettableMetadata(customMetadata: down4Metadata.toJson()),
           );
           print("Updated the metadata");
           return true;
@@ -143,12 +144,9 @@ Future<bool> uploadOrUpdateMedia(
       // If there's an exception, it should mean that there is no media, so we
       // do the full upload
       try {
-        await mediaRef.putFile(
-          media.file!,
-          SettableMetadata(
-              customMetadata:
-                  media.metadata.updatedTimestamp(timeStamp()).toJson()),
-        );
+        media.metadata.timestamp = timeStamp();
+        await mediaRef.putFile(media.file!,
+            SettableMetadata(customMetadata: media.metadata.toJson()));
         return true;
       } on FirebaseException catch (e) {
         print("Error uploading file $e");
@@ -158,21 +156,16 @@ Future<bool> uploadOrUpdateMedia(
   }
 }
 
-// void writeMedia({
-//   required Uint8List data,
-//   required String id,
-//   bool temp = false,
-// }) async {
-//   if (temp) {
-//     File("$temporaryPath/$id").writeAsBytesSync(data);
-//   } else {
-//     File("$documentPath/$id").writeAsBytesSync(data);
-//   }
-// }
+Future<File> writeMedia({
+  required Uint8List mediaData,
+  required String mediaID,
+  bool temporary = false,
+}) async =>
+    File(mediaPath(mediaID, temporary: temporary)).writeAsBytes(mediaData);
 
 extension Saver on ExchangeRate {
-  void save() {
-    b.personal.put("exchangeRate", jsonEncode(this));
+  Future<void> save() async {
+    return b.personal.put("exchangeRate", jsonEncode(this));
   }
 }
 
@@ -195,8 +188,8 @@ extension Getters on Identifier {
     return BaseNode.fromJson(jsonDecode(jsonEncoded));
   }
 
-  void deleteLocalNode() {
-    b.nodes.delete(this);
+  Future<void> deleteLocalNode() async {
+    return b.nodes.delete(this);
   }
 }
 
@@ -222,11 +215,12 @@ extension MessageSave on Message {
     if (media != null) {
       media.references.remove(id);
       if (media.references.isEmpty && !media.isSaved) {
-        b.medias.delete(media.id);
-        deleteMediaFile(media.id);
+        await b.medias.delete(media.id);
+        await deleteMediaFile(media.id);
       }
     }
-    b.messages.delete(id);
+    await b.messages.delete(id);
+    return;
   }
 }
 
@@ -252,8 +246,8 @@ extension NodeSave on BaseNode {
 }
 
 extension MediaSave on MessageMedia {
-  void save() {
-    b.medias.put(id, jsonEncode(toJson(toLocal: true)));
+  Future<void> save() async {
+    return b.medias.put(id, jsonEncode(toJson(toLocal: true)));
   }
 
   Future<void> delete() async {
@@ -278,7 +272,7 @@ extension WalletSave on Wallet {
 class Boxes {
   static Boxes? _instance;
   // List<String> fileIDs;
-  String dirPath;
+  String docPath, tempPath;
   Box
       // images,
       //     videos,
@@ -302,7 +296,8 @@ class Boxes {
   // snipImages,
   // snipVideos;
   Boxes()
-      : dirPath = main.docDirPath,
+      : docPath = main.docDirPath,
+        tempPath = main.tempDirPath,
         // imageIDs = Hive.box("ImageIDs"),
         // videoIDs = Hive.box("VideoIDs"),
         // nftIDs = Hive.box("NftIDs"),

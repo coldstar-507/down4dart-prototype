@@ -16,13 +16,12 @@ class SnipCamera extends StatefulWidget {
   final double minZoom, maxZoom;
   final int camNum;
   final void Function() cameraBack, nextRes, flip;
-  final void Function(
-    String? filePath,
-    bool? isVideo,
-    bool? toReverse,
+  final void Function({
+    required String path,
+    required bool isReversed,
+    required double aspectRatio,
     String? text,
-    double aspectRatio,
-  ) cameraCallBack;
+  }) cameraCallBack;
   final bool enableVideo;
 
   const SnipCamera({
@@ -109,9 +108,9 @@ class _SnipCameraState extends State<SnipCamera> {
       final xfile = await widget.ctrl.takePicture();
       final path = xfile.path;
       await precacheImage(FileImage(File(path)), context);
-      imagePreview(path, false, widget.camNum == 1);
+      imagePreview(path, widget.camNum == 1);
     } catch (e) {
-      widget.cameraCallBack(null, null, null, null, -1);
+      widget.cameraBack();
     }
   }
 
@@ -119,7 +118,7 @@ class _SnipCameraState extends State<SnipCamera> {
     try {
       await widget.ctrl.startVideoRecording();
     } catch (e) {
-      widget.cameraCallBack(null, null, null, null, -1);
+      widget.cameraBack();
     }
   }
 
@@ -128,9 +127,9 @@ class _SnipCameraState extends State<SnipCamera> {
       XFile? f = await widget.ctrl.stopVideoRecording();
       final path = f.path;
       final vpc = await initVPC(path);
-      videoPreview(vpc, path, true, widget.camNum == 1);
+      videoPreview(vpc, path, widget.camNum == 1);
     } catch (e) {
-      widget.cameraCallBack(null, null, null, null, -1);
+      widget.cameraBack();
     }
   }
 
@@ -141,7 +140,7 @@ class _SnipCameraState extends State<SnipCamera> {
       await vpc.setLooping(true);
       await vpc.play();
     } catch (err) {
-      widget.cameraCallBack(null, null, null, null, -1);
+      widget.cameraBack();
     }
     return vpc;
   }
@@ -227,7 +226,6 @@ class _SnipCameraState extends State<SnipCamera> {
   void videoPreview(
     VideoPlayerController vpc,
     String filePath,
-    bool isVideo,
     bool toReverse, [
     String? text,
     bool hasInput = false,
@@ -244,11 +242,10 @@ class _SnipCameraState extends State<SnipCamera> {
               onPress: () async {
                 await vpc.dispose();
                 widget.cameraCallBack(
-                  filePath,
-                  isVideo,
-                  toReverse,
-                  tec.value.text,
-                  widget.ctrl.value.aspectRatio,
+                  path: filePath,
+                  isReversed: toReverse,
+                  text: tec.value.text,
+                  aspectRatio: widget.ctrl.value.aspectRatio,
                 );
               },
             ),
@@ -257,6 +254,7 @@ class _SnipCameraState extends State<SnipCamera> {
             ConsoleButton(
               name: "Back",
               onPress: () => setState(() {
+                File(filePath).delete();
                 tec.clear();
                 vpc.dispose();
                 setState(() {
@@ -269,7 +267,6 @@ class _SnipCameraState extends State<SnipCamera> {
               onPress: () => videoPreview(
                 vpc,
                 filePath,
-                isVideo,
                 toReverse,
                 text,
                 !hasInput,
@@ -284,7 +281,6 @@ class _SnipCameraState extends State<SnipCamera> {
 
   void imagePreview(
     String filePath,
-    bool isVideo,
     bool toReverse, [
     String? text,
     bool hasInput = false,
@@ -298,11 +294,10 @@ class _SnipCameraState extends State<SnipCamera> {
           ConsoleButton(
             name: "Accept",
             onPress: () => widget.cameraCallBack(
-              filePath,
-              isVideo,
-              toReverse,
-              tec.value.text,
-              widget.ctrl.value.aspectRatio,
+              path: filePath,
+              isReversed: toReverse,
+              text: tec.value.text,
+              aspectRatio: widget.ctrl.value.aspectRatio,
             ),
           ),
         ],
@@ -311,6 +306,7 @@ class _SnipCameraState extends State<SnipCamera> {
             name: "Back",
             onPress: () => setState(() {
               tec.clear();
+              File(filePath).delete();
               setState(() {
                 _preview = null;
               });
@@ -321,7 +317,6 @@ class _SnipCameraState extends State<SnipCamera> {
             isMode: false,
             onPress: () => imagePreview(
               filePath,
-              isVideo,
               toReverse,
               text,
               !hasInput,

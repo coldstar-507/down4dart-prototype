@@ -141,26 +141,27 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                   reversed: page.value.reversedList,
                                   scrollController: page.value.scrollController,
                                   topPadding: page.value.isChatPage ? 4 : null,
-                                  list: page.value.list
-                                      .map((p) => p is Palette
-                                          ? p.animated(
-                                              squish: page.key == curPos,
-                                              alignedRight: curPos < page.key
-                                                  ? true
-                                                  : curPos > page.key
-                                                      ? false
-                                                      : null)
-                                          : p is ChatMessage
-                                              ? p.animated(
-                                                  show: page.key == curPos,
-                                                  transitionFromRight:
-                                                      curPos < page.key
-                                                          ? true
-                                                          : curPos > page.key
-                                                              ? false
-                                                              : null)
-                                              : p)
-                                      .toList(growable: false))
+                                  list: page.value.list,
+                                )
+                              // .map((p) => p is Palette
+                              //     ? p.animated(
+                              //         squish: page.key == curPos,
+                              //         alignedRight: curPos < page.key
+                              //             ? true
+                              //             : curPos > page.key
+                              //                 ? false
+                              //                 : null)
+                              //     : p is ChatMessage
+                              //         ? p.animated(
+                              //             show: page.key == curPos,
+                              //             transitionFromRight:
+                              //                 curPos < page.key
+                              //                     ? true
+                              //                     : curPos > page.key
+                              //                         ? false
+                              //                         : null)
+                              //         : p)
+                              // .toList(growable: false))
                               : DynamicList(
                                   // refreshController: page.value.refreshController,
                                   // onLoading: page.value.onLoading,

@@ -114,8 +114,9 @@ class _AddFriendPageState extends State<AddFriendPage> {
       scanner = null;
     }
     _console = Console(
-      scanController: scanning ? scanner : null,
-      scanCallBack: scanning ? scanCallBack : null,
+      scanner: !scanning
+          ? null
+          : MobileScanner(onDetect: scanCallBack, controller: scanner),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(

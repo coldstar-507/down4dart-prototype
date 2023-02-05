@@ -394,8 +394,11 @@ class _MoneyPageState extends State<MoneyPage> {
     }
     loadMainViewInput(reloadInput);
     _console = Console(
-      scanCallBack: scanning ? onScan : null,
-      scanController: scanning ? scanner : null,
+      scanner: !scanning
+          ? null
+          : MobileScanner(onDetect: onScan, controller: scanner),
+      // scanCallBack: scanning ? onScan : null,
+      // scanController: scanning ? scanner : null,
       bottomInputs: [_cachedMainViewInput!],
       topButtons: [
         ConsoleButton(

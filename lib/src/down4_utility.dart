@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:convert/convert.dart';
+import 'package:path/path.dart' as p;
 import 'bsv/utils.dart';
 import 'dart:typed_data';
 import 'data_objects.dart';
@@ -11,6 +12,24 @@ import 'dart:math' as math;
 import 'package:english_words/english_words.dart' as w;
 
 const golden = 1.618;
+
+const videoExtensions = [".mp4", ".3gp", ".webm", ".mkv", ".m4a", ".mov"];
+
+const imageExtensions = [
+  ".jpeg",
+  ".jpg",
+  ".png",
+  ".gif",
+  ".bmp",
+  ".webp",
+  ".apng"
+];
+
+const animatedImageExtensions = [".apng", ".gif"];
+
+extension TrimmedExtensions on List<String> {
+  List<String> withoutDots() => map((e) => e.substring(1)).toList();
+}
 
 final listEqual = const ListEquality().equals;
 
@@ -92,8 +111,9 @@ int fastHash(String string) {
   return hash;
 }
 
-String deterministicMediaID(Uint8List mediaData) {
-  return sha1(mediaData).toBase58();
+String deterministicMediaID(Uint8List mediaData, String selfID) {
+  final selfData = utf8.encode(selfID);
+  return sha1(mediaData + selfData).toBase58();
 }
 
 Uint8List randomBytes({int size = 16}) {
@@ -136,9 +156,11 @@ extension ByteEncoding on List<int> {
 }
 
 extension StringExtension on String {
-  String capitalize() {
-    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
-  }
+  String capitalize() =>
+      "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
+  String extension() => p.extension(this);
+  bool isVideoExtension() => videoExtensions.contains(this);
+  bool isImageExtension() => imageExtensions.contains(this);
 }
 
 extension Down4TimestampExpiration on int {

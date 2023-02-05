@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:io' as io;
 
+import 'package:path/path.dart' as p;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -9,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../web_requests.dart' as r;
 import '../down4_utility.dart' as u;
+import '../data_objects.dart' show Identifier;
 
 import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
@@ -16,10 +18,17 @@ import '../render_objects/palette_maker.dart';
 import '../render_objects/render_utils.dart';
 
 class UserMakerPage extends StatefulWidget {
-  final Future<bool> Function(String, String, String, String, double, bool)
-      initUser;
   final void Function() success;
   final List<CameraDescription> cameras;
+  final Future<bool> Function({
+    required String id,
+    required String name,
+    required String lastName,
+    required String imPath,
+    required String imExtension,
+    required double imAspectRatio,
+    required bool toReverse,
+  }) initUser;
 
   const UserMakerPage({
     required this.initUser,
@@ -38,6 +47,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   String _name = "";
   String _lastName = "";
   String _imagePath = "";
+  String _imageExtension = "";
   Console? _console;
   dynamic _inputs;
   double _imageAspectRatio = 1.0;
@@ -57,7 +67,10 @@ class _UserMakerPageState extends State<UserMakerPage> {
   }
 
   bool get isReady =>
-      _isValidUsername && _imagePath.isNotEmpty && _name.isNotEmpty;
+      _isValidUsername &&
+      _imagePath.isNotEmpty &&
+      _name.isNotEmpty &&
+      _imageExtension.isNotEmpty;
 
   void inputs() {
     _inputs = [
@@ -109,12 +122,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
             onPress: () async {
               baseConsole(activatedProceed: false);
               _errorTryAgain = !await widget.initUser(
-                _id,
-                _name,
-                _lastName,
-                _imagePath,
-                _imageAspectRatio,
-                _toReverse,
+                id: _id,
+                name: _name,
+                lastName: _lastName,
+                imPath: _imagePath,
+                imExtension: _imageExtension,
+                imAspectRatio: _imageAspectRatio,
+                toReverse: _toReverse,
               );
               if (_errorTryAgain) {
                 baseConsole();
@@ -130,10 +144,9 @@ class _UserMakerPageState extends State<UserMakerPage> {
   Future<void> camConsole({
     CameraController? ctrl,
     int cam = 0,
-    bool reload = false,
     String? path,
   }) async {
-    if (ctrl == null || reload) {
+    if (ctrl == null) {
       try {
         ctrl = CameraController(
           widget.cameras[cam],
@@ -146,21 +159,22 @@ class _UserMakerPageState extends State<UserMakerPage> {
       }
     }
 
-    void nextCam() => cam == 0
-        ? camConsole(ctrl: ctrl, cam: 1, reload: true)
-        : camConsole(ctrl: ctrl, cam: 0, reload: true);
+    Future<void> nextCam() async {
+      await ctrl?.dispose();
+      return camConsole(cam: (cam + 1) % 2);
+    }
 
     if (path == null) {
       _console = Console(
         cameraController: ctrl,
-        toMirror: cam == 1,
-        aspectRatio: ctrl?.value.aspectRatio,
+        // toMirror: cam == 1,
+        // aspectRatio: ctrl?.value.aspectRatio,
         topButtons: [
           ConsoleButton(
             name: "Capture",
             onPress: () async {
-              XFile? f = await ctrl?.takePicture();
-              camConsole(ctrl: ctrl, cam: cam, reload: false, path: f?.path);
+              XFile f = await ctrl!.takePicture();
+              camConsole(ctrl: ctrl, cam: cam, path: f.path);
             },
           ),
         ],
@@ -175,9 +189,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
       );
     } else {
       _console = Console(
-        imagePreviewPath: path,
-        aspectRatio: ctrl?.value.aspectRatio ?? 1.0,
-        toMirror: cam == 1,
+        imageForPreview: ImagePreview(
+            path: path,
+            isReversed: cam == 1,
+            imageAspectRatio: ctrl?.value.aspectRatio ?? 1.0),
+        // imagePreviewPath: path,
+        // aspectRatio: ctrl?.value.aspectRatio ?? 1.0,
+        // toMirror: cam == 1,
         topButtons: [
           ConsoleButton(
             name: "Accept",
@@ -185,14 +203,17 @@ class _UserMakerPageState extends State<UserMakerPage> {
               _imagePath = path;
               _toReverse = cam == 1;
               _imageAspectRatio = ctrl!.value.aspectRatio;
-              baseConsole();
+              _imageExtension = p.extension(path);
             },
           ),
         ],
         bottomButtons: [
           ConsoleButton(
             name: "Back",
-            onPress: () => camConsole(ctrl: ctrl, cam: cam, reload: false),
+            onPress: () {
+              io.File(path).delete();
+              camConsole(ctrl: ctrl, cam: cam);
+            },
           ),
           ConsoleButton(
               name: "Cancel",
@@ -214,13 +235,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
           FilePickerResult? r = await FilePicker.platform.pickFiles(
               type: FileType.custom,
               allowedExtensions: ['jpg', 'png', 'jpeg'],
-              withData: false);
-          if (r?.files.single.path != null) {
-            final String thePath = r?.files.single.path as String;
-            final imageSize =
-                await calculateImageDimension(f: io.File(thePath));
-            _imageAspectRatio = imageSize?.aspectRatio ?? 1.0;
-            _imagePath = r!.files.single.path!;
+              withData: true);
+          if (r?.files.single.path != null && r?.files.single.bytes != null) {
+            final String thePath = r!.files.single.path as String;
+            final imageSize = await decodeImageSize(r.files.single.bytes!);
+            _imageAspectRatio = imageSize.aspectRatio;
+            _imagePath = thePath;
+            _imageExtension = p.extension(thePath);
             baseConsole();
           }
         },

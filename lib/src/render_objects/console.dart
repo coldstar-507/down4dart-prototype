@@ -1,5 +1,4 @@
 import 'dart:io' as io;
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
 
@@ -12,6 +11,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
+import '../down4_utility.dart' show golden;
 
 import 'palette.dart';
 import 'render_utils.dart';
@@ -159,15 +159,15 @@ class ConsoleInput extends StatelessWidget {
   final String placeHolder;
   final String value;
   final String prefix, suffix;
-  final int? maxLines;
+  final int maxLines;
   final void Function(String)? inputCallBack;
   final TextEditingController tec;
-  final bool? b;
+  final bool show;
   const ConsoleInput({
-    this.b,
+    this.show = true,
     this.type = TextInputType.text,
     this.inputCallBack,
-    this.maxLines,
+    this.maxLines = 1,
     required this.placeHolder,
     required this.tec,
     this.prefix = "",
@@ -177,62 +177,70 @@ class ConsoleInput extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  ConsoleInput animated(bool b) => ConsoleInput(
-        type: type,
-        placeHolder: placeHolder,
-        tec: tec,
-        activated: activated,
-        value: value,
-        prefix: prefix,
-        suffix: suffix,
-        inputCallBack: inputCallBack,
-        b: b,
-      );
+  bool get isMultiLine => maxLines > 1;
 
-  Widget get activatedField => TextField(
-        controller: tec,
-        cursorColor: PinkTheme.black,
-        key: GlobalKey(),
-        maxLines: maxLines,
-        keyboardType: type,
-        textAlign: TextAlign.center,
-        decoration: InputDecoration(
-          isDense: true,
-          isCollapsed: true,
-          contentPadding: EdgeInsets.symmetric(vertical: Sizes.w * 0.008),
-          hintText: placeHolder,
-          border: InputBorder.none,
-          prefixIcon: Text(prefix),
-          prefixIconConstraints: const BoxConstraints(
-            minHeight: 0,
-            minWidth: 0,
-          ),
-          suffixIcon: Text(suffix),
-          suffixIconConstraints: const BoxConstraints(
-            minHeight: 0,
-            minWidth: 0,
-          ),
+  ConsoleInput animated({required bool show}) {
+    return ConsoleInput(
+      type: type,
+      placeHolder: placeHolder,
+      tec: tec,
+      activated: activated,
+      value: value,
+      maxLines: maxLines,
+      prefix: prefix,
+      suffix: suffix,
+      inputCallBack: inputCallBack,
+      show: show,
+    );
+  }
+
+  Widget get activatedField {
+    return TextField(
+      controller: tec,
+      cursorColor: PinkTheme.black,
+      key: GlobalKey(),
+      maxLines: maxLines,
+      minLines: 1,
+      keyboardType: type,
+      textAlign: TextAlign.center,
+      decoration: InputDecoration(
+        isDense: true,
+        isCollapsed: true,
+        contentPadding: EdgeInsets.symmetric(vertical: Sizes.w * 0.008),
+        hintText: placeHolder,
+        border: InputBorder.none,
+        prefixIcon: Text(prefix),
+        prefixIconConstraints: const BoxConstraints(
+          minHeight: 0,
+          minWidth: 0,
         ),
-        textDirection: TextDirection.ltr,
-        onChanged: inputCallBack,
-      );
+        suffixIcon: Text(suffix),
+        suffixIconConstraints: const BoxConstraints(
+          minHeight: 0,
+          minWidth: 0,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      onChanged: inputCallBack,
+    );
+  }
 
-  Widget get unactivatedField => Center(child: Text(placeHolder));
+  Widget get unactivatedField {
+    return Center(child: Text(placeHolder));
+  }
 
-  // Widget sizedContainer({required Widget child}) => SizedBox(
-  //       height: ConsoleButton.buttonHeight,
-  //       child: DecoratedBox(
-  //         decoration: BoxDecoration(
-  //             border: Border.all(width: 0.5), color: Colors.white),
-  //         child: Center(child: child),
-  //       ),
-  //     );
+  // Widget mainContainer({required Widget child}) => DecoratedBox(decoration: BoxDecoration(
+  //     border: Border.all(width: Console.contourWidth, color: Console.contourColor,), color: Colors.white), child: Center(child: child) );
+  //       // decoration: BoxDecoration(
+  //     border: Border.all(width: Console.contourWidth, color: Console.contourColor,), color: Colors.white) ,
+  //   child: Center(child: child),
+  // );
 
   // Widget animatedContainer({required Widget child}) => AnimatedContainer(
-  //     duration: const Duration(milliseconds: 200),
+  //     duration: Console.animationDuration,
   //     constraints: BoxConstraints(
-  //       minHeight: b ?? false ? 0 : ConsoleButton.buttonHeight,
-  //       maxHeight: b ?? false // ? 0 : buttonHeight,
+  //       minHeight: !show ? 0 : ConsoleButton.buttonHeight,
+  //       maxHeight: !show // ? 0 : buttonHeight,
   //           ? 0
   //           : activated
   //               ? ConsoleButton.buttonHeight * 4
@@ -263,7 +271,22 @@ class ConsoleInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return activated ? activatedField : unactivatedField;
+    return Expanded(
+      // height: show ? ConsoleButton.buttonHeight : 0,
+      child: AnimatedContainer(
+        duration: Console.animationDuration,
+        // height: show ? null : 0,
+        decoration: BoxDecoration(
+            color: activated ? Colors.white : Colors.grey,
+            border: Border.all(width: Console.contourWidth)),
+        constraints: BoxConstraints(
+            // this is higher than maxfields in the textInput allows
+            maxHeight: show ? 8 * ConsoleButton.buttonHeight : 0,
+            minHeight: show ? ConsoleButton.buttonHeight : 0),
+        child: activated ? activatedField : unactivatedField,
+      ),
+    );
+
     // print("Text field is animated: $b");
     // return Expanded(
     //     child: b != null || activated
@@ -272,9 +295,43 @@ class ConsoleInput extends StatelessWidget {
   }
 }
 
+class ConsoleMedias {
+  final Iterable<MessageMedia> medias;
+  final void Function(MessageMedia) onSelectMedia;
+  final int nMedias;
+  const ConsoleMedias({
+    required this.medias,
+    required this.onSelectMedia,
+    required this.nMedias,
+  });
+}
+
+class ImagePreview {
+  final String path;
+  final double imageAspectRatio;
+  final bool isReversed;
+  const ImagePreview({
+    required this.path,
+    required this.isReversed,
+    required this.imageAspectRatio,
+  });
+}
+
+class VideoPreview {
+  final VideoPlayer videoPlayer;
+  final double videoAspectRatio;
+  final bool isReversed;
+  VideoPreview({
+    required this.videoPlayer,
+    required this.videoAspectRatio,
+    required this.isReversed,
+  });
+}
+
 class Console extends StatelessWidget {
   final List<ConsoleButton>? _topButtons;
   final List<ConsoleButton> _bottomButtons;
+  final List<ConsoleInput>? _bottomInputs, _topInputs;
   // final CameraController? _cameraController;
   // final double? aspectRatio;
   // final bool? toMirror, images;
@@ -282,23 +339,24 @@ class Console extends StatelessWidget {
   // final void Function(MessageMedia)? selectMedia;
   // final String? imagePreviewPath;
   final bool animatedInputs;
-  final VideoPlayerController? videoPlayerController;
-  final List<ConsoleInput>? bottomInputs, topInputs;
+  // final VideoPlayerController? videoPlayerController;
   // final MobileScannerController? scanController;
   // final dynamic Function(Barcode, MobileScannerArguments?)? scanCallBack;
   final List<Palette>? forwardingPalette;
   final bool invertedColors;
-  final ({Iterable<MessageMedia> medias, void Function(MessageMedia) onSelect, int nMedias})? mediasInfo;
-  final MessageMedia? mediaForPreview;
+  final ConsoleMedias? mediasInfo;
+  // final ({Iterable<MessageMedia> medias, void Function(MessageMedia) onSelect, int nMedias})? mediasInfo;
+  // final MessageMedia? mediaForPreview;
+  final ImagePreview? imageForPreview;
+  final VideoPreview? videoForPreview;
   final CameraController? cameraController;
   final MobileScanner? scanner;
   // final (MobileScannerController scanner, Function(Barcode, dynamic) onScan)? scan;
 
-
-
   static GlobalKey get widgetCaptureKey => GlobalKey();
 
-  int get nMediaRow => mediasInfo == null ? 0  : (mediasInfo!.nMedias / nMediaPerRow).floor();
+  int get nMediaRow =>
+      mediasInfo == null ? 0 : (mediasInfo!.nMedias / nMediaPerRow).ceil();
 
   // int get nImageRows => ((medias?.length ?? 0) / 5).ceil();
 
@@ -381,12 +439,13 @@ class Console extends StatelessWidget {
       }
     }).toList();
   }
-  
+
   double get consoleGap => Sizes.w * 0.022;
   static double get contourWidth => 0.6;
   static Color get contourColor => PinkTheme.black;
   double get consoleWidth => Sizes.w - (2.0 * consoleGap);
   double get trueWidth => consoleWidth - (4 * contourWidth);
+  double get bbWidth => consoleWidth - (2 * contourWidth);
 
   // contour width is actually applied 2 times horizontally, (4 times)
   // (it is also applied 2 times vertically)
@@ -401,17 +460,24 @@ class Console extends StatelessWidget {
   //     imagePreviewPath != null ||
   //     videoPlayerController != null ||
   //     scanController != null;
-  
-  Duration get animationDuration => const Duration(milliseconds: 600);
-  
-  bool get hasBB => mediasInfo != null || mediaForPreview != null || scanner != null;
+
+  static Duration get animationDuration =>
+      Duration(milliseconds: (100 * golden).toInt());
+
+  bool get hasGadgets =>
+      mediasInfo != null ||
+      cameraController != null ||
+      imageForPreview != null ||
+      scanner != null ||
+      videoForPreview != null;
 
   const Console({
     required List<ConsoleButton> bottomButtons,
     this.invertedColors = false,
     this.forwardingPalette,
     this.cameraController,
-    this.mediaForPreview,
+    this.imageForPreview,
+    this.videoForPreview,
     this.mediasInfo,
     this.scanner,
     // this.selectMedia,
@@ -419,17 +485,18 @@ class Console extends StatelessWidget {
     this.animatedInputs = true,
     // this.medias,
     // this.imagePreviewPath,
-    this.videoPlayerController,
+    // this.videoPlayerController,
     // this.toMirror,
     // this.aspectRatio,
     // CameraController? cameraController,
-    this.bottomInputs,
-    this.topInputs,
+    List<ConsoleInput>? bottomInputs,
+    List<ConsoleInput>? topInputs,
     List<ConsoleButton>? topButtons,
     // this.scanCallBack,
     // this.scanController,
     Key? key,
-  })  : // _cameraController = cameraController,
+  })  : _topInputs = topInputs,
+        _bottomInputs = bottomInputs, // _cameraController = cameraController,
         _bottomButtons = bottomButtons,
         _topButtons = topButtons,
         super(key: key);
@@ -449,68 +516,17 @@ class Console extends StatelessWidget {
     return RepaintBoundary(key: widgetCaptureKey, child: child);
   }
 
-  Widget mainContainer({required List<Widget> children}) => Container(
-        margin: EdgeInsets.only(
-          left: consoleGap,
-          right: consoleGap,
-          bottom: consoleGap,
-        ),
-        decoration: BoxDecoration(
-            border: Border.all(
-                width: contourWidth,
-                color: invertedColors ? PinkTheme.buttonColor : Colors.black)),
-        child: Column(children: children),
-      );
+  List<ConsoleInput> get topConsoleInputs =>
+      _topInputs
+          ?.map((input) => input.animated(show: !hasGadgets))
+          .toList(growable: false) ??
+      [];
 
-  Widget? forwardingPalettes() {
-    if (forwardingPalette == null) return null;
-    return SizedBox(
-      height: ConsoleButton.buttonHeight,
-      width: consoleWidth,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        textDirection: TextDirection.ltr,
-        children: forwardingPalette!
-            .map((palette) =>
-            Flexible(
-                child: DecoratedBox(
-                    position: DecorationPosition.foreground,
-                    decoration: BoxDecoration(
-                      border: Border.all(width: 0.5),
-                    ),
-                    child: Row(
-                        textDirection: TextDirection.ltr,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SizedBox(
-                              width: ConsoleButton.buttonHeight,
-                              height: ConsoleButton.buttonHeight,
-                              child: palette.image),
-                          Expanded(
-                              child: Container(
-                                  padding: const EdgeInsets.all(2.0),
-                                  color: PinkTheme
-                                      .nodeColors[palette.node.colorCode],
-                                  child: Text(palette.node.name,
-                                      overflow: TextOverflow.clip)))
-                        ]))))
-            .toList(),
-      ),
-    );
-  }
-
-  Widget topConsoleInputs() => Row(
-      textDirection: TextDirection.ltr,
-      children: topInputs
-              ?.map((input) => input.animated(hasBB))
-              .toList(growable: false) ??
-          []);
-
-  Widget bottomConsoleInputs() => Row(
-      textDirection: TextDirection.ltr,
-      children:
-          bottomInputs?.map((input) => input.animated(hasBB)).toList(growable: false) ??
-              []);
+  List<ConsoleInput> get bottomConsoleInputs =>
+      _bottomInputs
+          ?.map((input) => input.animated(show: !hasGadgets))
+          .toList(growable: false) ??
+      [];
 
   int get mediaPerRow => 5;
 
@@ -524,8 +540,16 @@ class Console extends StatelessWidget {
         itemBuilder: ((context, index) {
           Widget f(int i) {
             if (i < mi.nMedias) {
-              return Down4MediaViewer(media: mi.medias.elementAt(i), displaySize: Size.square(mediaCelSize), forceSquareAnyways: true,);
-              
+              return GestureDetector(
+                onTap: () => mi.onSelectMedia(mi.medias.elementAt(i)),
+                child: Down4ImageViewer(
+                  // backgroundColor: PinkTheme.qrColor,
+                  media: mi.medias.elementAt(i),
+                  displaySize: Size.square(mediaCelSize),
+                  forceSquareAnyways: true,
+                ),
+              );
+
               // final theMedia = mi.medias.elementAt(i);
               // return theMedia.metadata.isVideo == true
               // // return medias?[i].metadata.isVideo == true
@@ -568,6 +592,52 @@ class Console extends StatelessWidget {
         }));
   }
 
+  Widget mainContainer({required List<Widget> children}) => Container(
+        margin: EdgeInsets.only(
+            left: consoleGap, right: consoleGap, bottom: consoleGap),
+        decoration: BoxDecoration(
+            border: Border.all(
+                width: contourWidth,
+                color: invertedColors ? PinkTheme.buttonColor : Colors.black)),
+        child: Column(children: children),
+      );
+
+  Widget? forwardingPalettes() {
+    if (forwardingPalette == null) return null;
+    return SizedBox(
+      height: ConsoleButton.buttonHeight,
+      width: consoleWidth,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        textDirection: TextDirection.ltr,
+        children: forwardingPalette!
+            .map((palette) => Flexible(
+                child: DecoratedBox(
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      border: Border.all(width: 0.5),
+                    ),
+                    child: Row(
+                        textDirection: TextDirection.ltr,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                              width: ConsoleButton.buttonHeight,
+                              height: ConsoleButton.buttonHeight,
+                              child: palette.image),
+                          Expanded(
+                              child: Container(
+                                  padding: const EdgeInsets.all(2.0),
+                                  color: PinkTheme
+                                      .nodeColors[palette.node.colorCode],
+                                  child: Text(palette.node.name,
+                                      overflow: TextOverflow.clip)))
+                        ]))))
+            .toList(),
+      ),
+    );
+  }
+
   // Widget consoleCamera() => DisplayMediaBody(
   //       shouldScale: false,
   //       isReversed: false,
@@ -579,11 +649,12 @@ class Console extends StatelessWidget {
   Widget? consoleCamera() {
     final camCtrl = cameraController;
     if (camCtrl == null) return null;
-    return AnimatedContainer(duration: animationDuration, height: trueWidth, width: trueWidth, child: Transform.scale(
+    // return CameraPreview(camCtrl);
+    return Transform.scale(
       scaleY: camCtrl.value.aspectRatio,
-      child: CameraPreview(camCtrl),),);
-    
-    
+      child: CameraPreview(camCtrl),
+    );
+
     // var scale = camCtrl.value.aspectRatio * 1.0;
     // scale = scale > 1 ? scale : 1 / scale;
     // return Down4Display(
@@ -611,13 +682,35 @@ class Console extends StatelessWidget {
   //     child: CameraPreview(cameraController!),
   //   ),
   // );
-  
-  Widget? mediaPreview() {
-    final theMedia = mediaForPreview;
-    if (theMedia == null) return null;
-    return Down4MediaViewer(media: theMedia, displaySize: Size.square(trueWidth), forceSquareAnyways: true, autoPlayIfVideo: true,);
+
+  Widget? videoPreview() {
+    final vfp = videoForPreview;
+    if (vfp == null) return null;
+    return Down4VideoTransform(
+      displaySize: Size.square(trueWidth),
+      videoAspectRatio: vfp.videoAspectRatio,
+      video: vfp.videoPlayer,
+      isReversed: vfp.isReversed,
+      isSquared: true,
+    );
   }
 
+  Widget? imagePreview() {
+    final ifp = imageForPreview;
+    if (ifp == null) return null;
+    final theImage = Image.file(
+      io.File(ifp.path),
+      cacheHeight: trueWidth.toInt(),
+      cacheWidth: trueWidth.toInt(),
+    );
+    return Down4ImageTransform(
+      image: theImage,
+      imageAspectRatio: ifp.imageAspectRatio,
+      displaySize: Size.square(trueWidth),
+      isSquared: true,
+      isReversed: ifp.isReversed,
+    );
+  }
 
   // Widget consoleImagePreview() => Down4Display(
   //       displayType: DisplayType.image,
@@ -650,19 +743,33 @@ class Console extends StatelessWidget {
   //   ),
   // );
 
-  Widget bbContainer({required Widget child}) => Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border.all(color: Colors.black, width: contourWidth),
-      ),
-      child: child,);
+  double get bbHeight {
+    if (imageForPreview != null ||
+        videoForPreview != null ||
+        cameraController != null ||
+        scanner != null) {
+      return bbWidth;
+    } else if (mediasInfo != null) {
+      return mediasHeight;
+    } else {
+      return 0;
+    }
+  }
 
-  Widget? consoleScanner() => AnimatedContainer(
-    duration: const Duration(milliseconds: 600),
-    height: trueWidth,
-    width: trueWidth,
-    child: scanner,);
+  Widget bbContainer({required Widget child}) => AnimatedContainer(
+        // clipBehavior: Clip.hardEdge,
+        duration: animationDuration,
+        height: bbHeight,
+        width: bbWidth,
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          border: Border.all(color: Colors.black, width: contourWidth),
+        ),
+        child: child,
+      );
+
+  Widget? consoleScanner() => scanner;
 
   List<ConsoleButton> get bottomConsoleButtons => invertedColors
       ? _bottomButtons
@@ -695,35 +802,75 @@ class Console extends StatelessWidget {
               key, value.withKey(key: ButtonKeys.instance.topButtonKeys[key])))
           .values
           .toList(growable: false);
-  
-  Widget inputs() {
-    if (topInputs == null && bottomInputs == null) return const SizedBox.shrink();
-    return
-      AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            constraints: BoxConstraints(
-              minHeight: hasBB ? 0 : ConsoleButton.buttonHeight,
-              maxHeight: hasBB ? 0 : ConsoleButton.buttonHeight * 4 // ? 0 : buttonHeight,
-                  // ? 0
-                  // : activated
-                  //     ? ConsoleButton.buttonHeight * 4
-                  //     : ConsoleButton.buttonHeight,
-            ),
-            decoration: BoxDecoration(
-              color:
-                  activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
-              border: Border.all(
-                  color: Console.contourColor, width: Console.contourWidth),
-            ),
-            child: child);
-      
-    //   Column(
-    //   textDirection: TextDirection.ltr,
-    //   children: [
-    //     !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
-    //     !animatedInputs ? Row(children: bottomInputs ?? []) : bottomConsoleInputs(),],
-    // );
+
+  // return
+  //   AnimatedContainer(
+  //         duration: const Duration(milliseconds: 200),
+  //         constraints: BoxConstraints(
+  //           minHeight: hasBB ? 0 : ConsoleButton.buttonHeight,
+  //           maxHeight: hasBB ? 0 : ConsoleButton.buttonHeight * 4 // ? 0 : buttonHeight,
+  //               // ? 0
+  //               // : activated
+  //               //     ? ConsoleButton.buttonHeight * 4
+  //               //     : ConsoleButton.buttonHeight,
+  //         ),
+  //         decoration: BoxDecoration(
+  //           color:
+  //               activated ? Colors.white : const Color.fromARGB(255, 216, 212, 212),
+  //           border: Border.all(
+  //               color: Console.contourColor, width: Console.contourWidth),
+  //         ),
+  //         child: child);
+
+  //   Column(
+  //   textDirection: TextDirection.ltr,
+  //   children: [
+  //     !animatedInputs ? Row(children: topInputs ?? []) : topConsoleInputs(),
+  //     !animatedInputs ? Row(children: bottomInputs ?? []) : bottomConsoleInputs(),],
+  // );
+  // }
+
+  Widget get anyGadgets {
+    return bbContainer(
+        child: consoleMedias() ??
+            consoleScanner() ??
+            consoleCamera() ??
+            imagePreview() ??
+            videoPreview() ??
+            forwardingPalettes() ??
+            const SizedBox.shrink());
   }
+
+  // Widget buttons() {
+  //   return Column(children: [Row(textDirection: TextDirection.ltr, children: topConsoleButtons),
+  // Row(textDirection: TextDirection.ltr, children: bottomConsoleButtons)],);
+  // }
+
+  Widget get staticInputs => Column(
+        children: [
+          Row(children: _topInputs ?? []),
+          Row(children: _bottomInputs ?? [])
+        ],
+      );
+
+  Widget get inputs => Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
+        // mainAxisAlignment: MainAxisAlignment.end,
+        // crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: topConsoleInputs),
+          Row(children: bottomConsoleInputs),
+        ],
+      );
+
+  Widget get buttons => Column(
+        // crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(textDirection: TextDirection.ltr, children: topConsoleButtons),
+          Row(textDirection: TextDirection.ltr, children: bottomConsoleButtons),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -742,8 +889,20 @@ class Console extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
+        // crossAxisAlignment: CrossAxisAlignment.end,
+        // crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          bbContainer(child: inputs),
+          // inputs and gadgets are programmed so only inputs or a gadget can
+          // be viewed at once. They are animated in a way that opening a gadget
+          // (like camera for example) will squeeze the input and vice-versa
+          // current gadets are camera, media preview after taking picture or
+          // video from said camera, and the saved medias
+
+          // Row(children: topConsoleInputs),
+          // Row(children: bottomConsoleInputs),
+          animatedInputs ? inputs : staticInputs,
+          // inputs,
+          anyGadgets,
           // forwardingPalette != null
           //     ? forwardingPalettes()
           //     : const SizedBox.shrink(),
@@ -758,8 +917,8 @@ class Console extends StatelessWidget {
           //   //         ? consoleWidth
           //   //         : 0,
           //   child: bbContainer(
-          //     child: mediaPreview() ?? consoleScanner() ?? 
-          //    
+          //     child: mediaPreview() ?? consoleScanner() ??
+          //
           //     images == true
           //         ? consoleMedias()
           //         : imagePreviewPath != null
@@ -773,8 +932,7 @@ class Console extends StatelessWidget {
           //                         : const SizedBox.shrink(),
           //   ),
           // ),
-          Row(textDirection: TextDirection.ltr, children: topConsoleButtons),
-          Row(textDirection: TextDirection.ltr, children: bottomConsoleButtons),
+          buttons,
         ],
       ),
     );

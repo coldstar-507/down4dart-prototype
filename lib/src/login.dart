@@ -69,14 +69,15 @@ class _Down4State extends State<Down4> {
     }
   }
 
-  Future<bool> initUser(
-    String id,
-    String name,
-    String lastName,
-    String imPath,
-    double imAspectRatio,
-    bool toReverse,
-  ) async {
+  Future<bool> initUser({
+    required Identifier id,
+    required String name,
+    required String lastName,
+    required String imPath,
+    required String imExtension,
+    required double imAspectRatio,
+    required bool toReverse,
+  }) async {
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
       print("error getting firebase messaging token");
@@ -96,6 +97,7 @@ class _Down4State extends State<Down4> {
         owner: id,
         timestamp: d4utils.timeStamp(),
         elementAspectRatio: imAspectRatio,
+        extension: imExtension,
         isReversed: toReverse,
       ),
     );

@@ -98,7 +98,6 @@ country
 computer
 canoe
 clock
-charlie (u.k)
 dog
 deer
 donkey

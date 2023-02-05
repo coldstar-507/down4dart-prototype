@@ -61,17 +61,25 @@ abstract class Media {
 class MessageMedia extends Media {
   String path;
   MessageMedia({
+    required this.path,
     required Identifier id,
     required MediaMetadata metadata,
-    required this.path,
     this.isSaved = false,
     Set<Identifier>? references,
   })  : references = references ?? Set<Identifier>.identity(),
         super(id: id, metadata: metadata);
 
-  bool get isVideo => metadata.isVideo;
+  String get extension => metadata.extension;
+
+  bool get isVideo => u.videoExtensions.contains(extension);
+
+  bool get isImage => u.imageExtensions.contains(extension);
+
+  bool get isAnimatedImage => u.animatedImageExtensions.contains(extension);
 
   File? get file => File(path).existsSync() ? File(path) : null;
+
+  bool get hasFile => File(path).existsSync();
 
   Set<Identifier> references;
 
@@ -109,9 +117,9 @@ class MessageMedia extends Media {
 
 class NodeMedia extends Media {
   NodeMedia({
+    required this.data,
     required Identifier id,
     required MediaMetadata metadata,
-    required this.data,
   }) : super(id: id, metadata: metadata);
 
   Uint8List data;
@@ -604,9 +612,10 @@ class MediaMetadata {
       isPaidToView,
       isPaidToOwn,
       isSquared,
-      isVideo,
+      // isVideo,
       canSkipCheck;
   final Identifier owner;
+  final String extension;
   final double elementAspectRatio;
   final String? text;
   int timestamp;
@@ -614,7 +623,8 @@ class MediaMetadata {
     required this.owner,
     required this.timestamp,
     required this.elementAspectRatio,
-    this.isVideo = false,
+    required this.extension,
+    // this.isVideo = false,
     this.isLocked = false,
     this.canSkipCheck = false,
     this.isPaidToView = false,
@@ -624,28 +634,33 @@ class MediaMetadata {
     this.text,
   });
 
-  MediaMetadata updatedTimestamp(int newTimeStamp) {
-    return MediaMetadata(
-      owner: owner,
-      timestamp: newTimeStamp,
-      elementAspectRatio: elementAspectRatio,
-      isVideo: isVideo,
-      isReversed: isReversed,
-      isPaidToOwn: isPaidToOwn,
-      canSkipCheck: false,
-      isPaidToView: isPaidToView,
-      isSquared: isSquared,
-      isLocked: isLocked,
-      text: text,
-    );
-  }
+  // MediaMetadata updatedTimestamp(int newTimeStamp) {
+  //   return MediaMetadata(
+  //     owner: owner,
+  //     timestamp: newTimeStamp,
+  //     extension: extension,
+  //     elementAspectRatio: elementAspectRatio,
+  //     isVideo: isVideo,
+  //     isReversed: isReversed,
+  //     isPaidToOwn: isPaidToOwn,
+  //     canSkipCheck: false,
+  //     isPaidToView: isPaidToView,
+  //     isSquared: isSquared,
+  //     isLocked: isLocked,
+  //     text: text,
+  //   );
+  // }
+
+  // void updateTimestamp(int newTimestamp) => timestamp = newTimestamp;
 
   factory MediaMetadata.fromJson(Map<String, dynamic> decodedJson) {
+    print(decodedJson);
     return MediaMetadata(
       owner: decodedJson["o"],
       timestamp: int.parse(decodedJson["ts"]),
+      extension: decodedJson["ex"],
       isReversed: decodedJson["trv"] == "true",
-      isVideo: decodedJson["vid"] == "true",
+      // isVideo: decodedJson["vid"] == "true",
       isLocked: decodedJson["lck"] == "true",
       isPaidToView: decodedJson["ptv"] == "true",
       isPaidToOwn: decodedJson["pto"] == "true",
@@ -660,9 +675,10 @@ class MediaMetadata {
     return {
       "o": owner,
       "ts": timestamp.toString(),
+      "ex": extension,
       "trv": isReversed.toString(),
       "sqr": isSquared.toString(),
-      "vid": isVideo.toString(),
+      // "vid": isVideo.toString(),
       "lck": isLocked.toString(),
       "ptv": isPaidToView.toString(),
       "csc": canSkipCheck.toString(),
