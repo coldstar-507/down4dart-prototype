@@ -1045,7 +1045,6 @@ class _HomeState extends State<Home> {
     _page = GroupPage(
       initialOffset: _homeScrollController.offset,
       self: widget.self,
-      // afterMessageCallback: (node) => writePalette(node),
       back: homePage,
       groupRequest: (groupRequest) {
         _requests.add(groupRequest);
@@ -1281,7 +1280,5 @@ class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     return _page ?? const LoadingPage2();
-    // print(widget.wallet.payments.length);
-    // return _page ?? const LoadingPage();
   }
 }

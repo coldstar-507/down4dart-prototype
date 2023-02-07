@@ -13,7 +13,6 @@ class NodePage extends StatefulWidget {
   final void Function(int) onPageChange;
   final List<CameraDescription> cameras;
   final List<Palette>? palettes;
-  // final MessageList4? messageList;
   final Palette palette;
   final Self self;
   final Palette? Function(BaseNode, {String at}) nodeToPalette;
@@ -31,7 +30,6 @@ class NodePage extends StatefulWidget {
     required this.back,
     required this.self,
     this.palettes,
-    // this.messageList,
     Key? key,
   }) : super(key: key);
 
@@ -45,16 +43,13 @@ class _NodePageState extends State<NodePage> {
   void initState() {
     super.initState();
     final node = widget.palette.node;
-    if (node is User) {
+    if (node is Person) {
       _view = Andrew(pages: [
         Down4Page(
           reversedList: false,
           title: node.name,
           console: userPaletteConsole,
-          list: [
-            ProfileWidget(palette: widget.palette),
-            ...?widget.palettes
-          ],
+          list: [ProfileWidget(palette: widget.palette), ...?widget.palettes],
         ),
       ]);
     } // TODO other node types

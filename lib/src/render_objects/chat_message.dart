@@ -14,18 +14,13 @@ import '_down4_flutter_utils.dart';
 
 class ChatReplyInfo {
   final Identifier messageRefID, senderID; // senderName,
-  // final Image thumbnail;
   final String body;
-  // final NodesColor type;
   final void Function() onPressReply;
   const ChatReplyInfo({
     required this.onPressReply,
-    // required this.senderName,
     required this.senderID,
     required this.messageRefID,
-    // required this.thumbnail,
     required this.body,
-    // required this.type,
   });
 }
 
@@ -57,41 +52,18 @@ class ChatMessage extends StatelessWidget {
   static const double headerHeight = 18.0;
   final bool myMessage, selected, isPost;
   final void Function(Identifier id)? select;
-  // final void Function(Identifier id)? goToReply;
   final Message message;
   final bool hasGap, hasHeader;
-  // final Widget Function(double) spinningLogo;
 
-  // final VideoPlayerController? videoController;
   final ChatTextInfo? textInfo;
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
 
-  // const ChatMessage._({
-  //   this.textInfo,
-  //   this.mediaInfo,
-  //   this.replyInfo,
-  //   required this.spinningLogo,
-  //   required this.hasHeader,
-  //   required this.message,
-  //   required this.goToReply,
-  //   required this.myMessage,
-  //   required this.hasGap,
-  //   this.videoController,
-  //   this.isPost = false,
-  //   this.selected = false,
-  //   required this.select,
-  //   Key? key,
-  // }) : super(key: key);
-
   const ChatMessage({
     required this.hasHeader,
     required this.message,
-    // required this.goToReply,
     required this.myMessage,
     required this.hasGap,
-    // required this.spinningLogo,
-    // this.videoController,
     required this.mediaInfo,
     required this.textInfo,
     required this.repliesInfo,
@@ -103,13 +75,10 @@ class ChatMessage extends StatelessWidget {
 
   ChatMessage withHeader({required bool hasHeader}) {
     return ChatMessage(
-      // spinningLogo: spinningLogo,
       message: message,
-      // goToReply: goToReply,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
       textInfo: textInfo,
-      // videoController: videoController,
       isPost: isPost,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -121,14 +90,11 @@ class ChatMessage extends StatelessWidget {
 
   ChatMessage invertedSelection() {
     return ChatMessage(
-      // spinningLogo: spinningLogo,
       message: message,
-      // goToReply: goToReply,
       isPost: isPost,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
       textInfo: textInfo,
-      // videoController: videoController,
       hasHeader: hasHeader,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -140,13 +106,8 @@ class ChatMessage extends StatelessWidget {
   ChatMessage onPageTransition() {
     if (mediaInfo?.videoController?.value.isPlaying ?? false) {
       return ChatMessage(
-        // spinningLogo: spinningLogo,
         message: message,
-        // goToReply: goToReply,
         isPost: isPost,
-        // videoController: videoController
-        // ?..pause()
-        // ..seekTo(Duration.zero),
         repliesInfo: repliesInfo,
         mediaInfo: mediaInfo
           ?..videoController?.pause()
@@ -341,12 +302,6 @@ class ChatMessage extends StatelessWidget {
       neededWidth: neededWidth,
       singleLineHeight: oneLineTextHeight,
     );
-    //   specialDisplayText,
-    //   neededWidth,
-    //   oneLineTextHeight,
-    //   heightIfNotOnSameLine,
-    //   lastStringAndDateOnSameLine,
-    // ];
   }
 
   static ChatMediaInfo? generateMediaInfo(Message message) {
@@ -440,12 +395,6 @@ class ChatMessage extends StatelessWidget {
                 maxLines: 1,
               ),
             ),
-
-            // SizedBox(
-            //   height: ChatMessage.headerHeight,
-            //   width: ChatMessage.headerHeight,
-            //   child: replyData.thumbnail,
-            // ),
           ],
         ),
       ),
@@ -498,56 +447,15 @@ class ChatMessage extends StatelessWidget {
               child: child));
     }
 
-    // Future<void> generateThumbnail() async {
-    //   print("MEDIA THUMBNAIL IS NULL, GENERATING IT!");
-    //   final thumbnail = await VideoThumbnail.thumbnailFile(
-    //       video: mi.media.hasFile ? mi.media.path : mi.media.url, quality: 95);
-    //   mi.media.thumbnail = thumbnail;
-    //   mi.media.save();
-    // }
-
     Widget theMedia() {
       if (mi.media.isVideo) {
-        // if (mi.media.thumbnail == null) {
-        //   return FutureBuilder(
-        //     future: generateThumbnail(),
-        //     builder: (context, snapshot) {
-        //       if (snapshot.connectionState == ConnectionState.done) {
-        //         return Down4VideoPlayer(
-        //             videoController: mi.videoController!,
-        //             rotatingLogo: spinningLogo,
-        //             backgroundColor: myMessage
-        //                 ? PinkTheme.myBubblesColor
-        //                 : PinkTheme.buttonColor,
-        //             media: mi.media,
-        //             autoPlay: false,
-        //             displaySize: mi.precalculatedMediaSize);
-        //       } else {
-        //         return Container(
-        //             color: myMessage
-        //                 ? PinkTheme.myBubblesColor
-        //                 : PinkTheme.buttonColor,
-        //             child: Center(
-        //                 child: spinningLogo(
-        //                     mi.precalculatedMediaSize.aspectRatio > 1
-        //                         ? mi.precalculatedMediaSize.height
-        //                         : mi.precalculatedMediaSize.width)));
-        //       }
-        //     },
-        //   );
-        // } else {
         return Down4VideoPlayer(
-            // rotatingLogo: spinningLogo,
-            videoController: mi.videoController!
-            // ? VideoPlayerController.file(mi.media.file!)
-            // : VideoPlayerController.network(mi.media.url)
-            ,
+            videoController: mi.videoController!,
             backgroundColor:
                 myMessage ? PinkTheme.myBubblesColor : PinkTheme.buttonColor,
             media: mi.media,
             autoPlay: false,
             displaySize: mi.precalculatedMediaSize);
-        // }
       } else {
         return Down4ImageViewer(
             media: mi.media, displaySize: mi.precalculatedMediaSize);
@@ -555,32 +463,6 @@ class ChatMessage extends StatelessWidget {
     }
 
     return mediaBody(child: theMedia());
-
-    // return GestureDetector(
-    //   onTap: () => select?.call(message.id),
-    //   child: Container(
-    //     clipBehavior: Clip.hardEdge,
-    //     height: mi.precalculatedMediaSize.height,
-    //     width: mi.precalculatedMediaSize.width,
-    //     decoration: BoxDecoration(
-    //       borderRadius: BorderRadius.vertical(
-    //           top: const Radius.circular(4),
-    //           bottom: Radius.circular(_textInfo != null ? 0 : 4)),
-    //     ),
-    //     child: mi.media.isVideo
-    //         ? Down4VideoPlayer(
-    //             media: mi.media,
-    //             autoPlay: false,
-    //             displaySize: mi.precalculatedMediaSize,
-    //             backgroundColor: myMessage
-    //                 ? PinkTheme.myBubblesColor
-    //                 : PinkTheme.buttonColor)
-    //         : Down4ImageViewer(
-    //             media: mi.media,
-    //             displaySize: mi.precalculatedMediaSize,
-    //           ),
-    //   ),
-    // );
   }
 
   Widget? get text {
@@ -593,7 +475,6 @@ class ChatMessage extends StatelessWidget {
     return GestureDetector(
       onTap: () => select?.call(message.id),
       child: Container(
-        // alignment: AlignmentDirectional.centerStart,
         padding: const EdgeInsets.all(6.0),
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(

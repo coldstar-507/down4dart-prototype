@@ -10,35 +10,6 @@ import 'chat_message.dart';
 import 'palette_maker.dart';
 import '_down4_flutter_utils.dart';
 
-class PaletteList extends StatelessWidget {
-  final List<Palette> palettes;
-  const PaletteList({required this.palettes, Key? key}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    final gapSize = Sizes.h * 0.02; // 2%
-    return ScrollConfiguration(
-      behavior: NoGlow(),
-      child: ListView.builder(
-        reverse: true,
-        itemBuilder: (c, i) => palettes[i],
-        itemCount: palettes.length,
-        padding: EdgeInsets.only(top: gapSize),
-      ),
-      // child: ListView.separated(
-      //   padding: const EdgeInsets.only(top: 0),
-      //   reverse: true,
-      //   itemBuilder: (c, i) => i == 0
-      //       ? const SizedBox.shrink()
-      //       : i == palettes.length + 2 - 1
-      //           ? const SizedBox.shrink()
-      //           : palettes[i - 1],
-      //   separatorBuilder: (c, i) => Container(height: gapSize),
-      //   itemCount: palettes.length + 2,
-      // ),
-    );
-  }
-}
-
 class DynamicList extends StatelessWidget {
   final ScrollController? scrollController;
   final List<Widget> list;
@@ -61,7 +32,7 @@ class DynamicList extends StatelessWidget {
     this.reversed = true,
     Key? key,
   }) : super(key: key);
-  double get gapSize => Sizes.h * 0.02;
+  static double get gapSize => Sizes.h * 0.02;
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +93,6 @@ class StaticList extends StatelessWidget {
           controller: scrollController,
           padding: EdgeInsets.only(top: topPadding ?? gapSize),
           child: Column(
-            // mainAxisAlignment: MainAxisAlignment.end,
             children: list,
           ),
         ),

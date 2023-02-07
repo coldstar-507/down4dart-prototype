@@ -107,7 +107,6 @@ class Down4Payment {
     while (comp.length % 4 != 0) {
       comp.add(0x00);
     }
-    // print("COMP\n${comp.sublist(300)}");
     print("COMPRESSED\n${comp.toHex()}");
 
     const maxSize = 550;
@@ -143,21 +142,6 @@ class Down4Payment {
 
     return listData;
   }
-
-  // factory Down4Payment.fromQrData(List<String> qrData) {
-  //   final codec = Base85Codec(Alphabets.z85);
-  //   List<String> sorted =
-  //       List<String>.generate(qrData.length, (index) => "", growable: false);
-  //
-  //   for (final str in qrData) {
-  //     final prefixEnd = str.indexOf(";");
-  //     final ix = int.parse(str.substring(0, prefixEnd));
-  //     sorted[ix] = str.substring(prefixEnd + 1);
-  //   }
-  //
-  //   final decoded = codec.decode(sorted.join());
-  //   return Down4Payment.fromCompressed(decoded);
-  // }
 
   Map<String, dynamic> toJson({bool withImages = false}) => {
         "id": id,
@@ -299,7 +283,6 @@ class Sats {
 }
 
 class Down4TXIN {
-  // Down4TXOUT utxo;
   Identifier? spender;
   VarInt? _scriptSigLen;
   TXID utxoTXID;
@@ -310,7 +293,6 @@ class Down4TXIN {
   FourByteInt sequenceNo;
 
   Down4TXIN({
-    // required this.utxo,
     required this.utxoIndex,
     required this.utxoTXID,
     int? scriptSigLen,
@@ -323,20 +305,12 @@ class Down4TXIN {
         _scriptSigLen =
             scriptSigLen != null ? VarInt.fromInt(scriptSigLen) : null;
 
-  // factory Down4TXIN.fromP2PKH(Down4TXOUT txOut) {
-  //   return Down4TXIN(
-  //     utxo: txOut,
-  //     spender: txOut.receiver,
-  //     sequenceNo: 0,
-  //   );
-  // }
   List<int>? get scriptSig => _scriptSig;
 
   List<int> get compressed {
     return [
       ...raw,
       ...spender == null ? [0x00] : [spender!.length, ...utf8.encode(spender!)],
-      // ...dependance == null ? [] : dependance!.data,
     ];
   }
 
@@ -373,7 +347,6 @@ class Down4TXIN {
   String get utxoID => down4UtxoID(utxoTXID, utxoIndex);
 
   factory Down4TXIN.fromJson(dynamic decodedJson) => Down4TXIN(
-        // utxo: Down4TXOUT.fromJson(decodedJson["utxo"]),
         utxoTXID: TXID.fromBase64(decodedJson["id"]),
         utxoIndex: FourByteInt(decodedJson["ix"]),
         spender: decodedJson["sp"],
@@ -384,24 +357,6 @@ class Down4TXIN {
             ? TXID.fromBase64(decodedJson["dp"])
             : null,
       );
-
-  // factory Down4TXIN.fromRaw(Uint8List raw) {
-  //   final utxoID = TXID(raw.sublist(0, 32));
-  //   final utxoIX = FourByteInt.fromRaw(raw.sublist(32, 36));
-  //   final scriptLenVarInt = VarInt.fromRaw(raw.sublist(36));
-  //   final offset = scriptLenVarInt.data.length;
-  //   final scriptLen = scriptLenVarInt.asInt;
-  //   final script = raw.sublist(36 + offset, 36 + offset + scriptLen);
-  //   final seqNo = FourByteInt.fromRaw(raw.sublist(36 + offset + scriptLen));
-  //   // final utxo =
-  //   // return Down4TXIN(utxo: utxo)
-  //   // now we decompose the script
-  //   // there could be many different scripts, but
-  // }
-  //
-  // Down4TXOUT utxoWhere(Wallet w, TXID txid, int idx) {
-  //
-  // }
 
   List<int> get raw => [
         ...utxoTXID.data,
@@ -673,96 +628,6 @@ class Down4TX {
     );
 
     return Pair(down4Tx, finalOffset);
-  }
-
-  List<int>? sigData(int nIn, Down4TXOUT utxo, [int sigHashType = SIG.ALL]) {
-    switch (sigHashType) {
-      case SIG.ALL:
-        return [
-          ...versionNo.data,
-          ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
-          ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
-          ...txsIn[nIn].prevOut,
-          ...utxo.scriptPubKeyLen.data,
-          ...utxo.scriptPubKey,
-          ...utxo.sats.data,
-          ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
-          ...nLockTime.data,
-          ...FourByteInt(sigHashType).data,
-        ];
-      case SIG.SINGLE:
-        return [
-          ...versionNo.data,
-          ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
-          ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
-          ...txsIn[nIn].prevOut,
-          ...utxo.scriptPubKeyLen.data,
-          ...utxo.scriptPubKey,
-          ...utxo.sats.data,
-          ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut[nIn].raw),
-          ...nLockTime.data,
-          ...FourByteInt(sigHashType).data,
-        ];
-      case SIG.NONE:
-        return [
-          ...versionNo.data,
-          ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
-          ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
-          ...txsIn[nIn].prevOut,
-          ...utxo.scriptPubKeyLen.data,
-          ...utxo.scriptPubKey,
-          ...utxo.sats.data,
-          ...txsIn[nIn].sequenceNo.data,
-          ...Uint8List(32),
-          ...nLockTime.data,
-          ...FourByteInt(sigHashType).data,
-        ];
-      case SIG.ALL_ANYONECANPAY:
-        return [
-          ...versionNo.data,
-          ...Uint8List(32),
-          ...Uint8List(32),
-          ...txsIn[nIn].prevOut,
-          ...utxo.scriptPubKeyLen.data,
-          ...utxo.scriptPubKey,
-          ...utxo.sats.data,
-          ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
-          ...nLockTime.data,
-          ...FourByteInt(sigHashType).data,
-        ];
-      case SIG.SINGLE_ANYONECANPAY:
-        return [
-          ...versionNo.data,
-          ...Uint8List(32),
-          ...Uint8List(32),
-          ...txsIn[nIn].prevOut,
-          ...utxo.scriptPubKeyLen.data,
-          ...utxo.scriptPubKey,
-          ...utxo.sats.data,
-          ...txsIn[nIn].sequenceNo.data,
-          ...hash256(txsOut[nIn].raw),
-          ...nLockTime.data,
-          ...FourByteInt(sigHashType).data,
-        ];
-      case SIG.NONE_ANYONECANPAY:
-        return [
-          ...versionNo.data,
-          ...Uint8List(32),
-          ...Uint8List(32),
-          ...txsIn[nIn].prevOut,
-          ...utxo.scriptPubKeyLen.data,
-          ...utxo.scriptPubKey,
-          ...utxo.sats.data,
-          ...txsIn[nIn].sequenceNo.data,
-          ...Uint8List(32),
-          ...nLockTime.data,
-          ...FourByteInt(sigHashType).data,
-        ];
-    }
-    return null;
   }
 
   List<TXID> get txidDeps {

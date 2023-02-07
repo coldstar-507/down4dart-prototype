@@ -81,7 +81,6 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
-    // _animationController.dispose();
     for (final msg in loadedChatMessageWithVideos) {
       msg.mediaInfo!.videoController!.dispose();
     }
@@ -129,9 +128,6 @@ class _ChatPageState extends State<ChatPage> {
       // we need to remove its header
       _cachedMsgs[prevMsgID] = prevChatMessage.withHeader(hasHeader: false);
       // and update it's size
-      // final lastMessageSize = prevChatMessage.precalculatedSize;
-      // final newSize = Size(lastMessageSize.width,
-      //     lastMessageSize.height - ChatMessage.headerHeight);
     }
 
     if (_cachedMsgs[msgID] != null) return _cachedMsgs[msgID]!;
@@ -141,8 +137,6 @@ class _ChatPageState extends State<ChatPage> {
 
     bool hasGap = false;
     if (prevMsg != null) hasGap = ChatMessage.displayGap(msg, prevMsg);
-
-    // final ChatMediaInfo? mediaInfo = chatMediaInfos(msg);
 
     // mark as read
     if (!msg.isRead) {
@@ -157,88 +151,11 @@ class _ChatPageState extends State<ChatPage> {
     final bool hasHeader = !senderIsSelf &&
         widget.node is GroupNode &&
         nextMsg?.senderID != msg.senderID;
-    // final List<ChatReplyInfo>? repliesData = msg.replies
-    //     ?.map((msgID) {
-    //       final replyMsg = getMessage(msgID);
-    //       final replyUser = widget.senders[replyMsg?.senderID];
-    //       if (replyMsg == null || replyUser == null) return null;
-    //       final String replyBody = replyMsg.text?.isNotEmpty ?? false
-    //           ? replyMsg.text!
-    //           : "&attachment";
-    //       return ChatReplyInfo(
-    //         onPressReply: () => print("TODO ON REPLY PRESS!"),
-    //         senderID: replyMsg.senderID,
-    //         senderName: replyUser.node.name,
-    //         messageRefID: replyMsg.id,
-    //         thumbnail: replyUser.nodeImage,
-    //         body: replyBody,
-    //         type: replyUser.node.colorCode,
-    //       );
-    //     })
-    //     .whereType<ChatReplyInfo>()
-    //     .toList(growable: false);
-
-    // double minWidth = 0;
-    // final bool hasReplies = (repliesData?.length ?? 0) > 0;
-    // final bool hasHeader = !senderIsSelf &&
-    //     widget.node is GroupNode &&
-    //     nextMsg?.senderID != msg.senderID;
-
-    // if (hasReplies) {
-    //   final minRepLen = minReplyDisplayLen(repliesData!);
-    //   minWidth = minRepLen > ChatMessage.maxMessageWidth
-    //       ? ChatMessage.maxMessageWidth / golden
-    //       : minRepLen;
-    // }
-    // if (hasHeader) {
-    //   final tp = TextPainter(
-    //     text: TextSpan(
-    //         text: "-${msg.senderID}   ",
-    //         style: const TextStyle(fontFamily: "Alice", fontSize: 13)),
-    //     textDirection: TextDirection.ltr,
-    //   )..layout();
-    //   if (minWidth < tp.width &&
-    //       tp.width < ChatMessage.maxMessageWidth / golden) {
-    //     print("AAAAA");
-    //     minWidth = tp.width;
-    //   }
-    // }
-
-    // final textInfos = textAsStringList(msg);
-    // final hasText = textInfos != null;
-
-    // final lineStrings = textInfos?.specialDisplayTexts;
-    // final textWidth = textInfos?.neededWidth;
-    // final oneTextLineHeight = textInfos?.singleLineHeight;
-    // final heightIfNotOnSameLine = textInfos?.heightIfNotOnSameLine;
-
-    // final headerSize = hasHeader ? ChatMessage.headerHeight : 0;
-    // final repliesHeight = (repliesData?.length ?? 0) * ChatMessage.headerHeight;
-    // final nLines = hasText ? lineStrings!.length - 1 : 0;
-
-    // var messageHeight = (mediaInfo?.precalculatedMediaSize.height ?? 0) +
-    //     ChatMessage.messageBorder +
-    //     headerSize +
-    //     repliesHeight;
-
-    // messageHeight += hasText
-    //     ? (nLines * oneTextLineHeight!) +
-    //         ChatMessage.textPadding +
-    //         heightIfNotOnSameLine!
-    //     : 0;
-
-    // var messageWidth = mediaInfo != null
-    //     ? ChatMessage.maxMessageWidth
-    //     : lineStrings != null
-    //         ? textWidth! + ChatMessage.textPadding + ChatMessage.messageBorder
-    //         : 0.0; // TODO, will be forwarding nodes, or messages
-    // messageWidth = messageWidth < minWidth ? minWidth : messageWidth;
 
     return _cachedMsgs[msg.id] = ChatMessage(
       key: GlobalKey(),
       hasGap: hasGap,
       message: msg,
-      // spinningLogo: rotatingLogo,
       textInfo: ChatMessage.generateTextInfo(msg),
       mediaInfo: ChatMessage.generateMediaInfo(msg),
       repliesInfo: ChatMessage.generateRepliesInfo(msg, (replyID) {
@@ -298,7 +215,6 @@ class _ChatPageState extends State<ChatPage> {
                 elementAspectRatio: 1.0 / size.aspectRatio))
           ..isSaved = true
           ..save();
-        // _cachedSavedImages[mediaID] = down4Media;
         widget.self.images.add(mediaID);
         loadMediasConsole();
       }
@@ -341,7 +257,6 @@ class _ChatPageState extends State<ChatPage> {
           ..save();
         widget.self.videos.add(mediaID);
         loadMediasConsole();
-        // _cachedSavedVideos[mediaID] = down4Media;
       }
     }
     widget.self.save();
@@ -360,10 +275,6 @@ class _ChatPageState extends State<ChatPage> {
                   msg.message
                     ..isSaved = true
                     ..save();
-
-                  // msg.message
-                  // ..isSaved = true
-                  // ..save();
                 }
               }
               widget.self.save();
@@ -400,11 +311,9 @@ class _ChatPageState extends State<ChatPage> {
   void saveSelectedMessages() async {
     for (final msg in _cachedMsgs.values) {
       if (msg.selected) {
-        // final theMessage = getMessage(msg.messageID);
         _cachedMsgs[msg.message.id] = msg.invertedSelection();
         widget.self.messages.add(msg.message.id);
         msg.message
-          // theMessage
           ..isSaved = true
           ..save();
       }

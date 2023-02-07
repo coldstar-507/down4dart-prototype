@@ -125,17 +125,12 @@ class MessageMedia extends Media {
 }
 
 class NodeMedia extends Media {
+  Uint8List data;
   NodeMedia({
     required this.data,
     required Identifier id,
     required MediaMetadata metadata,
   }) : super(id: id, metadata: metadata);
-
-  Uint8List data;
-
-  // MessageMedia asMessageMedia() {
-  //   return MessageMedia(id: id, metadata: metadata, path: path);
-  // }
 
   factory NodeMedia.fromJson(dynamic decodedJson) {
     final b64Data = decodedJson["d"];
@@ -166,18 +161,16 @@ class MessageNotification {
 }
 
 class Message {
-  // final Messages type;
   final Identifier id;
   final Identifier senderID;
   final Identifier? root, forwarderID, mediaID;
   final String? text;
   final int timestamp;
-  final List<Identifier>? replies, nodes; // reactions, nodes
+  final List<Identifier>? replies, nodes;
   bool isRead, isSaved;
 
   Message({
     required this.senderID,
-    // required this.type,
     required this.timestamp,
     required this.id,
     this.mediaID,
@@ -192,7 +185,6 @@ class Message {
 
   Message forwarded(BaseNode self) {
     return Message(
-      // type: type,
       id: id,
       text: text,
       timestamp: timestamp,
@@ -205,9 +197,7 @@ class Message {
   }
 
   factory Message.fromJson(Map<String, dynamic> decodedJson) {
-    // print("decodedJson message: $decodedJson");
     return Message(
-      // type: Messages.values.byName(decodedJson["t"]),
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
@@ -215,8 +205,6 @@ class Message {
       isSaved: decodedJson["sv"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
-      // mediaID: decodedJson["m"],
-      // paymentID: decodedJson["p"],
       timestamp: decodedJson["ts"],
       root: decodedJson["rt"],
       replies: (decodedJson["r"] ?? "").isNotEmpty
@@ -229,7 +217,6 @@ class Message {
   }
 
   Map<String, dynamic> toJson({bool toLocal = false}) => {
-        // 't': type.name,
         'id': id,
         if (root != null) 'rt': root!,
         if (text != null) 'txt': text,
@@ -621,7 +608,6 @@ class MediaMetadata {
       isPaidToView,
       isPaidToOwn,
       isSquared,
-      // isVideo,
       canSkipCheck;
   final Identifier owner;
   final String extension;
@@ -633,7 +619,6 @@ class MediaMetadata {
     required this.timestamp,
     required this.elementAspectRatio,
     required this.extension,
-    // this.isVideo = false,
     this.isLocked = false,
     this.canSkipCheck = false,
     this.isPaidToView = false,
@@ -643,25 +628,6 @@ class MediaMetadata {
     this.text,
   });
 
-  // MediaMetadata updatedTimestamp(int newTimeStamp) {
-  //   return MediaMetadata(
-  //     owner: owner,
-  //     timestamp: newTimeStamp,
-  //     extension: extension,
-  //     elementAspectRatio: elementAspectRatio,
-  //     isVideo: isVideo,
-  //     isReversed: isReversed,
-  //     isPaidToOwn: isPaidToOwn,
-  //     canSkipCheck: false,
-  //     isPaidToView: isPaidToView,
-  //     isSquared: isSquared,
-  //     isLocked: isLocked,
-  //     text: text,
-  //   );
-  // }
-
-  // void updateTimestamp(int newTimestamp) => timestamp = newTimestamp;
-
   factory MediaMetadata.fromJson(Map<String, dynamic> decodedJson) {
     print(decodedJson);
     return MediaMetadata(
@@ -669,7 +635,6 @@ class MediaMetadata {
       timestamp: int.parse(decodedJson["ts"]),
       extension: decodedJson["ex"],
       isReversed: decodedJson["trv"] == "true",
-      // isVideo: decodedJson["vid"] == "true",
       isLocked: decodedJson["lck"] == "true",
       isPaidToView: decodedJson["ptv"] == "true",
       isPaidToOwn: decodedJson["pto"] == "true",
@@ -687,7 +652,6 @@ class MediaMetadata {
       "ex": extension,
       "trv": isReversed.toString(),
       "sqr": isSquared.toString(),
-      // "vid": isVideo.toString(),
       "lck": isLocked.toString(),
       "ptv": isPaidToView.toString(),
       "csc": canSkipCheck.toString(),

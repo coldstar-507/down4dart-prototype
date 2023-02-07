@@ -1,12 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
-import '_down4_dart_utils.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart' show Down4Payment, Down4TX;
-// import 'package:firebase_database/firebase_database.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
 
 Future<bool> usernameIsValid(String username) async {
   if (username.length < 3) {
@@ -138,74 +133,6 @@ Future<double?> getExchangeRate() async {
   if (res.statusCode != 200) return null;
   return jsonDecode(res.body)["rate"];
 }
-
-// Future<bool> pingRequest(PingRequest req) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req));
-//   return res.statusCode == 200;
-// }
-//
-// Future<bool> snipRequest(SnipRequest req) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req));
-//   return res.statusCode == 200;
-// }
-//
-// Future<Group?> groupRequest(GroupRequest req, [withMedia = false]) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
-//   if (res.statusCode == HttpStatus.noContent) {
-//     return groupRequest(req, true);
-//   }
-//   if (res.statusCode == 200) {
-//     return BaseNode.fromJson(jsonDecode(res.body)) as Group;
-//   } else {
-//     return null;
-//   }
-// }
-//
-// Future<Hyperchat?> hyperchatRequest(
-//   HyperchatRequest req, [
-//   bool withMedia = false,
-// ]) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
-//   if (res.statusCode == HttpStatus.noContent) {
-//     return hyperchatRequest(req, true);
-//   }
-//   if (res.statusCode == 200) {
-//     return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
-//   } else {
-//     return null;
-//   }
-// }
-//
-// Future<bool> paymentRequest(PaymentRequest req) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req));
-//   return res.statusCode == 200;
-// }
-//
-// Future<bool> chatRequest(ChatRequest req, [withMedia = false]) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
-//   );
-//   final res = await http.post(url, body: jsonEncode(req.toJson(withMedia)));
-//   if (res.statusCode == HttpStatus.noContent) {
-//     return chatRequest(req, true);
-//   }
-//   return res.statusCode == 200;
-// }
 
 Future<int> refreshTokenRequest(String newToken) async {
   final url = Uri.parse(

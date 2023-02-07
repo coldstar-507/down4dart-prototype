@@ -64,7 +64,6 @@ class _Down4State extends State<Down4> {
       _wallet = loadWallet();
       home();
     } else {
-      // returns false if user hasn't been initialized
       createUser();
     }
   }
@@ -118,15 +117,6 @@ class _Down4State extends State<Down4> {
       print("It was not a success");
       return false;
     }
-
-    // final thumbnail = await FlutterImageCompress.compressWithFile(
-    //   appPath,
-    //   minWidth: 20,
-    //   minHeight: 20,
-    //   quality: 50,
-    // );
-    //
-    // image.thumbnail = thumbnail;
 
     _self = Self(
       id: id,

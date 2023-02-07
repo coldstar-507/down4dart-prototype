@@ -62,7 +62,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
   void initState() {
     super.initState();
     loadBaseConsole();
-    // asyncImageLoad();
     animatedTransition();
   }
 
@@ -113,8 +112,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
       wordPairs: pairs,
       media: mediaInput ?? _cameraInput,
     );
-
-    // return print("LOLOLOLOL");
     widget.hyperchatRequest(hcReq);
   }
 
@@ -138,9 +135,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
         onSelectMedia: (media) => send(mediaInput: media),
         nMedias: images ? widget.self.images.length : widget.self.videos.length,
       ),
-      // selectMedia: (media) => send(mediaInput: media),
-      // images: true,
-      // medias: images ? savedImages.toList() : savedVideos.toList(),
       topButtons: [
         ConsoleButton(
           name: "Import",
@@ -208,7 +202,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
                 elementAspectRatio: 1.0 / size.aspectRatio))
           ..isSaved = true
           ..save();
-        // _cachedSavedImages[mediaID] = down4Media;
         widget.self.images.add(mediaID);
         loadMediaConsole();
       }

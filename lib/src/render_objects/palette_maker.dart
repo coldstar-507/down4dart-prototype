@@ -226,38 +226,8 @@ class UserMakerPalette extends StatelessWidget {
   }
 }
 
-// abstract class PaletteMaker2 {
-//   void Function()? get nameCallBack;
-//   void Function()? get imagePress;
-//   Image get defaultImage;
-//   String get defaultName;
-//   String? get name;
-//   NodesColor get colorCode;
-//   Nodes? get parentType;
-//   TextEditingController get tec;
-//   bool get fold;
-//   void Function(Identifier)? get go;
-//   const PaletteMaker2({
-//     void Function()? nameCallBack,
-//     void Function()? imagePress,
-//     required Image defaultImage,
-//     required String defaultName,
-//     String? name,
-//     required NodesColor colorCode,
-//     Nodes? parentType,
-//     required TextEditingController tec,
-//     bool fold = false,
-//     void Function(Identifier)? go,
-//   });
-// }
-//
-// class GroupMaker extends StatelessWidget implements PaletteMaker2 {
-//
-// }
-
 class PaletteMaker extends StatelessWidget {
   final void Function(String)? nameCallBack;
-  // final void Function(Uint8List) imageCallBack;
   final void Function() imagePress;
   final String name, id;
   final String hintText;
@@ -276,7 +246,6 @@ class PaletteMaker extends StatelessWidget {
     required this.name,
     this.nameCallBack,
     required this.imagePress,
-    // required this.imageCallBack,
     this.image,
     required this.hintText,
     this.go,
@@ -433,10 +402,6 @@ class PaletteMaker extends StatelessWidget {
   Widget get paletteImage => GestureDetector(
         onTap: imagePress,
         child: SizedBox(
-          // clipBehavior: Clip.hardEdge,
-          // decoration: const BoxDecoration(
-          //   borderRadius: BorderRadius.horizontal(left: Radius.circular(4.0)),
-          // ),
           width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image == null
               ? _defaultImage
@@ -451,7 +416,6 @@ class PaletteMaker extends StatelessWidget {
   Widget get paletteBody => Expanded(
         child: Container(
           padding: const EdgeInsets.only(left: 10.0, top: 10.0),
-          // color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
           child: Down4Input(
             tec: tec,
             inputCallBack: nameCallBack,
@@ -468,15 +432,9 @@ class PaletteMaker extends StatelessWidget {
         }
       },
       child: Container(
-          // clipBehavior: Clip.hardEdge,
           padding: const EdgeInsets.all(2.0),
           width: Palette.paletteHeight - 4,
           height: Palette.paletteHeight - 4,
-          // decoration: BoxDecoration(
-          //     color: PinkTheme.nodeColors[colorCode], //PinkTheme.headerColor,
-          //     borderRadius: const BorderRadius.only(
-          //         topRight: Radius.circular(4.0),
-          //         bottomRight: Radius.circular(4.0))),
           child: go != null
               ? Image.asset('lib/src/assets/images/filled.png')
               : const SizedBox.shrink()));
@@ -495,265 +453,3 @@ class PaletteMaker extends StatelessWidget {
     );
   }
 }
-
-// class LocalPaletteMaker extends StatelessWidget {
-//   final void Function(String) nameCallBack;
-//   final void Function(Uint8List) imageCallBack;
-//   final String name, id;
-//   final String hintText;
-//   final Uint8List image;
-//   final LocalNodes type;
-//   const LocalPaletteMaker({
-//     required this.id,
-//     required this.name,
-//     required this.nameCallBack,
-//     required this.imageCallBack,
-//     required this.image,
-//     required this.hintText,
-//     required this.type,
-//     Key? key,
-//   }) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       height: Palette.height,
-//       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-//       decoration: BoxDecoration(
-//           boxShadow: const [
-//             BoxShadow(
-//                 color: Colors.black54,
-//                 blurRadius: 6.0,
-//                 spreadRadius: -6.0,
-//                 offset: Offset(8.0, 8.0),
-//                 blurStyle: BlurStyle.normal)
-//           ],
-//           borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-//           border: Border.all(width: 2.0, color: Colors.transparent)),
-//       child: Row(
-//         crossAxisAlignment: CrossAxisAlignment.stretch,
-//         textDirection: TextDirection.ltr,
-//         children: [
-//           GestureDetector(
-//             onTap: () async {
-//               FilePickerResult? r = await FilePicker.platform.pickFiles(
-//                   type: FileType.custom,
-//                   allowedExtensions: ['jpg', 'png', 'jpeg'],
-//                   withData: true);
-//               if (r?.files.single.bytes != null) {
-//                 imageCallBack(r!.files.single.bytes!);
-//               }
-//             },
-//             child: Container(
-//               clipBehavior: Clip.hardEdge,
-//               decoration: const BoxDecoration(
-//                   borderRadius: BorderRadius.only(
-//                 topLeft: Radius.circular(4.0),
-//                 bottomLeft: Radius.circular(4.0),
-//               )),
-//               width: Palette.height - 2.0, // borderWidth x2
-//               child: image.isEmpty
-//                   ? Image.asset(
-//                       'lib/src/assets/picture_place_holder_2.png',
-//                       fit: BoxFit.cover,
-//                       gaplessPlayback: true,
-//                     )
-//                   : Image.memory(
-//                       image,
-//                       gaplessPlayback: true,
-//                       fit: BoxFit.cover,
-//                     ),
-//             ),
-//           ),
-//           Expanded(
-//             child: Container(
-//                 padding: const EdgeInsets.only(left: 10.0, top: 10.0),
-//                 color: PinkTheme.nodeColors[type], //PinkTheme.headerColor,
-//                 child: Down4Input(
-//                   inputCallBack: nameCallBack,
-//                   placeHolder: hintText,
-//                   padding: const EdgeInsets.only(bottom: Palette.height / 2),
-//                 ) // TextField(
-//                 //   textAlignVertical: TextAlignVertical.top,
-//                 //   decoration: InputDecoration(
-//                 //       hintText: hintText,
-//                 //       border: InputBorder.none,
-//                 //       contentPadding: const EdgeInsets.only(
-//                 //           bottom: (SingleActionPalette.height) / 2)),
-//                 //   textDirection: TextDirection.ltr,
-//                 //   onChanged: nameCallBack,
-//                 // ),
-//                 ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-// class LocalPalette extends StatelessWidget {
-//   static const double height = 60.0;
-//   final LocalNode node;
-//   final void Function(String)? imPress,
-//       bodyPress,
-//       imLongPress,
-//       bodyLongPress,
-//       goPress,
-//       goLongPress;
-//   final bool selected;
-
-//   const LocalPalette({
-//     required this.node,
-//     this.imPress,
-//     this.bodyPress,
-//     this.imLongPress,
-//     this.bodyLongPress,
-//     this.goLongPress,
-//     this.goPress,
-//     this.selected = false,
-//     Key? key,
-//   }) : super(key: key);
-
-//   LocalPalette invertedSelection() {
-//     return LocalPalette(
-//       node: node,
-//       selected: !selected,
-//       imPress: imPress,
-//       imLongPress: imLongPress,
-//       bodyPress: bodyPress,
-//       bodyLongPress: bodyLongPress,
-//       goPress: goPress,
-//       goLongPress: goLongPress,
-//     );
-//   }
-
-//   LocalPalette deactivated() {
-//     return LocalPalette(
-//       node: node,
-//     );
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       height: Palette.height,
-//       margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-//       decoration: BoxDecoration(
-//         boxShadow: !selected
-//             ? [
-//                 const BoxShadow(
-//                   color: Colors.black54,
-//                   blurRadius: 6.0,
-//                   spreadRadius: -6.0,
-//                   offset: Offset(8.0, 8.0),
-//                   blurStyle: BlurStyle.normal,
-//                 )
-//               ]
-//             : null,
-//         borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-//         border: Border.all(
-//           width: 2.0,
-//           color: selected ? PinkTheme.black : Colors.transparent,
-//         ),
-//       ),
-//       child: Row(
-//         crossAxisAlignment: CrossAxisAlignment.stretch,
-//         textDirection: TextDirection.ltr,
-//         children: [
-//           GestureDetector(
-//             onTap: () => imPress?.call(node.id),
-//             onLongPress: () => imLongPress?.call(node.id),
-//             child: Container(
-//               clipBehavior: Clip.hardEdge,
-//               decoration: const BoxDecoration(
-//                 borderRadius: BorderRadius.only(
-//                   topLeft: Radius.circular(4.0),
-//                   bottomLeft: Radius.circular(4.0),
-//                 ),
-//               ),
-//               width: Palette.height - 2.0, // borderWidth x2
-//               child: Image.memory(
-//                 node.image.data,
-//                 fit: BoxFit.cover,
-//               ),
-//             ),
-//           ),
-//           Expanded(
-//             child: GestureDetector(
-//               onTap: () => bodyPress?.call(node.id),
-//               onLongPress: () => bodyLongPress?.call(node.id),
-//               child: Container(
-//                 decoration: BoxDecoration(
-//                   color: PinkTheme.nodeColors[node.type],
-//                   border: Border(
-//                     left: BorderSide(
-//                       color: selected
-//                           ? PinkTheme.black
-//                           : PinkTheme.nodeColors[node.type]!,
-//                       width: 1.0,
-//                     ),
-//                   ),
-//                 ),
-//                 padding: const EdgeInsets.only(left: 6.0, top: 5.0),
-//                 child: Column(
-//                   mainAxisAlignment: MainAxisAlignment.start,
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     Text(
-//                       node.name + " " + (node.lastName ?? ""),
-//                       style: TextStyle(
-//                         fontSize: 14,
-//                         fontWeight:
-//                             selected ? FontWeight.bold : FontWeight.normal,
-//                       ),
-//                     ),
-//                     node.type == Nodes.user
-//                         ? Text(
-//                             "@" + node.id,
-//                             style: TextStyle(
-//                               fontSize: 10,
-//                               fontWeight: selected
-//                                   ? FontWeight.bold
-//                                   : FontWeight.normal,
-//                             ),
-//                           )
-//                         : const SizedBox.shrink(),
-//                   ],
-//                 ),
-//               ),
-//             ),
-//           ),
-//           goPress != null
-//               ? GestureDetector(
-//                   onTap: () => goPress!.call(node.id),
-//                   onLongPress: () => goLongPress?.call(node.id),
-//                   child: Container(
-//                     padding: const EdgeInsets.all(2.0),
-//                     decoration: BoxDecoration(
-//                       color: PinkTheme.nodeColors[node.type],
-//                       borderRadius: const BorderRadius.only(
-//                         topRight: Radius.circular(4.0),
-//                         bottomRight: Radius.circular(4.0),
-//                       ),
-//                     ),
-//                     child: Image.asset(
-//                       "lib/src/assets/rightBlackArrow.png",
-//                       fit: BoxFit.cover,
-//                     ),
-//                   ),
-//                 )
-//               : Container(
-//                   padding: const EdgeInsets.all(2.0),
-//                   decoration: BoxDecoration(
-//                     color: PinkTheme.nodeColors[node.type],
-//                     borderRadius: const BorderRadius.only(
-//                       topRight: Radius.circular(4.0),
-//                       bottomRight: Radius.circular(4.0),
-//                     ),
-//                   ),
-//                 ),
-//         ],
-//       ),
-//     );
-//   }
-// }

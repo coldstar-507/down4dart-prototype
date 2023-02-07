@@ -74,16 +74,18 @@ class _AddFriendPageState extends State<AddFriendPage> {
         widget.self.neuter.toYouKnow(),
       ].join("~");
 
-  double get dimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);
+  static double get qrDimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);
+
+  static double get qrTopGap => Sizes.w - qrDimension * 2 * 1 / golden;
 
   Widget get qr => Align(
         alignment: Alignment.topCenter,
         child: Column(
           children: [
-            SizedBox(height: Sizes.w - dimension * 2 * 1 / golden),
+            SizedBox(height: qrTopGap),
             SizedBox.square(
-              dimension: dimension,
-              child: Down4Qr(data: qrData, dimension: dimension),
+              dimension: qrDimension,
+              child: Down4Qr(data: qrData, dimension: qrDimension),
             ),
           ],
         ),

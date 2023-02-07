@@ -2,12 +2,10 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 
-import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 
-import '../_down4_dart_utils.dart';
 import '../render_objects/console.dart';
 import '../boxes.dart';
 
@@ -47,7 +45,6 @@ class _SnipCameraState extends State<SnipCamera> {
   double _baseScale = 1.0;
   var tec = TextEditingController();
   bool _extra = false;
-  // late Size mediaSize = MediaQuery.of(context).size;
 
   double get scale => widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
 
@@ -57,13 +54,7 @@ class _SnipCameraState extends State<SnipCamera> {
       ? Center(
           child: Container(
             width: Sizes.w,
-            decoration: const BoxDecoration(
-              // border: Border.symmetric(
-              //   horizontal: BorderSide(color: Colors.black38),
-              // ),
-              color: Colors.black38,
-              // color: PinkTheme.snipRibbon,
-            ),
+            decoration: const BoxDecoration(color: Colors.black38),
             constraints: BoxConstraints(
               minHeight: 16,
               maxHeight: Sizes.fullHeight,
@@ -336,7 +327,6 @@ class _SnipCameraState extends State<SnipCamera> {
 
   @override
   Widget build(BuildContext context) {
-    // print("Extra = $_extra}");
     return _preview ?? capturingPage();
   }
 }

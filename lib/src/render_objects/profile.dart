@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import 'palette.dart';
+
 import '../data_objects.dart';
 import '../boxes.dart';
 import '../themes.dart';
-import 'palette.dart';
+
+import '../render_objects/lists.dart';
 
 class ProfileWidget extends StatelessWidget {
   final Palette palette;
@@ -14,7 +17,7 @@ class ProfileWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var node = palette.node as User;
+    var node = palette.node as Person;
     final squareImageSize = Sizes.w * 0.84;
     return Container(
       clipBehavior: Clip.hardEdge,
@@ -22,7 +25,7 @@ class ProfileWidget extends StatelessWidget {
       margin: EdgeInsets.only(
         left: Sizes.w * 0.08,
         right: Sizes.w * 0.08,
-        top: (Sizes.w * 0.08) - (Sizes.w * 0.02),
+        top: (Sizes.w * 0.08) - DynamicList.gapSize,
       ),
       decoration: const BoxDecoration(
         boxShadow: [

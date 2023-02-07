@@ -80,17 +80,13 @@ class ButtonsInfo {
 }
 
 class Palette extends StatelessWidget {
-  // static double get paletteHeight => Sizes.h * 0.1052;
   static double get paletteHeight => Sizes.h * 0.1027;
-  // static double get gapSize => Sizes.h * 0.0147;
   static double get gapSize => Sizes.h * 0.0166;
-  // static double get paletteMargin => Sizes.w * 0.042;
   static double get paletteMargin => Sizes.w * 0.042;
   static double get blurRadius => 6.0;
   static double get spreadRadius => -7.0;
   static Offset get shadowOffset => const Offset(6.0, 6.0);
   static Color get shadowColor => Colors.black.withOpacity(0.66);
-  // static const double height = 60.0;
   final BaseNode node;
   final String at;
   final void Function(String, String)? imPress,
@@ -236,9 +232,6 @@ class Palette extends StatelessWidget {
 
   Widget get buttons => AnimatedOpacity(
       opacity: fadeButton ? 0 : 1,
-      // : snipOrMessageToRead
-      //     ? 1
-      //     : 0.50,
       curve: Curves.easeInOut,
       duration: Duration(milliseconds: fadeButtonMS),
       child: Row(
@@ -361,9 +354,6 @@ class Palette extends StatelessWidget {
                         maxLines: 1,
                         style: TextStyle(
                           fontSize: 12,
-                          // fontStyle: messagePreviewWasRead
-                          //     ? FontStyle.normal
-                          //     : FontStyle.italic,
                           fontWeight:
                               !selected ? FontWeight.normal : FontWeight.bold,
                         ),

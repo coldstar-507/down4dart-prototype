@@ -78,7 +78,6 @@ class _GroupPageState extends State<GroupPage> {
     super.initState();
     loadBaseConsole();
     animatedTransition();
-    // asyncImageLoad();
   }
 
   Future<void> animatedTransition() async {
@@ -425,7 +424,6 @@ class _GroupPageState extends State<GroupPage> {
 
   @override
   void dispose() async {
-    // _ctrl?.dispose();
     super.dispose();
   }
 

@@ -96,9 +96,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
             _calls.add(r.usernameIsValid(id));
             _id = id.toLowerCase();
           },
-          placeHolder: "@username"
-          // value: _id == '' ? '' : '@$_id',
-          ),
+          placeHolder: "@username"),
       ConsoleInput(
         tec: tec2,
         inputCallBack: (firstName) {
@@ -180,8 +178,6 @@ class _UserMakerPageState extends State<UserMakerPage> {
     if (path == null) {
       _console = Console(
         cameraController: ctrl,
-        // toMirror: cam == 1,
-        // aspectRatio: ctrl?.value.aspectRatio,
         topButtons: [
           ConsoleButton(
             name: "Capture",
@@ -206,9 +202,6 @@ class _UserMakerPageState extends State<UserMakerPage> {
             path: path,
             isReversed: cam == 1,
             imageAspectRatio: ctrl?.value.aspectRatio ?? 1.0),
-        // imagePreviewPath: path,
-        // aspectRatio: ctrl?.value.aspectRatio ?? 1.0,
-        // toMirror: cam == 1,
         topButtons: [
           ConsoleButton(
             name: "Accept",

@@ -6,18 +6,6 @@ import '../themes.dart';
 import '../boxes.dart';
 import '../render_objects/_down4_flutter_utils.dart' show down4Logo;
 
-class LoadingPage extends StatelessWidget {
-  const LoadingPage({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: PinkTheme.backGroundColor,
-      child: const Center(child: Text("Loading...")),
-    );
-  }
-}
-
 class LoadingPage2 extends StatefulWidget {
   final String? seed;
   const LoadingPage2({this.seed, Key? key}) : super(key: key);
@@ -28,8 +16,6 @@ class LoadingPage2 extends StatefulWidget {
 
 class _LoadingPage2State extends State<LoadingPage2>
     with SingleTickerProviderStateMixin {
-  // late String text = sha256(utf8.encode(widget.seed ?? "")).toHex();
-
   late final AnimationController _controller =
       AnimationController(vsync: this, duration: const Duration(seconds: 2))
         ..repeat();
@@ -53,17 +39,6 @@ class _LoadingPage2State extends State<LoadingPage2>
         ),
       );
 
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   // Timer.periodic(const Duration(milliseconds: 100), (timer) { });
-  //   // Future.delayed(const Duration(milliseconds: 90), () {
-  //   //   setState(() {
-  //   //     text = sha256(utf8.encode(text)).toHex();
-  //   //   });
-  //   // });
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -73,43 +48,5 @@ class _LoadingPage2State extends State<LoadingPage2>
         child: rotatingLogo,
       ),
     );
-
-    // Andrew(pages: [
-    //   Down4Page(
-    //     title: "Loading",
-    //     centerStackItems: true,
-    //     stackWidgets: [rotatingLogo],
-    //   )
-    // ]);
-
-    // var texts = [
-    //   text.substring(0, 8),
-    //   text.substring(8, 16),
-    //   text.substring(16, 24),
-    //   text.substring(24, 32),
-    //   text.substring(32, 40),
-    //   text.substring(40, 48),
-    //   text.substring(48, 56),
-    //   text.substring(56, 64)
-    // ];
-    // return Andrew(pages: [
-    //   Down4Page(title: "Loading", stackWidgets: [
-    //     Center(
-    //       child: Column(
-    //         children: texts
-    //             .map((t) => Text(
-    //                   t,
-    //                   textAlign: TextAlign.justify,
-    //                   style: const TextStyle(
-    //                     color: PinkTheme.black,
-    //                     fontSize: 24,
-    //                     fontWeight: FontWeight.bold,
-    //                   ),
-    //                 ))
-    //             .toList(growable: false),
-    //       ),
-    //     )
-    //   ])
-    // ]);
   }
 }

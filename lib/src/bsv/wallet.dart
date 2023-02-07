@@ -17,10 +17,6 @@ class Wallet {
 
   Down4Keys get neuter => _keys.neutered();
 
-  // Down4Keys get keys => _keys;
-
-  // Map<Identifier, Down4TXOUT> get utxos => _utxos;
-
   int get balance => _utxos.values.fold(0, (bal, tx) => bal + tx.sats.asInt);
 
   Set<Down4Payment> get payments => _payments.values.toSet();
@@ -74,19 +70,6 @@ class Wallet {
       }
     }
   }
-
-  // void paymentRoutine() {
-  //   // clears space and make other routines faster
-  //   // we can remove payment after the last tx has over 60 confirmations
-  //   for (final payment in payments) {
-  //     final confirmations = payment.txs.last.confirmations;
-  //     if (confirmations > 60) {
-  //       _payments.remove(payment.id);
-  //     } else if (confirmations == 0) {
-  //       _trySettlement(payment);
-  //     }
-  //   }
-  // }
 
   Down4Payment? payPeople({
     required List<Person> people,

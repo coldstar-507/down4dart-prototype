@@ -69,45 +69,6 @@ class _PaymentPageState extends State<PaymentPage> {
         setState(() {});
       });
 
-  // Future<void> loadQrs() async {
-  //   if (widget.payment.qrPngs != null) {
-  //     qrs2 = widget.payment.qrPngs!
-  //         .map((e) => Align(
-  //             alignment: Alignment.topCenter,
-  //             child: Column(children: [
-  //               SizedBox(height: topPadding),
-  //               SizedBox.square(
-  //                   dimension: qrDimension,
-  //                   child: Image.memory(e,
-  //                       height: qrDimension, width: qrDimension))
-  //             ])))
-  //         .toList(growable: false);
-  //   } else {
-  //     widget.payment.qrPngs = widget.paymentAsList
-  //         .map((e) async =>
-  //             await Down4Qr2(data: e, dimension: qrDimension).asImage())
-  //         .whereType<Uint8List>()
-  //         .toList(growable: false);
-  //
-  //     widget.payment.save();
-  //
-  //     qrs2 = widget.payment.qrPngs!
-  //         .map((e) => Align(
-  //             alignment: Alignment.topCenter,
-  //             child: Column(children: [
-  //               SizedBox(height: topPadding),
-  //               SizedBox.square(
-  //                   dimension: qrDimension,
-  //                   child: Image.memory(e,
-  //                       height: qrDimension, width: qrDimension))
-  //             ])))
-  //         .toList(growable: false);
-  //   }
-  //   setState(() {
-  //     startTimer();
-  //   });
-  // }
-
   void loadQrsAsPaints() {
     for (int i = 0; i < widget.paymentAsList.length; i++) {
       var paymentData = widget.paymentAsList[i];
@@ -302,21 +263,6 @@ class _MoneyPageState extends State<MoneyPage> {
 
   String get method => _paymentMethod["l"][_paymentMethod["i"]] as String;
 
-  // int get inputAsSatoshis {
-  //   int amount;
-  //   final numInput = num.parse(tec.value.text);
-  //   if (currency == "Satoshis") {
-  //     amount = method == "Split"
-  //         ? numInput.round()
-  //         : (numInput * widget.trueTargets.length).round();
-  //   } else {
-  //     amount = method == "Split"
-  //         ? usdToSatoshis(numInput.toDouble())
-  //         : usdToSatoshis(numInput.toDouble() * widget.trueTargets.length);
-  //   }
-  //   return amount;
-  // }
-
   void rotateCurrency() {
     _currencies["i"] =
         (_currencies["i"] + 1) % (_currencies["l"] as List<String>).length;
@@ -397,8 +343,6 @@ class _MoneyPageState extends State<MoneyPage> {
       scanner: !scanning
           ? null
           : MobileScanner(onDetect: onScan, controller: scanner),
-      // scanCallBack: scanning ? onScan : null,
-      // scanController: scanning ? scanner : null,
       bottomInputs: [_cachedMainViewInput!],
       topButtons: [
         ConsoleButton(
@@ -513,13 +457,6 @@ class _MoneyPageState extends State<MoneyPage> {
     _console = Console(
       bottomInputs: [
         ConsoleInput(placeHolder: "(Text Note)", tec: textNoteTec)
-        // ConsoleInput(
-        //   placeHolder: currency == "USD"
-        //       ? "${asUSD.toStringAsFixed(4)} \$"
-        //       : "$satsString sat",
-        //   tec: emptyTec,
-        //   activated: false,
-        // ),
       ],
       topButtons: [
         ConsoleButton(

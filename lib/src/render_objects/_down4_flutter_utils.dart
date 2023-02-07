@@ -73,66 +73,6 @@ class _Down4InputState extends State<Down4Input> {
   }
 }
 
-// class Down4VideoPlayer2 extends StatelessWidget {
-//   final MessageMedia media;
-//   final Uint8List? thumbnail;
-//   final VideoPlayerController videoController;
-//   final Future<void> Function() touch, stop;
-
-//   final Color backgroundColor;
-//   final Size displaySize;
-//   final bool forceSquareAnyways;
-//   final bool autoPlay;
-//   const Down4VideoPlayer2({
-//     this.thumbnail,
-//     required this.touch,
-//     required this.stop,
-//     required this.videoController,
-//     required this.backgroundColor,
-//     required this.media,
-//     required this.autoPlay,
-//     required this.displaySize,
-//     this.forceSquareAnyways = false,
-//     Key? key,
-//   }) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Stack(children: [
-//       videoController.value.isPlaying
-//           ? Down4VideoTransform(
-//               displaySize: displaySize,
-//               isReversed: media.isVideo,
-//               isSquared: media.metadata.isSquared || forceSquareAnyways,
-//               video: VideoPlayer(videoController),
-//               videoAspectRatio: media.metadata.elementAspectRatio)
-//           : Stack(
-//               children: [
-//                 Down4ImageTransform(
-//                     image: Image.memory(thumbnail!,
-//                         fit: BoxFit.cover,
-//                         cacheHeight: displaySize.height.toInt(),
-//                         cacheWidth: displaySize.width.toInt()),
-//                     imageAspectRatio: media.metadata.elementAspectRatio,
-//                     displaySize: displaySize,
-//                     isSquared: media.metadata.isSquared || forceSquareAnyways,
-//                     isReversed: media.metadata.isReversed),
-//                 Center(
-//                     child: SizedBox.square(
-//                         dimension: displaySize.aspectRatio > 1
-//                             ? displaySize.height / 4
-//                             : displaySize.width / 4,
-//                         child: GestureDetector(
-//                             onTap: touch,
-//                             child: Image.asset(
-//                                 "lib/src/assets/images/filled.png",
-//                                 fit: BoxFit.cover))))
-//               ],
-//             )
-//     ]);
-//   }
-// }
-
 class Down4VideoPlayer extends StatefulWidget {
   final VideoPlayerController videoController;
   // final Widget Function(double) rotatingLogo;
@@ -449,42 +389,6 @@ class Down4ImageViewer extends StatelessWidget {
   }
 }
 
-// class Down4MediaViewer extends StatelessWidget {
-//   final MessageMedia media;
-//   final Size displaySize;
-//   final Color backgroundColor;
-//   final bool forceSquareAnyways;
-//   final bool autoPlayIfVideo;
-//   final Widget rotatingLogo;
-//   const Down4MediaViewer({
-//     required this.rotatingLogo,
-//     required this.backgroundColor,
-//     required this.media,
-//     required this.displaySize,
-//     this.forceSquareAnyways = false,
-//     this.autoPlayIfVideo = false,
-//     Key? key,
-//   }) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return media.isVideo
-//         ? Down4VideoPlayer(
-//             media: media,
-//             backgroundColor: backgroundColor,
-//             displaySize: displaySize,
-//             forceSquareAnyways: forceSquareAnyways,
-//             autoPlay: autoPlayIfVideo,
-//             rotatingLogo: rotatingLogo,
-//           )
-//         : Down4ImageViewer(
-//             media: media,
-//             displaySize: displaySize,
-//             forceSquareAnyways: forceSquareAnyways,
-//           );
-//   }
-// }
-
 extension PaletteExtensionsMap on Map<Identifier, Palette> {
   Map<Identifier, Palette> those(List<Identifier> ids) {
     var map = <Identifier, Palette>{};
@@ -606,47 +510,6 @@ class MediaSizeClipper extends CustomClipper<Rect> {
   }
 }
 
-// enum DisplayType {
-//   image,
-//   video,
-//   camera,
-// }
-
-// class Down4Display extends StatelessWidget {
-//   final Size renderRect;
-//   final double captureAspectRatio;
-//   final Widget child;
-//   final bool isReversed;
-//   final DisplayType displayType;
-
-//   const Down4Display({
-//     required this.captureAspectRatio,
-//     required this.displayType,
-//     required this.isReversed,
-//     required this.renderRect,
-//     required this.child,
-//     Key? key,
-//   }) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final scale = renderRect.aspectRatio * captureAspectRatio;
-//     return Transform(
-//       alignment: Alignment.center,
-//       transform: Matrix4.rotationY(isReversed ? math.pi : 0),
-//       child: Transform.scale(
-//         scale: displayType == DisplayType.video
-//             ? null
-//             : scale > 1
-//                 ? scale
-//                 : 1 / scale,
-//         scaleY: displayType == DisplayType.video ? captureAspectRatio : null,
-//         child: Center(child: child),
-//       ),
-//     );
-//   }
-// }
-
 class Down4VideoTransform extends StatelessWidget {
   final Size displaySize;
   final double videoAspectRatio;
@@ -680,33 +543,6 @@ class Down4VideoTransform extends StatelessWidget {
     );
   }
 }
-
-// Future<Size?> calculateImageDimension({
-//   File? f,
-//   Uint8List? d,
-//   String? url,
-// }) async {
-//   Image? image = f != null
-//       ? Image.file(f)
-//       : d != null
-//           ? Image.memory(d)
-//           : url != null
-//               ? Image.network(url)
-//               : null;
-//   if (image == null) return null;
-//   Future<ImageInfo> getImageInfo(Image img) async {
-//     final c = Completer<ImageInfo>();
-//     img.image
-//         .resolve(const ImageConfiguration())
-//         .addListener(ImageStreamListener((ImageInfo i, bool _) {
-//       c.complete(i);
-//     }));
-//     return c.future;
-//   }
-
-//   final info = await getImageInfo(image);
-//   return Size(info.image.width.toDouble(), info.image.height.toDouble());
-// }
 
 Future<Size> decodeImageSize(Uint8List d) async {
   final decodedImage = await decodeImageFromList(d);

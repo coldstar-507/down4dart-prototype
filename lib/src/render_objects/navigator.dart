@@ -12,8 +12,6 @@ class Down4Page {
   final ScrollController? scrollController;
   final String title;
   final List<Widget>? _list;
-  // final RefreshController? refreshController;
-  // final void Function()? onRefresh, onLoading;
   final Future<void> Function()? onRefresh;
   final Map<String, Widget>? asMap;
   final List<String>? orderedKeys;
@@ -27,9 +25,7 @@ class Down4Page {
     this.scrollController,
     this.asMap,
     this.orderedKeys,
-    // this.refreshController,
     this.onRefresh,
-    // this.onLoading,
     this.isChatPage = false,
     this.stackWidgets,
     this.iterableLen,
@@ -143,25 +139,6 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                   topPadding: page.value.isChatPage ? 4 : null,
                                   list: page.value.list,
                                 )
-                              // .map((p) => p is Palette
-                              //     ? p.animated(
-                              //         squish: page.key == curPos,
-                              //         alignedRight: curPos < page.key
-                              //             ? true
-                              //             : curPos > page.key
-                              //                 ? false
-                              //                 : null)
-                              //     : p is ChatMessage
-                              //         ? p.animated(
-                              //             show: page.key == curPos,
-                              //             transitionFromRight:
-                              //                 curPos < page.key
-                              //                     ? true
-                              //                     : curPos > page.key
-                              //                         ? false
-                              //                         : null)
-                              //         : p)
-                              // .toList(growable: false))
                               : DynamicList(
                                   // refreshController: page.value.refreshController,
                                   // onLoading: page.value.onLoading,
@@ -173,27 +150,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                   topPadding: page.value.isChatPage ? 4 : null,
                                   iterables: page.value.iterables,
                                   iterableLen: page.value.iterableLen,
-                                  list: page.value.list
-                                  // .map((p) => p is Palette
-                                  //     ? p.animated(
-                                  //         squish: page.key == curPos,
-                                  //         alignedRight: curPos < page.key
-                                  //             ? true
-                                  //             : curPos > page.key
-                                  //                 ? false
-                                  //                 : null)
-                                  //     : p is ChatMessage
-                                  //         ? p.animated(
-                                  //             show: page.key == curPos,
-                                  //             transitionFromRight:
-                                  //                 curPos < page.key
-                                  //                     ? true
-                                  //                     : curPos > page.key
-                                  //                         ? false
-                                  //                         : null)
-                                  //         : p)
-                                  // .toList()
-                                  ),
+                                  list: page.value.list),
                         )))
                     .toList(growable: false),
               ),

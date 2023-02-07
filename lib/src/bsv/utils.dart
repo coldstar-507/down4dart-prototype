@@ -15,18 +15,11 @@ import 'package:bs58/bs58.dart';
 import 'package:convert/convert.dart';
 import 'package:pointycastle/export.dart';
 
-// import '../down4_utility.dart';
 import 'package:collection/collection.dart';
 
 import 'dart:io' as io;
 
 final listEqual_ = const ListEquality().equals;
-
-// extension on List<int> {
-//   Uint8List asUint8List() => Uint8List.fromList(this);
-//   String toBase58() => base58.encode(this.asUint8List());
-//   String toHex() => hex.encode(this);
-// }
 
 int randomSats() {
   return Random().nextInt(50);
