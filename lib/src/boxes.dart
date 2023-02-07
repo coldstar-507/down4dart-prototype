@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
-// import 'package:sqflite/sql.dart' as sql;
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -48,29 +48,20 @@ class ButtonKeys {
   static ButtonKeys get instance => _instance ??= ButtonKeys._();
 }
 
-String mediaPath(String mediaID, {bool temporary = false}) =>
-    "${temporary ? b.tempPath : b.docPath}/$mediaID";
+String mediaPath(String mediaID, {bool isThumbnail = false}) =>
+    "${b.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
 
-Future<void> deleteMediaFile(String mediaID) async {
+Future<void> deleteMediaFile(String path) async {
   try {
-    await File(mediaPath(mediaID)).delete();
+    await File(path).delete();
   } on PathNotFoundException catch (e) {
     print("Cannot delete, this file is external: $e");
-  } catch (_) {}
+  } catch (e) {
+    print("Cannot delete this file for this reason: $e");
+  }
 }
 
 String messagePushId() => db.child("Messages").push().key!;
-
-// Future<List<BaseNode>> getNodesFromEverywhere(List<Identifier> ids) async {
-//   final locals = ids.where((id) => b.nodes.containsKey(id)).toList();
-//   final externals = ids.toSet().difference(locals.toSet()).toList();
-//   var externalNodes = r.getNodes(externals);
-//   List<BaseNode> localNodes = [];
-//   for (final localNodeID in locals) {
-//     localNodes.add(localNodeID.getLocalNode()!);
-//   }
-//   return localNodes + (await externalNodes ?? <BaseNode>[]);
-// }
 
 Future<MessageMedia?> downloadAndWriteMedia(
   String mediaID, {
@@ -78,7 +69,7 @@ Future<MessageMedia?> downloadAndWriteMedia(
 }) async {
   final mediaRef = isNodeMedia ? st_node.ref(mediaID) : st.ref(mediaID);
   try {
-    final futureMediaData = mediaRef.getData();
+    final futureMediaData = mediaRef.getData(31457280); // 30mib
     final fullMetadata = await mediaRef.getMetadata();
     final customMetadata = fullMetadata.customMetadata as Map<String, String>;
     final mediaMetadata = MediaMetadata.fromJson(customMetadata);
@@ -159,9 +150,27 @@ Future<bool> uploadOrUpdateMedia(
 Future<File> writeMedia({
   required Uint8List mediaData,
   required String mediaID,
-  bool temporary = false,
+  bool isThumbnail = false,
 }) async =>
-    File(mediaPath(mediaID, temporary: temporary)).writeAsBytes(mediaData);
+    File(mediaPath(mediaID, isThumbnail: isThumbnail)).writeAsBytes(mediaData);
+
+Future<File> copyMedia({
+  required String fromPath,
+  required String mediaID,
+  bool isThumbnail = false,
+}) async =>
+    File(fromPath).copy(mediaPath(mediaID, isThumbnail: isThumbnail));
+
+Future<File?> makeThumbnail({
+  required String videoPath,
+  required String mediaID,
+}) async {
+  final tn = await VideoThumbnail.thumbnailData(video: videoPath, quality: 90);
+  if (tn != null) {
+    return writeMedia(mediaData: tn, mediaID: mediaID, isThumbnail: true);
+  }
+  return null;
+}
 
 extension Saver on ExchangeRate {
   Future<void> save() async {
@@ -199,6 +208,17 @@ extension MessageSave on Message {
     if (mediaID != null) {
       MessageMedia? media = mediaID?.getLocalMessageMedia();
       media ??= await downloadAndWriteMedia(mediaID!);
+      if (media != null && media.extension.isVideoExtension()) {
+        // we generate a thumbnail
+        final tn =
+            await VideoThumbnail.thumbnailData(video: media.path, quality: 90);
+        if (tn != null) {
+          final f = await writeMedia(
+              mediaData: tn, mediaID: mediaID!, isThumbnail: true);
+          media.thumbnail = f.path;
+        }
+      }
+
       media
         ?..references.add(id)
         ..save();
@@ -214,10 +234,7 @@ extension MessageSave on Message {
     final MessageMedia? media = mediaID?.getLocalMessageMedia();
     if (media != null) {
       media.references.remove(id);
-      if (media.references.isEmpty && !media.isSaved) {
-        await b.medias.delete(media.id);
-        await deleteMediaFile(media.id);
-      }
+      media.delete();
     }
     await b.messages.delete(id);
     return;
@@ -251,10 +268,13 @@ extension MediaSave on MessageMedia {
   }
 
   Future<void> delete() async {
-    b.medias.delete(id);
     if (references.isEmpty && !isSaved) {
       print("References are empty, deleting the file!");
-      return deleteMediaFile(id);
+      b.medias.delete(id);
+      deleteMediaFile(path);
+      if (thumbnail != null) {
+        deleteMediaFile(thumbnail!);
+      }
     }
     return;
   }
@@ -271,203 +291,18 @@ extension WalletSave on Wallet {
 
 class Boxes {
   static Boxes? _instance;
-  // List<String> fileIDs;
   String docPath, tempPath;
-  Box
-      // images,
-      //     videos,
-      personal,
-      // imageIDs,
-      // videoIDs,
-      // nftIDs,
-      // reactions,
-      nodes,
-      messages,
-      medias,
-      messageQueue,
-      bills,
-      payments;
-  // savedMessages,
-  // savedMessageMedias,
-  // messageMedias,
-  // snipMedias;
-  // messageImages,
-  // messageVideos,
-  // snipImages,
-  // snipVideos;
+  Box personal, nodes, messages, medias, messageQueue, bills, payments;
   Boxes()
       : docPath = main.docDirPath,
         tempPath = main.tempDirPath,
-        // imageIDs = Hive.box("ImageIDs"),
-        // videoIDs = Hive.box("VideoIDs"),
-        // nftIDs = Hive.box("NftIDs"),
         medias = Hive.box("Medias"),
-        // fileIDs = [],
         personal = Hive.box("Personal"),
-        // images = Hive.box("Images"),
-        // videos = Hive.box("Videos"),
         nodes = Hive.box("Nodes"),
-        // reactions = Hive.box("Reactions"),
         messages = Hive.box("Messages"),
         messageQueue = Hive.box("MessageQueue"),
         bills = Hive.box("Bills"),
         payments = Hive.box("Payments");
-  // savedMessages = Hive.box("SavedMessages"),
-  // snipMedias = Hive.box('SnipMedias'),
-  // savedMessageMedias = Hive.box('SavedMessageMedias'),
-  // snipImages = Hive.box("SnipImages"),
-  // snipVideos = Hive.box("SnipVideos"),
-  // messageMedias = Hive.box('MessageMedias');
-  // messageImages = Hive.box("MessageImages"),
-  // messageVideos = Hive.box("MessageVideos");
-
-  // File writeMediaToFile(Down4Media m) {
-  //   var f = File(dirPath + "/" + m.id);
-  //   f.writeAsBytes(m.data);
-  //   return f;
-  // }
-
-  // String writeToDocs({required String cachedPath, required String mediaID}) {
-  //   var f = File("$documentPath/$mediaID");
-  //   final data = File(cachedPath).readAsBytesSync();
-  //   f.writeAsBytesSync(data);
-  //   return f.path;
-  // }
-
-  // void saveImage(Media im) {
-  //   images.put(im.id, jsonEncode(im));
-  // }
-  //
-  // MessageMedia loadSavedImage(Identifier id) {
-  //   return MessageMedia.fromJson(jsonDecode(images.get(id)));
-  // }
-  //
-  // void deleteSavedImage(Identifier id) {
-  //   try {
-  //     File("$dirPath/$id").delete();
-  //   } catch (_) {}
-  //   images.delete(id);
-  // }
-  //
-  // void saveVideo(Media im) {
-  //   videos.put(im.id, jsonEncode(im));
-  // }
-  //
-  // MessageMedia loadSavedVideo(Identifier id) {
-  //   return MessageMedia.fromJson(jsonDecode(videos.get(id)));
-  // }
-  //
-  // ExchangeRate loadExchangeRate() {
-  //   final rate = user.get("exchangeRate");
-  //   if (rate == null) return ExchangeRate(lastUpdate: 0, rate: 0.0);
-  //   return ExchangeRate.fromJson(jsonDecode(rate));
-  // }
-  //
-  // void saveExchangeRate(ExchangeRate exchangeRate) {
-  //   user.put("exchangeRate", jsonEncode(exchangeRate));
-  // }
-  //
-  // void deleteVideo(Identifier id) {
-  //   videos.delete(id);
-  // }
-  //
-  // void saveSnip(Media snip) {
-  //   snipMedias.put(snip.id, jsonEncode(snip));
-  // }
-  //
-  // Media loadSnip(Identifier id) {
-  //   return MessageMedia.fromJson(jsonDecode(snipMedias.get(id)));
-  // }
-
-  // void deleteSnip(Identifier id) {
-  //   snipImages.delete(id);
-  // }
-
-  // void saveUser(User u) {
-  //   user.put("user", jsonEncode(u));
-  // }
-  //
-  // User loadUser() {
-  //   return BaseNode.fromJson(jsonDecode(user.get("user"))) as User;
-  // }
-  //
-  // void saveWallet(Wallet w) {
-  //   user.put("wallet", jsonEncode(w));
-  // }
-  //
-  // Wallet loadWallet() {
-  //   return Wallet.fromJson(jsonDecode(user.get("wallet")));
-  // }
-  //
-  // void saveNode(BaseNode p) {
-  //   home.put(p.id, jsonEncode(p));
-  // }
-  //
-  // BaseNode loadNode(Identifier id) {
-  //   return BaseNode.fromJson(jsonDecode(home.get(id)));
-  // }
-  //
-  // void deleteNode(Identifier id) {
-  //   final node = loadNode(id);
-  //   if (node is ChatableNode) {
-  //     for (final msgID in node.messages) {
-  //       messages.delete(msgID);
-  //     }
-  //   }
-  //   home.delete(id);
-  // }
-  //
-  // void saveMessage(Message msg) {
-  //   messages.put(msg.id, jsonEncode(msg));
-  // }
-  //
-  // Message? loadMessage(Identifier id) {
-  //   var msg = messages.get(id);
-  //   if (msg is! String) return null;
-  //   var msgJson = jsonDecode(messages.get(id));
-  //   if (msgJson == null) return null;
-  //   return Message.fromJson(msgJson);
-  // }
-
-  // void deleteMessage(Identifier id) {
-  //   final msgJson = jsonDecode(messages.get(id));
-  //   final mediaID = msgJson["m"];
-  //   if (mediaID != null) {
-  //     messageImages.delete(mediaID);
-  //     messageVideos.delete(mediaID);
-  //     if (!images.keys.contains(mediaID) || !videos.keys.contains(mediaID)) {
-  //       try {
-  //         File("$dirPath/$mediaID").delete();
-  //       } catch (_) {}
-  //     }
-  //   }
-  //   messages.delete(id);
-  // }
-
-  // bool mediaIsLocal(Identifier mediaID) {
-  //   final isSavedImage = images.containsKey(mediaID);
-  //   final isSavedVideo = videos.containsKey(mediaID);
-  //   final isMessageMedia = messageImages.containsKey(mediaID);
-  //   return isSavedImage || isSavedVideo || isMessageMedia;
-  // }
-
-  // Media? loadMessageMediaFromLocal(Identifier mediaID) {
-  //   final isSavedImage = images.containsKey(mediaID);
-  //   if (isSavedImage) {
-  //     return MessageMedia.fromJson(jsonDecode(images.get(mediaID)));
-  //   } else {
-  //     final isMessageMedia = messageImages.containsKey(mediaID);
-  //     if (isMessageMedia) {
-  //       return MessageMedia.fromJson(jsonDecode(messageImages.get(mediaID)));
-  //     } else {
-  //       final isSavedVideo = videos.containsKey(mediaID);
-  //       if (isSavedVideo) {
-  //         return MessageMedia.fromJson(jsonDecode(videos.get(mediaID)));
-  //       }
-  //     }
-  //   }
-  //   return null;
-  // }
 
   static Boxes get instance => _instance ??= Boxes();
 }

@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
-import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/types.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:down4/src/render_objects/render_utils.dart';
+import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../boxes.dart';

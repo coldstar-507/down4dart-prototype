@@ -1,26 +1,26 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert' show utf8;
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/utils.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_picker/file_picker.dart';
-// import 'package:image_picker/image_picker.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../boxes.dart';
-import '../down4_utility.dart' as u;
+import '../_down4_dart_utils.dart' as u;
 import '../web_requests.dart' as r;
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
-import '../render_objects/render_utils.dart';
+import '../render_objects/_down4_flutter_utils.dart';
 
 class GroupPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -49,7 +49,6 @@ class GroupPage extends StatefulWidget {
 
 class _GroupPageState extends State<GroupPage> {
   Console? _console;
-  // CameraController? _ctrl;
   late List<Widget> _items = [...widget.homePalettes, groupMaker(fold: false)];
   var _tec = TextEditingController();
   var _tec2 = TextEditingController();
@@ -192,10 +191,19 @@ class _GroupPageState extends State<GroupPage> {
         final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
         final videoInfo = await fvi.getVideoInfo(file.path!);
         final ar = (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0);
+        final tn =
+            await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
+        String? thumbnailPath;
+        if (tn != null) {
+          final f = await writeMedia(
+              mediaData: tn, mediaID: mediaID, isThumbnail: true);
+          thumbnailPath = f.path;
+        }
         MessageMedia(
             id: mediaID,
             path: f.path,
             isSaved: true,
+            thumbnail: thumbnailPath,
             metadata: MediaMetadata(
                 extension: file.path!.extension(),
                 isSquared: false,
@@ -340,11 +348,23 @@ class _GroupPageState extends State<GroupPage> {
       final topBottons = [
         ConsoleButton(
           name: "Accept",
-          onPress: () {
+          onPress: () async {
+            String? thumbnailPath;
+            final mediaID = u.randomMediaID();
+            if (path.extension().isVideoExtension()) {
+              final tn =
+                  await VideoThumbnail.thumbnailData(video: path, quality: 90);
+              if (tn != null) {
+                final f = await writeMedia(
+                    mediaData: tn, mediaID: mediaID, isThumbnail: true);
+                thumbnailPath = f.path;
+              }
+            }
             vpc?.dispose();
             _cameraInput = MessageMedia(
                 path: path,
-                id: u.randomMediaID(),
+                thumbnail: thumbnailPath,
+                id: mediaID,
                 metadata: MediaMetadata(
                     owner: widget.self.id,
                     timestamp: u.timeStamp(),

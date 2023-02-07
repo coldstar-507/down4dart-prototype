@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:down4/src/down4_utility.dart';
-import 'package:down4/src/render_objects/render_utils.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
+import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';

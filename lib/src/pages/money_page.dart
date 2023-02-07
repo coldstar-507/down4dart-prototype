@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr/qr.dart';
 

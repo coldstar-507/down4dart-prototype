@@ -27,7 +27,7 @@ class WelcomePage extends StatelessWidget {
     final stackWidgets = [
       Positioned(
         width: Sizes.w,
-        height: Sizes.h - (16.0 + ConsoleButton.buttonHeight),
+        height: Sizes.h - (16.0 + Console.buttonHeight),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [

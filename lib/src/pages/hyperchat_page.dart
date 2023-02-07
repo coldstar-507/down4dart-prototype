@@ -1,25 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
-import 'package:down4/src/render_objects/render_utils.dart';
+import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/utils.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:file_picker/file_picker.dart';
-// import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../boxes.dart';
-import '../down4_utility.dart' as u;
+import '../_down4_dart_utils.dart' as u;
 import '../web_requests.dart' as r;
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
-import '../render_objects/render_utils.dart' as ru;
+import '../render_objects/_down4_flutter_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget {
   final double initialOffset;
@@ -225,9 +226,18 @@ class _HyperchatPageState extends State<HyperchatPage> {
         final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
         final mediaID = u.deterministicMediaID(video.bytes!, widget.self.id);
         final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
+        final tn =
+            await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
+        String? thumbnailPath;
+        if (tn != null) {
+          final f = await writeMedia(
+              mediaData: tn, mediaID: mediaID, isThumbnail: true);
+          thumbnailPath = f.path;
+        }
         MessageMedia(
             id: mediaID,
             path: f.path,
+            thumbnail: thumbnailPath,
             metadata: MediaMetadata(
                 isReversed: false,
                 isSquared: false,
@@ -307,10 +317,22 @@ class _HyperchatPageState extends State<HyperchatPage> {
       final topBottons = [
         ConsoleButton(
           name: "Accept",
-          onPress: () {
+          onPress: () async {
+            String? thumbnailPath;
+            final mediaID = u.randomMediaID();
+            if (path.extension().isVideoExtension()) {
+              final tn =
+                  await VideoThumbnail.thumbnailData(video: path, quality: 90);
+              if (tn != null) {
+                final f = await writeMedia(
+                    mediaData: tn, mediaID: mediaID, isThumbnail: true);
+                thumbnailPath = f.path;
+              }
+            }
             vpc?.dispose();
             _cameraInput = MessageMedia(
                 path: path,
+                thumbnail: thumbnailPath,
                 id: u.randomMediaID(),
                 metadata: MediaMetadata(
                     owner: widget.self.id,

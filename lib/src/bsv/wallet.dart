@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import '../data_objects.dart';
-import '../down4_utility.dart';
+import '../_down4_dart_utils.dart';
 import '../web_requests.dart' as r;
 import 'dart:io' as io;
 import 'utils.dart';

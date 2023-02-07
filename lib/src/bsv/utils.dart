@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
 
 import 'types.dart';
 

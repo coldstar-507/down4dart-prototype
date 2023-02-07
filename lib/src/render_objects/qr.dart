@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:qr/qr.dart';
 import '../themes.dart';
-import '../down4_utility.dart' show golden;
+import '../_down4_dart_utils.dart' show golden;
 
 class QrPainter extends CustomPainter {
   final double strokeWidth;

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
-import 'down4_utility.dart';
+import '_down4_dart_utils.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart' show Down4Payment, Down4TX;
 // import 'package:firebase_database/firebase_database.dart';

@@ -4,24 +4,21 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
-import 'package:down4/src/render_objects/render_utils.dart';
+import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:video_player/video_player.dart';
 import 'package:file_picker/file_picker.dart';
-// import 'package:image_picker/image_picker.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../boxes.dart';
-import '../down4_utility.dart' as u;
+import '../_down4_dart_utils.dart' as u;
 import '../web_requests.dart' as r;
-import '../down4_utility.dart' show golden;
 
 import '../render_objects/console.dart';
 import '../render_objects/chat_message.dart';
 import '../render_objects/palette.dart';
-import '../render_objects/lists.dart';
 import '../render_objects/navigator.dart';
 
 class ChatPage extends StatefulWidget {
@@ -52,8 +49,7 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage>
-    with SingleTickerProviderStateMixin {
+class _ChatPageState extends State<ChatPage> {
   Console? _console;
   ConsoleInput? _consoleInput;
   var _tec = TextEditingController();
@@ -64,19 +60,6 @@ class _ChatPageState extends State<ChatPage>
   Future<void> _onRefresh() async {
     messages.skip(_cachedMsgs.length).take(40).toList();
     setState(() {});
-  }
-
-  late final AnimationController _animationController =
-      AnimationController(vsync: this, duration: const Duration(seconds: 2))
-        ..repeat();
-
-  Widget rotatingLogo(double dimension) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (_, child) => Transform.rotate(
-          angle: _animationController.value * 2 * pi, child: child),
-      child: down4Logo(dimension),
-    );
   }
 
   late var _msgs = widget.node.messages.toList();
@@ -98,9 +81,9 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void dispose() {
-    _animationController.dispose();
+    // _animationController.dispose();
     for (final msg in loadedChatMessageWithVideos) {
-      msg.videoController?.dispose();
+      msg.mediaInfo!.videoController!.dispose();
     }
     super.dispose();
   }
@@ -255,22 +238,14 @@ class _ChatPageState extends State<ChatPage>
       key: GlobalKey(),
       hasGap: hasGap,
       message: msg,
-      spinningLogo: rotatingLogo,
-      // repliesInfo: repliesData,
-      // messageID: msg.id,
+      // spinningLogo: rotatingLogo,
+      textInfo: ChatMessage.generateTextInfo(msg),
+      mediaInfo: ChatMessage.generateMediaInfo(msg),
+      repliesInfo: ChatMessage.generateRepliesInfo(msg, (replyID) {
+        print("TODO, GO TO REPLY ID = $replyID");
+      }),
       hasHeader: hasHeader,
-      // repliesData: repliesData,
-      // sender: widget.senders[msg.senderID]!,
-      // message: msg,
-      // senderID: msg.senderID,
       myMessage: widget.self.id == msg.senderID,
-      // textInfo: textInfos,
-      // lastStringOnSameLine: lastStringAndDateOnSameLine,
-      // heightIfNotOnSameLine: heightIfNotOnSameLine,
-      // at: "",
-      // precalculatedSize: Size(messageWidth, messageHeight),
-      // mediaInfo: mediaInfo,
-      goToReply: (replyID) => print("TODO, GO TO REPLY ID = $replyID"),
       select: (id) => setState(() {
         _cachedMsgs[id] = _cachedMsgs[id]!.invertedSelection();
       }),
@@ -341,9 +316,19 @@ class _ChatPageState extends State<ChatPage>
         final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
         final mediaID = u.deterministicMediaID(video.bytes!, widget.self.id);
         final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
+        final tn =
+            await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
+        String? thumbnailPath;
+        if (tn != null) {
+          final f = await writeMedia(
+              mediaData: tn, mediaID: mediaID, isThumbnail: true);
+          thumbnailPath = f.path;
+        }
+
         MessageMedia(
             id: mediaID,
             path: f.path,
+            thumbnail: thumbnailPath,
             metadata: MediaMetadata(
                 isReversed: false,
                 isSquared: false,
@@ -535,11 +520,19 @@ class _ChatPageState extends State<ChatPage>
       final topBottons = [
         ConsoleButton(
           name: "Accept",
-          onPress: () {
+          onPress: () async {
+            String? thumbnailPath;
+            final mediaID = u.randomMediaID();
+            final media = await copyMedia(fromPath: path, mediaID: mediaID);
+            if (path.extension().isVideoExtension()) {
+              final tn = await makeThumbnail(videoPath: path, mediaID: mediaID);
+              thumbnailPath = tn?.path;
+            }
             vpc?.dispose();
             _cameraInput = MessageMedia(
-                path: path,
-                id: u.randomMediaID(),
+                path: media.path,
+                thumbnail: thumbnailPath,
+                id: mediaID,
                 metadata: MediaMetadata(
                     owner: widget.self.id,
                     timestamp: u.timeStamp(),

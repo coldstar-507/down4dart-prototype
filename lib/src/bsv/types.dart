@@ -5,7 +5,7 @@ import 'package:convert/convert.dart';
 import 'package:pointycastle/export.dart';
 import 'package:base85/base85.dart';
 
-import '../down4_utility.dart';
+import '../_down4_dart_utils.dart';
 import '../data_objects.dart';
 import 'utils.dart';
 

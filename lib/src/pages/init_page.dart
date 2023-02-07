@@ -9,13 +9,13 @@ import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../web_requests.dart' as r;
-import '../down4_utility.dart' as u;
+import '../_down4_dart_utils.dart' as u;
 import '../data_objects.dart' show Identifier;
 
 import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
-import '../render_objects/render_utils.dart';
+import '../render_objects/_down4_flutter_utils.dart';
 
 class UserMakerPage extends StatefulWidget {
   final void Function() success;
@@ -52,18 +52,33 @@ class _UserMakerPageState extends State<UserMakerPage> {
   dynamic _inputs;
   double _imageAspectRatio = 1.0;
   bool _toReverse = false;
-  List<Future<bool>> _readyUsernameCalls = [];
+  List<Future<bool>> _calls = [];
   bool _isValidUsername = false;
   bool _errorTryAgain = false;
   var tec1 = TextEditingController();
   var tec2 = TextEditingController();
   var tec3 = TextEditingController();
 
+  late var timer;
+
   @override
   void initState() {
     super.initState();
+    timer = Timer.periodic(const Duration(milliseconds: 444), (timer) async {
+      print("TIMER CALL");
+      if (_calls.isNotEmpty) {
+        _isValidUsername = await _calls.last;
+        baseConsole();
+      }
+    });
     inputs();
     baseConsole();
+  }
+
+  @override
+  void dispose() {
+    timer.cancel();
+    super.dispose();
   }
 
   bool get isReady =>
@@ -76,16 +91,14 @@ class _UserMakerPageState extends State<UserMakerPage> {
     _inputs = [
       // preloading inputs here so they don't redraw on setState because the redraw hides the keyboard which is very undesirable
       ConsoleInput(
-        tec: tec1,
-        inputCallBack: (id) async {
-          _readyUsernameCalls.add(r.usernameIsValid(id));
-          _isValidUsername = await _readyUsernameCalls.last;
-          _id = id.toLowerCase();
-          baseConsole();
-        },
-        placeHolder: "@username",
-        value: _id == '' ? '' : '@$_id',
-      ),
+          tec: tec1,
+          inputCallBack: (id) async {
+            _calls.add(r.usernameIsValid(id));
+            _id = id.toLowerCase();
+          },
+          placeHolder: "@username"
+          // value: _id == '' ? '' : '@$_id',
+          ),
       ConsoleInput(
         tec: tec2,
         inputCallBack: (firstName) {

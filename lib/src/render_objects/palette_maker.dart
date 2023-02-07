@@ -9,7 +9,7 @@ import '../data_objects.dart';
 import '../themes.dart';
 
 import 'palette.dart';
-import 'render_utils.dart';
+import '_down4_flutter_utils.dart';
 
 class UserPaletteMaker extends StatelessWidget {
   final void Function(Map<String, String>) infoCallBack;
@@ -111,7 +111,6 @@ class UserPaletteMaker extends StatelessWidget {
 }
 
 class UserMakerPalette extends StatelessWidget {
-  // static const double height = 60.0;
   final String name, lastName, id, imagePath;
   final void Function() selectFile;
 
@@ -178,17 +177,6 @@ class UserMakerPalette extends StatelessWidget {
         ),
       );
 
-  // Widget get end => Container(
-  //       padding: const EdgeInsets.all(2.0),
-  //       decoration: const BoxDecoration(
-  //         color: PinkTheme.headerColor,
-  //         borderRadius: BorderRadius.only(
-  //           topRight: Radius.circular(4.0),
-  //           bottomRight: Radius.circular(4.0),
-  //         ),
-  //       ),
-  //     );
-
   Widget mainContainer({required Widget child}) => Container(
       height: Palette.paletteHeight,
       width: double.infinity,
@@ -214,7 +202,7 @@ class UserMakerPalette extends StatelessWidget {
     return Column(children: [
       Container(
           height: Palette.paletteHeight,
-          margin: EdgeInsets.symmetric(horizontal: Palette.gapSize),
+          margin: EdgeInsets.symmetric(horizontal: Palette.paletteMargin),
           decoration: BoxDecoration(
             boxShadow: const [
               BoxShadow(

@@ -2,12 +2,12 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 
-import 'package:down4/src/render_objects/render_utils.dart';
+import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 
-import '../down4_utility.dart';
+import '../_down4_dart_utils.dart';
 import '../render_objects/console.dart';
 import '../boxes.dart';
 

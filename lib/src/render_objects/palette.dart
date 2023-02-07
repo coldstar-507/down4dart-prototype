@@ -80,8 +80,11 @@ class ButtonsInfo {
 }
 
 class Palette extends StatelessWidget {
-  static double get paletteHeight => Sizes.h * 0.1007;
-  static double get gapSize => Sizes.h * 0.0192;
+  // static double get paletteHeight => Sizes.h * 0.1052;
+  static double get paletteHeight => Sizes.h * 0.1027;
+  // static double get gapSize => Sizes.h * 0.0147;
+  static double get gapSize => Sizes.h * 0.0166;
+  // static double get paletteMargin => Sizes.w * 0.042;
   static double get paletteMargin => Sizes.w * 0.042;
   static double get blurRadius => 6.0;
   static double get spreadRadius => -7.0;

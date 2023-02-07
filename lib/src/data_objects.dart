@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 
-import 'down4_utility.dart' as u;
+import '_down4_dart_utils.dart' as u;
 import 'bsv/types.dart';
 
 typedef Identifier = String;
@@ -60,10 +60,12 @@ abstract class Media {
 
 class MessageMedia extends Media {
   String path;
+  String? thumbnail;
   MessageMedia({
     required this.path,
     required Identifier id,
     required MediaMetadata metadata,
+    this.thumbnail,
     this.isSaved = false,
     Set<Identifier>? references,
   })  : references = references ?? Set<Identifier>.identity(),
@@ -77,9 +79,14 @@ class MessageMedia extends Media {
 
   bool get isAnimatedImage => u.animatedImageExtensions.contains(extension);
 
-  File? get file => File(path).existsSync() ? File(path) : null;
+  File? get file => hasFile ? File(path) : null;
 
   bool get hasFile => File(path).existsSync();
+
+  bool get hasThumbnail =>
+      thumbnail == null ? false : File(thumbnail!).existsSync();
+
+  File? get thumbnailFile => !hasThumbnail ? null : File(thumbnail!);
 
   Set<Identifier> references;
 
@@ -100,12 +107,14 @@ class MessageMedia extends Media {
         metadata: MediaMetadata.fromJson(decodedJson["md"]),
         path: decodedJson["p"],
         isSaved: decodedJson["sv"] ?? false,
-        references: Set<Identifier>.from(decodedJson["ref"]));
+        references: Set<Identifier>.from(decodedJson["ref"]),
+        thumbnail: decodedJson["tn"]);
   }
 
   Map<String, dynamic> toJson({bool toLocal = false}) => {
         "id": id,
         "md": metadata.toJson(),
+        if (toLocal && thumbnail != null) "tn": thumbnail,
         if (toLocal) "sv": isSaved,
         if (toLocal) "ref": references.toList(),
         if (toLocal) "p": path,

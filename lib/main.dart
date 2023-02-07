@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:hive/hive.dart';
 import 'dart:async';
 import 'package:path_provider/path_provider.dart';

@@ -11,7 +11,7 @@ import 'package:video_player/video_player.dart';
 
 import 'boxes.dart';
 import 'web_requests.dart' as r;
-import 'down4_utility.dart';
+import '_down4_dart_utils.dart';
 import 'bsv/wallet.dart';
 import 'bsv/types.dart';
 
@@ -32,7 +32,7 @@ import 'pages/snipview_page.dart';
 
 import 'render_objects/palette.dart';
 import 'render_objects/chat_message.dart';
-import 'render_objects/render_utils.dart' as ru;
+import 'render_objects/_down4_flutter_utils.dart' as ru;
 import 'render_objects/console.dart';
 
 class Home extends StatefulWidget {

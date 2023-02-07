@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../themes.dart';
 import '../boxes.dart';
-import '../render_objects/render_utils.dart' show down4Logo;
+import '../render_objects/_down4_flutter_utils.dart' show down4Logo;
 
 class LoadingPage extends StatelessWidget {
   const LoadingPage({Key? key}) : super(key: key);

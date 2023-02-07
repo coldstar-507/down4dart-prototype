@@ -6,7 +6,7 @@ import 'dart:async';
 
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:flutter/services.dart';
-import 'package:down4/src/down4_utility.dart';
+import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -73,78 +73,78 @@ class _Down4InputState extends State<Down4Input> {
   }
 }
 
-class Down4VideoPlayer2 extends StatelessWidget {
-  final MessageMedia media;
-  final Uint8List? thumbnail;
-  final VideoPlayerController videoController;
-  final Future<void> Function() touch, stop;
+// class Down4VideoPlayer2 extends StatelessWidget {
+//   final MessageMedia media;
+//   final Uint8List? thumbnail;
+//   final VideoPlayerController videoController;
+//   final Future<void> Function() touch, stop;
 
-  final Color backgroundColor;
-  final Size displaySize;
-  final bool forceSquareAnyways;
-  final bool autoPlay;
-  const Down4VideoPlayer2({
-    this.thumbnail,
-    required this.touch,
-    required this.stop,
-    required this.videoController,
-    required this.backgroundColor,
-    required this.media,
-    required this.autoPlay,
-    required this.displaySize,
-    this.forceSquareAnyways = false,
-    Key? key,
-  }) : super(key: key);
+//   final Color backgroundColor;
+//   final Size displaySize;
+//   final bool forceSquareAnyways;
+//   final bool autoPlay;
+//   const Down4VideoPlayer2({
+//     this.thumbnail,
+//     required this.touch,
+//     required this.stop,
+//     required this.videoController,
+//     required this.backgroundColor,
+//     required this.media,
+//     required this.autoPlay,
+//     required this.displaySize,
+//     this.forceSquareAnyways = false,
+//     Key? key,
+//   }) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(children: [
-      videoController.value.isPlaying
-          ? Down4VideoTransform(
-              displaySize: displaySize,
-              isReversed: media.isVideo,
-              isSquared: media.metadata.isSquared || forceSquareAnyways,
-              video: VideoPlayer(videoController),
-              videoAspectRatio: media.metadata.elementAspectRatio)
-          : Stack(
-              children: [
-                Down4ImageTransform(
-                    image: Image.memory(thumbnail!,
-                        fit: BoxFit.cover,
-                        cacheHeight: displaySize.height.toInt(),
-                        cacheWidth: displaySize.width.toInt()),
-                    imageAspectRatio: media.metadata.elementAspectRatio,
-                    displaySize: displaySize,
-                    isSquared: media.metadata.isSquared || forceSquareAnyways,
-                    isReversed: media.metadata.isReversed),
-                Center(
-                    child: SizedBox.square(
-                        dimension: displaySize.aspectRatio > 1
-                            ? displaySize.height / 4
-                            : displaySize.width / 4,
-                        child: GestureDetector(
-                            onTap: touch,
-                            child: Image.asset(
-                                "lib/src/assets/images/filled.png",
-                                fit: BoxFit.cover))))
-              ],
-            )
-    ]);
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Stack(children: [
+//       videoController.value.isPlaying
+//           ? Down4VideoTransform(
+//               displaySize: displaySize,
+//               isReversed: media.isVideo,
+//               isSquared: media.metadata.isSquared || forceSquareAnyways,
+//               video: VideoPlayer(videoController),
+//               videoAspectRatio: media.metadata.elementAspectRatio)
+//           : Stack(
+//               children: [
+//                 Down4ImageTransform(
+//                     image: Image.memory(thumbnail!,
+//                         fit: BoxFit.cover,
+//                         cacheHeight: displaySize.height.toInt(),
+//                         cacheWidth: displaySize.width.toInt()),
+//                     imageAspectRatio: media.metadata.elementAspectRatio,
+//                     displaySize: displaySize,
+//                     isSquared: media.metadata.isSquared || forceSquareAnyways,
+//                     isReversed: media.metadata.isReversed),
+//                 Center(
+//                     child: SizedBox.square(
+//                         dimension: displaySize.aspectRatio > 1
+//                             ? displaySize.height / 4
+//                             : displaySize.width / 4,
+//                         child: GestureDetector(
+//                             onTap: touch,
+//                             child: Image.asset(
+//                                 "lib/src/assets/images/filled.png",
+//                                 fit: BoxFit.cover))))
+//               ],
+//             )
+//     ]);
+//   }
+// }
 
 class Down4VideoPlayer extends StatefulWidget {
   final VideoPlayerController videoController;
-  final Widget Function(double) rotatingLogo;
+  // final Widget Function(double) rotatingLogo;
   final MessageMedia media;
-  final Uint8List? thumbnail;
+  // final String? thumbnail;
   final Color backgroundColor;
   final Size displaySize;
   final bool forceSquareAnyways;
   final bool autoPlay;
   const Down4VideoPlayer({
-    this.thumbnail,
-    required this.rotatingLogo,
+    // this.thumbnail,
+    // required this.rotatingLogo,
     required this.videoController,
     required this.backgroundColor,
     required this.media,
@@ -158,14 +158,59 @@ class Down4VideoPlayer extends StatefulWidget {
   State<Down4VideoPlayer> createState() => _Down4VideoPlayerState();
 }
 
-class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
+class _Down4VideoPlayerState extends State<Down4VideoPlayer>
+    with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    listenOnEnd();
+    if (widget.videoController.value.isInitialized) {
+      widget.videoController.addListener(_listenOnEnd);
+      print("LISTENING ON END OF VIDEO ID ${widget.media.id}");
+    } else {
+      _animationController =
+          AnimationController(vsync: this, duration: const Duration(seconds: 2))
+            ..repeat();
+    }
+
+    print("INITIALIZING STATE OF VIDEO ID ${widget.media.id}");
   }
 
-  Future<void> pauseOrPlay() async {
+  @override
+  void didUpdateWidget(Down4VideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    print("DID UPDATE WIDGET OF VIDEO ID ${widget.media.id}");
+  }
+
+  @override
+  void dispose() {
+    print("DISPOSING STATE OF VIDEO ID ${widget.media.id}");
+    _animationController?.dispose();
+    if (widget.videoController.value.isInitialized) {
+      print("REMOVING LISTEN ON END OF VIDEO ID ${widget.media.id}");
+      widget.videoController.removeListener(_listenOnEnd);
+    }
+    super.dispose();
+  }
+
+  bool loading = false;
+
+  Future<void> _initController() async {
+    setState(() {
+      loading = true;
+    });
+    await widget.videoController.initialize();
+    widget.videoController.addListener(_listenOnEnd);
+    if (widget.autoPlay) {
+      widget.videoController
+        ..setLooping(true)
+        ..play();
+    }
+    setState(() {
+      loading = false;
+    });
+  }
+
+  Future<void> _pauseOrPlay() async {
     if (!widget.autoPlay) {
       if (widget.videoController.value.isPlaying == true) {
         await widget.videoController.pause();
@@ -177,62 +222,158 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
     setState(() {});
   }
 
-  void listenOnEnd() {
-    widget.videoController.addListener(() async {
-      if (widget.videoController.value.duration ==
-              widget.videoController.value.position &&
-          !widget.videoController.value.isPlaying) {
-        await widget.videoController.seekTo(Duration.zero);
-        print("CLOSING VIDEO!");
-        setState(() {});
-      }
-    });
+  Future<void> onTap() async {
+    if (!widget.videoController.value.isInitialized) {
+      await _initController();
+    }
+    await _pauseOrPlay();
+  }
+
+  void _listenOnEnd() async {
+    if (widget.videoController.value.duration ==
+            widget.videoController.value.position &&
+        !widget.videoController.value.isPlaying) {
+      await widget.videoController.seekTo(Duration.zero);
+      print("CLOSING VIDEO!");
+      setState(() {});
+    }
+  }
+
+  AnimationController? _animationController;
+
+  Widget rotatingLogo(double dimension) {
+    return AnimatedBuilder(
+      animation: _animationController!,
+      builder: (_, child) => Transform.rotate(
+          angle: _animationController!.value * 2 * math.pi, child: child),
+      child: down4Logo(dimension),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    print(
-        "DISPLAYING VIDEO = ${widget.videoController.value.isPlaying || widget.thumbnail == null}");
-    return widget.videoController.value.isPlaying || widget.thumbnail == null
-        ? GestureDetector(
-            onTap: pauseOrPlay,
-            child: Down4VideoTransform(
-                displaySize: widget.displaySize,
-                isReversed: widget.media.metadata.isReversed,
-                isSquared: widget.media.metadata.isSquared ||
-                    widget.forceSquareAnyways,
-                video: VideoPlayer(widget.videoController),
-                videoAspectRatio: widget.media.metadata.elementAspectRatio))
-        : Stack(children: [
-            Down4ImageTransform(
-                image: Image.memory(widget.thumbnail!,
-                    fit: BoxFit.cover,
-                    cacheHeight: widget.displaySize.height.toInt(),
-                    cacheWidth: widget.displaySize.width.toInt()),
-                imageAspectRatio: widget.media.metadata.elementAspectRatio,
-                displaySize: widget.displaySize,
-                isSquared: widget.media.metadata.isSquared ||
-                    widget.forceSquareAnyways,
-                isReversed: widget.media.metadata.isReversed),
-            Center(
-              child: SizedBox.square(
-                  dimension: widget.displaySize.aspectRatio > 1
-                      ? widget.displaySize.height / 4
-                      : widget.displaySize.width / 4,
-                  child: GestureDetector(
-                      onTap: pauseOrPlay,
-                      child: Image.asset("lib/src/assets/images/filled.png",
-                          fit: BoxFit.cover))),
-            )
-          ]);
-    // return Transform(
-    //   alignment: Alignment.center,
-    //   transform: Matrix4.rotationY(isReversed ? math.pi : 0),
-    //   child: GestureDetector(
-    //     onTap: touch,
-    //     child: VideoPlayer(_videoController),
-    //   ),
-    // );
+    if (!widget.videoController.value.isInitialized && !loading) {
+      print("THUMBNAIL PATH = ${widget.media.thumbnail}");
+      return Stack(children: [
+        Down4ImageTransform(
+            image: Image.file(widget.media.thumbnailFile!,
+                fit: BoxFit.cover,
+                cacheHeight: widget.displaySize.height.toInt(),
+                cacheWidth: widget.displaySize.width.toInt()),
+            imageAspectRatio: widget.media.metadata.elementAspectRatio,
+            displaySize: widget.displaySize,
+            isSquared:
+                widget.media.metadata.isSquared || widget.forceSquareAnyways,
+            isReversed: widget.media.metadata.isReversed),
+        Center(
+            child: SizedBox.square(
+                dimension: widget.displaySize.aspectRatio > 1
+                    ? widget.displaySize.height / 4
+                    : widget.displaySize.width / 4,
+                child: GestureDetector(
+                    onTap: onTap,
+                    child: Image.asset("lib/src/assets/images/filled.png",
+                        fit: BoxFit.cover))))
+      ]);
+      // return FutureBuilder(
+      //   future: _initController(),
+      //   builder: (context, snapshot) {
+      //     if (snapshot.connectionState == ConnectionState.done) {
+      //       if (widget.videoController.value.isPlaying) {
+      //         return GestureDetector(
+      //           onTap: _pauseOrPlay,
+      //           child: Down4VideoTransform(
+      //               displaySize: widget.displaySize,
+      //               isReversed: widget.media.metadata.isReversed,
+      //               isSquared: widget.media.metadata.isSquared ||
+      //                   widget.forceSquareAnyways,
+      //               video: VideoPlayer(widget.videoController),
+      //               videoAspectRatio: widget.media.metadata.elementAspectRatio),
+      //         );
+      //       } else {
+      //         return Stack(
+      //           children: [
+      //             Down4ImageTransform(
+      //                 image: Image.memory(widget.thumbnail!,
+      //                     fit: BoxFit.cover,
+      //                     cacheHeight: widget.displaySize.height.toInt(),
+      //                     cacheWidth: widget.displaySize.width.toInt()),
+      //                 imageAspectRatio:
+      //                     widget.media.metadata.elementAspectRatio,
+      //                 displaySize: widget.displaySize,
+      //                 isSquared: widget.media.metadata.isSquared ||
+      //                     widget.forceSquareAnyways,
+      //                 isReversed: widget.media.metadata.isReversed),
+      //             Center(
+      //                 child: SizedBox.square(
+      //                     dimension: widget.displaySize.aspectRatio > 1
+      //                         ? widget.displaySize.height / 4
+      //                         : widget.displaySize.width / 4,
+      //                     child: GestureDetector(
+      //                         onTap: _pauseOrPlay,
+      //                         child: Image.asset(
+      //                             "lib/src/assets/images/filled.png",
+      //                             fit: BoxFit.cover))))
+      //           ],
+      //         );
+      //       }
+      //     } else {
+      //       return S
+      //     }
+      //   },
+      // );
+    } else if (!widget.videoController.value.isInitialized && loading) {
+      return Stack(children: [
+        Down4ImageTransform(
+            image: Image.file(widget.media.thumbnailFile!,
+                fit: BoxFit.cover,
+                cacheHeight: widget.displaySize.height.toInt(),
+                cacheWidth: widget.displaySize.width.toInt()),
+            imageAspectRatio: widget.media.metadata.elementAspectRatio,
+            displaySize: widget.displaySize,
+            isSquared:
+                widget.media.metadata.isSquared || widget.forceSquareAnyways,
+            isReversed: widget.media.metadata.isReversed),
+        Center(
+            child: GestureDetector(
+                onTap: onTap,
+                child: rotatingLogo(widget.displaySize.aspectRatio > 1
+                    ? widget.displaySize.height / 4
+                    : widget.displaySize.width / 4)))
+      ]);
+    } else {
+      return widget.videoController.value.isPlaying
+          ? GestureDetector(
+              onTap: _pauseOrPlay,
+              child: Down4VideoTransform(
+                  displaySize: widget.displaySize,
+                  isReversed: widget.media.metadata.isReversed,
+                  isSquared: widget.media.metadata.isSquared ||
+                      widget.forceSquareAnyways,
+                  video: VideoPlayer(widget.videoController),
+                  videoAspectRatio: widget.media.metadata.elementAspectRatio))
+          : Stack(children: [
+              Down4ImageTransform(
+                  image: Image.file(widget.media.thumbnailFile!,
+                      fit: BoxFit.cover,
+                      cacheHeight: widget.displaySize.height.toInt(),
+                      cacheWidth: widget.displaySize.width.toInt()),
+                  imageAspectRatio: widget.media.metadata.elementAspectRatio,
+                  displaySize: widget.displaySize,
+                  isSquared: widget.media.metadata.isSquared ||
+                      widget.forceSquareAnyways,
+                  isReversed: widget.media.metadata.isReversed),
+              Center(
+                  child: SizedBox.square(
+                      dimension: widget.displaySize.aspectRatio > 1
+                          ? widget.displaySize.height / 4
+                          : widget.displaySize.width / 4,
+                      child: GestureDetector(
+                          onTap: _pauseOrPlay,
+                          child: Image.asset("lib/src/assets/images/filled.png",
+                              fit: BoxFit.cover))))
+            ]);
+    }
   }
 }
 
