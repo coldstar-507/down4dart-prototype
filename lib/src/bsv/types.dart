@@ -27,25 +27,47 @@ class Down4Payment {
       .sats
       .asInt;
 
-  String get formattedName {
-    final tx = txs.last;
-    final spender = txs.last.txsIn.first.spender ?? "";
-    String receivers = "";
-    int singularGets = tx.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
-    int count = 0;
-    for (final txOut in txs.last.txsOut) {
-      if (txOut.isGets) {
-        receivers += "${txOut.receiver!} ";
-        count += 1;
-      }
+  bool isSpentBy({required Identifier id}) {
+    return txs.last.txsIn.any((element) => element.spender == id);
+  }
+
+  String formattedName(Identifier selfID) {
+    bool spentBySelf = isSpentBy(id: selfID);
+    int outSats; // can be positive of negative
+    if (spentBySelf) {
+      // we want to sum sats that isn't change and isn't fee and isn't received by self
+      outSats = txs.last.txsOut
+          .where((out) => out.receiver != selfID && out.isGets)
+          .fold<int>(0, (sum, out) => sum - out.sats.asInt);
+    } else {
+      // we want to sum sats that are received by self
+      outSats = txs.last.txsOut
+          .where((out) => out.receiver == selfID)
+          .fold<int>(0, (sum, out) => sum + out.sats.asInt);
     }
 
-    if (count > 1) {
-      return "$spender --($count x $singularGets)--> $receivers";
-    } else {
-      return "$spender  --($singularGets)--> $receivers";
-    }
+    return "$outSats sat";
   }
+
+  // String get formattedName {
+  //   final tx = txs.last;
+  //   final spender = txs.last.txsIn.first.spender ?? "";
+  //   String receivers = "";
+  //   int singularGets = tx.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
+  //   int count = 0;
+  //   for (final txOut in txs.last.txsOut) {
+  //     if (txOut.isGets) {
+  //       receivers += "${txOut.receiver!} ";
+  //       count += 1;
+  //     }
+  //   }
+
+  //   if (count > 1) {
+  //     return "$spender --($count x $singularGets)--> $receivers";
+  //   } else {
+  //     return "$spender  --($singularGets)--> $receivers";
+  //   }
+  // }
 
   String get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);

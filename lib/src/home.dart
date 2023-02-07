@@ -62,7 +62,6 @@ class _HomeState extends State<Home> {
     "Search": {},
     "Forward": {},
     "Payments": {},
-    // "Hidden": {},
   };
 
   StreamSubscription? _messageListener;
@@ -86,6 +85,7 @@ class _HomeState extends State<Home> {
     super.initState();
     loadHomePalettes();
     loadPayments();
+    ru.clearAppCache();
     widget.wallet.printWalletInfo();
     connectToMessages();
     processWebRequests();
@@ -235,7 +235,8 @@ class _HomeState extends State<Home> {
   void parsePayment(Down4Payment payment) {
     widget.wallet.parsePayment(widget.self.id, payment);
     widget.wallet.save();
-    writePalette(Payment(payment: payment), at: "Payments");
+    writePalette(Payment(payment: payment, selfID: widget.self.id),
+        at: "Payments");
   }
 
   void loadPayments() async {
@@ -243,7 +244,8 @@ class _HomeState extends State<Home> {
     widget.wallet.settlementRoutine();
     widget.wallet.save();
     for (final payment in widget.wallet.payments) {
-      writePalette(Payment(payment: payment), at: "Payments");
+      writePalette(Payment(payment: payment, selfID: widget.self.id),
+          at: "Payments");
     }
     if (_page is MoneyPage) moneyPage();
   }

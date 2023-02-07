@@ -323,7 +323,8 @@ abstract class BaseNode {
         // TODO: Handle this case.
         break;
       case Nodes.payment:
-        return Payment(payment: Down4Payment.fromYouKnow(decodedJson["pay"]));
+        break;
+      // return Payment(payment: Down4Payment.fromYouKnow(decodedJson["pay"]));
     }
     throw 'invalid node type: $type';
   }
@@ -575,12 +576,13 @@ class Hyperchat extends GroupNode {
 
 class Payment extends BaseNode {
   final Down4Payment _payment;
-  Payment({required Down4Payment payment})
+  final Identifier selfID;
+  Payment({required Down4Payment payment, required this.selfID})
       : _payment = payment,
         super(id: payment.id);
 
   @override
-  String get name => payment.formattedName;
+  String get name => payment.formattedName(selfID);
 
   Down4Payment get payment => _payment;
 
@@ -597,8 +599,9 @@ class Payment extends BaseNode {
 
   @override
   Map toJson({bool toLocal = true}) => {
-        "t": Nodes.payment.name,
-        "pay": _payment.toYouKnow(),
+        // "t": Nodes.payment.name,
+        // "selfID": selfID,
+        // "pay": _payment.toYouKnow(),
       };
 }
 
