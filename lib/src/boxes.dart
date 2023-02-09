@@ -291,6 +291,7 @@ extension WalletSave on Wallet {
 
 class Boxes {
   static Boxes? _instance;
+  static Self? _self;
   String docPath, tempPath;
   Box personal, nodes, messages, medias, messageQueue, bills, payments;
   Boxes()
@@ -305,6 +306,8 @@ class Boxes {
         payments = Hive.box("Payments");
 
   static Boxes get instance => _instance ??= Boxes();
+
+  static Self get self => _self ??= loadSelf()!;
 }
 
 class Sizes {

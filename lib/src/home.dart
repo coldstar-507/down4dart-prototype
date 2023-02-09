@@ -323,11 +323,11 @@ class _HomeState extends State<Home> {
               ButtonsInfo(
                 assetPath: at == "Home"
                     ? node.snips.isNotEmpty
-                        ? "lib/src/assets/images/redArrow.png"
+                        ? "assets/images/redArrow.png"
                         : messagePreviewWasRead
-                            ? "lib/src/assets/images/50.png"
-                            : "lib/src/assets/images/filled.png"
-                    : "lib/src/assets/images/50.png",
+                            ? "assets/images/50.png"
+                            : "assets/images/filled.png"
+                    : "assets/images/50.png",
                 pressFunc: at == "Home"
                     ? node.snips.isNotEmpty
                         ? checkSnips
@@ -349,8 +349,8 @@ class _HomeState extends State<Home> {
             buttonsInfo: [
               ButtonsInfo(
                 assetPath: at == "Home" && node.snips.isNotEmpty
-                    ? "lib/src/assets/images/redArrow.png"
-                    : "lib/src/assets/images/50.png",
+                    ? "assets/images/redArrow.png"
+                    : "assets/images/50.png",
                 pressFunc: at == "Home"
                     ? node.snips.isNotEmpty
                         ? checkSnips
@@ -374,10 +374,10 @@ class _HomeState extends State<Home> {
               rightMost: true,
               pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
               assetPath: at == "Home" && node.snips.isNotEmpty
-                  ? "lib/src/assets/images/redArrow.png"
+                  ? "assets/images/redArrow.png"
                   : messagePreviewWasRead
-                      ? "lib/src/assets/images/50.png"
-                      : "lib/src/assets/images/filled.png",
+                      ? "assets/images/50.png"
+                      : "assets/images/filled.png",
             )
           ],
         );
@@ -395,10 +395,10 @@ class _HomeState extends State<Home> {
               rightMost: true,
               pressFunc: node.snips.isNotEmpty ? checkSnips : openChat,
               assetPath: at == "Home" && node.snips.isNotEmpty
-                  ? "lib/src/assets/images/redArrow.png"
+                  ? "assets/images/redArrow.png"
                   : messagePreviewWasRead
-                      ? "lib/src/assets/images/50.png"
-                      : "lib/src/assets/images/filled.png",
+                      ? "assets/images/50.png"
+                      : "assets/images/filled.png",
             )
           ],
         );
@@ -412,7 +412,7 @@ class _HomeState extends State<Home> {
         messagePreview: node.payment.textNote,
         buttonsInfo: [
           ButtonsInfo(
-            assetPath: 'lib/src/assets/images/filled.png',
+            assetPath: 'assets/images/filled.png',
             pressFunc: (id, at) {
               _locations.add(Location(id: "Payment"));
               paymentPage(node.payment);
@@ -867,6 +867,14 @@ class _HomeState extends State<Home> {
       scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
       console: Console(
+        mediasInfo: ConsoleMedias(
+          show: false,
+          medias: widget.self.images
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>(),
+          onSelectMedia: (_) {},
+          nMedias: widget.self.images.length,
+        ),
         bottomInputs: [
           ConsoleInput(
             tec: _tec,

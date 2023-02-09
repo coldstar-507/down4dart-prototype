@@ -63,13 +63,20 @@ class _GroupPageState extends State<GroupPage> {
 
   MessageMedia? _cameraInput;
 
-  Iterable<MessageMedia> get savedImages => widget.self.images
-      .map((mediaID) => mediaID.getLocalMessageMedia())
-      .whereType<MessageMedia>();
-
-  Iterable<MessageMedia> get savedVideos => widget.self.videos
-      .map((mediaID) => mediaID.getLocalMessageMedia())
-      .whereType<MessageMedia>();
+  ConsoleMedias consoleMedias({required bool images, required bool show}) {
+    return ConsoleMedias(
+      show: show,
+      medias: images
+          ? widget.self.images
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>()
+          : widget.self.videos
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>(),
+      onSelectMedia: (media) => send(mediaInput: media),
+      nMedias: images ? widget.self.images.length : widget.self.videos.length,
+    );
+  }
 
   ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: _tec);
 
@@ -232,16 +239,15 @@ class _GroupPageState extends State<GroupPage> {
 
     _console = Console(
       bottomInputs: [consoleInput],
-      mediasInfo: ConsoleMedias(
-        medias: images ? savedImages : savedVideos,
-        onSelectMedia: selectMedia,
-        nMedias: images ? widget.self.images.length : widget.self.videos.length,
-      ),
+      mediasInfo: consoleMedias(images: images, show: true),
       topButtons: [
         ConsoleButton(name: "Import", onPress: handleImport),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+          name: "Back",
+          onPress: () => loadBaseConsole(images: images),
+        ),
         ConsoleButton(
           isMode: true,
           isActivated: !forGroupImage,
@@ -258,8 +264,9 @@ class _GroupPageState extends State<GroupPage> {
     // TODO
   }
 
-  void loadBaseConsole() {
+  void loadBaseConsole({bool images = true}) {
     _console = Console(
+      mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(

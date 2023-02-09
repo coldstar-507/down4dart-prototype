@@ -37,13 +37,9 @@ dependencies:
 
   # Packages
   qr: ^3.0.1
-#  isar: ^3.0.5
-#  pull_to_refresh: ^2.0.0
   video_thumbnail: ^0.5.3
   mobile_scanner: ^2.0.0
   path_provider: ^2.0.9
-#  objectbox: ^1.7.0
-#  sqflite: ^2.2.3
   base85: ^1.0.3
   flutter_video_info: ^1.3.1
   http: ^0.13.4
@@ -58,7 +54,6 @@ dependencies:
   flutter_image_compress: ^1.1.0
   firebase_messaging: ^14.0.2
   firebase_storage: ^11.0.2
-#  scroll_navigation: ^1.3.2
   firebase_auth: ^4.0.1
   flutter_local_notifications: ^12.0.3
   firebase_core_platform_interface: ^4.5.1
@@ -70,7 +65,7 @@ dependencies:
 flutter_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "lib/src/assets/down4_inverted.png"
+  image_path: "assets/images/down4_inverted.png"
   min_sdk_android: 21
 
 dev_dependencies:
@@ -95,7 +90,9 @@ dev_dependencies:
 # The following section is specific to Flutter.
 flutter:
   assets:
-    - lib/src/assets/
+    - assets/images/
+    - assets/fonts/
+    - assets/texts/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -121,49 +118,49 @@ flutter:
   fonts:
     - family: Merriweather
       fonts:
-      - asset: lib/src/assets/fonts/Merriweather-Regular.ttf
+      - asset: assets/fonts/Merriweather-Regular.ttf
     - family: Alegreya
       fonts:
-      - asset: lib/src/assets/fonts/Alegreya-Regular.ttf
+      - asset: assets/fonts/Alegreya-Regular.ttf
     - family: Alice
       fonts:
-      - asset: lib/src/assets/fonts/Alice-Regular.ttf
+      - asset: assets/fonts/Alice-Regular.ttf
     - family: EBGaramond
       fonts:
-      - asset: lib/src/assets/fonts/EBGaramond-Regular.ttf
+      - asset: assets/fonts/EBGaramond-Regular.ttf
     - family: Handlee
       fonts:
-      - asset: lib/src/assets/fonts/Handlee-Regular.ttf
+      - asset: assets/fonts/Handlee-Regular.ttf
     - family: LobsterTwo
       fonts:
-      - asset: lib/src/assets/fonts/LobsterTwo-Regular.ttf
+      - asset: assets/fonts/LobsterTwo-Regular.ttf
     - family: SourceCodePro
       fonts:
-      - asset: lib/src/assets/fonts/SourceCodePro-Regular.ttf
+      - asset: assets/fonts/SourceCodePro-Regular.ttf
     - family: NotoSerif
       fonts:
-      - asset: lib/src/assets/fonts/NotoSerif-Regular.ttf
+      - asset: assets/fonts/NotoSerif-Regular.ttf
     - family: Tapestry
       fonts:
-      - asset: lib/src/assets/fonts/Tapestry-Regular.ttf
+      - asset: assets/fonts/Tapestry-Regular.ttf
     - family: MonteCarlo
       fonts:
-      - asset: lib/src/assets/fonts/MonteCarlo-Regular.ttf
+      - asset: assets/fonts/MonteCarlo-Regular.ttf
     - family: Sacramento
       fonts:
-      - asset: lib/src/assets/fonts/Sacramento-Regular.ttf
+      - asset: assets/fonts/Sacramento-Regular.ttf
     - family: Kaushan
       fonts:
-      - asset: lib/src/assets/fonts/KaushanScript-Regular.ttf
+      - asset: assets/fonts/KaushanScript-Regular.ttf
     - family: Kalam
       fonts:
-      - asset: lib/src/assets/fonts/Kalam-Regular.ttf
+      - asset: assets/fonts/Kalam-Regular.ttf
     - family: Ubuntu
       fonts:
-      - asset: lib/src/assets/fonts/Ubuntu-Regular.ttf
+      - asset: assets/fonts/Ubuntu-Regular.ttf
     - family: Updock
       fonts:
-      - asset: lib/src/assets/fonts/Updock-Regular.ttf
+      - asset: assets/fonts/Updock-Regular.ttf
   #       - asset: fonts/TrajanPro_Bold.ttf
   #         weight: 700
   #

@@ -99,13 +99,20 @@ class _ChatPageState extends State<ChatPage> {
     print("Did update the chat page widget!");
   }
 
-  Iterable<MessageMedia> get savedImages => widget.self.images
-      .map((mediaID) => mediaID.getLocalMessageMedia())
-      .whereType<MessageMedia>();
-
-  Iterable<MessageMedia> get savedVideos => widget.self.videos
-      .map((mediaID) => mediaID.getLocalMessageMedia())
-      .whereType<MessageMedia>();
+  ConsoleMedias consoleMedias({required bool images, required bool show}) {
+    return ConsoleMedias(
+      show: show,
+      medias: images
+          ? widget.self.images
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>()
+          : widget.self.videos
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>(),
+      onSelectMedia: (media) => send2(mediaInput: media),
+      nMedias: images ? widget.self.images.length : widget.self.videos.length,
+    );
+  }
 
   ChatMessage? getChatMessage(
     Identifier msgID,
@@ -375,7 +382,7 @@ class _ChatPageState extends State<ChatPage> {
   }) async {
     if (ctrl == null) {
       try {
-        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.high);
+        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.medium);
         await ctrl.initialize();
       } catch (err) {
         loadBaseConsole();
@@ -523,11 +530,7 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     _console = Console(
-      mediasInfo: ConsoleMedias(
-        medias: images ? savedImages : savedVideos,
-        onSelectMedia: selectMedia,
-        nMedias: images ? widget.self.images.length : widget.self.videos.length,
-      ),
+      mediasInfo: consoleMedias(images: images, show: true),
       bottomInputs: [_consoleInput ?? consoleInput],
       topButtons: [
         ConsoleButton(
@@ -559,8 +562,9 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void loadBaseConsole() {
+  void loadBaseConsole({bool images = true}) {
     _console = Console(
+      mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [_consoleInput ?? consoleInput],
       topButtons: [
         ConsoleButton(name: "Save", onPress: loadSavingConsole),
@@ -580,7 +584,7 @@ class _ChatPageState extends State<ChatPage> {
         ),
         ConsoleButton(
           name: "Medias",
-          onPress: loadMediasConsole,
+          onPress: () => loadMediasConsole(images: images),
         ),
       ],
     );

@@ -63,7 +63,7 @@ class UserPaletteMaker extends StatelessWidget {
               width: Palette.paletteHeight - 2.0, // borderWidth x2
               child: info['image'] == null || info['image'] == ""
                   ? Image.asset(
-                      'lib/src/assets/images/picture_place_holder_2.png',
+                      'assets/images/picture_place_holder_2.png',
                       fit: BoxFit.cover,
                       gaplessPlayback: true,
                     )
@@ -141,7 +141,7 @@ class UserMakerPalette extends StatelessWidget {
                   gaplessPlayback: true,
                 )
               : Image.asset(
-                  'lib/src/assets/images/picture_place_holder_2.png',
+                  'assets/images/picture_place_holder_2.png',
                   fit: BoxFit.cover,
                 ),
         ),
@@ -297,7 +297,7 @@ class PaletteMaker extends StatelessWidget {
     switch (type) {
       case Nodes.user:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -306,7 +306,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.hyperchat:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -315,7 +315,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.group:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -324,7 +324,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.self:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -333,7 +333,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.root:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -342,7 +342,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.market:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -351,7 +351,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.checkpoint:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -360,7 +360,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.journal:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -369,7 +369,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.item:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -378,7 +378,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.event:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -387,7 +387,7 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.ticket:
         return Image.asset(
-          'lib/src/assets/images/picture_place_holder_2.png',
+          'assets/images/picture_place_holder_2.png',
           fit: BoxFit.cover,
           gaplessPlayback: true,
           width: Palette.paletteHeight - 4,
@@ -436,7 +436,7 @@ class PaletteMaker extends StatelessWidget {
           width: Palette.paletteHeight - 4,
           height: Palette.paletteHeight - 4,
           child: go != null
-              ? Image.asset('lib/src/assets/images/filled.png')
+              ? Image.asset('assets/images/filled.png')
               : const SizedBox.shrink()));
 
   @override

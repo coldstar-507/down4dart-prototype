@@ -1,10 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:async';
 
-import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:flutter/services.dart';
 import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:video_player/video_player.dart';
@@ -15,11 +12,13 @@ import 'palette.dart';
 
 import '../data_objects.dart';
 
-Image down4Logo(double dimension) => Image.asset(
-      "lib/src/assets/images/down4_inverted.png",
-      height: dimension,
-      width: dimension,
-    );
+Image down4Logo(double dimension) {
+  return Image.asset(
+    "assets/images/down4_inverted.png",
+    height: dimension,
+    width: dimension,
+  );
+}
 
 class Down4Input extends StatefulWidget {
   final TextInputType type;
@@ -106,13 +105,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
     if (widget.videoController.value.isInitialized) {
       widget.videoController.addListener(_listenOnEnd);
       print("LISTENING ON END OF VIDEO ID ${widget.media.id}");
-    } else {
-      _animationController =
-          AnimationController(vsync: this, duration: const Duration(seconds: 2))
-            ..repeat();
     }
-
-    print("INITIALIZING STATE OF VIDEO ID ${widget.media.id}");
   }
 
   @override
@@ -124,7 +117,6 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
   @override
   void dispose() {
     print("DISPOSING STATE OF VIDEO ID ${widget.media.id}");
-    _animationController?.dispose();
     if (widget.videoController.value.isInitialized) {
       print("REMOVING LISTEN ON END OF VIDEO ID ${widget.media.id}");
       widget.videoController.removeListener(_listenOnEnd);
@@ -179,15 +171,11 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
     }
   }
 
-  AnimationController? _animationController;
-
   Widget rotatingLogo(double dimension) {
-    return AnimatedBuilder(
-      animation: _animationController!,
-      builder: (_, child) => Transform.rotate(
-          angle: _animationController!.value * 2 * math.pi, child: child),
-      child: down4Logo(dimension),
-    );
+    return AnimatedRotation(
+        turns: math.pi * 2,
+        duration: const Duration(seconds: 2),
+        child: down4Logo(dimension));
   }
 
   @override
@@ -212,7 +200,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
                     : widget.displaySize.width / 4,
                 child: GestureDetector(
                     onTap: onTap,
-                    child: Image.asset("lib/src/assets/images/filled.png",
+                    child: Image.asset("assets/images/filled.png",
                         fit: BoxFit.cover))))
       ]);
       // return FutureBuilder(
@@ -252,7 +240,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
       //                     child: GestureDetector(
       //                         onTap: _pauseOrPlay,
       //                         child: Image.asset(
-      //                             "lib/src/assets/images/filled.png",
+      //                             "assets/images/filled.png",
       //                             fit: BoxFit.cover))))
       //           ],
       //         );
@@ -310,7 +298,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
                           : widget.displaySize.width / 4,
                       child: GestureDetector(
                           onTap: _pauseOrPlay,
-                          child: Image.asset("lib/src/assets/images/filled.png",
+                          child: Image.asset("assets/images/filled.png",
                               fit: BoxFit.cover))))
             ]);
     }
@@ -489,8 +477,8 @@ class _TouchableOpacityState extends State<TouchableOpacity> {
       onLongPress: widget.onLongPress,
       onLongPressUp: widget.onLongPressUp,
       child: Opacity(
-        child: widget.child,
         opacity: isDown || widget.shouldBeDownButIsnt ? widget.opacity : 1,
+        child: widget.child,
       ),
     );
   }
@@ -553,8 +541,8 @@ Future<Size> decodeImageSize(Uint8List d) async {
 }
 
 Future<List<Pair<String, String>>> randomPrompts(int qty) async {
-  const String adjPath = "lib/src/assets/texts/descriptive_adjectives.txt";
-  const String nounsPath = "lib/src/assets/texts/concrete_nouns.txt";
+  const String adjPath = "assets/texts/descriptive_adjectives.txt";
+  const String nounsPath = "assets/texts/concrete_nouns.txt";
   final adjectives = (await rootBundle.loadString(adjPath)).split('\n');
   final nouns = (await rootBundle.loadString(nounsPath)).split('\n');
 

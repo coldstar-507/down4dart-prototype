@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
@@ -28,7 +27,7 @@ class HyperchatPage extends StatefulWidget {
   final List<Palette> homePalettes, transitionedHomePalettes;
   final Iterable<Person> people;
   final void Function(r.HyperchatRequest) hyperchatRequest;
-  final void Function(r.ChatRequest) ping;
+  final void Function(r.PingRequest) ping;
   final void Function() back;
   final Self self;
 
@@ -74,13 +73,20 @@ class _HyperchatPageState extends State<HyperchatPage> {
         }));
   }
 
-  Iterable<MessageMedia> get savedImages => widget.self.images
-      .map((mediaID) => mediaID.getLocalMessageMedia())
-      .whereType<MessageMedia>();
-
-  Iterable<MessageMedia> get savedVideos => widget.self.videos
-      .map((mediaID) => mediaID.getLocalMessageMedia())
-      .whereType<MessageMedia>();
+  ConsoleMedias consoleMedias({required bool images, required bool show}) {
+    return ConsoleMedias(
+      show: show,
+      medias: images
+          ? widget.self.images
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>()
+          : widget.self.videos
+              .map((mediaID) => mediaID.getLocalMessageMedia())
+              .whereType<MessageMedia>(),
+      onSelectMedia: (media) => send(mediaInput: media),
+      nMedias: images ? widget.self.images.length : widget.self.videos.length,
+    );
+  }
 
   Future<void> send({MessageMedia? mediaInput}) async {
     if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
@@ -116,7 +122,12 @@ class _HyperchatPageState extends State<HyperchatPage> {
   }
 
   void ping() {
-    // TODO
+    if (_tec.value.text.isEmpty) return;
+    widget.ping(r.PingRequest(
+        senderID: widget.self.id,
+        text: _tec.value.text,
+        targets: widget.people.asIds().toList()));
+    _tec.clear();
   }
 
   ConsoleInput get consoleInput {
@@ -130,11 +141,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
   void loadMediaConsole([bool images = true]) {
     _console = Console(
       bottomInputs: [consoleInput],
-      mediasInfo: ConsoleMedias(
-        medias: images ? savedImages : savedVideos,
-        onSelectMedia: (media) => send(mediaInput: media),
-        nMedias: images ? widget.self.images.length : widget.self.videos.length,
-      ),
+      mediasInfo: consoleMedias(images: images, show: true),
       topButtons: [
         ConsoleButton(
           name: "Import",
@@ -157,8 +164,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
     // TODO
   }
 
-  void loadBaseConsole() {
+  void loadBaseConsole({bool images = true}) {
     _console = Console(
+      mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(name: "Ping", onPress: ping),
@@ -169,7 +177,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ConsoleButton(
             name: _cameraInput == null ? "Camera" : "@Camera",
             onPress: loadSquaredCameraConsole),
-        ConsoleButton(name: "Medias", onPress: loadMediaConsole),
+        ConsoleButton(name: "Medias", onPress: () => loadMediaConsole(images)),
       ],
     );
     setState(() {});
