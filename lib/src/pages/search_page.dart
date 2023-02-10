@@ -10,7 +10,7 @@ import 'package:down4/src/data_objects.dart';
 import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../boxes.dart';
+import '../globals.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -18,7 +18,7 @@ import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
 
 class AddFriendPage extends StatefulWidget {
-  final Self self;
+  // final Self self;
   final List<Palette> palettes;
   final Future<bool> Function(List<String>) search;
   final void Function(User node) putNodeOffline;
@@ -28,7 +28,7 @@ class AddFriendPage extends StatefulWidget {
   const AddFriendPage({
     required this.palettes,
     required this.search,
-    required this.self,
+    // required this.self,
     required this.putNodeOffline,
     required this.addCallback,
     required this.backCallback,
@@ -68,15 +68,15 @@ class _AddFriendPageState extends State<AddFriendPage> {
   }
 
   String get qrData => [
-        widget.self.id,
-        widget.self.name,
-        widget.self.lastName,
-        widget.self.neuter.toYouKnow(),
+        g.self.id,
+        g.self.name,
+        g.self.lastName,
+        g.self.neuter.toYouKnow(),
       ].join("~");
 
-  static double get qrDimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);
+  static double get qrDimension => g.sizes.w - (g.sizes.w * 0.08 * golden * 2);
 
-  static double get qrTopGap => Sizes.w - qrDimension * 2 * 1 / golden;
+  static double get qrTopGap => g.sizes.w - qrDimension * 2 * 1 / golden;
 
   Widget get qr => Align(
         alignment: Alignment.topCenter,

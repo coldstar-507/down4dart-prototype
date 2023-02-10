@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 // import 'package:pull_to_refresh/pull_to_refresh.dart';
 
 import '../data_objects.dart';
-import '../boxes.dart';
+import '../globals.dart';
 
 import 'palette.dart';
 import 'chat_message.dart';
@@ -32,7 +32,7 @@ class DynamicList extends StatelessWidget {
     this.reversed = true,
     Key? key,
   }) : super(key: key);
-  static double get gapSize => Sizes.h * 0.02;
+  // static double get gapSize => Palette.gapSize; //g.sizes.h * 0.02;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +45,7 @@ class DynamicList extends StatelessWidget {
           backgroundColor: PinkTheme.backGroundColor,
           child: ListView.builder(
             controller: scrollController,
-            padding: EdgeInsets.only(top: topPadding ?? gapSize),
+            padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
             reverse: reversed,
             itemBuilder: (_, i) => asMap![orderedKeys![i]]!,
             itemCount: iterableLen ?? iterables?.length ?? list.length,
@@ -58,7 +58,7 @@ class DynamicList extends StatelessWidget {
       behavior: NoGlow(),
       child: ListView.builder(
         controller: scrollController,
-        padding: EdgeInsets.only(top: topPadding ?? gapSize),
+        padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
         reverse: reversed,
         itemBuilder: (_, i) => asMap?[orderedKeys?[i]] ?? list[i],
         itemCount: iterableLen ?? iterables?.length ?? list.length,
@@ -83,7 +83,7 @@ class StaticList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gapSize = Sizes.h * 0.02;
+    // final gapSize = g.sizes.h * 0.02;
     return ScrollConfiguration(
       behavior: NoGlow(),
       child: Align(
@@ -91,7 +91,7 @@ class StaticList extends StatelessWidget {
         child: SingleChildScrollView(
           reverse: reversed,
           controller: scrollController,
-          padding: EdgeInsets.only(top: topPadding ?? gapSize),
+          padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
           child: Column(
             children: list,
           ),
@@ -101,22 +101,22 @@ class StaticList extends StatelessWidget {
   }
 }
 
-class PaletteMakerList extends StatelessWidget {
-  final List<PaletteMaker> palettes;
-  const PaletteMakerList({required this.palettes, Key? key}) : super(key: key);
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-        child: ScrollConfiguration(
-            behavior: NoGlow(),
-            child: ListView.separated(
-                reverse: true,
-                itemBuilder: (c, i) => i == 0
-                    ? const SizedBox.shrink()
-                    : i == palettes.length + 2 - 1
-                        ? const SizedBox.shrink()
-                        : palettes[i - 1],
-                separatorBuilder: (c, i) => Container(height: 16.0),
-                itemCount: palettes.length + 2)));
-  }
-}
+// class PaletteMakerList extends StatelessWidget {
+//   final List<PaletteMaker> palettes;
+//   const PaletteMakerList({required this.palettes, Key? key}) : super(key: key);
+//   @override
+//   Widget build(BuildContext context) {
+//     return Expanded(
+//         child: ScrollConfiguration(
+//             behavior: NoGlow(),
+//             child: ListView.separated(
+//                 reverse: true,
+//                 itemBuilder: (c, i) => i == 0
+//                     ? const SizedBox.shrink()
+//                     : i == palettes.length + 2 - 1
+//                         ? const SizedBox.shrink()
+//                         : palettes[i - 1],
+//                 separatorBuilder: (c, i) => Container(height: 16.0),
+//                 itemCount: palettes.length + 2)));
+//   }
+// }

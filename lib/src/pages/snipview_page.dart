@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../boxes.dart';
+import '../globals.dart';
 import '../render_objects/console.dart';
 
 class SnipViewPage extends StatelessWidget {
@@ -22,13 +22,13 @@ class SnipViewPage extends StatelessWidget {
       text != "" && text != null
           ? Center(
               child: Container(
-                width: Sizes.w,
+                width: g.sizes.w,
                 decoration: const BoxDecoration(
                   color: Colors.black38,
                 ),
                 constraints: BoxConstraints(
                   minHeight: 16,
-                  maxHeight: Sizes.fullHeight,
+                  maxHeight: g.sizes.fullHeight,
                 ),
                 child: Text(
                   text!,
@@ -42,7 +42,7 @@ class SnipViewPage extends StatelessWidget {
         bottom: 0,
         left: 0,
         child: SizedBox(
-          width: Sizes.w,
+          width: g.sizes.w,
           child: Console(
             invertedColors: true,
             bottomButtons: [

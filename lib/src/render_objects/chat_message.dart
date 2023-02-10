@@ -7,7 +7,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 import '../_down4_dart_utils.dart' show Pair;
 
 import '../data_objects.dart';
-import '../boxes.dart';
+import '../globals.dart';
 import '../themes.dart';
 
 import '_down4_flutter_utils.dart';
@@ -129,7 +129,7 @@ class ChatMessage extends StatelessWidget {
   static TextStyle get dateStyle =>
       const TextStyle(fontFamily: "Alice", fontSize: 10);
 
-  static double get maxMessageWidth => Sizes.w * 0.76;
+  static double get maxMessageWidth => g.sizes.w * 0.76;
 
   static double get textPadding => 12.0;
 

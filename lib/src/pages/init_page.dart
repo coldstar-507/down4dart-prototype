@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:io' as io;
 
+import 'package:down4/src/globals.dart';
 import 'package:path/path.dart' as p;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +20,6 @@ import '../render_objects/_down4_flutter_utils.dart';
 
 class UserMakerPage extends StatefulWidget {
   final void Function() success;
-  final List<CameraDescription> cameras;
   final Future<bool> Function({
     required String id,
     required String name,
@@ -33,7 +33,6 @@ class UserMakerPage extends StatefulWidget {
   const UserMakerPage({
     required this.initUser,
     required this.success,
-    required this.cameras,
     Key? key,
   }) : super(key: key);
 
@@ -52,6 +51,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
   dynamic _inputs;
   double _imageAspectRatio = 1.0;
   bool _toReverse = false;
+  bool _onBaseConsole = true;
   List<Future<bool>> _calls = [];
   bool _isValidUsername = false;
   bool _errorTryAgain = false;
@@ -72,7 +72,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
       }
     });
     inputs();
-    baseConsole();
+    if (_onBaseConsole) baseConsole();
   }
 
   @override
@@ -118,7 +118,9 @@ class _UserMakerPageState extends State<UserMakerPage> {
   }
 
   void baseConsole({bool activatedProceed = true}) {
+    _onBaseConsole = true;
     _console = Console(
+      initializationConsole: true,
       animatedInputs: false,
       topInputs: [_inputs[0]],
       bottomInputs: [_inputs[1], _inputs[2]],
@@ -160,7 +162,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
     if (ctrl == null) {
       try {
         ctrl = CameraController(
-          widget.cameras[cam],
+          g.cameras[cam],
           ResolutionPreset.high,
           enableAudio: false,
         );
@@ -169,7 +171,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         baseConsole();
       }
     }
-
+    _onBaseConsole = false;
     Future<void> nextCam() async {
       await ctrl?.dispose();
       return camConsole(cam: (cam + 1) % 2);
@@ -177,6 +179,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
 
     if (path == null) {
       _console = Console(
+        initializationConsole: true,
         cameraController: ctrl,
         topButtons: [
           ConsoleButton(
@@ -198,6 +201,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
       );
     } else {
       _console = Console(
+        initializationConsole: true,
         imageForPreview: ImagePreview(
             path: path,
             isReversed: cam == 1,
@@ -210,6 +214,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
               _toReverse = cam == 1;
               _imageAspectRatio = ctrl!.value.aspectRatio;
               _imageExtension = p.extension(path);
+              baseConsole();
             },
           ),
         ],

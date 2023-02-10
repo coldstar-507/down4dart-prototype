@@ -165,7 +165,7 @@ class Down4Payment {
     return listData;
   }
 
-  Map<String, dynamic> toJson({bool withImages = false}) => {
+  Map<String, dynamic> toJson() => {
         "id": id,
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,

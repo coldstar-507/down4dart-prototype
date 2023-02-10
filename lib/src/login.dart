@@ -12,7 +12,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 import 'web_requests.dart' as r;
-import 'boxes.dart';
+import 'globals.dart';
 import '_down4_dart_utils.dart' as d4utils;
 import 'home.dart';
 import 'data_objects.dart';
@@ -25,11 +25,7 @@ import 'pages/init_page.dart';
 import 'pages/loading_page.dart';
 
 class Down4 extends StatefulWidget {
-  final List<CameraDescription> cameras;
-  const Down4({
-    required this.cameras,
-    Key? key,
-  }) : super(key: key);
+  const Down4({Key? key}) : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
@@ -37,8 +33,8 @@ class Down4 extends StatefulWidget {
 
 class _Down4State extends State<Down4> {
   // ============================================================ VARIABLES ============================================================ //
-  Self? _self;
-  Wallet? _wallet;
+  // Self? _self;
+  // Wallet? _wallet;
   Widget? _view;
 
   // ============================================================ KERNEL ============================================================ //
@@ -59,12 +55,10 @@ class _Down4State extends State<Down4> {
   }
 
   Future<void> loadUser() async {
-    _self = loadSelf();
-    if (_self != null) {
-      _wallet = loadWallet();
-      home();
-    } else {
+    if (g.notYetInitialized) {
       createUser();
+    } else {
+      home();
     }
   }
 
@@ -86,8 +80,8 @@ class _Down4State extends State<Down4> {
     final seed1 = unsafeSeed(32);
     final seed2 = unsafeSeed(32);
     final secret = hash256(seed1 + seed2);
-    _wallet = Wallet.fromSeed(seed1, seed2);
-    final neutered = _wallet!.neuter;
+    g.initWallet(seed1, seed2);
+    final neuter = g.wallet.neuter;
 
     NodeMedia image = NodeMedia(
       id: d4utils.randomMediaID(),
@@ -105,9 +99,9 @@ class _Down4State extends State<Down4> {
       'id': id,
       'nm': name,
       'ln': lastName,
-      'sh': secret.toBase64(),
+      'sh': secret.toBase58(),
       'tkn': token,
-      'nt': neutered.toYouKnow(),
+      'nt': neuter.toYouKnow(),
       'im': image,
     };
 
@@ -118,25 +112,9 @@ class _Down4State extends State<Down4> {
       return false;
     }
 
-    _self = Self(
-      id: id,
-      media: image,
-      firstName: name,
-      lastName: lastName,
-      neuter: neutered,
-      children: {},
-      messages: {},
-      snips: {},
-      images: {},
-      videos: {},
-      nfts: {},
-    );
+    g.initSelf(id, image, neuter, name, lastName);
 
-    b.personal.putAll({
-      'token': token,
-      'self': jsonEncode(_self),
-      'wallet': jsonEncode(_wallet),
-    });
+    g.boxes.personal.put("token", token);
 
     return true;
   }
@@ -144,20 +122,12 @@ class _Down4State extends State<Down4> {
   // ============================================================ RENDER ============================================================ //
 
   void home() {
-    _view = Home(
-      wallet: _wallet!..save(),
-      cameras: widget.cameras,
-      self: _self!..save(),
-    );
+    _view = const Home();
     setState(() {});
   }
 
   void createUser() {
-    _view = UserMakerPage(
-      cameras: widget.cameras,
-      initUser: initUser,
-      success: home,
-    );
+    _view = UserMakerPage(initUser: initUser, success: home);
     setState(() {});
   }
 
@@ -176,11 +146,13 @@ class _Down4State extends State<Down4> {
     final size = mediaQuery.size;
     final truePadding = mediaQuery.viewPadding;
     // final fakePadding = mediaQuery.padding;
-    Sizes.fullHeight = size.height;
-    Sizes.headerHeight = size.height * 0.056;
-    Sizes.h =
-        size.height - truePadding.top - truePadding.bottom - Sizes.headerHeight;
-    Sizes.w = size.width - truePadding.left - truePadding.right;
+    g.sizes.fullHeight = size.height;
+    g.sizes.headerHeight = size.height * 0.056;
+    g.sizes.h = size.height -
+        truePadding.top -
+        truePadding.bottom -
+        g.sizes.headerHeight;
+    g.sizes.w = size.width - truePadding.left - truePadding.right;
     return _view ?? const LoadingPage2();
   }
 }

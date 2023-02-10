@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../data_objects.dart';
-import '../boxes.dart';
+import '../globals.dart';
 import '../themes.dart';
 
 class BasicActionButton extends StatelessWidget {
@@ -71,9 +71,9 @@ class ButtonsInfo {
 }
 
 class Palette extends StatelessWidget {
-  static double get paletteHeight => Sizes.h * 0.1027;
-  static double get gapSize => Sizes.h * 0.0166;
-  static double get paletteMargin => Sizes.w * 0.042;
+  static double get paletteHeight => g.sizes.h * 0.1027;
+  static double get gapSize => g.sizes.h * 0.0166;
+  static double get paletteMargin => g.sizes.w * 0.042;
   static double get blurRadius => 6.0;
   static double get spreadRadius => -7.0;
   static Offset get shadowOffset => const Offset(6.0, 6.0);

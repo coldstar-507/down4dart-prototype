@@ -11,9 +11,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'src/login.dart';
+import 'src/globals.dart';
 
-String docDirPath = "";
-String tempDirPath = "";
+// String docDirPath = "";
+// String tempDirPath = "";
+// List<CameraDescription> cameras = [];
 
 Future<void> _initBox() async {
   await Hive.openBox("Personal");
@@ -106,15 +108,16 @@ Future<void> main() async {
     // TODO kIsWeb
   }
 
-  docDirPath = (await getApplicationDocumentsDirectory()).path;
-  tempDirPath = (await getTemporaryDirectory()).path;
-  Hive.init(docDirPath);
+  final appDir = await getApplicationDocumentsDirectory();
+  final tempDir = await getTemporaryDirectory();
+  Hive.init(appDir.path);
   await _initBox();
+  g.boxes.docPath = appDir.path;
+  g.boxes.tempPath = tempDir.path;
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  List<CameraDescription> cameras = [];
   try {
-    cameras = await availableCameras();
+    g.cameras = await availableCameras();
   } catch (err) {
     print("Available cameras error $err");
   }
@@ -131,9 +134,7 @@ Future<void> main() async {
     MaterialApp(
       theme: ThemeData(fontFamily: "Alice"),
       home: Material(
-        child: Down4(
-          cameras: cameras,
-        ),
+        child: Down4(),
       ),
     ),
   );

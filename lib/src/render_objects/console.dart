@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data_objects.dart';
-import '../boxes.dart';
+import '../globals.dart';
 import '../themes.dart';
 import '../_down4_dart_utils.dart' show golden;
 
@@ -193,7 +193,7 @@ class ConsoleInput extends StatelessWidget {
       decoration: InputDecoration(
         isDense: true,
         isCollapsed: true,
-        contentPadding: EdgeInsets.symmetric(vertical: Sizes.w * 0.012),
+        contentPadding: EdgeInsets.symmetric(vertical: g.sizes.w * 0.012),
         hintText: placeHolder,
         border: InputBorder.none,
         prefixIcon: Text(prefix),
@@ -268,6 +268,12 @@ class ConsoleMedias {
   });
 }
 
+class ConsoleMedias2 {
+  final void Function(MessageMedia) onSelectMedia;
+  final bool showImages;
+  ConsoleMedias2({required this.showImages, required this.onSelectMedia});
+}
+
 class ImagePreview {
   final String path;
   final double imageAspectRatio;
@@ -296,9 +302,10 @@ class Console extends StatelessWidget {
   final List<ConsoleInput>? _bottomInputs, _topInputs;
   final bool animatedInputs;
   final List<Palette>? forwardingPalette;
-  final bool invertedColors;
-  final bool? showImage;
-  final ConsoleMedias? mediasInfo;
+  final bool invertedColors, initializationConsole;
+  // final bool? showImage;
+  // final ConsoleMedias? mediasInfo;
+  final ConsoleMedias2? consoleMedias2;
   final ImagePreview? imageForPreview;
   final VideoPreview? videoForPreview;
   final CameraController? cameraController;
@@ -306,16 +313,16 @@ class Console extends StatelessWidget {
 
   static GlobalKey get widgetCaptureKey => GlobalKey();
 
-  int get nMediaRow =>
-      mediasInfo == null ? 0 : (mediasInfo!.nMedias / nMediaPerRow).ceil();
+  // int get nMediaRow =>
+  //     mediasInfo == null ? 0 : (mediasInfo!.nMedias / nMediaPerRow).ceil();
   int get nMediaPerRow => 5;
   int get maximumMediaRows => 3;
   double get rowHeight => (consoleWidth / nMediaPerRow); // squared element
-  double get mediasHeight => nMediaRow == 0
-      ? rowHeight
-      : nMediaRow <= maximumMediaRows
-          ? rowHeight * nMediaRow
-          : rowHeight * maximumMediaRows;
+  // double get mediasHeight => nMediaRow == 0
+  //     ? rowHeight
+  //     : nMediaRow <= maximumMediaRows
+  //         ? rowHeight * nMediaRow
+  //         : rowHeight * maximumMediaRows;
 
   List<Widget> get extraTopButtons {
     List<Widget> extras = [];
@@ -328,13 +335,12 @@ class Console extends StatelessWidget {
         final leftBottom = semantics.bottomLeft;
 
         extras.add(Positioned(
-          bottom: leftBottom.dy - Console.contourWidth,
-          left: leftBottom.dx - Console.contourWidth,
+          bottom: leftBottom.dy - contourWidth,
+          left: leftBottom.dx - contourWidth,
           child: Container(
-            width: buttonWidth + Console.contourWidth,
+            width: buttonWidth + contourWidth,
             decoration: BoxDecoration(
-                border: Border.all(
-                    width: Console.contourWidth, color: Console.contourColor)),
+                border: Border.all(width: contourWidth, color: contourColor)),
             child: Column(children: b.extraButtons!),
           ),
         ));
@@ -359,27 +365,25 @@ class Console extends StatelessWidget {
         print("""
         button height: $buttonHeight
         position:      $position
-        Sizes.w:       ${Sizes.w}
-        Sizes.h:       ${Sizes.h}
+        Sizes.w:       ${g.sizes.w}
+        Sizes.h:       ${g.sizes.h}
         """);
 
         return Positioned(
-          left: position.dx - Console.contourWidth,
+          left: position.dx - contourWidth,
           top: position.dy -
-              Sizes.viewPaddingHeight -
-              Console.contourWidth -
+              g.sizes.viewPaddingHeight -
+              contourWidth -
               (buttonHeight * (b.extraButtons!.length)),
           child: Container(
-            width: buttonWidth + (2 * Console.contourWidth),
-            height: buttonHeight * b.extraButtons!.length +
-                (2 * Console.contourWidth),
+            width: buttonWidth + (2 * contourWidth),
+            height: buttonHeight * b.extraButtons!.length + (2 * contourWidth),
             decoration: BoxDecoration(
-                border: Border.all(width: Console.contourWidth),
-                color: Console.contourColor),
+                border: Border.all(width: contourWidth, color: contourColor),
+                color: contourColor),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: b.extraButtons!,
-            ),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: b.extraButtons!),
           ),
         );
       } else {
@@ -388,36 +392,39 @@ class Console extends StatelessWidget {
     }).toList();
   }
 
-  static double get buttonHeight => Sizes.h * 0.045;
+  static double get buttonHeight => g.sizes.h * 0.045;
 
-  double get consoleGap => Sizes.w * 0.022;
+  double get consoleGap => g.sizes.w * 0.022;
   static double get contourWidth => 0.9;
   static Color get contourColor => Colors.black54;
-  double get consoleWidth => Sizes.w - (2.0 * consoleGap);
+  double get consoleWidth => g.sizes.w - (2.0 * consoleGap);
   double get trueWidth => consoleWidth - (4 * contourWidth);
   double get bbWidth => consoleWidth - (2 * contourWidth);
 
   // contour width is actually applied 2 times horizontally, (4 times)
   // (it is also applied 2 times vertically)
 
-  static ConsoleMedias medias({
-    required bool? showImages,
-    required void Function(MessageMedia) onSelectedMedia,
-  }) =>
-      ConsoleMedias(
-        show: showImages != null,
-        medias: (showImages ?? true)
-            ? Boxes.self.images
-                .map((imID) => imID.getLocalMessage())
-                .whereType<MessageMedia>()
-            : Boxes.self.videos
-                .map((imID) => imID.getLocalMessage())
-                .whereType<MessageMedia>(),
-        onSelectMedia: onSelectedMedia,
-        nMedias: (showImages ?? true)
-            ? Boxes.self.images.length
-            : Boxes.self.videos.length,
-      );
+  static int nMedias(bool images) =>
+      images ? g.self.images.length : g.self.videos.length;
+
+  static Iterable<MessageMedia> medias(bool images) => images
+      ? g.self.images
+          .map((imID) => imID.getLocalMessageMedia())
+          .whereType<MessageMedia>()
+      : g.self.videos
+          .map((vidID) => vidID.getLocalMessageMedia())
+          .whereType<MessageMedia>();
+
+  // static ConsoleMedias consoleMedias2({
+  //   required bool? showImages,
+  //   required void Function(MessageMedia) onSelectedMedia,
+  // }) =>
+  //     ConsoleMedias(
+  //       show: showImages != null,
+  //       medias: medias(showImages ?? true),
+  //       onSelectMedia: onSelectedMedia,
+  //       nMedias: nMedias(showImages ?? true),
+  //     );
 
   static Duration get animationDuration =>
       Duration(milliseconds: (100 * golden).toInt());
@@ -427,7 +434,7 @@ class Console extends StatelessWidget {
       videoForPreview != null ||
       cameraController != null ||
       scanner != null ||
-      (mediasInfo != null && (mediasInfo?.show ?? false));
+      consoleMedias2 != null;
 
   const Console({
     required List<ConsoleButton> bottomButtons,
@@ -436,10 +443,11 @@ class Console extends StatelessWidget {
     this.cameraController,
     this.imageForPreview,
     this.videoForPreview,
-    this.mediasInfo,
+    this.initializationConsole = false,
+    // this.mediasInfo,
     this.scanner,
     this.animatedInputs = true,
-    this.showImage,
+    this.consoleMedias2,
     List<ConsoleInput>? bottomInputs,
     List<ConsoleInput>? topInputs,
     List<ConsoleButton>? topButtons,
@@ -482,35 +490,40 @@ class Console extends StatelessWidget {
   double get mediaCelSize => trueWidth / mediaPerRow;
 
   Widget consoleMedias() {
-    final mi = mediasInfo;
-    if (mi == null) return const SizedBox.shrink();
-    final theoreticalRows = (mi.nMedias / mediaPerRow).floor();
+    if (initializationConsole) return const SizedBox.shrink();
+    // final mi = mediasInfo;
+    // if (mi == null) return const SizedBox.shrink();
+    final nMedia = nMedias(consoleMedias2?.showImages ?? true);
+    final theoreticalRows = (nMedia / mediaPerRow).ceil();
     final trueRows = theoreticalRows > 0
         ? theoreticalRows < 4
             ? theoreticalRows
             : 3
         : 1;
+
+    final showingImages = consoleMedias2?.showImages ?? true;
     return Container(
       decoration: BoxDecoration(
-          color: PinkTheme.black,
+          color: Console.contourColor,
           border: Border.all(
             color: contourColor,
-            width: mi.show ? contourWidth : 0,
+            width: consoleMedias2 != null ? contourWidth : 0,
           )),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: mi.show ? trueRows * mediaCelSize : 0,
+          maxHeight: consoleMedias2 != null ? trueRows * mediaCelSize : 0,
           maxWidth: trueWidth,
         ),
         child: ListView.builder(
-            itemCount: nMediaRow,
+            itemCount: theoreticalRows,
             itemBuilder: ((context, index) {
               Widget f(int i) {
-                if (i < mi.nMedias) {
+                if (i < nMedia) {
+                  final theMedia = medias(showingImages).elementAt(i);
                   return GestureDetector(
-                    onTap: () => mi.onSelectMedia(mi.medias.elementAt(i)),
+                    onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
                     child: Down4ImageViewer(
-                      media: mi.medias.elementAt(i),
+                      media: theMedia,
                       displaySize: Size.square(mediaCelSize),
                       forceSquareAnyways: true,
                     ),
@@ -579,20 +592,17 @@ class Console extends StatelessWidget {
     final camCtrl = cameraController;
     if (camCtrl == null) return const SizedBox.shrink();
     return Container(
-        decoration: BoxDecoration(
-          color: PinkTheme.black,
-          border: Border.all(color: contourColor, width: contourWidth),
-        ),
-        child: SizedBox(
-            height: trueWidth,
-            width: trueWidth,
-            child: ClipRect(
+      decoration: BoxDecoration(
+          color: contourColor,
+          border: Border.all(color: contourColor, width: contourWidth)),
+      child: SizedBox(
+          height: trueWidth,
+          width: trueWidth,
+          child: ClipRect(
               child: Transform.scale(
                   scaleY: camCtrl.value.aspectRatio,
-                  child: CameraPreview(
-                    camCtrl,
-                  )),
-            )));
+                  child: CameraPreview(camCtrl)))),
+    );
 
     // return Transform.scale(
     //   scale: 1.0,
@@ -698,12 +708,18 @@ class Console extends StatelessWidget {
 
   Widget consoleScanner() {
     if (scanner == null) return const SizedBox.shrink();
-    return ColoredBox(
-      color: contourColor,
-      child: SizedBox(
-        height: trueWidth + (contourWidth * 2),
-        width: trueWidth + (contourWidth * 2),
-        child: scanner!,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+          color: contourColor,
+          border: Border.all(width: contourWidth, color: contourColor)),
+      child: Stack(
+        children: [
+          SizedBox.square(
+              dimension: trueWidth + (contourWidth * 2),
+              child: Center(
+                  child: SizedBox(
+                      height: trueWidth, width: trueWidth, child: scanner!))),
+        ],
       ),
     );
   }
@@ -794,7 +810,7 @@ class Console extends StatelessWidget {
         bottom: consoleGap,
       ),
       decoration: BoxDecoration(
-          color: null,
+          color: Colors.black54,
           border: Border.all(width: contourWidth, color: contourColor)),
       child: Column(
         mainAxisSize: MainAxisSize.min,

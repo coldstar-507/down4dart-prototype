@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../themes.dart';
-import '../boxes.dart';
+import '../globals.dart';
 import '../render_objects/_down4_flutter_utils.dart' show down4Logo;
 
 class LoadingPage2 extends StatefulWidget {
@@ -35,7 +35,7 @@ class _LoadingPage2State extends State<LoadingPage2>
               child: child,
             );
           },
-          child: down4Logo(0.82 * Sizes.w),
+          child: down4Logo(0.82 * g.sizes.w),
         ),
       );
 

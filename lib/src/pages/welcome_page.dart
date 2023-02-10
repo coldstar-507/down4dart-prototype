@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 
-import '../boxes.dart';
+import '../globals.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -26,8 +26,8 @@ class WelcomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final stackWidgets = [
       Positioned(
-        width: Sizes.w,
-        height: Sizes.h - (16.0 + Console.buttonHeight),
+        width: g.sizes.w,
+        height: g.sizes.h - (16.0 + Console.buttonHeight),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [

@@ -13,7 +13,7 @@ import '../web_requests.dart' as r;
 import '../bsv/wallet.dart';
 import '../bsv/types.dart';
 import '../bsv/utils.dart';
-import '../boxes.dart';
+import '../globals.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
@@ -28,14 +28,12 @@ void printWrapped(String text) {
 }
 
 class PaymentPage extends StatefulWidget {
-  final Self self;
   final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentAsList;
   final void Function(r.PaymentRequest) paymentRequest;
 
   PaymentPage({
-    required this.self,
     required this.ok,
     required this.back,
     required this.payment,
@@ -99,9 +97,9 @@ class _PaymentPageState extends State<PaymentPage> {
     super.dispose();
   }
 
-  double get qrDimension => Sizes.w - (Sizes.w * 0.08 * golden * 2);
+  double get qrDimension => g.sizes.w - (g.sizes.w * 0.08 * golden * 2);
 
-  double get topPadding => Sizes.w - qrDimension * 2 * 1 / golden;
+  double get topPadding => g.sizes.w - qrDimension * 2 * 1 / golden;
 
   Console get aConsole => Console(
         // inputs: [input],
@@ -117,7 +115,7 @@ class _PaymentPageState extends State<PaymentPage> {
               onPress: () {
                 // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
                 final spender = widget.payment.txs.last.txsIn.first.spender;
-                if (spender == widget.self.id) {
+                if (spender == g.self.id) {
                   final pr = r.PaymentRequest(
                     sender: spender!,
                     payment: widget.payment,
@@ -148,12 +146,9 @@ class _PaymentPageState extends State<PaymentPage> {
 }
 
 class MoneyPage extends StatefulWidget {
-  final double exchangeRate;
-  final Wallet wallet;
   final List<Palette> paymentAsPalettes;
   final Iterable<Palette> homePalettes;
   final Iterable<Person> trueTargets;
-  final Self self;
   final List<Palette> transitioned;
   final void Function() back;
   final void Function(Down4Payment) makePayment, scanOrImport;
@@ -166,12 +161,9 @@ class MoneyPage extends StatefulWidget {
     required this.scanOrImport,
     required this.trueTargets,
     required this.transitioned,
-    required this.wallet,
-    required this.exchangeRate,
     required this.homePalettes,
     required this.paymentAsPalettes,
     required this.back,
-    required this.self,
     required this.pageIndex,
     required this.onPageChange,
     required this.makePayment,
@@ -238,12 +230,12 @@ class _MoneyPageState extends State<MoneyPage> {
   }
 
   int usdToSatoshis(double usds) =>
-      ((usds / widget.exchangeRate) * 100000000).floor();
+      ((usds / g.exchangeRate.rate) * 100000000).floor();
 
   double satoshisToUSD(int satoshis) =>
-      (satoshis / 100000000) * widget.exchangeRate;
+      (satoshis / 100000000) * g.exchangeRate.rate;
 
-  String get satoshis => widget.wallet.balance.toString();
+  String get satoshis => g.wallet.balance.toString();
 
   String formattedSats(int sats) => String.fromCharCodes(sats
       .toString()
@@ -257,7 +249,7 @@ class _MoneyPageState extends State<MoneyPage> {
       .values
       .reduce((value, element) => [...element, ...value]));
 
-  String get usds => satoshisToUSD(widget.wallet.balance).toStringAsFixed(4);
+  String get usds => satoshisToUSD(g.wallet.balance).toStringAsFixed(4);
 
   String get currency => _currencies["l"][_currencies["i"]] as String;
 
@@ -321,7 +313,7 @@ class _MoneyPageState extends State<MoneyPage> {
       type: TextInputType.number,
       placeHolder: currency == "USD"
           ? "$usds \$"
-          : "${formattedSats(widget.wallet.balance)} sat",
+          : "${formattedSats(g.wallet.balance)} sat",
       tec: tec,
     );
     if (reload) setState(() {});
@@ -441,9 +433,9 @@ class _MoneyPageState extends State<MoneyPage> {
     }
 
     void confirmPayment() {
-      final pay = widget.wallet.payPeople(
+      final pay = g.wallet.payPeople(
         people: widget.trueTargets.toList(growable: false),
-        selfID: widget.self.id,
+        selfID: g.self.id,
         amount: Sats(asSats),
         textNote: textNoteTec.value.text,
       );
@@ -491,7 +483,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
     void import() async {
       final payment =
-          await widget.wallet.importMoney(importTec.value.text, widget.self.id);
+          await g.wallet.importMoney(importTec.value.text, g.self.id);
 
       if (payment == null) return;
       widget.scanOrImport(payment);

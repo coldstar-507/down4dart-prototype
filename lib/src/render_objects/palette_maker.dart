@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import '../boxes.dart';
+import '../globals.dart';
 
 import '../data_objects.dart';
 import '../themes.dart';
@@ -263,7 +263,7 @@ class PaletteMaker extends StatelessWidget {
         margin: EdgeInsets.only(
           left: Palette.paletteMargin,
           right: Palette.paletteMargin,
-          bottom: fold ? 0 : Sizes.h * 0.02,
+          bottom: fold ? 0 : Palette.gapSize,
         ),
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(

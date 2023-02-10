@@ -7,7 +7,7 @@ import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 
 import '../render_objects/console.dart';
-import '../boxes.dart';
+import '../globals.dart';
 
 class SnipCamera extends StatefulWidget {
   final CameraController ctrl;
@@ -46,18 +46,18 @@ class _SnipCameraState extends State<SnipCamera> {
   var tec = TextEditingController();
   bool _extra = false;
 
-  double get scale => widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio;
+  double get scale => widget.ctrl.value.aspectRatio * g.sizes.fullAspectRatio;
 
   bool get toReverse => widget.camNum != 0;
 
   Widget inputBody(bool input) => input
       ? Center(
           child: Container(
-            width: Sizes.w,
+            width: g.sizes.w,
             decoration: const BoxDecoration(color: Colors.black38),
             constraints: BoxConstraints(
               minHeight: 16,
-              maxHeight: Sizes.fullHeight,
+              maxHeight: g.sizes.fullHeight,
             ),
             child: TextField(
               autofocus: input,
@@ -144,8 +144,8 @@ class _SnipCameraState extends State<SnipCamera> {
           child: Transform.scale(
             scale: scale > 1 ? scale : 1 / scale,
             child: SizedBox(
-              height: widget.ctrl.value.aspectRatio * Sizes.w,
-              width: Sizes.w,
+              height: widget.ctrl.value.aspectRatio * g.sizes.w,
+              width: g.sizes.w,
               child: child,
             ),
           ),
@@ -157,14 +157,14 @@ class _SnipCameraState extends State<SnipCamera> {
       left: 0,
       child: SizedBox(
         // height: mediaSize.height,
-        width: Sizes.w,
+        width: g.sizes.w,
         child: child,
       ));
 
   Widget capturingPage([bool extra = false]) {
     final cscal = 1.143;
-    final cal = 1 / (widget.ctrl.value.aspectRatio * Sizes.fullAspectRatio);
-    print("full = ${Sizes.fullAspectRatio}");
+    final cal = 1 / (widget.ctrl.value.aspectRatio * g.sizes.fullAspectRatio);
+    print("full = ${g.sizes.fullAspectRatio}");
     print("cam = ${widget.ctrl.value.aspectRatio}");
     print("cscal = $cscal");
     print("calll = $cal");

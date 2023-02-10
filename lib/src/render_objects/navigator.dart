@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 // import 'package:pull_to_refresh/pull_to_refresh.dart';
-import '../boxes.dart';
+import '../globals.dart';
 import '../themes.dart';
 
 import 'lists.dart';
@@ -131,7 +131,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 600),
                           curve: Curves.easeInOut,
-                          width: curPos == page.key ? Sizes.w : 0,
+                          width: curPos == page.key ? g.sizes.w : 0,
                           child: page.value.staticList
                               ? StaticList(
                                   reversed: page.value.reversedList,
@@ -162,7 +162,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: Sizes.headerHeight,
+        toolbarHeight: g.sizes.headerHeight,
         title: pageHeader,
         backgroundColor: PinkTheme.qrColor,
       ),

@@ -11,10 +11,8 @@ import '../render_objects/profile.dart';
 class NodePage extends StatefulWidget {
   final int pageIndex;
   final void Function(int) onPageChange;
-  final List<CameraDescription> cameras;
   final List<Palette>? palettes;
   final Palette palette;
-  final Self self;
   final Palette? Function(BaseNode, {String at}) nodeToPalette;
   final void Function(String, String) openNode, openChat;
   final void Function() back;
@@ -22,13 +20,11 @@ class NodePage extends StatefulWidget {
   const NodePage({
     required this.pageIndex,
     required this.onPageChange,
-    required this.cameras,
     required this.openNode,
     required this.openChat,
     required this.palette,
     required this.nodeToPalette,
     required this.back,
-    required this.self,
     this.palettes,
     Key? key,
   }) : super(key: key);

@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:video_player/video_player.dart';
 
-import 'boxes.dart';
+import 'globals.dart';
 import 'web_requests.dart' as r;
 import '_down4_dart_utils.dart';
 import 'bsv/wallet.dart';
@@ -36,24 +36,14 @@ import 'render_objects/_down4_flutter_utils.dart' as ru;
 import 'render_objects/console.dart';
 
 class Home extends StatefulWidget {
-  final List<CameraDescription> cameras;
-  final Self self;
-  final Wallet wallet;
-
-  const Home({
-    required this.cameras,
-    required this.self,
-    required this.wallet,
-    Key? key,
-  }) : super(key: key);
+  const Home({Key? key}) : super(key: key);
 
   @override
-  _HomeState createState() => _HomeState();
+  State<Home> createState() => _HomeState();
 }
 
 class _HomeState extends State<Home> {
   Widget? _page;
-  ExchangeRate _exchangeRate = loadExchangeRate();
 
   List<r.Request> _requests = [];
 
@@ -86,15 +76,10 @@ class _HomeState extends State<Home> {
     loadHomePalettes();
     loadPayments();
     ru.clearAppCache();
-    widget.wallet.printWalletInfo();
+    g.wallet.printWalletInfo();
     connectToMessages();
     processWebRequests();
     updateExchangeRate();
-    try {
-      printRandomPrompts();
-    } catch (e) {
-      print("ERROR PRINTING RANDOM PROMPTS $e");
-    }
   }
 
   @override
@@ -103,21 +88,10 @@ class _HomeState extends State<Home> {
     super.dispose();
   }
 
-  Future<void> printRandomPrompts() async {
-    final rp = await ru.randomPrompts(10);
-    rp.forEach((element) {
-      print("""
-      =========
-      ${element.first} ${element.second}
-      =========
-      """);
-    });
-  }
-
   Future<void> loadHomePalettes() async {
-    writePalette(widget.self);
+    writePalette(g.self);
 
-    final jsonEncodedHomeNodes = b.nodes.values;
+    final jsonEncodedHomeNodes = g.boxes.nodes.values;
     var groupPeopleIDs = Set<Identifier>.identity();
     for (final jsonEncodedHomeNode in jsonEncodedHomeNodes) {
       final node = BaseNode.fromJson(jsonDecode(jsonEncodedHomeNode));
@@ -137,7 +111,7 @@ class _HomeState extends State<Home> {
   }
 
   void connectToMessages() {
-    var msgQueue = db.child("Users").child(widget.self.id).child("M");
+    var msgQueue = db.child("Users").child(g.self.id).child("M");
     var messagesRef = db.child("Messages");
 
     _messageListener = msgQueue.onChildAdded.listen((event) async {
@@ -151,7 +125,7 @@ class _HomeState extends State<Home> {
         // PAYMENT!
         final payment = await r.getPayment(eventKey);
         if (payment == null) return;
-        widget.wallet.parsePayment(widget.self.id, payment);
+        g.wallet.parsePayment(g.self.id, payment);
         loadPayments();
         return;
       } else if (eventPayload == "m") {
@@ -233,18 +207,17 @@ class _HomeState extends State<Home> {
   }
 
   void parsePayment(Down4Payment payment) {
-    widget.wallet.parsePayment(widget.self.id, payment);
-    widget.wallet.save();
-    writePalette(Payment(payment: payment, selfID: widget.self.id),
-        at: "Payments");
+    g.wallet.parsePayment(g.self.id, payment);
+    g.wallet.save();
+    writePalette(Payment(payment: payment, selfID: g.self.id), at: "Payments");
   }
 
   void loadPayments() async {
-    await widget.wallet.updateAllStatus();
-    widget.wallet.settlementRoutine();
-    widget.wallet.save();
-    for (final payment in widget.wallet.payments) {
-      writePalette(Payment(payment: payment, selfID: widget.self.id),
+    await g.wallet.updateAllStatus();
+    g.wallet.settlementRoutine();
+    g.wallet.save();
+    for (final payment in g.wallet.payments) {
+      writePalette(Payment(payment: payment, selfID: g.self.id),
           at: "Payments");
     }
     if (_page is MoneyPage) moneyPage();
@@ -253,14 +226,14 @@ class _HomeState extends State<Home> {
   // ======================================================= UTILS ============================================================ //
 
   Future<void> updateExchangeRate() async {
-    final lastUpdate = _exchangeRate.lastUpdate;
+    final lastUpdate = g.exchangeRate.lastUpdate;
     final rightNow = timeStamp();
     if (rightNow - lastUpdate > const Duration(minutes: 10).inMilliseconds) {
       final rate = await r.getExchangeRate();
       if (rate != null) {
-        _exchangeRate.rate = rate;
-        _exchangeRate.lastUpdate = rightNow;
-        _exchangeRate.save();
+        g.exchangeRate.rate = rate;
+        g.exchangeRate.lastUpdate = rightNow;
+        g.exchangeRate.save();
         if (_page is MoneyPage) moneyPage();
       }
     }
@@ -291,6 +264,7 @@ class _HomeState extends State<Home> {
     String at = "Home",
     bool fold = false,
     bool fade = false,
+    bool selected = false,
   }) {
     if (node is ChatableNode) {
       String? lastMessagePreview;
@@ -305,14 +279,16 @@ class _HomeState extends State<Home> {
         }
       }
       if (node is User) {
-        if (node.id == widget.self.id) {
-          return nodeToPalette(node as Self, at: at, fade: fade, fold: fold);
+        if (node.id == g.self.id) {
+          return nodeToPalette(node as Self,
+              at: at, fade: fade, fold: fold, selected: selected);
         }
         return Palette(
             node: node,
             at: at,
             fold: fold,
             fade: fade,
+            selected: selected,
             snipOrMessageToRead:
                 node.snips.isNotEmpty || !messagePreviewWasRead,
             messagePreview: lastMessagePreview,
@@ -341,6 +317,7 @@ class _HomeState extends State<Home> {
         return Palette(
             node: node,
             at: at,
+            selected: selected,
             messagePreview: lastMessagePreview,
             messagePreviewWasRead: true,
             snipOrMessageToRead: node.snips.isNotEmpty,
@@ -364,6 +341,7 @@ class _HomeState extends State<Home> {
         return Palette(
           node: node,
           at: at,
+          selected: selected,
           snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
           messagePreview: lastMessagePreview,
           messagePreviewWasRead: messagePreviewWasRead,
@@ -384,6 +362,7 @@ class _HomeState extends State<Home> {
       } else if (node is Group) {
         return Palette(
           node: node,
+          selected: selected,
           snipOrMessageToRead: node.snips.isNotEmpty || !messagePreviewWasRead,
           messagePreview: lastMessagePreview,
           messagePreviewWasRead: messagePreviewWasRead,
@@ -408,6 +387,7 @@ class _HomeState extends State<Home> {
     } else if (node is Payment) {
       return Palette(
         node: node,
+        selected: selected,
         at: "Payments",
         messagePreview: node.payment.textNote,
         buttonsInfo: [
@@ -432,7 +412,7 @@ class _HomeState extends State<Home> {
         var node = nodeAt(root) as ChatableNode?;
         if (node == null) return false;
 
-        final bool sendingToSelf = node.id == widget.self.id;
+        final bool sendingToSelf = node.id == g.self.id;
 
         // first, save the message, if we are sending it to self,
         // it's a saved message, hence isSaved will be true
@@ -554,7 +534,7 @@ class _HomeState extends State<Home> {
         path: path,
         metadata: MediaMetadata(
           isSquared: false,
-          owner: widget.self.id,
+          owner: g.self.id,
           extension: path.extension(),
           timestamp: timestamp,
           isReversed: isReversed,
@@ -577,7 +557,7 @@ class _HomeState extends State<Home> {
           mediaID: media.id,
           root: node.id,
           groupName: node.name,
-          senderID: widget.self.id,
+          senderID: g.self.id,
           targets: targets.toList(growable: false),
         );
         snipRequests.add(sr);
@@ -590,7 +570,7 @@ class _HomeState extends State<Home> {
       final targets = selectedPalettes.asNodes().whereType<Person>().asIds();
       final sr = r.SnipRequest(
         mediaID: media.id,
-        senderID: widget.self.id,
+        senderID: g.self.id,
         targets: targets.toList(growable: false),
       );
       snipRequests.add(sr);
@@ -629,7 +609,7 @@ class _HomeState extends State<Home> {
     if (curLoc.id == "Search") {
       searchPage();
     } else if (curLoc.id == "Home") {
-      homePage(false);
+      homePage();
     }
   }
 
@@ -677,8 +657,8 @@ class _HomeState extends State<Home> {
     if (curLoc.id == "Home") {
       if (prevLoc.type == "Chat") {
         print("fucking niggers!");
-        final lastNode = nodeAt(prevLoc.id);
-        if (lastNode != null) writePalette(lastNode);
+        final lastNode = nodeAt(prevLoc.id)!;
+        writePalette(lastNode);
       }
       _homeScrollController.dispose();
       _homeScrollController =
@@ -778,15 +758,15 @@ class _HomeState extends State<Home> {
     bool onlyIfAbsent = false,
     bool fold = false,
     bool fade = false,
+    bool selected = false,
   }) {
     if (_paletteMap[at] == null) _paletteMap[at] = {};
-    final p = nodeToPalette(node, at: at, fold: fold, fade: fade);
-    if (p != null) {
-      if (onlyIfAbsent) {
-        _paletteMap[at]?.putIfAbsent(node.id, () => p);
-      } else {
-        _paletteMap[at]?[node.id] = p;
-      }
+    final p =
+        nodeToPalette(node, at: at, fold: fold, fade: fade, selected: selected);
+    if (onlyIfAbsent) {
+      _paletteMap[at]?.putIfAbsent(node.id, () => p);
+    } else {
+      _paletteMap[at]?[node.id] = p;
     }
   }
 
@@ -862,85 +842,35 @@ class _HomeState extends State<Home> {
     throw "Invalid previous location";
   }
 
-  void homePage([bool extra = false]) {
+  void homePage() {
     _page = HomePage(
       scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
-      console: Console(
-        mediasInfo: ConsoleMedias(
-          show: false,
-          medias: widget.self.images
-              .map((mediaID) => mediaID.getLocalMessageMedia())
-              .whereType<MessageMedia>(),
-          onSelectMedia: (_) {},
-          nMedias: widget.self.images.length,
-        ),
-        bottomInputs: [
-          ConsoleInput(
-            tec: _tec,
-            placeHolder: ":)",
-          ),
-        ],
-        topButtons: [
-          ConsoleButton(
-            name: "Hyperchat",
-            onPress: hyperchatPage,
-          ),
-          ConsoleButton(
-              name: "Money",
-              onPress: () {
-                _locations.add(Location(id: "Money"));
-                moneyPage();
-              }),
-        ],
-        bottomButtons: [
-          ConsoleButton(
-              showExtra: extra,
-              name: "Group",
-              bottomEpsilon: -0.3,
-              widthEpsilon: 0.7,
-              heightEpsilon: -1.0,
-              onPress: () => extra ? homePage(!extra) : groupPage(),
-              isSpecial: true,
-              onLongPress: () => homePage(!extra),
-              extraButtons: [
-                ConsoleButton(name: "Delete", onPress: delete),
-                ConsoleButton(
-                  name: "Forward",
-                  onPress: () => forward(
-                    formattedHomePalettes.selected().toList(growable: false),
-                  ),
-                ),
-                ConsoleButton(name: "Shit", onPress: () => homePage(!extra)),
-                ConsoleButton(name: "Wacko", onPress: () => homePage(!extra)),
-              ]),
-          ConsoleButton(
-            name: "Search",
-            onPress: () {
-              _locations.add(Location(id: "Search"));
-              searchPage();
-            },
-          ),
-          ConsoleButton(
-            name: "Ping",
-            onPress: () {
-              if (_tec.value.text.isNotEmpty) {
-                final pr = r.PingRequest(
-                  text: _tec.value.text,
-                  targets: palettes().users().asIds().toList(growable: false),
-                  senderID: widget.self.id,
-                );
-                _requests.add(pr);
-                processWebRequests();
-                _tec.clear();
-              }
-            },
-            onLongPress: snipPage,
-            isSpecial: true,
-          ),
-        ],
+      hyperchat: hyperchatPage,
+      group: groupPage,
+      money: () {
+        _locations.add(Location(id: "Money"));
+        moneyPage();
+      },
+      ping: (pingRequest) {
+        _requests.add(pingRequest);
+        processWebRequests();
+      },
+      snip: snipPage,
+      search: () {
+        _locations.add(Location(id: "Search"));
+        searchPage();
+      },
+      delete: delete,
+      forward: () => forward(
+        formattedHomePalettes.selected().toList(growable: false),
       ),
     );
+
+    // _page = HomePage(
+    //     scrollController: _homeScrollController,
+    //     palettes: formattedHomePalettes,
+    //     console: _homeConsole);
     setState(() {});
   }
 
@@ -976,10 +906,10 @@ class _HomeState extends State<Home> {
 
   void paymentPage(Down4Payment payment) {
     _page = PaymentPage(
-      self: widget.self,
       ok: () {
-        _locations.removeLast();
-        _locations.removeLast();
+        _locations
+          ..removeLast()
+          ..removeLast();
         homePage();
       },
       paymentRequest: (pr) {
@@ -997,11 +927,8 @@ class _HomeState extends State<Home> {
     // updateExchangeRate();
     _page = MoneyPage(
       initialOffset: fromHome ? _homeScrollController.offset : 0.0,
-      self: widget.self,
-      wallet: widget.wallet,
       transitioned: transition.first,
       trueTargets: transition.second,
-      exchangeRate: _exchangeRate.rate,
       homePalettes: formattedHomePalettes,
       scanOrImport: (payment) {
         parsePayment(payment);
@@ -1032,7 +959,6 @@ class _HomeState extends State<Home> {
     final transition = homeToMoneyOrHyperchatOrGroupTransition();
     _page = HyperchatPage(
       initialOffset: _homeScrollController.offset,
-      self: widget.self,
       homePalettes: formattedHomePalettes,
       transitionedHomePalettes: transition.first,
       people: transition.second,
@@ -1040,7 +966,6 @@ class _HomeState extends State<Home> {
         _requests.add(hyperchatRequest);
         processWebRequests();
       },
-      cameras: widget.cameras,
       back: homePage,
       ping: (pingRequest) {
         _requests.add(pingRequest);
@@ -1054,7 +979,6 @@ class _HomeState extends State<Home> {
     final transition = homeToMoneyOrHyperchatOrGroupTransition();
     _page = GroupPage(
       initialOffset: _homeScrollController.offset,
-      self: widget.self,
       back: homePage,
       groupRequest: (groupRequest) {
         _requests.add(groupRequest);
@@ -1063,7 +987,6 @@ class _HomeState extends State<Home> {
       transitionedHomePalettes: transition.first,
       people: transition.second,
       homePalettes: formattedHomePalettes,
-      cameras: widget.cameras,
     );
 
     setState(() {});
@@ -1073,7 +996,6 @@ class _HomeState extends State<Home> {
     _page = AddFriendPage(
       forwardNodes: forward,
       putNodeOffline: putNodeOffLine,
-      self: widget.self,
       search: search,
       palettes: _paletteMap["Search"]?.values.toList().reversed.toList() ?? [],
       addCallback: addPalettes,
@@ -1128,7 +1050,7 @@ class _HomeState extends State<Home> {
 
     if (ctrl == null || reload) {
       await ctrl?.dispose();
-      ctrl = CameraController(widget.cameras[camera], res);
+      ctrl = CameraController(g.cameras[camera], res);
       await ctrl.initialize();
       snip();
     }
@@ -1138,8 +1060,6 @@ class _HomeState extends State<Home> {
     _page = NodePage(
       pageIndex: curLoc.pageIndex,
       onPageChange: (pageIdx) => curLoc.pageIndex = pageIdx,
-      cameras: widget.cameras,
-      self: widget.self,
       openChat: (id, at) {
         if (at == "Home") {
           openChat(id, at);
@@ -1165,8 +1085,8 @@ class _HomeState extends State<Home> {
       if (palettes(at: node.id).length != node.group.length) {
         for (final sender in node.group) {
           BaseNode? userNode;
-          if (sender == widget.self.id) {
-            userNode = widget.self;
+          if (sender == g.self.id) {
+            userNode = g.self;
           } else {
             userNode = nodeAt(sender);
             userNode ??= nodeAt(sender, "Hidden");
@@ -1177,7 +1097,7 @@ class _HomeState extends State<Home> {
       senders = paletteMap(node.id);
     } else {
       senders = {
-        widget.self.id: palette(widget.self.id)!,
+        g.self.id: palette(g.self.id)!,
         node.id: palette(node.id)!,
       };
     }
@@ -1189,9 +1109,7 @@ class _HomeState extends State<Home> {
         _requests.add(messageRequest);
         processWebRequests();
       },
-      self: widget.self,
       node: node,
-      cameras: widget.cameras,
       pageIndex: curLoc.pageIndex,
       onPageChange: (idx) => curLoc.pageIndex = idx,
       back: back,
@@ -1215,7 +1133,7 @@ class _HomeState extends State<Home> {
     if (media == null) return snipView(node);
     // final media = MessageMedia(id: snip, metadata: mediaMetadata);
 
-    final scale = media.metadata.elementAspectRatio * Sizes.fullAspectRatio;
+    final scale = media.metadata.elementAspectRatio * g.sizes.fullAspectRatio;
     Widget displayMediaBody(Widget child) => Center(
           child: Transform(
             alignment: Alignment.center,
@@ -1225,8 +1143,8 @@ class _HomeState extends State<Home> {
             child: Transform.scale(
               scale: scale > 1 ? scale : 1 / scale,
               child: SizedBox(
-                  height: media.metadata.elementAspectRatio * Sizes.w,
-                  width: Sizes.w,
+                  height: media.metadata.elementAspectRatio * g.sizes.w,
+                  width: g.sizes.w,
                   child: child),
             ),
           ),

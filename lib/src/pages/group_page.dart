@@ -12,7 +12,7 @@ import 'package:video_player/video_player.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
-import '../boxes.dart';
+import '../globals.dart';
 import '../_down4_dart_utils.dart' as u;
 import '../web_requests.dart' as r;
 
@@ -23,8 +23,6 @@ import '../render_objects/palette_maker.dart';
 import '../render_objects/_down4_flutter_utils.dart';
 
 class GroupPage extends StatefulWidget {
-  final List<CameraDescription> cameras;
-  final Self self;
   final List<Palette> homePalettes, transitionedHomePalettes;
   final Iterable<Person> people;
   final void Function() back;
@@ -34,11 +32,9 @@ class GroupPage extends StatefulWidget {
   const GroupPage({
     required this.people,
     required this.transitionedHomePalettes,
-    required this.self,
     required this.back,
     required this.groupRequest,
     required this.homePalettes,
-    required this.cameras,
     required this.initialOffset,
     Key? key,
   }) : super(key: key);
@@ -67,14 +63,14 @@ class _GroupPageState extends State<GroupPage> {
     return ConsoleMedias(
       show: show,
       medias: images
-          ? widget.self.images
+          ? g.self.images
               .map((mediaID) => mediaID.getLocalMessageMedia())
               .whereType<MessageMedia>()
-          : widget.self.videos
+          : g.self.videos
               .map((mediaID) => mediaID.getLocalMessageMedia())
               .whereType<MessageMedia>(),
       onSelectMedia: (media) => send(mediaInput: media),
-      nMedias: images ? widget.self.images.length : widget.self.videos.length,
+      nMedias: images ? g.self.images.length : g.self.videos.length,
     );
   }
 
@@ -128,7 +124,7 @@ class _GroupPageState extends State<GroupPage> {
     final msg = Message(
       root: groupID,
       id: messagePushId(),
-      senderID: widget.self.id,
+      senderID: g.self.id,
       timestamp: u.timeStamp(),
       mediaID: mediaInput?.id ?? _cameraInput?.id,
       text: _tec.value.text,
@@ -161,10 +157,10 @@ class _GroupPageState extends State<GroupPage> {
       if (result == null) return;
       for (final file in result.files) {
         if (file.path == null || file.bytes == null) continue;
-        final mediaID = u.deterministicMediaID(file.bytes!, widget.self.id);
+        final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
         final size = await decodeImageSize(file.bytes!);
         final mediaMetadata = MediaMetadata(
-            owner: widget.self.id,
+            owner: g.self.id,
             timestamp: u.timeStamp(),
             elementAspectRatio: 1 / size.aspectRatio,
             extension: file.path!.extension());
@@ -178,11 +174,11 @@ class _GroupPageState extends State<GroupPage> {
           MessageMedia(id: mediaID, path: f.path, metadata: mediaMetadata)
             ..isSaved = true
             ..save();
-          widget.self.images.add(mediaID);
+          g.self.images.add(mediaID);
           loadMediaConsole();
         }
       }
-      widget.self.save();
+      g.self.save();
     } else {
       final result = await FilePicker.platform.pickFiles(
           allowMultiple: true,
@@ -193,7 +189,7 @@ class _GroupPageState extends State<GroupPage> {
       for (final file in result.files) {
         if (file.path == null || file.bytes == null) continue;
         final fvi = FlutterVideoInfo();
-        final mediaID = u.deterministicMediaID(file.bytes!, widget.self.id);
+        final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
         final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
         final videoInfo = await fvi.getVideoInfo(file.path!);
         final ar = (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0);
@@ -216,13 +212,13 @@ class _GroupPageState extends State<GroupPage> {
                 isReversed: false,
                 elementAspectRatio: ar,
                 timestamp: u.timeStamp(),
-                owner: widget.self.id))
+                owner: g.self.id))
           ..isSaved = true
           ..save();
-        widget.self.videos.add(mediaID);
+        g.self.videos.add(mediaID);
         loadMediaConsole(images: false);
       }
-      widget.self.save();
+      g.self.save();
     }
   }
 
@@ -239,7 +235,8 @@ class _GroupPageState extends State<GroupPage> {
 
     _console = Console(
       bottomInputs: [consoleInput],
-      mediasInfo: consoleMedias(images: images, show: true),
+      consoleMedias2: ConsoleMedias2(
+          showImages: images, onSelectMedia: (media) => selectMedia(media)),
       topButtons: [
         ConsoleButton(name: "Import", onPress: handleImport),
       ],
@@ -266,7 +263,7 @@ class _GroupPageState extends State<GroupPage> {
 
   void loadBaseConsole({bool images = true}) {
     _console = Console(
-      mediasInfo: consoleMedias(images: images, show: false),
+      // mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(
@@ -300,7 +297,7 @@ class _GroupPageState extends State<GroupPage> {
   }) async {
     if (ctrl == null) {
       try {
-        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.high);
+        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
         await ctrl.initialize();
       } catch (err) {
         loadBaseConsole();
@@ -372,7 +369,7 @@ class _GroupPageState extends State<GroupPage> {
                 thumbnail: thumbnailPath,
                 id: mediaID,
                 metadata: MediaMetadata(
-                    owner: widget.self.id,
+                    owner: g.self.id,
                     timestamp: u.timeStamp(),
                     elementAspectRatio: ctrl!.value.aspectRatio,
                     extension: path.extension(),
@@ -431,6 +428,7 @@ class _GroupPageState extends State<GroupPage> {
 
   @override
   void dispose() async {
+    _cameraInput?.delete();
     super.dispose();
   }
 

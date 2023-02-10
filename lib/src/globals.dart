@@ -2,28 +2,28 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:down4/src/_down4_dart_utils.dart';
-import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'package:firebase_database/firebase_database.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'data_objects.dart';
-import 'web_requests.dart' as r;
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
 
-import '../main.dart' as main;
+// import '../main.dart' as main;
 
-var b = Boxes.instance;
-var db = FirebaseDatabase.instance.ref();
-var fs = FirebaseFirestore.instance;
-var st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
-var st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+final g = Singletons.instance;
+final db = FirebaseDatabase.instance.ref();
+// var _fs = FirebaseFirestore.instance;
+final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
+final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
 class ButtonKeys {
   final List<GlobalKey> topButtonKeys;
@@ -48,10 +48,10 @@ class ButtonKeys {
   static ButtonKeys get instance => _instance ??= ButtonKeys._();
 }
 
-String mediaPath(String mediaID, {bool isThumbnail = false}) =>
-    "${b.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
+String _mediaPath(String mediaID, {bool isThumbnail = false}) =>
+    "${g.boxes.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
 
-Future<void> deleteMediaFile(String path) async {
+Future<void> _deleteMediaFile(String path) async {
   try {
     await File(path).delete();
   } on PathNotFoundException catch (e) {
@@ -67,13 +67,13 @@ Future<MessageMedia?> downloadAndWriteMedia(
   String mediaID, {
   bool isNodeMedia = false,
 }) async {
-  final mediaRef = isNodeMedia ? st_node.ref(mediaID) : st.ref(mediaID);
+  final mediaRef = isNodeMedia ? _st_node.ref(mediaID) : _st.ref(mediaID);
   try {
     final futureMediaData = mediaRef.getData(31457280); // 30mib
     final fullMetadata = await mediaRef.getMetadata();
     final customMetadata = fullMetadata.customMetadata as Map<String, String>;
     final mediaMetadata = MediaMetadata.fromJson(customMetadata);
-    final path = "${b.docPath}/$mediaID";
+    final path = "${g.boxes.docPath}/$mediaID";
     final mediaData = await futureMediaData;
     if (mediaData != null) {
       await File(path).writeAsBytes(mediaData);
@@ -85,22 +85,22 @@ Future<MessageMedia?> downloadAndWriteMedia(
   }
 }
 
-Future<MediaMetadata?> downloadMediaMetadata(String mediaID) async {
-  try {
-    final fullMetadata = await st.ref(mediaID).getMetadata();
-    final jsonMetadata = fullMetadata.customMetadata as Map<String, String>;
-    return MediaMetadata.fromJson(jsonMetadata);
-  } catch (e) {
-    return null;
-  }
-}
+// Future<MediaMetadata?> _downloadMediaMetadata(String mediaID) async {
+//   try {
+//     final fullMetadata = await _st.ref(mediaID).getMetadata();
+//     final jsonMetadata = fullMetadata.customMetadata as Map<String, String>;
+//     return MediaMetadata.fromJson(jsonMetadata);
+//   } catch (e) {
+//     return null;
+//   }
+// }
 
 Future<bool> uploadOrUpdateMedia(
   MessageMedia media, {
   bool skipCheck = false, // usually for camera uploads
 }) async {
   if (media.file == null) return false;
-  final mediaRef = st.ref(media.id);
+  final mediaRef = _st.ref(media.id);
   if (skipCheck) {
     try {
       await mediaRef.putFile(
@@ -152,14 +152,14 @@ Future<File> writeMedia({
   required String mediaID,
   bool isThumbnail = false,
 }) async =>
-    File(mediaPath(mediaID, isThumbnail: isThumbnail)).writeAsBytes(mediaData);
+    File(_mediaPath(mediaID, isThumbnail: isThumbnail)).writeAsBytes(mediaData);
 
 Future<File> copyMedia({
   required String fromPath,
   required String mediaID,
   bool isThumbnail = false,
 }) async =>
-    File(fromPath).copy(mediaPath(mediaID, isThumbnail: isThumbnail));
+    File(fromPath).copy(_mediaPath(mediaID, isThumbnail: isThumbnail));
 
 Future<File?> makeThumbnail({
   required String videoPath,
@@ -172,33 +172,39 @@ Future<File?> makeThumbnail({
   return null;
 }
 
-extension Saver on ExchangeRate {
-  Future<void> save() async {
-    return b.personal.put("exchangeRate", jsonEncode(this));
+extension ExchangeRateSave on ExchangeRate {
+  void save() {
+    g.boxes.personal.put("exchangeRate", jsonEncode(this));
+  }
+
+  static ExchangeRate load() {
+    final jsonEncoded = g.boxes.personal.get("exchangeRate");
+    if (jsonEncoded == null) return ExchangeRate(lastUpdate: 0, rate: 0);
+    return ExchangeRate.fromJson(jsonDecode(jsonEncoded));
   }
 }
 
 extension Getters on Identifier {
   MessageMedia? getLocalMessageMedia() {
-    final String? jsonEncoded = b.medias.get(this);
+    final String? jsonEncoded = g.boxes.medias.get(this);
     if (jsonEncoded == null) return null;
     return MessageMedia.fromJson(jsonDecode(jsonEncoded));
   }
 
   Message? getLocalMessage() {
-    final String? jsonEncoded = b.messages.get(this);
+    final String? jsonEncoded = g.boxes.messages.get(this);
     if (jsonEncoded == null) return null;
     return Message.fromJson(jsonDecode(jsonEncoded));
   }
 
   BaseNode? getLocalNode() {
-    final String? jsonEncoded = b.nodes.get(this);
+    final String? jsonEncoded = g.boxes.nodes.get(this);
     if (jsonEncoded == null) return null;
     return BaseNode.fromJson(jsonDecode(jsonEncoded));
   }
 
   Future<void> deleteLocalNode() async {
-    return b.nodes.delete(this);
+    return g.boxes.nodes.delete(this);
   }
 }
 
@@ -227,7 +233,7 @@ extension MessageSave on Message {
   }
 
   Future<void> save() async {
-    return b.messages.put(id, jsonEncode(toJson(toLocal: true)));
+    return g.boxes.messages.put(id, jsonEncode(toJson(toLocal: true)));
   }
 
   Future<void> delete() async {
@@ -236,7 +242,7 @@ extension MessageSave on Message {
       media.references.remove(id);
       media.delete();
     }
-    await b.messages.delete(id);
+    await g.boxes.messages.delete(id);
     return;
   }
 }
@@ -244,9 +250,9 @@ extension MessageSave on Message {
 extension NodeSave on BaseNode {
   void save() {
     if (this is Self) {
-      b.personal.put("self", jsonEncode(toJson(toLocal: true)));
+      g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
     } else {
-      b.nodes.put(id, jsonEncode(toJson(toLocal: true)));
+      g.boxes.nodes.put(id, jsonEncode(toJson(toLocal: true)));
     }
   }
 
@@ -257,23 +263,23 @@ extension NodeSave on BaseNode {
         var msg = messageID.getLocalMessage();
         if (msg != null && !msg.isSaved) msg.delete();
       }
-      b.nodes.delete(id);
+      g.boxes.nodes.delete(id);
     }
   }
 }
 
 extension MediaSave on MessageMedia {
   Future<void> save() async {
-    return b.medias.put(id, jsonEncode(toJson(toLocal: true)));
+    return g.boxes.medias.put(id, jsonEncode(toJson(toLocal: true)));
   }
 
   Future<void> delete() async {
     if (references.isEmpty && !isSaved) {
       print("References are empty, deleting the file!");
-      b.medias.delete(id);
-      deleteMediaFile(path);
+      g.boxes.medias.delete(id);
+      _deleteMediaFile(path);
       if (thumbnail != null) {
-        deleteMediaFile(thumbnail!);
+        _deleteMediaFile(thumbnail!);
       }
     }
     return;
@@ -281,73 +287,104 @@ extension MediaSave on MessageMedia {
 }
 
 extension PaymentSave on Down4Payment {
-  Future<void> save() =>
-      b.payments.put(id, jsonEncode(toJson(withImages: true)));
+  Future<void> save() => g.boxes.payments.put(id, jsonEncode(this));
 }
 
 extension WalletSave on Wallet {
-  Future<void> save() => b.personal.put("wallet", jsonEncode(toJson()));
+  void save() {
+    g.boxes.personal.put("wallet", jsonEncode(this));
+  }
+
+  static Wallet load() {
+    final asJson = g.boxes.personal.get("wallet");
+    return Wallet.fromJson(jsonDecode(asJson));
+  }
+}
+
+extension SelfSave on Self {
+  void save() {
+    // this will be split so we don't save the whole thing everytime
+    g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
+  }
+
+  static Self load() {
+    // this will be remade so we load many different parts to make the self
+    final asJson = jsonDecode(g.boxes.personal.get("self"));
+    return BaseNode.fromJson(asJson) as Self;
+  }
+
+  static bool notYetInitialized() {
+    return g.boxes.personal.get("self") == null;
+  }
 }
 
 class Boxes {
-  static Boxes? _instance;
-  static Self? _self;
-  String docPath, tempPath;
+  late String docPath, tempPath;
   Box personal, nodes, messages, medias, messageQueue, bills, payments;
-  Boxes()
-      : docPath = main.docDirPath,
-        tempPath = main.tempDirPath,
-        medias = Hive.box("Medias"),
+  Boxes._()
+      : medias = Hive.box("Medias"),
         personal = Hive.box("Personal"),
         nodes = Hive.box("Nodes"),
         messages = Hive.box("Messages"),
         messageQueue = Hive.box("MessageQueue"),
         bills = Hive.box("Bills"),
         payments = Hive.box("Payments");
-
-  static Boxes get instance => _instance ??= Boxes();
-
-  static Self get self => _self ??= loadSelf()!;
 }
 
 class Sizes {
-  static double h = 0;
-  static double w = 0;
-  static double fullHeight = 0;
-  static double headerHeight = 0;
-  static Size get fullSize => Size(w, fullAspectRatio);
-  static Size get paddedSize => Size(w, h);
-  static double get viewPaddingHeight => fullHeight - h;
-  static double get fullAspectRatio => w / fullHeight;
-  static double get paddedAspectRatio => w / h;
+  Sizes._()
+      : h = 0,
+        w = 0,
+        fullHeight = 0,
+        headerHeight = 0;
+  double h;
+  double w;
+  double fullHeight;
+  double headerHeight;
+  Size get fullSize => Size(w, fullAspectRatio);
+  Size get paddedSize => Size(w, h);
+  double get viewPaddingHeight => fullHeight - h;
+  double get fullAspectRatio => w / fullHeight;
+  double get paddedAspectRatio => w / h;
 }
 
-class Sizes2 {
-  Sizes2._()
-      : w = 0,
-        h = 0;
-  double w, h;
-  static Sizes2? _instance;
-  Sizes2 get instance => _instance ??= Sizes2._();
-}
+class Singletons {
+  static final Singletons _instance = Singletons();
+  static Singletons get instance => _instance;
 
-Self? loadSelf() {
-  final String? jsonEncodedSelf = b.personal.get("self");
-  if (jsonEncodedSelf == null) return null;
-  return BaseNode.fromJson(jsonDecode(jsonEncodedSelf)) as Self;
-}
+  Self? _self;
+  Wallet? _wallet;
+  Sizes? _sizes;
+  Boxes? _boxes;
+  ExchangeRate? _exchangeRate;
+  late List<CameraDescription> cameras;
 
-Wallet? loadWallet() {
-  final String? jsonEncodedWallet = b.personal.get("wallet");
-  if (jsonEncodedWallet == null) return null;
-  return Wallet.fromJson(jsonDecode(jsonEncodedWallet));
-}
+  Self get self => _self ??= SelfSave.load();
+  Wallet get wallet => _wallet ??= WalletSave.load();
+  Boxes get boxes => _boxes ??= Boxes._();
+  Sizes get sizes => _sizes ??= Sizes._();
+  ExchangeRate get exchangeRate => _exchangeRate ??= ExchangeRateSave.load();
 
-ExchangeRate loadExchangeRate() {
-  final String? jsonEncodedExchangeRate = b.personal.get("exchangeRate");
-  if (jsonEncodedExchangeRate != null) {
-    return ExchangeRate.fromJson(jsonDecode(jsonEncodedExchangeRate));
-  } else {
-    return ExchangeRate(lastUpdate: 0, rate: 0.0);
+  bool get notYetInitialized => SelfSave.notYetInitialized();
+
+  void initWallet(Uint8List s1, Uint8List s2) {
+    _wallet = Wallet.fromSeed(s1, s2)..save();
+  }
+
+  void initSelf(Identifier id, NodeMedia media, Down4Keys neuter, String name,
+      String? lastName) {
+    _self = Self(
+      id: id,
+      media: media,
+      firstName: name,
+      lastName: lastName,
+      neuter: neuter,
+      images: {},
+      videos: {},
+      nfts: {},
+      children: {},
+      messages: {},
+      snips: {},
+    )..save();
   }
 }

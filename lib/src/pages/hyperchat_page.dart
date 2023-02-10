@@ -12,7 +12,7 @@ import 'package:video_player/video_player.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
-import '../boxes.dart';
+import '../globals.dart';
 import '../_down4_dart_utils.dart' as u;
 import '../web_requests.dart' as r;
 
@@ -23,22 +23,19 @@ import '../render_objects/_down4_flutter_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget {
   final double initialOffset;
-  final List<CameraDescription> cameras;
   final List<Palette> homePalettes, transitionedHomePalettes;
   final Iterable<Person> people;
   final void Function(r.HyperchatRequest) hyperchatRequest;
   final void Function(r.PingRequest) ping;
   final void Function() back;
-  final Self self;
+  // final Self self;
 
   const HyperchatPage({
     required this.initialOffset,
     required this.people,
     required this.transitionedHomePalettes,
-    required this.self,
     required this.homePalettes,
     required this.hyperchatRequest,
-    required this.cameras,
     required this.back,
     required this.ping,
     Key? key,
@@ -77,14 +74,14 @@ class _HyperchatPageState extends State<HyperchatPage> {
     return ConsoleMedias(
       show: show,
       medias: images
-          ? widget.self.images
+          ? g.self.images
               .map((mediaID) => mediaID.getLocalMessageMedia())
               .whereType<MessageMedia>()
-          : widget.self.videos
+          : g.self.videos
               .map((mediaID) => mediaID.getLocalMessageMedia())
               .whereType<MessageMedia>(),
       onSelectMedia: (media) => send(mediaInput: media),
-      nMedias: images ? widget.self.images.length : widget.self.videos.length,
+      nMedias: images ? g.self.images.length : g.self.videos.length,
     );
   }
 
@@ -101,7 +98,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
     final msg = Message(
       root: randomRoot,
       id: messageID,
-      senderID: widget.self.id,
+      senderID: g.self.id,
       timestamp: u.timeStamp(),
       text: _tec.value.text,
       mediaID: mediaInput?.id ?? _cameraInput?.id,
@@ -124,7 +121,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
   void ping() {
     if (_tec.value.text.isEmpty) return;
     widget.ping(r.PingRequest(
-        senderID: widget.self.id,
+        senderID: g.self.id,
         text: _tec.value.text,
         targets: widget.people.asIds().toList()));
     _tec.clear();
@@ -140,8 +137,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   void loadMediaConsole([bool images = true]) {
     _console = Console(
+      consoleMedias2: ConsoleMedias2(
+          showImages: images,
+          onSelectMedia: (media) => send(mediaInput: media)),
       bottomInputs: [consoleInput],
-      mediasInfo: consoleMedias(images: images, show: true),
+      // mediasInfo: consoleMedias(images: images, show: true),
       topButtons: [
         ConsoleButton(
           name: "Import",
@@ -166,7 +166,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   void loadBaseConsole({bool images = true}) {
     _console = Console(
-      mediasInfo: consoleMedias(images: images, show: false),
+      // mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(name: "Ping", onPress: ping),
@@ -194,7 +194,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
       if (results == null) return;
       for (final file in results.files) {
         if (file.path == null && file.bytes != null) continue;
-        final mediaID = u.deterministicMediaID(file.bytes!, widget.self.id);
+        final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
         final size = await decodeImageSize(file.bytes!);
         final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
         MessageMedia(
@@ -206,11 +206,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
                 isReversed: false,
                 extension: file.path!.extension(),
                 timestamp: u.timeStamp(),
-                owner: widget.self.id,
+                owner: g.self.id,
                 elementAspectRatio: 1.0 / size.aspectRatio))
           ..isSaved = true
           ..save();
-        widget.self.images.add(mediaID);
+        g.self.images.add(mediaID);
         loadMediaConsole();
       }
     } else {
@@ -225,7 +225,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         if (video.path == null || video.bytes == null) continue;
         final videoInfoGetter = FlutterVideoInfo();
         final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
-        final mediaID = u.deterministicMediaID(video.bytes!, widget.self.id);
+        final mediaID = u.deterministicMediaID(video.bytes!, g.self.id);
         final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
         final tn =
             await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
@@ -244,17 +244,17 @@ class _HyperchatPageState extends State<HyperchatPage> {
                 isSquared: false,
                 extension: video.path!.extension(),
                 timestamp: u.timeStamp(),
-                owner: widget.self.id,
+                owner: g.self.id,
                 elementAspectRatio:
                     (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
           ..isSaved = true
           ..save();
-        widget.self.videos.add(mediaID);
+        g.self.videos.add(mediaID);
         loadMediaConsole();
         // _cachedSavedVideos[mediaID] = down4Media;
       }
     }
-    widget.self.save();
+    g.self.save();
   }
 
   Future<void> loadSquaredCameraConsole({
@@ -264,7 +264,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
   }) async {
     if (ctrl == null) {
       try {
-        ctrl = CameraController(widget.cameras[cam], ResolutionPreset.high);
+        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
         await ctrl.initialize();
       } catch (err) {
         loadBaseConsole();
@@ -336,7 +336,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
                 thumbnail: thumbnailPath,
                 id: u.randomMediaID(),
                 metadata: MediaMetadata(
-                    owner: widget.self.id,
+                    owner: g.self.id,
                     timestamp: u.timeStamp(),
                     elementAspectRatio: ctrl!.value.aspectRatio,
                     extension: path.extension(),
@@ -394,8 +394,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
   }
 
   @override
-  void dispose() async {
-    if (_ctrl != null) await _ctrl!.dispose();
+  void dispose() {
+    _ctrl?.dispose();
+    _cameraInput?.delete();
     super.dispose();
   }
 
