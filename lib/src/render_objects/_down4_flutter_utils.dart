@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'palette.dart';
 
 import '../data_objects.dart';
+import 'chat_message.dart' show ChatMessage;
 
 Image down4Logo(double dimension) {
   return Image.asset(
@@ -18,6 +19,169 @@ Image down4Logo(double dimension) {
     height: dimension,
     width: dimension,
   );
+}
+
+abstract class Down4PageWidget extends Widget {
+  ID get id;
+}
+
+class PageManager {
+  List<ID> _idStack;
+  Map<ID, Down4PageWidget> pages;
+  PageManager()
+      : _idStack = [],
+        pages = {};
+
+  Down4PageWidget get currentPage => pages[_idStack.last]!;
+  ID get currentID => _idStack.last;
+  Iterable<ID> get path => _idStack
+      .asMap()
+      .map((i, id) => _idStack.sublist(i + 1).contains(id)
+          ? MapEntry(i, null)
+          : MapEntry(i, id))
+      .values
+      .whereType<ID>();
+
+  void put(Down4PageWidget page) {
+    _idStack.add(page.id);
+    pages[page.id] = page;
+  }
+
+  void refresh(Down4PageWidget page) => pages[page.id] = page;
+
+  void pop() {
+    final last = _idStack.removeLast();
+    // id could be twice in stack because graph can be cyclic
+    // in this case we don't remove the page from pages to keep the state
+    if (!_idStack.contains(last)) pages.remove(last);
+  }
+}
+
+class Down4TextPainter extends CustomPainter {
+  final TextPainter painter;
+  const Down4TextPainter({required this.painter});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    painter.paint(canvas, Offset.zero);
+  }
+
+  @override
+  bool shouldRebuildSemantics(Down4TextPainter oldDelegate) => false;
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class Down4TextBubblePainter extends CustomPainter {
+  final TextPainter textPainter, datePainter;
+  final Offset dateOffset;
+
+  const Down4TextBubblePainter({
+    required this.textPainter,
+    required this.datePainter,
+    required this.dateOffset,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    textPainter.paint(canvas, const Offset(0, 0));
+    datePainter.paint(canvas, dateOffset);
+  }
+
+  @override
+  bool shouldRebuildSemantics(Down4TextBubblePainter oldDelegate) => false;
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class Down4TextBubble extends StatelessWidget {
+  final String text, dateText;
+  final double? inheritedWidth;
+  late TextPainter textPainter, datePainter;
+  late double calcWidth, calcHeight;
+  late bool dateOnSameLine;
+  late Offset dateOffset;
+
+  Down4TextBubble({
+    required this.text,
+    required this.dateText,
+    this.inheritedWidth,
+    Key? key,
+  }) : super(key: key) {
+    final ts = TextSpan(text: text, style: ChatMessage.textStyle);
+    final ds = TextSpan(text: dateText, style: ChatMessage.globalDateStyle);
+
+    textPainter = TextPainter(
+        text: ts,
+        textDirection: TextDirection.ltr,
+        textWidthBasis: TextWidthBasis.longestLine);
+    datePainter = TextPainter(
+        text: ds,
+        textDirection: TextDirection.ltr,
+        textWidthBasis: TextWidthBasis.longestLine);
+
+    textPainter.layout(maxWidth: ChatMessage.maxTextWidth);
+    datePainter.layout();
+    final metrics = textPainter.computeLineMetrics();
+
+    final widthWithDateOnSameLine = metrics.last.width + datePainter.width;
+    final maxTextWidth = textPainter.width;
+
+    dateOnSameLine = widthWithDateOnSameLine <= ChatMessage.maxTextWidth;
+
+    calcWidth = inheritedWidth ??
+        math.max(dateOnSameLine ? widthWithDateOnSameLine : 0, maxTextWidth);
+    calcHeight = textPainter.height + (dateOnSameLine ? 0 : datePainter.height);
+
+    dateOffset = Offset(
+      calcWidth - datePainter.width,
+      calcHeight - (datePainter.height * 1 / golden),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+        child: CustomPaint(
+            painter: Down4TextBubblePainter(
+                textPainter: textPainter,
+                datePainter: datePainter,
+                dateOffset: dateOffset),
+            isComplex: true,
+            size: Size(inheritedWidth ?? calcWidth, calcHeight)));
+  }
+}
+
+class Down4Text extends StatelessWidget {
+  final String text;
+  final Size? inheritedSize;
+  final TextStyle style;
+
+  late Size calculatedSize;
+  late TextPainter painter;
+  Down4Text({
+    required this.text,
+    required this.style,
+    this.inheritedSize,
+    Key? key,
+  }) : super(key: key) {
+    painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr);
+    painter.layout(maxWidth: inheritedSize?.width ?? double.infinity);
+    calculatedSize = Size(painter.width, painter.height);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+        child: CustomPaint(
+            painter: Down4TextPainter(painter: painter),
+            size: inheritedSize ?? calculatedSize,
+            isComplex: true));
+  }
 }
 
 class Down4Input extends StatefulWidget {
@@ -74,6 +238,7 @@ class _Down4InputState extends State<Down4Input> {
 
 class Down4VideoPlayer extends StatefulWidget {
   final VideoPlayerController videoController;
+  // final AnimationController animationController;
   // final Widget Function(double) rotatingLogo;
   final MessageMedia media;
   // final String? thumbnail;
@@ -84,6 +249,7 @@ class Down4VideoPlayer extends StatefulWidget {
   const Down4VideoPlayer({
     // this.thumbnail,
     // required this.rotatingLogo,
+    // required this.animationController,
     required this.videoController,
     required this.backgroundColor,
     required this.media,
@@ -97,8 +263,9 @@ class Down4VideoPlayer extends StatefulWidget {
   State<Down4VideoPlayer> createState() => _Down4VideoPlayerState();
 }
 
-class _Down4VideoPlayerState extends State<Down4VideoPlayer>
-    with SingleTickerProviderStateMixin {
+class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
+  double turns = 0.0;
+  Timer? timer;
   @override
   void initState() {
     super.initState();
@@ -121,10 +288,19 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
       print("REMOVING LISTEN ON END OF VIDEO ID ${widget.media.id}");
       widget.videoController.removeListener(_listenOnEnd);
     }
-    super.dispose();
+    if (mounted) super.dispose();
   }
 
   bool loading = false;
+
+  void startTurning() {
+    timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      setState(() {
+        turns += 2 * math.pi / 10;
+        turns = turns % (2 * math.pi);
+      });
+    });
+  }
 
   Future<void> _initController() async {
     setState(() {
@@ -139,6 +315,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
     }
     setState(() {
       loading = false;
+      timer?.cancel();
     });
   }
 
@@ -156,6 +333,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
 
   Future<void> onTap() async {
     if (!widget.videoController.value.isInitialized) {
+      startTurning();
       await _initController();
     }
     await _pauseOrPlay();
@@ -171,11 +349,19 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer>
     }
   }
 
+  // Widget rotatingLogo(double dimension) {
+  //   return AnimatedRotation(
+  //       turns: math.pi * 2,
+  //       duration: const Duration(seconds: 2),
+  //       child: down4Logo(dimension));
+  // }
+
   Widget rotatingLogo(double dimension) {
     return AnimatedRotation(
-        turns: math.pi * 2,
-        duration: const Duration(seconds: 2),
-        child: down4Logo(dimension));
+      duration: const Duration(seconds: 1),
+      turns: turns,
+      child: down4Logo(dimension),
+    );
   }
 
   @override
@@ -377,9 +563,9 @@ class Down4ImageViewer extends StatelessWidget {
   }
 }
 
-extension PaletteExtensionsMap on Map<Identifier, Palette> {
-  Map<Identifier, Palette> those(List<Identifier> ids) {
-    var map = <Identifier, Palette>{};
+extension PaletteExtensionsMap on Map<ID, Palette> {
+  Map<ID, Palette> those(List<ID> ids) {
+    var map = <ID, Palette>{};
     for (final id in ids) {
       map[id] = this[id]!;
     }
@@ -388,7 +574,7 @@ extension PaletteExtensionsMap on Map<Identifier, Palette> {
 }
 
 extension PaletteExtensions on Iterable<Palette> {
-  List<Palette> inThatOrder(Iterable<Identifier> ids) {
+  List<Palette> inThatOrder(Iterable<ID> ids) {
     var theList = <Palette>[];
     var palIds = asIds();
     for (final id in ids) {
@@ -399,7 +585,7 @@ extension PaletteExtensions on Iterable<Palette> {
     return theList;
   }
 
-  List<Palette> inReversedOrder(Iterable<Identifier> ids) {
+  List<Palette> inReversedOrder(Iterable<ID> ids) {
     var theList = <Palette>[];
     var palIds = asIds();
     for (final id in ids.toList(growable: false).reversed) {
@@ -421,17 +607,131 @@ extension PaletteExtensions on Iterable<Palette> {
       map((p) => p.node).whereType<BaseNode>();
   Iterable<Palette> selected() => where((p) => p.selected);
   Iterable<Palette> notSelected() => where((p) => !p.selected);
-  Iterable<Identifier> asIds() => map((e) => e.node.id);
+  Iterable<ID> asIds() => map((e) => e.node.id);
   Iterable<Palette> chatables() => where((p) => p.node is ChatableNode);
   Iterable<Palette> users() => where((p) => p.node is User);
   Iterable<Palette> people() => where((p) => p.node is Person);
   Iterable<Palette> groups() => where((p) => p.node is GroupNode);
-  Iterable<Palette> those(Iterable<Identifier> ids) =>
+  Iterable<Palette> those(Iterable<ID> ids) =>
       where((p) => ids.contains(p.node.id));
-  Iterable<Palette> notThose(Iterable<Identifier> ids) =>
+  Iterable<Palette> notThose(Iterable<ID> ids) =>
       where((p) => !ids.contains(p.node.id));
   Iterable<Palette> forwardables() =>
       where((p) => p.node.isPublicGroup || p.node is User);
+}
+
+extension Palette2Extensions on List<Palette2> {
+  List<Palette2> formatted() => toList(growable: false)
+    ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+  List<Palette2> formattedReverse() => toList(growable: false)
+    ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
+}
+
+extension IterablePalette2Extensions on Iterable<Palette2> {
+  Iterable<Palette2> deactivated() => map((p) => p.deactivated());
+
+  Iterable<Palette2> selected() => where((element) => element.selected);
+  Iterable<Palette2> notSelected() => where((p) => !p.selected);
+  Iterable<Palette2> whereNodeIs<T>() => where((p) => p.node is T);
+  Iterable<ID> asIds() => map((e) => e.node.id);
+  Iterable<BaseNode> asNodes<BaseNode>() =>
+      map((p) => p.node).whereType<BaseNode>();
+  Iterable<Palette2> those(Iterable<ID> ids) =>
+      where((p) => ids.contains(p.node.id));
+  Iterable<Palette2> notThose(Iterable<ID> ids) =>
+      where((p) => !ids.contains(p.node.id));
+  List<Palette2> inThatOrder(Iterable<ID> ids) {
+    var theList = <Palette2>[];
+    var palIds = asIds();
+    for (final id in ids) {
+      if (palIds.contains(id)) {
+        theList.add(firstWhere((p) => p.node.id == id));
+      }
+    }
+    return theList;
+  }
+
+  List<Palette2> inReversedOrder(Iterable<ID> ids) {
+    var theList = <Palette2>[];
+    var palIds = asIds();
+    for (final id in ids.toList(growable: false).reversed) {
+      if (palIds.contains(id)) {
+        theList.add(firstWhere((p) => p.node.id == id));
+      }
+    }
+    return theList;
+  }
+
+  Set<ID> allPeopleIds() {
+    Set<ID> ids = {};
+    for (final node in asNodes()) {
+      if (node is GroupNode) {
+        ids.addAll(node.group);
+      } else if (node is Person) {
+        ids.add(node.id);
+      }
+    }
+    return ids;
+  }
+}
+
+extension ImageOfNodes on BaseNode {
+  Widget get transformedImage {
+    if (media != null) {
+      return Down4ImageTransform(
+          image: nodeImage,
+          imageAspectRatio: media!.metadata.elementAspectRatio,
+          displaySize: Size.square(Palette.paletteHeight),
+          isSquared: media!.metadata.isSquared,
+          isReversed: media!.metadata.isReversed);
+    } else {
+      return nodeImage;
+    }
+  }
+
+  Image get nodeImage {
+    final n = this;
+    if (n is User) {
+      return n.media != null
+          ? Image.memory(n.media!.data,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              cacheHeight: Palette.paletteHeight.toInt(),
+              cacheWidth: Palette.paletteHeight.toInt())
+          : Image.asset('assets/images/hashirama.jpg',
+              fit: BoxFit.cover,
+              cacheHeight: Palette.paletteHeight.toInt(),
+              cacheWidth: Palette.paletteHeight.toInt());
+    } else if (n is GroupNode) {
+      return Image.memory(n.media.data,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          cacheHeight: Palette.paletteHeight.toInt(),
+          cacheWidth: Palette.paletteHeight.toInt());
+    } else if (n is Payment) {
+      return n.payment.independentGets < 2000000
+          ? Image.asset('assets/images/Dollar_Sign_1.png',
+              fit: BoxFit.cover,
+              cacheHeight: Palette.paletteHeight.toInt(),
+              cacheWidth: Palette.paletteHeight.toInt())
+          : n.payment.independentGets < 10000000
+              ? Image.asset('assets/images/Dollar_Sign_2.png',
+                  fit: BoxFit.cover,
+                  cacheHeight: Palette.paletteHeight.toInt(),
+                  cacheWidth: Palette.paletteHeight.toInt())
+              : Image.asset('assets/images/Dollar_Sign_3.png',
+                  fit: BoxFit.cover,
+                  cacheHeight: Palette.paletteHeight.toInt(),
+                  cacheWidth: Palette.paletteHeight.toInt());
+    } else if (n is Self) {
+      return Image.memory(n.media.data,
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          cacheHeight: Palette.paletteHeight.toInt(),
+          cacheWidth: Palette.paletteHeight.toInt());
+    }
+    throw 'stop breaking my app';
+  }
 }
 
 class NoGlow extends ScrollBehavior {

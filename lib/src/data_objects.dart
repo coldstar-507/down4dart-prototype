@@ -5,7 +5,7 @@ import 'dart:io';
 import '_down4_dart_utils.dart' as u;
 import 'bsv/types.dart';
 
-typedef Identifier = String;
+typedef ID = String;
 
 enum Messages {
   chat,
@@ -47,8 +47,14 @@ enum NodesColor {
   self,
 }
 
-abstract class Media {
-  final Identifier id;
+abstract class Down4Object {
+  ID get id;
+}
+
+abstract class Media implements Down4Object {
+  @override
+  final ID id;
+
   MediaMetadata metadata;
   Media({
     required this.id,
@@ -63,12 +69,12 @@ class MessageMedia extends Media {
   String? thumbnail;
   MessageMedia({
     required this.path,
-    required Identifier id,
+    required ID id,
     required MediaMetadata metadata,
     this.thumbnail,
     this.isSaved = false,
-    Set<Identifier>? references,
-  })  : references = references ?? Set<Identifier>.identity(),
+    Set<ID>? references,
+  })  : references = references ?? Set<ID>.identity(),
         super(id: id, metadata: metadata);
 
   String get extension => metadata.extension;
@@ -88,7 +94,7 @@ class MessageMedia extends Media {
 
   File? get thumbnailFile => !hasThumbnail ? null : File(thumbnail!);
 
-  Set<Identifier> references;
+  Set<ID> references;
 
   bool isSaved;
 
@@ -107,7 +113,7 @@ class MessageMedia extends Media {
         metadata: MediaMetadata.fromJson(decodedJson["md"]),
         path: decodedJson["p"],
         isSaved: decodedJson["sv"] ?? false,
-        references: Set<Identifier>.from(decodedJson["ref"]),
+        references: Set<ID>.from(decodedJson["ref"]),
         thumbnail: decodedJson["tn"]);
   }
 
@@ -128,7 +134,7 @@ class NodeMedia extends Media {
   Uint8List data;
   NodeMedia({
     required this.data,
-    required Identifier id,
+    required ID id,
     required MediaMetadata metadata,
   }) : super(id: id, metadata: metadata);
 
@@ -160,13 +166,14 @@ class MessageNotification {
   MessageNotification({required this.type, this.base64jsonData});
 }
 
-class Message {
-  final Identifier id;
-  final Identifier senderID;
-  final Identifier? root, forwarderID, mediaID;
+class Message implements Down4Object {
+  @override
+  final ID id;
+  final ID senderID;
+  final ID? root, forwarderID, mediaID;
   final String? text;
   final int timestamp;
-  final List<Identifier>? replies, nodes;
+  final List<ID>? replies, nodes;
   bool isRead, isSaved;
 
   Message({
@@ -231,9 +238,13 @@ class Message {
       };
 }
 
-abstract class BaseNode {
+abstract class BaseNode implements Down4Object {
+  @override
+  ID id;
+
+  NodeMedia? get media;
+
   NodesColor get colorCode;
-  Identifier id;
   String get name;
   String get displayID;
   Map toJson({bool toLocal});
@@ -251,9 +262,9 @@ abstract class BaseNode {
           firstName: decodedJson["nm"],
           isFriend: decodedJson["if"] ?? false,
           neuter: Down4Keys.fromYouKnow(decodedJson["nt"]),
-          messages: Set<Identifier>.from(decodedJson["msg"] ?? []),
-          snips: Set<Identifier>.from(decodedJson["snp"] ?? []),
-          children: Set<Identifier>.from(decodedJson["chl"] ?? []),
+          messages: Set<ID>.from(decodedJson["msg"] ?? []),
+          snips: Set<ID>.from(decodedJson["snp"] ?? []),
+          children: Set<ID>.from(decodedJson["chl"] ?? []),
           lastName: decodedJson["ln"],
           activity: decodedJson["a"],
           media: decodedJson["im"]?["d"] != null
@@ -266,9 +277,9 @@ abstract class BaseNode {
           id: id,
           firstWord: decodedJson["nm"],
           secondWord: decodedJson["ln"],
-          group: Set<Identifier>.from(decodedJson["grp"] ?? []),
-          messages: Set<Identifier>.from(decodedJson["msg"] ?? []),
-          snips: Set<Identifier>.from(decodedJson["snp"] ?? []),
+          group: Set<ID>.from(decodedJson["grp"] ?? []),
+          messages: Set<ID>.from(decodedJson["msg"] ?? []),
+          snips: Set<ID>.from(decodedJson["snp"] ?? []),
           media: NodeMedia.fromJson(decodedJson["im"]),
           activity: decodedJson["a"],
         );
@@ -279,9 +290,9 @@ abstract class BaseNode {
           name: decodedJson["nm"],
           id: id,
           media: NodeMedia.fromJson(decodedJson["im"]),
-          group: Set<Identifier>.from(decodedJson["grp"]),
-          messages: Set<Identifier>.from(decodedJson["msg"] ?? <Identifier>[]),
-          snips: Set<Identifier>.from(decodedJson["snp"] ?? <Identifier>[]),
+          group: Set<ID>.from(decodedJson["grp"]),
+          messages: Set<ID>.from(decodedJson["msg"] ?? <ID>[]),
+          snips: Set<ID>.from(decodedJson["snp"] ?? <ID>[]),
           activity: decodedJson["a"],
         );
 
@@ -331,38 +342,39 @@ abstract class BaseNode {
 }
 
 abstract class ChatableNode extends BaseNode {
-  Set<Identifier> messages, snips;
+  Set<ID> messages, snips;
   ChatableNode({
-    required Identifier id,
+    required ID id,
     int? activity,
     required this.messages,
     required this.snips,
   }) : super(id: id, activity: activity);
 
-  Set<Identifier> calculateTargets(Identifier selfID) {
+  Set<ID> calculateTargets(ID selfID) {
     if (this is GroupNode) {
-      return Set<Identifier>.from((this as GroupNode).group)..remove(selfID);
+      return Set<ID>.from((this as GroupNode).group)..remove(selfID);
     }
     return {id};
   }
 }
 
 abstract class GroupNode extends ChatableNode {
-  Set<Identifier> group;
+  Set<ID> group;
+  @override
   NodeMedia media;
   GroupNode({
-    required Identifier id,
+    required ID id,
     required this.group,
     required this.media,
     int? activity,
-    required Set<Identifier> messages,
-    required Set<Identifier> snips,
+    required Set<ID> messages,
+    required Set<ID> snips,
   }) : super(id: id, activity: activity, messages: messages, snips: snips);
 }
 
 mixin Branchable {
-  Set<Identifier> get children; // can we remove that if we have set
-  set children(Set<Identifier> c);
+  Set<ID> get children; // can we remove that if we have set
+  set children(Set<ID> c);
 }
 
 abstract class Person extends ChatableNode with Branchable {
@@ -375,9 +387,9 @@ abstract class Person extends ChatableNode with Branchable {
     this.lastName,
     this.description,
     int? activity,
-    required Identifier id,
-    required Set<Identifier> messages,
-    required Set<Identifier> snips,
+    required ID id,
+    required Set<ID> messages,
+    required Set<ID> snips,
   }) : super(id: id, messages: messages, snips: snips, activity: activity);
 
   @override
@@ -391,18 +403,18 @@ class User extends Person {
   NodeMedia? media;
   bool isFriend;
   @override
-  Set<Identifier> children;
+  Set<ID> children;
 
   User({
     this.isFriend = false,
-    required Identifier id,
+    required ID id,
     required String firstName,
     this.media,
     String? lastName,
     String? description,
     required Down4Keys neuter,
-    required Set<Identifier> messages,
-    required Set<Identifier> snips,
+    required Set<ID> messages,
+    required Set<ID> snips,
     required this.children,
     int? activity,
   }) : super(
@@ -438,11 +450,11 @@ class User extends Person {
 }
 
 class Self extends Person {
-  Set<Identifier> images, videos, nfts;
+  Set<ID> images, videos, nfts;
   NodeMedia media;
 
   @override
-  Set<Identifier> children;
+  Set<ID> children;
 
   Self({
     required String firstName,
@@ -452,12 +464,12 @@ class Self extends Person {
     required this.images,
     required this.videos,
     required this.nfts,
-    required Identifier id,
+    required ID id,
     int? activity,
     required this.media,
     required this.children,
-    required Set<Identifier> messages,
-    required Set<Identifier> snips,
+    required Set<ID> messages,
+    required Set<ID> snips,
   }) : super(
           id: id,
           messages: messages,
@@ -497,11 +509,11 @@ class Group extends GroupNode {
   Group({
     required this.isPrivate,
     required this.name,
-    required Identifier id,
+    required ID id,
     required NodeMedia media,
-    required Set<Identifier> group,
-    required Set<Identifier> messages,
-    required Set<Identifier> snips,
+    required Set<ID> group,
+    required Set<ID> messages,
+    required Set<ID> snips,
     int? activity,
   }) : super(
           id: id,
@@ -535,12 +547,12 @@ class Group extends GroupNode {
 class Hyperchat extends GroupNode {
   final String firstWord, secondWord;
   Hyperchat({
-    required Identifier id,
+    required ID id,
     required this.firstWord,
     required this.secondWord,
-    required Set<Identifier> group,
-    required Set<Identifier> messages,
-    required Set<Identifier> snips,
+    required Set<ID> group,
+    required Set<ID> messages,
+    required Set<ID> snips,
     required NodeMedia media,
     int? activity,
   }) : super(
@@ -575,8 +587,10 @@ class Hyperchat extends GroupNode {
 }
 
 class Payment extends BaseNode {
+  @override
+  final NodeMedia? media = null;
   final Down4Payment _payment;
-  final Identifier selfID;
+  final ID selfID;
   Payment({required Down4Payment payment, required this.selfID})
       : _payment = payment,
         super(id: payment.id);
@@ -612,7 +626,7 @@ class MediaMetadata {
       isPaidToOwn,
       isSquared,
       canSkipCheck;
-  final Identifier owner;
+  final ID owner;
   final String extension;
   final double elementAspectRatio;
   final String? text;
@@ -632,7 +646,7 @@ class MediaMetadata {
   });
 
   factory MediaMetadata.fromJson(Map<String, dynamic> decodedJson) {
-    print(decodedJson);
+    // print(decodedJson);
     return MediaMetadata(
       owner: decodedJson["o"],
       timestamp: int.parse(decodedJson["ts"]),

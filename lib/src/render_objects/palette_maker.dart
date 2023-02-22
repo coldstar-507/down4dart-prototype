@@ -232,7 +232,7 @@ class PaletteMaker extends StatelessWidget {
   final String name, id;
   final String hintText;
   final NodeMedia? image;
-  final void Function(Identifier)? go;
+  final void Function(ID)? go;
   final NodesColor colorCode;
   final Nodes type;
   final Nodes? parentType;

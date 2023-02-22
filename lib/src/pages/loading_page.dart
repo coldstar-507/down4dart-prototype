@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 
 import '../themes.dart';
 import '../globals.dart';
-import '../render_objects/_down4_flutter_utils.dart' show down4Logo;
+import '../data_objects.dart' show ID;
+import '../render_objects/_down4_flutter_utils.dart'
+    show down4Logo, Down4PageWidget;
 
-class LoadingPage2 extends StatefulWidget {
+class LoadingPage2 extends StatefulWidget implements Down4PageWidget {
+  @override
+  ID get id => "LoadingPage";
+
   final String? seed;
   const LoadingPage2({this.seed, Key? key}) : super(key: key);
 

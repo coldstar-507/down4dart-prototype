@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:flutter/rendering.dart';
 import 'package:video_player/video_player.dart';
 import 'package:camera/camera.dart';
@@ -18,6 +19,7 @@ import 'palette.dart';
 import '_down4_flutter_utils.dart';
 
 class ConsoleButton extends StatelessWidget {
+  // RenderBox get renderBox => context.findRenderObject() as RenderBox;
   final String name;
   final List<ConsoleButton>? extraButtons;
   final bool isSpecial,
@@ -32,7 +34,7 @@ class ConsoleButton extends StatelessWidget {
   final double leftEpsilon, bottomEpsilon, widthEpsilon, heightEpsilon;
   final bool invertColors;
 
-  const ConsoleButton({
+  ConsoleButton({
     this.invertColors = false,
     required this.name,
     required this.onPress,
@@ -52,7 +54,7 @@ class ConsoleButton extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  ConsoleButton invertedColors({required Key key}) => ConsoleButton(
+  ConsoleButton invertedColors() => ConsoleButton(
         name: name,
         onPress: onPress,
         onLongPress: onLongPress,
@@ -70,27 +72,28 @@ class ConsoleButton extends StatelessWidget {
         isSpecial: isSpecial,
         isActivated: isActivated,
         key: key,
+        // key: key,
       );
 
-  ConsoleButton withKey({required Key key}) => ConsoleButton(
-        name: name,
-        onPress: onPress,
-        onLongPress: onLongPress,
-        onLongPressUp: onLongPressUp,
-        invertColors: false,
-        greyedOut: greyedOut,
-        leftEpsilon: leftEpsilon,
-        bottomEpsilon: bottomEpsilon,
-        widthEpsilon: widthEpsilon,
-        heightEpsilon: heightEpsilon,
-        extraButtons: extraButtons,
-        showExtra: showExtra,
-        shouldBeDownButIsnt: shouldBeDownButIsnt,
-        isMode: isMode,
-        isSpecial: isSpecial,
-        isActivated: isActivated,
-        key: key,
-      );
+  // ConsoleButton withKey({required Key key}) => ConsoleButton(
+  //       name: name,
+  //       onPress: onPress,
+  //       onLongPress: onLongPress,
+  //       onLongPressUp: onLongPressUp,
+  //       invertColors: false,
+  //       greyedOut: greyedOut,
+  //       leftEpsilon: leftEpsilon,
+  //       bottomEpsilon: bottomEpsilon,
+  //       widthEpsilon: widthEpsilon,
+  //       heightEpsilon: heightEpsilon,
+  //       extraButtons: extraButtons,
+  //       showExtra: showExtra,
+  //       shouldBeDownButIsnt: shouldBeDownButIsnt,
+  //       isMode: isMode,
+  //       isSpecial: isSpecial,
+  //       isActivated: isActivated,
+  //       key: key,
+  //     );
 
   @override
   Widget build(BuildContext context) {
@@ -111,24 +114,18 @@ class ConsoleButton extends StatelessWidget {
                 color: Console.contourColor,
                 width: Console.contourWidth,
               )),
-          child: TouchableOpacity(
-            shouldBeDownButIsnt: shouldBeDownButIsnt,
-            onPress: isActivated ? onPress : () {},
-            onLongPress: isActivated ? onLongPress : () {},
-            onLongPressUp: isActivated ? onLongPressUp : () {},
-            child: SizedBox(
-              height: Console.buttonHeight,
-              child: Center(
-                child: Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: invertColors ? PinkTheme.buttonColor : Colors.black,
-                    decoration: isSpecial ? TextDecoration.underline : null,
-                    decorationStyle: TextDecorationStyle.solid,
-                    fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                    fontWeight: FontWeight.bold,
-                  ),
+          child: SizedBox(
+            height: Console.buttonHeight,
+            child: Center(
+              child: Text(
+                name,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: invertColors ? PinkTheme.buttonColor : Colors.black,
+                  decoration: isSpecial ? TextDecoration.underline : null,
+                  decorationStyle: TextDecorationStyle.solid,
+                  fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -301,7 +298,10 @@ class Console extends StatelessWidget {
   final List<ConsoleButton> _bottomButtons;
   final List<ConsoleInput>? _bottomInputs, _topInputs;
   final bool animatedInputs;
+
+  final List<dynamic>? forwardingObjects;
   final List<Palette>? forwardingPalette;
+  // final List<Message>? forwardingMessage;
   final bool invertedColors, initializationConsole;
   // final bool? showImage;
   // final ConsoleMedias? mediasInfo;
@@ -330,6 +330,7 @@ class Console extends StatelessWidget {
       if (b.showExtra) {
         final key = b.key as GlobalKey;
         final renderBox = key.currentContext!.findRenderObject() as RenderBox;
+        // final RenderBox renderBox = b.renderBox as RenderBox;
         final semantics = renderBox.semanticBounds;
         final buttonWidth = semantics.width;
         final leftBottom = semantics.bottomLeft;
@@ -354,9 +355,11 @@ class Console extends StatelessWidget {
   List<Widget> get extraBottomButtons {
     return bottomConsoleButtons.map((b) {
       if (b.showExtra) {
-        final key = b.key as GlobalKey?;
-        final context = key!.currentContext;
+        final key = b.key as GlobalKey;
+        // final renderBox = key.currentContext?;
+        final context = key.currentContext;
         final renderBox = context!.findRenderObject() as RenderBox;
+        // final RenderBox renderBox = b.renderBox as RenderBox;
         final Offset position = renderBox.localToGlobal(Offset.zero);
         final semantics = renderBox.semanticBounds;
         final buttonWidth = semantics.width;
@@ -392,10 +395,10 @@ class Console extends StatelessWidget {
     }).toList();
   }
 
-  static double get buttonHeight => g.sizes.h * 0.045;
+  static double get buttonHeight => g.sizes.h * 0.044;
 
   double get consoleGap => g.sizes.w * 0.022;
-  static double get contourWidth => 0.9;
+  static double get contourWidth => 0.9; //0.9;
   static Color get contourColor => Colors.black54;
   double get consoleWidth => g.sizes.w - (2.0 * consoleGap);
   double get trueWidth => consoleWidth - (4 * contourWidth);
@@ -407,13 +410,13 @@ class Console extends StatelessWidget {
   static int nMedias(bool images) =>
       images ? g.self.images.length : g.self.videos.length;
 
-  static Iterable<MessageMedia> medias(bool images) => images
-      ? g.self.images
-          .map((imID) => imID.getLocalMessageMedia())
-          .whereType<MessageMedia>()
-      : g.self.videos
-          .map((vidID) => vidID.getLocalMessageMedia())
-          .whereType<MessageMedia>();
+  static Stream<MessageMedia> medias(bool images) async* {
+    final ids = List<ID>.from(images ? g.self.images : g.self.videos);
+    for (final mediaID in ids) {
+      final media = await mediaID.getLocalMessageMedia();
+      if (media != null) yield media;
+    }
+  }
 
   // static ConsoleMedias consoleMedias2({
   //   required bool? showImages,
@@ -440,6 +443,9 @@ class Console extends StatelessWidget {
     required List<ConsoleButton> bottomButtons,
     this.invertedColors = false,
     this.forwardingPalette,
+    // this.forwardingPalette2,
+    this.forwardingObjects,
+    // this.forwardingMessage,
     this.cameraController,
     this.imageForPreview,
     this.videoForPreview,
@@ -518,19 +524,37 @@ class Console extends StatelessWidget {
             itemCount: theoreticalRows,
             itemBuilder: ((context, index) {
               Widget f(int i) {
-                if (i < nMedia) {
-                  final theMedia = medias(showingImages).elementAt(i);
-                  return GestureDetector(
-                    onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
-                    child: Down4ImageViewer(
-                      media: theMedia,
-                      displaySize: Size.square(mediaCelSize),
-                      forceSquareAnyways: true,
-                    ),
-                  );
-                } else {
-                  return const SizedBox.shrink();
-                }
+                return FutureBuilder(
+                  future: medias(showingImages).elementAt(i),
+                  builder: ((context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.done &&
+                        snapshot.hasData) {
+                      return GestureDetector(
+                        onTap: () => consoleMedias2?.onSelectMedia
+                            .call(snapshot.requireData),
+                        child: Down4ImageViewer(
+                            media: snapshot.requireData,
+                            displaySize: Size.square(mediaCelSize),
+                            forceSquareAnyways: true),
+                      );
+                    } else {
+                      return const SizedBox.shrink();
+                    }
+                  }),
+                );
+                // if (i < nMedia) {
+                //   final theMedia = await medias(showingImages).elementAt(i);
+                //   return GestureDetector(
+                //     onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
+                //     child: Down4ImageViewer(
+                //       media: theMedia,
+                //       displaySize: Size.square(mediaCelSize),
+                //       forceSquareAnyways: true,
+                //     ),
+                //   );
+                // } else {
+                //   return const SizedBox.shrink();
+                // }
               }
 
               return Row(
@@ -548,44 +572,170 @@ class Console extends StatelessWidget {
   }
 
   Widget forwardingPalettes() {
-    if (forwardingPalette == null) return const SizedBox.shrink();
-    return Container(
-      decoration: BoxDecoration(
-          color: PinkTheme.black,
-          border: Border.all(color: contourColor, width: contourWidth)),
-      child: SizedBox(
-        height: Console.buttonHeight,
-        width: consoleWidth,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          textDirection: TextDirection.ltr,
-          children: forwardingPalette!
-              .map((palette) => Flexible(
-                  child: DecoratedBox(
-                      position: DecorationPosition.foreground,
-                      decoration: BoxDecoration(
-                        border: Border.all(width: 0.5),
-                      ),
-                      child: Row(
-                          textDirection: TextDirection.ltr,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(
-                                width: Console.buttonHeight,
-                                height: Console.buttonHeight,
-                                child: palette.image),
-                            Expanded(
-                                child: Container(
-                                    padding: const EdgeInsets.all(2.0),
-                                    color: PinkTheme
-                                        .nodeColors[palette.node.colorCode],
-                                    child: Text(palette.node.name,
-                                        overflow: TextOverflow.clip)))
-                          ]))))
-              .toList(),
-        ),
-      ),
-    );
+    if (forwardingObjects == null) return const SizedBox.shrink();
+
+    Widget individualObject(Down4Object obj) {
+      if (obj is Palette2) {
+        return Flexible(
+            child: Container(
+                decoration: BoxDecoration(
+                    border:
+                        Border.all(color: contourColor, width: contourWidth)),
+                child: Row(
+                    textDirection: TextDirection.ltr,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                          width: Console.buttonHeight,
+                          height: Console.buttonHeight,
+                          child: obj.image),
+                      Expanded(
+                          child: Container(
+                              padding: const EdgeInsets.all(4.0),
+                              color: PinkTheme.nodeColors[obj.node.colorCode],
+                              child: Text(
+                                obj.node.name,
+                                overflow: TextOverflow.clip,
+                                maxLines: 1,
+                              )))
+                    ])));
+      } else if (obj is ChatMessage) {
+        return Flexible(
+            child: Container(
+                decoration: BoxDecoration(
+                    color: obj.myMessage
+                        ? PinkTheme.myBubblesColor
+                        : PinkTheme.buttonColor,
+                    border:
+                        Border.all(color: contourColor, width: contourWidth)),
+                child: Expanded(
+                    child: Text(
+                        (obj.message.text ?? "").isEmpty
+                            ? "&attachment"
+                            : obj.message.text!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis))));
+      }
+
+      return const SizedBox.shrink();
+    }
+
+    return
+        // Container(
+        //     decoration: BoxDecoration(
+        //         color: null,
+        //         border: Border.all(color: contourColor, width: contourWidth)),
+        //     child:
+        SizedBox(
+            height: buttonHeight + (2 * contourWidth),
+            width: trueWidth + (2 * contourWidth),
+            child: Row(
+                // crossAxisAlignment: CrossAxisAlignment.stretch,
+                // crossAxisAlignment: CrossAxisAlignment.end,
+                textDirection: TextDirection.ltr,
+                children: forwardingObjects!
+                    .map((e) => individualObject(e))
+                    .toList()));
+
+    // return Container(
+    //   decoration: BoxDecoration(
+    //       color: PinkTheme.black,
+    //       border: Border.all(color: contourColor, width: contourWidth)),
+    //   child: SizedBox(
+    //     height: Console.buttonHeight,
+    //     width: consoleWidth,
+    //     child: Row(
+    //       crossAxisAlignment: CrossAxisAlignment.stretch,
+    //       textDirection: TextDirection.ltr,
+    //       children: forwardingPalette!
+    //           .map((palette) => Flexible(
+    //               child: DecoratedBox(
+    //                   position: DecorationPosition.foreground,
+    //                   decoration: BoxDecoration(
+    //                     border: Border.all(width: 0.5),
+    //                   ),
+    //                   child: Row(
+    //                       textDirection: TextDirection.ltr,
+    //                       crossAxisAlignment: CrossAxisAlignment.stretch,
+    //                       children: [
+    //                         SizedBox(
+    //                             width: Console.buttonHeight,
+    //                             height: Console.buttonHeight,
+    //                             child: palette.image),
+    //                         Expanded(
+    //                             child: Container(
+    //                                 padding: const EdgeInsets.all(2.0),
+    //                                 color: PinkTheme
+    //                                     .nodeColors[palette.node.colorCode],
+    //                                 child: Text(palette.node.name,
+    //                                     overflow: TextOverflow.clip)))
+    //                       ]))))
+    //           .toList(),
+    //     ),
+    //   ),
+    // );
+
+    // return ConstrainedBox(
+    //     constraints: BoxConstraints(
+    //         maxHeight: buttonHeight + (2 * contourWidth),
+    //         maxWidth: trueWidth + (2 * contourWidth)),
+    //     child: Row(
+    //         mainAxisSize: MainAxisSize.max,
+    //         crossAxisAlignment: CrossAxisAlignment.stretch,
+    //         textDirection: TextDirection.ltr,
+    //         // mainAxisSize: MainAxisSize.min,
+    //         children:
+    //             forwardingObjects!.map((e) => individualObject(e)).toList()));
+
+    //       .map((object) => object is Palette2
+    //           ? Flexible(
+    //               child: DecoratedBox(
+    //                   position: DecorationPosition.foreground,
+    //                   decoration: BoxDecoration(
+    //                     border: Border.all(width: 0.5),
+    //                   ),
+    //                   child: Row(
+    //                       textDirection: TextDirection.ltr,
+    //                       crossAxisAlignment: CrossAxisAlignment.stretch,
+    //                       children: [
+    //                         SizedBox(
+    //                             width: Console.buttonHeight,
+    //                             height: Console.buttonHeight,
+    //                             child: object.image),
+    //                         Expanded(
+    //                             child: Container(
+    //                                 padding: const EdgeInsets.all(2.0),
+    //                                 color: PinkTheme
+    //                                     .nodeColors[object.node.colorCode],
+    //                                 child: Text(object.node.name,
+    //                                     overflow: TextOverflow.clip)))
+    //                       ])))
+    //           : object is Message
+    //               ? Flexible(
+    //                   child: DecoratedBox(
+    //                       position: DecorationPosition.foreground,
+    //                       decoration: BoxDecoration(
+    //                         border: Border.all(width: 0.5),
+    //                       ),
+    //                       child: Row(
+    //                           textDirection: TextDirection.ltr,
+    //                           crossAxisAlignment: CrossAxisAlignment.stretch,
+    //                           children: [
+    //                             SizedBox(
+    //                                 width: Console.buttonHeight,
+    //                                 height: Console.buttonHeight,
+    //                                 child: object.image),
+    //                             Expanded(
+    //                                 child: Container(
+    //                                     padding: const EdgeInsets.all(2.0),
+    //                                     color: PinkTheme
+    //                                         .nodeColors[object.node.colorCode],
+    //                                     child: Text(object.node.name,
+    //                                         overflow: TextOverflow.clip)))
+    //                           ])))
+    //               : const SizedBox.shrink())
+    //       .toList(),
+    // );
   }
 
   Widget consoleCamera() {
@@ -615,19 +765,19 @@ class Console extends StatelessWidget {
     final vfp = videoForPreview;
     if (vfp == null) return const SizedBox.shrink();
     return Container(
-        decoration: BoxDecoration(
-          color: PinkTheme.black,
-          border: Border.all(color: contourColor, width: contourWidth),
-        ),
-        child: SizedBox(
+      decoration: BoxDecoration(
+          color: contourColor,
+          border: Border.all(color: contourColor, width: contourWidth)),
+      child: SizedBox(
           height: trueWidth,
           width: trueWidth,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.rotationY(vfp.isReversed ? math.pi : 0),
-            child: vfp.videoPlayer,
-          ),
-        ));
+          child: Down4VideoTransform(
+              displaySize: Size.square(trueWidth),
+              videoAspectRatio: vfp.videoAspectRatio,
+              video: vfp.videoPlayer,
+              isReversed: vfp.isReversed,
+              isSquared: true)),
+    );
     // return Down4VideoTransform(
     //   displaySize: Size.square(trueWidth),
     //   videoAspectRatio: vfp.videoAspectRatio,
@@ -725,49 +875,52 @@ class Console extends StatelessWidget {
   }
 
   List<ConsoleButton> get bottomConsoleButtons => invertedColors
-      ? _bottomButtons
-          .asMap()
-          .map((key, value) => MapEntry(
-              key,
-              value.invertedColors(
-                  key: ButtonKeys.instance.bottomButtonKeys[key])))
-          .values
-          .toList(growable: false)
-      : _bottomButtons
-          .asMap()
-          .map((key, value) => MapEntry(key,
-              value.withKey(key: ButtonKeys.instance.bottomButtonKeys[key])))
-          .values
-          .toList(growable: false);
+      ? _bottomButtons.map((e) => e.invertedColors()).toList()
+      // .toList()
+      // .asMap()
+      // .map((key, value) => MapEntry(
+      //     key,
+      //     value.invertedColors(
+      //         key: ButtonKeys.instance.bottomButtonKeys[key])))
+      // .values
+      // .toList(growable: false)
+      : _bottomButtons;
+  // .asMap()
+  // .map((key, value) => MapEntry(key,
+  //     value.withKey(key: ButtonKeys.instance.bottomButtonKeys[key])))
+  // .values
+  // .toList(growable: false);
 
   List<ConsoleButton> get topConsoleButtons => invertedColors
-      ? (_topButtons ?? [])
-          .asMap()
-          .map((key, value) => MapEntry(
-              key,
-              value.invertedColors(
-                  key: ButtonKeys.instance.topButtonKeys[key])))
-          .values
-          .toList(growable: false)
-      : (_topButtons ?? [])
-          .asMap()
-          .map((key, value) => MapEntry(
-              key, value.withKey(key: ButtonKeys.instance.topButtonKeys[key])))
-          .values
-          .toList(growable: false);
+      ? (_topButtons ?? []).map((e) => e.invertedColors()).toList()
+      // .asMap()
+      // .map((key, value) => MapEntry(
+      //     key,
+      //     value.invertedColors(
+      //         key: ButtonKeys.instance.topButtonKeys[key])))
+      // .values
+      // .toList(growable: false)
+      : (_topButtons ?? []);
+  // .asMap()
+  // .map((key, value) => MapEntry(
+  //     key, value.withKey(key: ButtonKeys.instance.topButtonKeys[key])))
+  // .values
+  // .toList(growable: false);
 
   Widget get anyGadgets {
     return AnimatedSize(
         duration: animationDuration,
         curve: Curves.easeInOut,
         child: Column(
+          // mainAxisSize: MainAxisSize.min,
+          // mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            consoleMedias(),
             consoleScanner(),
             consoleCamera(),
             imagePreview(),
             videoPreview(),
             forwardingPalettes(),
+            consoleMedias(),
           ],
         ));
   }
@@ -810,7 +963,7 @@ class Console extends StatelessWidget {
         bottom: consoleGap,
       ),
       decoration: BoxDecoration(
-          color: Colors.black54,
+          color: contourColor,
           border: Border.all(width: contourWidth, color: contourColor)),
       child: Column(
         mainAxisSize: MainAxisSize.min,

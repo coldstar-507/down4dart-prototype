@@ -1,31 +1,39 @@
 import 'package:camera/camera.dart';
+import 'package:down4/src/globals.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/lists.dart';
+import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
 import '../render_objects/navigator.dart';
 import '../render_objects/profile.dart';
 
-class NodePage extends StatefulWidget {
-  final int pageIndex;
-  final void Function(int) onPageChange;
-  final List<Palette>? palettes;
-  final Palette palette;
-  final Palette? Function(BaseNode, {String at}) nodeToPalette;
-  final void Function(String, String) openNode, openChat;
+class NodePage extends StatefulWidget implements Down4PageWidget {
+  @override
+  ID get id => node.id;
+
+  final BaseNode node;
+  // final int pageIndex;
+  // final void Function(int) onPageChange;
+  // final List<Palette2>? palettes;
+  // final BaseNode node;
+  // final Palette? Function(BaseNode, {String at}) nodeToPalette;
+  final void Function(BaseNode) openNode, openChat, payNode;
   final void Function() back;
 
   const NodePage({
-    required this.pageIndex,
-    required this.onPageChange,
+    // required this.pageIndex,
+    // required this.onPageChange,
+    required this.node,
+    required this.payNode,
     required this.openNode,
     required this.openChat,
-    required this.palette,
-    required this.nodeToPalette,
+    // required this.node,
+    // required this.nodeToPalette,
     required this.back,
-    this.palettes,
+    // this.palettes,
     Key? key,
   }) : super(key: key);
 
@@ -35,17 +43,22 @@ class NodePage extends StatefulWidget {
 
 class _NodePageState extends State<NodePage> {
   Widget? _view;
+
+  // List<Etat> get views => g.curState.e;
+  // List<ScrollController> scrolls = [];
+
+  // BaseNode get node => g.curState.n as BaseNode;
+
   @override
   void initState() {
     super.initState();
-    final node = widget.palette.node;
-    if (node is Person) {
+    if (widget.node is Person) {
       _view = Andrew(pages: [
         Down4Page(
           reversedList: false,
-          title: node.name,
+          title: widget.node.name,
           console: userPaletteConsole,
-          list: [ProfileWidget(palette: widget.palette), ...?widget.palettes],
+          list: [ProfileWidget(node: widget.node)],
         ),
       ]);
     } // TODO other node types
@@ -67,11 +80,8 @@ class _NodePageState extends State<NodePage> {
   Console get userPaletteConsole => Console(
         topButtons: [
           ConsoleButton(
-            name: "Message",
-            onPress: () => widget.openChat(
-              widget.palette.node.id,
-              widget.palette.at,
-            ),
+            name: "Pay",
+            onPress: () => widget.payNode(widget.node),
           ),
         ],
         bottomButtons: [

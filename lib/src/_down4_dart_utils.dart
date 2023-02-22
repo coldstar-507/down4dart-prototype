@@ -39,6 +39,13 @@ class Pair<E, F> {
   Pair(this.first, this.second);
 }
 
+class Triple<E, F, G> {
+  final E first;
+  final F second;
+  final G third;
+  Triple(this.first, this.second, this.third);
+}
+
 Future<bool> hasNetwork() async {
   try {
     final result = await InternetAddress.lookup('amazon.com');
@@ -132,7 +139,7 @@ extension IterableNodes on Iterable<BaseNode> {
   List<BaseNode> formatted() =>
       toList(growable: false)..sort((a, b) => b.activity.compareTo(a.activity));
   Iterable<String> asIds() => map((node) => node.id);
-  Iterable<BaseNode> those(List<Identifier> ids) =>
+  Iterable<BaseNode> those(List<ID> ids) =>
       where((node) => ids.contains(node.id));
   Iterable<GroupNode> groups() => whereType<GroupNode>();
   Iterable<User> users() => whereType<User>();

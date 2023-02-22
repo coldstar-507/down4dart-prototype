@@ -6,10 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:video_player/video_player.dart';
 
+import '../data_objects.dart' show ID;
+import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
 import '../render_objects/console.dart';
 import '../globals.dart';
 
-class SnipCamera extends StatefulWidget {
+class SnipCamera extends StatefulWidget implements Down4PageWidget {
+  @override
+  ID get id => "SnipCamera";
+
   final CameraController ctrl;
   final double minZoom, maxZoom;
   final int camNum;

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
+import 'package:down4/src/render_objects/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
@@ -21,23 +22,33 @@ import '../render_objects/chat_message.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 
-class ChatPage extends StatefulWidget {
-  final Map<Identifier, Palette> senders;
-  final ChatableNode node;
+class ChatPage extends StatefulWidget implements Down4PageWidget {
+  @override
+  ID get id => node.id;
+
+  // final Map<Identifier, Palette> senders;
+  // final Palette2 palette;
+  // final ChatableNode node;
   final void Function(r.ChatRequest) send;
+  final ChatableNode node;
+  final Iterable<BaseNode>? subNodes;
   final void Function() back;
-  final Palette? Function(BaseNode, {String at}) nodeToPalette;
-  final int pageIndex;
-  final Function(int)? onPageChange;
+  final void Function(BaseNode) openNode;
+  // final Palette? Function(BaseNode, {String at}) nodeToPalette;
+  // final int pageIndex;
+  // final Function(int)? onPageChange;
 
   const ChatPage({
-    required this.senders,
-    required this.node,
+    // required this.senders,
+    // required this.node,
+    required this.subNodes,
     required this.send,
     required this.back,
-    required this.nodeToPalette,
-    this.pageIndex = 0,
-    this.onPageChange,
+    required this.node,
+    required this.openNode,
+    // required this.nodeToPalette,
+    // this.pageIndex = 0,
+    // this.onPageChange,
     Key? key,
   }) : super(key: key);
 
@@ -46,22 +57,41 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  Console? _console;
-  ConsoleInput? _consoleInput;
+  GlobalKey mediaModeKey = GlobalKey();
+  late Console _console;
+  late ConsoleInput _consoleInput = consoleInput;
   var _tec = TextEditingController();
   MessageMedia? _cameraInput;
-  Map<Identifier, ChatMessage> _cachedMsgs = {};
-  List<Identifier> _msgsWithVideos = [];
-  final _scollController = ScrollController();
+  List<ID> _msgsWithVideos = [];
+  List<ID> loaded = [];
 
-  Future<void> _onRefresh() async {
-    messages.skip(_cachedMsgs.length).take(40).toList();
+  late List<ID> mIds;
+  late List<ID> ordered;
+
+  Future<void> _loadSome() async {
+    final nTotal = mIds.length;
+    final nLoaded = loaded.length;
+    final nToLoad = nLoaded + 30 < nTotal ? nLoaded + 30 : nTotal;
+    final toLoad = ordered.sublist(nLoaded, nToLoad);
+    await messages2(toLoad).toList();
     setState(() {});
   }
 
-  late var _msgs = widget.node.messages.toList();
-  late var _displayOrder = _msgs.reversed.toList();
-  late var _msgLen = _msgs.length;
+  Future<List<ButtonsInfo2>> buttonsOfNode(BaseNode node) async {
+    return [
+      ButtonsInfo2(
+          assetPath: 'assets/images/50.png',
+          pressFunc: () => widget.openNode(node),
+          rightMost: true)
+    ];
+  }
+
+  Map<ID, ChatMessage> _cachedMessages = {};
+
+  Map<ID, Down4Object> groupOrProfile = {};
+
+  void reload() => setState(() {});
+
   var lastOffsetUpdate = 0.0;
 
   String? _idOfLastMessageRead;
@@ -69,14 +99,17 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    messages.take(30).toList();
+    mIds = widget.node.messages.toList();
+    ordered = mIds.reversed.toList();
+    _loadSome();
+    loadProfileOrGroup();
     loadBaseConsole();
   }
 
   @override
   void dispose() {
     for (final msgID in _msgsWithVideos) {
-      _cachedMsgs[msgID]?.mediaInfo?.videoController?.dispose();
+      _cachedMessages[msgID]?.mediaInfo?.videoController?.dispose();
     }
     _cameraInput?.delete();
     super.dispose();
@@ -85,13 +118,63 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    setState(() {
-      _msgs = widget.node.messages.toList();
-      _displayOrder = _msgs.reversed.toList();
-      _msgLen = _msgs.length;
-      messages.take(1).toList();
-    });
-    print("Did update the chat page widget!");
+    mIds = widget.node.messages.toList();
+    ordered = mIds.reversed.toList();
+    reloadOne();
+    print("DID UPDATE THE WIDGET");
+  }
+
+  Future<void> reloadOne() async {
+    final last = ordered.first;
+    if (loaded.isNotEmpty && loaded.first != last) {
+      ID? prev = loaded.isEmpty ? null : loaded.first;
+      final msg = await getChatMessage(last, prev, null, true);
+      if (msg != null) {
+        _cachedMessages[msg.id] = msg;
+        loaded.insert(0, msg.id);
+      }
+      setState(() {});
+    }
+  }
+
+  // Stream<void> get messages3 async* {
+  //   final nLoaded = _cachedMessages.length;
+  //   final msgID = ordered.length > nLoaded ? ordered[nLoaded] : null;
+  //   if (msgID != null) {
+  //     final next = loaded.isNotEmpty ? loaded.last : null;
+  //     final prev = ordered.length > nLoaded + 1 ? ordered[nLoaded + 1] : null;
+  //     final isLast = msgID == ordered.first;
+  //     final msg = await getChatMessage(msgID, prev, next, isLast);
+  //     if (msg != null) {
+  //       _cachedMessages[msg.id] = msg;
+  //       loaded.add(msg.id);
+  //       if (msg.mediaInfo?.media.isVideo ?? false) _msgsWithVideos.add(msg.id);
+  //     }
+  //   }
+  // }
+
+  Future<void> loadProfileOrGroup() async {
+    final node_ = widget.node;
+    if (node_ is GroupNode) {
+      // writing the profile widget
+      groupOrProfile[node_.id] = ProfileWidget(node: node_);
+
+      for (final groupNode in widget.subNodes!) {
+        writePalette2(groupNode, groupOrProfile, buttonsOfNode, reload);
+      }
+      writePalette2(g.self, groupOrProfile, buttonsOfNode, reload);
+    } else if (node_ is User) {
+      // TODO DOWNLOAD THE SUB NODES
+      groupOrProfile[node_.id] = ProfileWidget(node: node_);
+      final children = await r.getNodes(node_.children);
+      for (final child in children ?? <BaseNode>[]) {
+        writePalette2(child, groupOrProfile, buttonsOfNode, reload);
+      }
+    } else if (node_ is Self) {
+      // TODO SELF WILL BE QUITE SOMETHING
+      groupOrProfile[node_.id] = ProfileWidget(node: node_);
+    }
+    reload();
   }
 
   ConsoleMedias consoleMedias({required bool images, required bool show}) {
@@ -109,16 +192,16 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  ChatMessage? getChatMessage(
-    Identifier msgID,
-    Identifier? prevMsgID,
-    Identifier? nextMsgID,
+  Future<ChatMessage?> getChatMessage(
+    ID msgID,
+    ID? prevMsgID,
+    ID? nextMsgID,
     bool isLast,
-  ) {
-    Message? msg = msgID.getLocalMessage();
+  ) async {
+    Message? msg = await msgID.getLocalMessage();
     if (msg == null) return null;
     Message? prevMsg, nextMsg;
-    ChatMessage? prevChatMessage = _cachedMsgs[prevMsgID];
+    ChatMessage? prevChatMessage = _cachedMessages[prevMsgID];
     // If new message while in chat, we might want to remove the header of the
     // previous last message
     if (isLast &&
@@ -128,14 +211,14 @@ class _ChatPageState extends State<ChatPage> {
         msg.senderID == prevChatMessage.message.senderID &&
         msg.senderID != g.self.id) {
       // we need to remove its header
-      _cachedMsgs[prevMsgID] = prevChatMessage.withHeader(hasHeader: false);
+      _cachedMessages[prevMsgID] = prevChatMessage.withHeader(hasHeader: false);
       // and update it's size
     }
 
-    if (_cachedMsgs[msgID] != null) return _cachedMsgs[msgID]!;
+    if (_cachedMessages[msgID] != null) return _cachedMessages[msgID]!;
 
-    prevMsg = prevMsgID?.getLocalMessage();
-    nextMsg = nextMsgID?.getLocalMessage();
+    prevMsg = await prevMsgID?.getLocalMessage();
+    nextMsg = await nextMsgID?.getLocalMessage();
 
     bool hasGap = false;
     if (prevMsg != null) hasGap = ChatMessage.displayGap(msg, prevMsg);
@@ -154,41 +237,61 @@ class _ChatPageState extends State<ChatPage> {
         widget.node is GroupNode &&
         nextMsg?.senderID != msg.senderID;
 
-    final chatMsg = ChatMessage(
-      key: GlobalKey(),
-      hasGap: hasGap,
-      message: msg,
-      textInfo: ChatMessage.generateTextInfo(msg),
-      mediaInfo: ChatMessage.generateMediaInfo(msg),
-      repliesInfo: ChatMessage.generateRepliesInfo(msg, (replyID) {
-        print("TODO, GO TO REPLY ID = $replyID");
-      }),
-      hasHeader: hasHeader,
-      myMessage: g.self.id == msg.senderID,
-      select: (id) => setState(() {
-        _cachedMsgs[id] = _cachedMsgs[id]!.invertedSelection();
-      }),
-    );
-
-    if (chatMsg.mediaInfo?.media.isVideo ?? false) {
-      _msgsWithVideos.add(msg.id);
-    }
-
-    return _cachedMsgs[msg.id] = chatMsg;
+    return ChatMessage(
+        key: GlobalKey(),
+        hasGap: hasGap,
+        message: msg,
+        // textInfo: ChatMessage.generateTextInfo(msg),
+        mediaInfo: await ChatMessage.generateMediaInfo(msg),
+        repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
+          print("TODO, GO TO REPLY ID = $replyID");
+        }),
+        hasHeader: hasHeader,
+        myMessage: g.self.id == msg.senderID,
+        select: (id) {
+          _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
+          reload();
+        });
   }
 
-  Iterable<ChatMessage?> get messages sync* {
-    for (int i = _msgLen - 1; i >= 0; i--) {
-      final Identifier msgID = _msgs[i];
-      final Identifier? prevMsgID = i > 0 ? _msgs[i - 1] : null;
-      final Identifier? nextMsgID = i < _msgLen - 1 ? _msgs[i + 1] : null;
-      final isFirst = i == _msgLen - 1;
-      yield getChatMessage(msgID, prevMsgID, nextMsgID, isFirst);
+  Stream<void> messages2(List<ID> ids) async* {
+    final n = ids.length;
+    for (int i = 0; i < n; i++) {
+      final msgID = ids[i];
+      final nxt = loaded.isEmpty ? null : loaded.last;
+      final prv = i < n - 1 ? ids[i + 1] : null;
+      final isFirst = msgID == ordered.first;
+      final msg = await getChatMessage(msgID, prv, nxt, isFirst);
+      if (msg != null) {
+        _cachedMessages[msg.id] = msg;
+        loaded.add(msg.id);
+        if (msg.mediaInfo?.media.isVideo ?? false) _msgsWithVideos.add(msg.id);
+      }
     }
   }
+
+  // Stream<Identifier> get messages async* {
+  //   final msgIDs = widget.node.messages.toList();
+  //   final nMsgs = msgIDs.length;
+  //   // iterating from last message received to first
+  //   for (int i = nMsgs - 1; i >= 0; i--) {
+  //     print("LOADING ${msgIDs[i]}");
+  //     final Identifier msgID = msgIDs[i];
+  //     final Identifier? prevMsgID = i > 0 ? msgIDs[i - 1] : null;
+  //     final Identifier? nextMsgID = i < nMsgs - 1 ? msgIDs[i + 1] : null;
+  //     final isFirst = i == nMsgs - 1;
+  //     final msg = await getChatMessage(msgID, prevMsgID, nextMsgID, isFirst);
+  //     if (msg != null) {
+  //       cachedMessages[msg.id] = msg;
+  //       if (msg.mediaInfo?.media.isVideo ?? false) _msgsWithVideos.add(msg.id);
+  //       _orderedMessages.add(msg.id);
+  //       yield msg.id;
+  //     }
+  //   }
+  // }
 
   ConsoleInput get consoleInput {
-    return _consoleInput = ConsoleInput(
+    return ConsoleInput(
       maxLines: 7,
       tec: _tec,
       placeHolder: ":)",
@@ -272,12 +375,12 @@ class _ChatPageState extends State<ChatPage> {
 
   void loadSavingConsole() {
     _console = Console(
-      bottomInputs: [_consoleInput ?? consoleInput],
+      bottomInputs: [_consoleInput],
       topButtons: [
         ConsoleButton(
             name: "To Saved Messages",
             onPress: () {
-              for (var msg in _cachedMsgs.values) {
+              for (var msg in _cachedMessages.values) {
                 if (msg.selected) {
                   g.self.messages.add(msg.message.id);
                   msg.message
@@ -295,7 +398,7 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(
             name: "To Medias",
             onPress: () {
-              for (var msg in _cachedMsgs.values) {
+              for (var msg in _cachedMessages.values) {
                 if (msg.selected && msg.hasMedia) {
                   if (msg.mediaInfo!.media.isVideo) {
                     g.self.videos.add(msg.mediaInfo!.media.id);
@@ -317,9 +420,9 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void saveSelectedMessages() async {
-    for (final msg in _cachedMsgs.values) {
+    for (final msg in _cachedMessages.values) {
       if (msg.selected) {
-        _cachedMsgs[msg.message.id] = msg.invertedSelection();
+        _cachedMessages[msg.message.id] = msg.invertedSelection();
         g.self.messages.add(msg.message.id);
         msg.message
           ..isSaved = true
@@ -331,9 +434,9 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void unselectSelectedMessage() {
-    for (final key in _cachedMsgs.keys) {
-      if (_cachedMsgs[key]?.selected ?? false) {
-        _cachedMsgs[key] = _cachedMsgs[key]!.invertedSelection();
+    for (final key in _cachedMessages.keys) {
+      if (_cachedMessages[key]?.selected ?? false) {
+        _cachedMessages[key] = _cachedMessages[key]!.invertedSelection();
       }
     }
     setState(() {});
@@ -344,8 +447,13 @@ class _ChatPageState extends State<ChatPage> {
       return;
     }
     final ts = u.timeStamp();
-    final targets = widget.node.calculateTargets(g.self.id);
-
+    final theNode = widget.node;
+    List<ID> targets;
+    if (theNode is GroupNode) {
+      targets = List<ID>.from((theNode.group))..remove(g.self.id);
+    } else {
+      targets = [theNode.id];
+    }
     var msg = Message(
       root: widget.node is GroupNode ? widget.node.id : null,
       id: messagePushId(),
@@ -353,7 +461,7 @@ class _ChatPageState extends State<ChatPage> {
       senderID: g.self.id,
       mediaID: mediaInput?.id ?? _cameraInput?.id,
       text: _tec.value.text,
-      replies: _cachedMsgs.values
+      replies: _cachedMessages.values
           .where((msg) => msg.selected)
           .map((msg) => msg.message.id)
           .toList(growable: false),
@@ -361,9 +469,11 @@ class _ChatPageState extends State<ChatPage> {
 
     unselectSelectedMessage();
 
+    print("TARGETS ===== $targets");
+
     var req = r.ChatRequest(
       message: msg,
-      targets: targets.toList(),
+      targets: targets,
       media: mediaInput ?? _cameraInput,
     );
 
@@ -535,7 +645,7 @@ class _ChatPageState extends State<ChatPage> {
           showImages: images,
           onSelectMedia: (media) => send2(mediaInput: media)),
       // mediasInfo: consoleMedias(images: images, show: true),
-      bottomInputs: [_consoleInput ?? consoleInput],
+      bottomInputs: [_consoleInput],
       topButtons: [
         ConsoleButton(
           name: "Import",
@@ -544,6 +654,7 @@ class _ChatPageState extends State<ChatPage> {
       ],
       bottomButtons: [
         ConsoleButton(
+          key: mediaModeKey,
           showExtra: extra,
           isSpecial: true,
           name: "Back",
@@ -569,7 +680,7 @@ class _ChatPageState extends State<ChatPage> {
   void loadBaseConsole({bool images = true}) {
     _console = Console(
       // mediasInfo: consoleMedias(images: images, show: false),
-      bottomInputs: [_consoleInput ?? consoleInput],
+      bottomInputs: [_consoleInput],
       topButtons: [
         ConsoleButton(name: "Save", onPress: loadSavingConsole),
         ConsoleButton(
@@ -597,43 +708,26 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    List<Down4Page> pages = widget.node is GroupNode
-        ? [
-            Down4Page(
-              isChatPage: true,
-              title: widget.node.name,
-              console: _console!,
-              asMap: _cachedMsgs,
-              orderedKeys: _displayOrder,
-              iterableLen: _cachedMsgs.length,
-              onRefresh: _onRefresh,
-            ),
-            Down4Page(
-              title: "Members",
-              console: _console!,
-              list: widget.senders.values.toList(),
-            ),
-          ]
-        : [
-            Down4Page(
-              isChatPage: true,
-              title: widget.node.name,
-              console: _console!,
-              asMap: _cachedMsgs,
-              orderedKeys: _displayOrder,
-              iterableLen: _cachedMsgs.length,
-              onRefresh: _onRefresh,
-            ),
-          ];
-
     return Andrew(
-      initialPageIndex: widget.pageIndex,
-      pages: pages,
+      initialPageIndex: widget.node.messages.isEmpty ? 1 : 0,
+      pages: [
+        Down4Page(
+            isChatPage: true,
+            title: "Chat",
+            console: _console,
+            asMap: _cachedMessages,
+            orderedKeys: loaded,
+            onRefresh: _cachedMessages.isEmpty ? null : _loadSome),
+        Down4Page(
+            title: widget.node is GroupNode ? "Members" : "Profile",
+            console: _console,
+            list: groupOrProfile.values.toList().cast<Widget>(),
+            reversedList: false),
+      ],
       onPageChange: (int newPageIndex) {
         for (final msgID in _msgsWithVideos) {
-          _cachedMsgs[msgID] = _cachedMsgs[msgID]!.onPageTransition();
+          _cachedMessages[msgID] = _cachedMessages[msgID]!.onPageTransition();
         }
-        widget.onPageChange?.call(newPageIndex);
       },
     );
   }

@@ -148,7 +148,7 @@ Future<List<Message>?> getPosts(List<String> ids) async {
 }
 
 abstract class Request {
-  final List<Identifier> targets;
+  final List<ID> targets;
   const Request({required this.targets});
   Map<String, dynamic> toJson();
   send();
@@ -158,7 +158,7 @@ abstract class MessageRequest extends Request {
   final Message message;
   final MessageMedia? media;
   MessageRequest({
-    required List<Identifier> targets,
+    required List<ID> targets,
     required this.message,
     this.media,
   }) : super(targets: targets);
@@ -169,7 +169,7 @@ class ChatRequest extends MessageRequest {
   ChatRequest({
     MessageMedia? media,
     required Message message,
-    required List<Identifier> targets,
+    required List<ID> targets,
     this.groupName,
   }) : super(targets: targets, message: message, media: media);
 
@@ -195,7 +195,7 @@ class PingRequest extends Request {
   PingRequest({
     required this.senderID,
     required this.text,
-    required List<Identifier> targets,
+    required List<ID> targets,
   }) : super(targets: targets);
 
   @override
@@ -223,7 +223,7 @@ class SnipRequest extends Request {
     required this.senderID,
     this.root,
     this.groupName,
-    required List<Identifier> targets,
+    required List<ID> targets,
   }) : super(targets: targets);
 
   @override
@@ -251,7 +251,7 @@ class HyperchatRequest extends MessageRequest {
   HyperchatRequest({
     required Message message,
     MessageMedia? media,
-    required List<Identifier> targets,
+    required List<ID> targets,
     required this.wordPairs,
   }) : super(targets: targets, message: message, media: media);
 
@@ -277,7 +277,7 @@ class HyperchatRequest extends MessageRequest {
 }
 
 class GroupRequest extends MessageRequest {
-  final Identifier groupID;
+  final ID groupID;
   final String name;
   final bool private;
   final NodeMedia groupMedia;
@@ -288,7 +288,7 @@ class GroupRequest extends MessageRequest {
     required this.groupMedia,
     required Message message,
     MessageMedia? media,
-    required List<Identifier> targets,
+    required List<ID> targets,
   }) : super(targets: targets, message: message, media: media);
 
   @override
@@ -325,7 +325,7 @@ class PaymentRequest extends Request {
   String get id => payment.id;
 
   PaymentRequest({
-    required List<Identifier> targets,
+    required List<ID> targets,
     required this.payment,
     required this.sender,
     this.textNote,

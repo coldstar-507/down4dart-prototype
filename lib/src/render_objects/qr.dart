@@ -1,14 +1,16 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:qr/qr.dart';
 import '../themes.dart';
 import '../_down4_dart_utils.dart' show golden;
+import 'chat_message.dart' show ChatMessage;
 
 class QrPainter extends CustomPainter {
   final double strokeWidth;
   final List<Offset> points;
-  QrPainter({
+  const QrPainter({
     required this.strokeWidth,
     required this.points,
   });

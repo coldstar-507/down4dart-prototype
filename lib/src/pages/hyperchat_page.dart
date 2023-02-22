@@ -21,10 +21,15 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/_down4_flutter_utils.dart' as ru;
 
-class HyperchatPage extends StatefulWidget {
+class HyperchatPage extends StatefulWidget implements Down4PageWidget {
+  ID get id => "HyperchatPage";
   final double initialOffset;
-  final List<Palette> homePalettes, transitionedHomePalettes;
+  // final u.Triple<List<Palette2>, Iterable<Person>, int> transition;
+  final List<Palette2> palettesForTransition;
+  final int nHidden;
   final Iterable<Person> people;
+  final List<Palette2> homePalettes; //, transitionedHomePalettes;
+  // final Iterable<Person> people;
   final void Function(r.HyperchatRequest) hyperchatRequest;
   final void Function(r.PingRequest) ping;
   final void Function() back;
@@ -32,8 +37,11 @@ class HyperchatPage extends StatefulWidget {
 
   const HyperchatPage({
     required this.initialOffset,
+    // required this.transition,
+    required this.palettesForTransition,
+    required this.nHidden,
     required this.people,
-    required this.transitionedHomePalettes,
+    // required this.transitionedHomePalettes,
     required this.homePalettes,
     required this.hyperchatRequest,
     required this.back,
@@ -50,7 +58,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
   MessageMedia? _cameraInput;
   CameraController? _ctrl;
   Console? _console;
-  late var _palettes = widget.homePalettes;
+  late List<Palette2> _palettes = widget.homePalettes;
+  late final double offset = widget.nHidden * Palette.fullHeight;
   late var _scrollController =
       ScrollController(initialScrollOffset: widget.initialOffset);
 
@@ -63,7 +72,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   Future<void> animatedTransition() async {
     Future(() => setState(() {
-          _palettes = widget.transitionedHomePalettes;
+          _palettes = [...widget.palettesForTransition];
+          _scrollController.jumpTo(widget.initialOffset + offset);
           _scrollController.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
@@ -404,12 +414,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
-        scrollController: _scrollController,
-        staticList: true,
-        title: "Hyperchat",
-        console: _console!,
-        list: _palettes,
-      ),
+          scrollController: _scrollController,
+          staticList: true,
+          title: "Hyperchat",
+          console: _console!,
+          list: _palettes),
     ]);
   }
 }

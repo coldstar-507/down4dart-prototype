@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:io' as io;
 
 import 'package:convert/convert.dart';
 import 'package:pointycastle/export.dart';
@@ -27,11 +28,11 @@ class Down4Payment {
       .sats
       .asInt;
 
-  bool isSpentBy({required Identifier id}) {
+  bool isSpentBy({required ID id}) {
     return txs.last.txsIn.any((element) => element.spender == id);
   }
 
-  String formattedName(Identifier selfID) {
+  String formattedName(ID selfID) {
     bool spentBySelf = isSpentBy(id: selfID);
     int outSats; // can be positive of negative
     if (spentBySelf) {
@@ -46,7 +47,7 @@ class Down4Payment {
           .fold<int>(0, (sum, out) => sum + out.sats.asInt);
     }
 
-    return "$outSats sat";
+    return outSats > 0 ? "+$outSats sat" : "$outSats sat";
   }
 
   // String get formattedName {
@@ -305,7 +306,7 @@ class Sats {
 }
 
 class Down4TXIN {
-  Identifier? spender;
+  ID? spender;
   VarInt? _scriptSigLen;
   TXID utxoTXID;
   FourByteInt utxoIndex;
@@ -416,7 +417,7 @@ class Down4TXOUT {
   final VarInt scriptPubKeyLen;
   final bool isChange;
   final bool isFee;
-  Identifier? receiver;
+  ID? receiver;
   int? outIndex;
   List<int>? secret;
   TXID? txid;
@@ -533,7 +534,7 @@ class Down4TXOUT {
 }
 
 class Down4TX {
-  Identifier? maker;
+  ID? maker;
   final List<int> down4Secret;
   final FourByteInt versionNo, nLockTime;
   final List<Down4TXIN> txsIn;
@@ -965,11 +966,34 @@ class Down4Keys {
 }
 
 void main() {
-  print("What the fuck is going on");
+  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  // var f = io.File("/home/scott/jeff.txt");
+  var pkHex = f.readAsStringSync();
 
-  var lol = 0x41;
-  var jk = 0x01 | 0x40;
-  print(lol == jk);
+  // final seed1 = safeSeed(32);
+  // final seed2 = safeSeed(32);
+
+  // var pair0_ = Down4Keys.fromRandom(seed1, seed2);
+
+  // final f = io.File("/home/scott/jeff.txt");
+  // final pkHex = f.readAsStringSync();
+
+  // io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
+
+  final pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
+  final pair1 = pair0.derive(makeUint32(1))!;
+  final pair2 = pair0.derive(makeUint32(2))!;
+  final pair3 = pair0.derive(makeUint32(3))!;
+
+  print("TEST0: ${testnetAddress(pair0.rawCompressedPub).toBase58()}");
+  print("TEST1: ${testnetAddress(pair1.rawCompressedPub).toBase58()}");
+  print("TEST2: ${testnetAddress(pair2.rawCompressedPub).toBase58()}");
+  print("TEST3: ${testnetAddress(pair3.rawCompressedPub).toBase58()}");
+
+  print("TEST0PK: ${pair0.privKeyBase58}");
+  print("TEST1PK: ${pair1.privKeyBase58}");
+  print("TEST2PK: ${pair2.privKeyBase58}");
+  print("TEST3PK: ${pair3.privKeyBase58}");
 
   // final seed = List<int>.generate(32, (index) => (index * 23) % 256);
   // final seed2 = List<int>.generate(32, (index) => (index * 21) % 256);

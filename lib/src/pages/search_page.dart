@@ -12,26 +12,36 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../globals.dart';
 
+import '../web_requests.dart' as r;
+
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
 
-class AddFriendPage extends StatefulWidget {
+class AddFriendPage extends StatefulWidget implements Down4PageWidget {
+  @override
+  ID get id => "SearchPage";
+
   // final Self self;
-  final List<Palette> palettes;
-  final Future<bool> Function(List<String>) search;
-  final void Function(User node) putNodeOffline;
-  final void Function(List<Palette>) addCallback, forwardNodes;
-  final void Function() backCallback;
+  // final List<Palette> palettes;
+  // final Future<bool> Function(List<String>) search;
+  // final void Function(User node) putNodeOffline;
+  final void Function(BaseNode) openNode;
+  final void Function(List<Palette2>) forwardNodes;
+  final void Function(Iterable<Palette2>) add;
+  final void Function() back;
+  // final List<ButtonsInfo2> Function(BaseNode) genButtonsForHome;
 
   const AddFriendPage({
-    required this.palettes,
-    required this.search,
+    // required this.palettes,
+    // required this.search,
     // required this.self,
-    required this.putNodeOffline,
-    required this.addCallback,
-    required this.backCallback,
+    // required this.putNodeOffline,
+    // required this.genButtonsForHome,
+    required this.openNode,
+    required this.add,
+    required this.back,
     required this.forwardNodes,
     Key? key,
   }) : super(key: key);
@@ -45,6 +55,48 @@ class _AddFriendPageState extends State<AddFriendPage> {
   var tec = TextEditingController();
   CameraController? _cameraController;
   MobileScannerController? scanner;
+
+  Future<List<ButtonsInfo2>> bGen(BaseNode node) async {
+    return [
+      ButtonsInfo2(
+          assetPath: 'assets/images/50.png',
+          pressFunc: () => widget.openNode(node),
+          rightMost: true)
+    ];
+  }
+
+  // Home palettes are all chatables. Friends, non-friends, hyperchats, groups
+  // void writePalette2(ChatableNode node, {required bool selected}) {
+  //   final lastMessagePreviewInfo = node.previewInfo();
+  //   _palettes[node.id] = Palette2(
+  //       node: node,
+  //       selected: selected,
+  //       messagePreview: lastMessagePreviewInfo.first,
+  //       imPress: () => writePalette2(node, selected: !selected),
+  //       bodyPress: () => writePalette2(node, selected: !selected),
+  //       buttonsInfo2: [buttonsOfNode(node, lastMessagePreviewInfo.second)]);
+  // }
+
+  Map<ID, Palette2> searchs = {};
+
+  void reload() => setState(() {});
+
+  Future<void> search() async {
+    if (tec.value.text.isEmpty) return;
+    final ids = tec.value.text.split(" ").toSet();
+    final toFetch = ids.difference(g.boxes.nodes.keys.toSet());
+    final inHome = (await Future.wait(ids
+            .difference(toFetch)
+            .map((homeNodeID) => homeNodeID.getLocalNode())))
+        .whereType<BaseNode>();
+
+    final nodes = await r.getNodes(toFetch);
+    for (final node in inHome.followedBy(nodes ?? [])) {
+      await writePalette2(node, searchs, bGen, reload);
+    }
+    tec.clear();
+    setState(() {});
+  }
 
   @override
   void initState() {
@@ -78,34 +130,36 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   static double get qrTopGap => g.sizes.w - qrDimension * 2 * 1 / golden;
 
-  Widget get qr => Align(
-        alignment: Alignment.topCenter,
-        child: Column(
-          children: [
-            SizedBox(height: qrTopGap),
-            SizedBox.square(
-              dimension: qrDimension,
-              child: Down4Qr(data: qrData, dimension: qrDimension),
-            ),
-          ],
-        ),
-      );
+  Widget get qr {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Column(
+        children: [
+          SizedBox(height: qrTopGap),
+          SizedBox.square(
+            dimension: qrDimension,
+            child: Down4Qr(data: qrData, dimension: qrDimension),
+          ),
+        ],
+      ),
+    );
+  }
 
   scanCallBack(Barcode bc, MobileScannerArguments? args) {
     if (bc.rawValue != null) {
       final data = bc.rawValue!.split("~");
       if (data.length != 4) return;
       var node = User(
-        id: data[0],
-        firstName: data[1],
-        lastName: data[2],
-        neuter: Down4Keys.fromYouKnow(data[3]),
-        messages: {},
-        snips: {},
-        children: {},
-      );
-      widget.putNodeOffline(node);
+          id: data[0],
+          firstName: data[1],
+          lastName: data[2],
+          neuter: Down4Keys.fromYouKnow(data[3]),
+          messages: {},
+          snips: {},
+          children: {});
+      writePalette2(node, searchs, bGen, reload);
     }
+    setState(() {});
   }
 
   void defaultConsole([scanning = false]) {
@@ -123,23 +177,26 @@ class _AddFriendPageState extends State<AddFriendPage> {
       topButtons: [
         ConsoleButton(
           name: "Add",
-          onPress: () => widget.addCallback(
-            widget.palettes.selected().toList(growable: false),
-          ),
+          onPress: () {
+            final selectedSearchs = searchs.values.selected();
+            for (final s in selectedSearchs) {
+              final n = s.node;
+              if (n is User) n.isFriend = true;
+              writePalette2(n, searchs, bGen, reload, sel: false);
+            }
+            widget.add(selectedSearchs);
+            setState(() {});
+          },
         ),
-        ConsoleButton(
-            name: "Search",
-            onPress: () async {
-              if (await widget.search(tec.value.text.split(" "))) tec.clear();
-            }),
+        ConsoleButton(name: "Search", onPress: search),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: widget.backCallback),
+        ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(name: "Scan", onPress: () => defaultConsole(!scanning)),
         ConsoleButton(
           name: "Forward",
           onPress: () => widget.forwardNodes(
-            widget.palettes.selected().toList(growable: false),
+            searchs.values.selected().toList(),
           ),
         ),
       ],
@@ -152,11 +209,10 @@ class _AddFriendPageState extends State<AddFriendPage> {
     print("QR DATA LEN = ${qrData.length}");
     return Andrew(pages: [
       Down4Page(
-        title: "Search",
-        console: _console!,
-        stackWidgets: [qr],
-        list: widget.palettes,
-      )
+          title: "Search",
+          console: _console!,
+          stackWidgets: [qr],
+          list: searchs.values.toList())
     ]);
   }
 }

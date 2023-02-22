@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/_down4_dart_utils.dart';
+import 'render_objects/palette.dart';
 // import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
@@ -17,36 +18,11 @@ import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
 
-// import '../main.dart' as main;
-
 final g = Singletons.instance;
 final db = FirebaseDatabase.instance.ref();
 // var _fs = FirebaseFirestore.instance;
 final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
-
-class ButtonKeys {
-  final List<GlobalKey> topButtonKeys;
-  final List<GlobalKey> bottomButtonKeys;
-  ButtonKeys._()
-      : topButtonKeys = [
-          GlobalKey(),
-          GlobalKey(),
-          GlobalKey(),
-          GlobalKey(),
-          GlobalKey(),
-        ],
-        bottomButtonKeys = [
-          GlobalKey(),
-          GlobalKey(),
-          GlobalKey(),
-          GlobalKey(),
-          GlobalKey(),
-        ];
-
-  static ButtonKeys? _instance;
-  static ButtonKeys get instance => _instance ??= ButtonKeys._();
-}
 
 String _mediaPath(String mediaID, {bool isThumbnail = false}) =>
     "${g.boxes.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
@@ -84,16 +60,6 @@ Future<MessageMedia?> downloadAndWriteMedia(
     return null;
   }
 }
-
-// Future<MediaMetadata?> _downloadMediaMetadata(String mediaID) async {
-//   try {
-//     final fullMetadata = await _st.ref(mediaID).getMetadata();
-//     final jsonMetadata = fullMetadata.customMetadata as Map<String, String>;
-//     return MediaMetadata.fromJson(jsonMetadata);
-//   } catch (e) {
-//     return null;
-//   }
-// }
 
 Future<bool> uploadOrUpdateMedia(
   MessageMedia media, {
@@ -184,27 +150,33 @@ extension ExchangeRateSave on ExchangeRate {
   }
 }
 
-extension Getters on Identifier {
-  MessageMedia? getLocalMessageMedia() {
-    final String? jsonEncoded = g.boxes.medias.get(this);
+extension Getters on ID {
+  Future<MessageMedia?> getLocalMessageMedia() async {
+    final String? jsonEncoded = await g.boxes.medias.get(this);
     if (jsonEncoded == null) return null;
     return MessageMedia.fromJson(jsonDecode(jsonEncoded));
   }
 
-  Message? getLocalMessage() {
-    final String? jsonEncoded = g.boxes.messages.get(this);
+  Future<Message?> getLocalMessage() async {
+    final String? jsonEncoded = await g.boxes.messages.get(this);
     if (jsonEncoded == null) return null;
     return Message.fromJson(jsonDecode(jsonEncoded));
   }
 
-  BaseNode? getLocalNode() {
-    final String? jsonEncoded = g.boxes.nodes.get(this);
+  Future<BaseNode?> getLocalNode() async {
+    final String? jsonEncoded = await g.boxes.nodes.get(this);
+    if (jsonEncoded == null) return null;
+    return BaseNode.fromJson(jsonDecode(jsonEncoded));
+  }
+
+  Future<BaseNode?> getHiddenNode() async {
+    final String? jsonEncoded = await g.boxes.hidden.get(this);
     if (jsonEncoded == null) return null;
     return BaseNode.fromJson(jsonDecode(jsonEncoded));
   }
 
   Future<void> deleteLocalNode() async {
-    return g.boxes.nodes.delete(this);
+    return await g.boxes.nodes.delete(this);
   }
 }
 
@@ -212,7 +184,7 @@ extension MessageSave on Message {
   Future<void> onReceipt() async {
     await save();
     if (mediaID != null) {
-      MessageMedia? media = mediaID?.getLocalMessageMedia();
+      MessageMedia? media = await mediaID?.getLocalMessageMedia();
       media ??= await downloadAndWriteMedia(mediaID!);
       if (media != null && media.extension.isVideoExtension()) {
         // we generate a thumbnail
@@ -237,7 +209,7 @@ extension MessageSave on Message {
   }
 
   Future<void> delete() async {
-    final MessageMedia? media = mediaID?.getLocalMessageMedia();
+    final MessageMedia? media = await mediaID?.getLocalMessageMedia();
     if (media != null) {
       media.references.remove(id);
       media.delete();
@@ -248,23 +220,44 @@ extension MessageSave on Message {
 }
 
 extension NodeSave on BaseNode {
-  void save() {
-    if (this is Self) {
-      g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
+  Future<void> save({bool hidden = false}) async {
+    if (hidden) {
+      await g.boxes.hidden.put(id, jsonEncode(toJson(toLocal: true)));
     } else {
-      g.boxes.nodes.put(id, jsonEncode(toJson(toLocal: true)));
+      if (this is Self) {
+        await g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
+      } else {
+        await g.boxes.nodes.put(id, jsonEncode(toJson(toLocal: true)));
+      }
     }
   }
 
-  void delete() {
+  Future<void> delete({bool hidden = false}) async {
     var node = this;
     if (node is ChatableNode && node is! Self) {
       for (var messageID in node.messages) {
-        var msg = messageID.getLocalMessage();
+        var msg = await messageID.getLocalMessage();
         if (msg != null && !msg.isSaved) msg.delete();
       }
       g.boxes.nodes.delete(id);
     }
+  }
+}
+
+extension ChatableNodeExtensions on ChatableNode {
+  Future<Pair<String, bool>> previewInfo() async {
+    String? lastMessagePreview;
+    bool? lastMessageWasRead;
+    if (messages.isNotEmpty) {
+      final lastMessage = await messages.last.getLocalMessage();
+      lastMessageWasRead = lastMessage?.isRead ?? true;
+      if ((lastMessage?.text ?? "").isEmpty) {
+        lastMessagePreview = "&attachment";
+      } else {
+        lastMessagePreview = lastMessage!.text!;
+      }
+    }
+    return Pair(lastMessagePreview ?? "", lastMessageWasRead ?? true);
   }
 }
 
@@ -290,14 +283,84 @@ extension PaymentSave on Down4Payment {
   Future<void> save() => g.boxes.payments.put(id, jsonEncode(this));
 }
 
-extension WalletSave on Wallet {
-  void save() {
-    g.boxes.personal.put("wallet", jsonEncode(this));
+extension WalletManager on Wallet {
+  void setIx(int ix) => g.boxes.personal.put("ix", ix);
+
+  static int get ix => g.boxes.personal.get("ix");
+
+  static Down4Keys get keys =>
+      Down4Keys.fromJson(jsonDecode(g.boxes.personal.get("keys")));
+
+  Stream<Down4Payment> get payments async* {
+    for (final paymentID in g.boxes.payments.keys) {
+      final json = await g.boxes.payments.get(paymentID);
+      if (json != null) {
+        yield Down4Payment.fromJson(jsonDecode(json));
+      }
+    }
+  }
+
+  Stream<Down4TXOUT> get utxos async* {
+    for (final utxoID in g.boxes.utxos.keys) {
+      final json = await g.boxes.utxos.get(utxoID);
+      if (json != null) {
+        yield Down4TXOUT.fromJson(jsonDecode(json));
+      }
+    }
+  }
+
+  Future<Down4TXOUT?> getUtxo(ID id) async {
+    final json = await g.boxes.utxos.get(id);
+    if (json == null) return null;
+    return Down4TXOUT.fromJson(jsonDecode(json));
+  }
+
+  void removeUtxo(ID id) {
+    g.boxes.utxos.delete(id);
+  }
+
+  Future<Down4Payment?> getPayment(ID id) async {
+    final json = await g.boxes.payments.get(id);
+    if (json == null) return null;
+    return Down4Payment.fromJson(jsonDecode(json));
+  }
+
+  void removePayment(ID id) {
+    g.boxes.payments.delete(id);
+  }
+
+  void setPayment(Down4Payment payment) {
+    g.boxes.payments.put(payment.id, jsonEncode(payment));
+  }
+
+  void setUtxo(Down4TXOUT utxo) {
+    g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
+  }
+
+  Future<bool> isSpent(ID utxoID) async {
+    final bool? spent = await g.boxes.spents.get(utxoID);
+    return spent ?? false;
+  }
+
+  void setSpent(ID id, bool spent) {
+    g.boxes.spents.put(id, spent);
   }
 
   static Wallet load() {
-    final asJson = g.boxes.personal.get("wallet");
-    return Wallet.fromJson(jsonDecode(asJson));
+    return Wallet(
+        keys: keys,
+        // payments: payments,
+        // utxos: utxos,
+        // getUtxo: getUtxo,
+        // getPayment: getPayment,
+        // removeUtxo: removeUtxo,
+        // removePayment: removePayment,
+        // setIx: setIx,
+        // setSpent: setSpent,
+        // isSpent: isSpent,
+        // setPayment: setPayment,
+        // setUtxo: setUtxo,
+        ix: ix);
   }
 }
 
@@ -320,15 +383,19 @@ extension SelfSave on Self {
 
 class Boxes {
   late String docPath, tempPath;
-  Box personal, nodes, messages, medias, messageQueue, bills, payments;
+  LazyBox payments, medias, messages, bills, nodes, utxos, spents, hidden;
+  Box personal, messageQueue;
   Boxes._()
-      : medias = Hive.box("Medias"),
+      : utxos = Hive.lazyBox("Utxos"),
+        spents = Hive.lazyBox("Spents"),
+        medias = Hive.lazyBox("Medias"),
+        hidden = Hive.lazyBox("Hidden"),
         personal = Hive.box("Personal"),
-        nodes = Hive.box("Nodes"),
-        messages = Hive.box("Messages"),
+        nodes = Hive.lazyBox("Nodes"),
+        messages = Hive.lazyBox("Messages"),
         messageQueue = Hive.box("MessageQueue"),
-        bills = Hive.box("Bills"),
-        payments = Hive.box("Payments");
+        bills = Hive.lazyBox("Bills"),
+        payments = Hive.lazyBox("Payments");
 }
 
 class Sizes {
@@ -357,10 +424,10 @@ class Singletons {
   Sizes? _sizes;
   Boxes? _boxes;
   ExchangeRate? _exchangeRate;
-  late List<CameraDescription> cameras;
 
+  late List<CameraDescription> cameras;
   Self get self => _self ??= SelfSave.load();
-  Wallet get wallet => _wallet ??= WalletSave.load();
+  Wallet get wallet => _wallet ??= WalletManager.load();
   Boxes get boxes => _boxes ??= Boxes._();
   Sizes get sizes => _sizes ??= Sizes._();
   ExchangeRate get exchangeRate => _exchangeRate ??= ExchangeRateSave.load();
@@ -368,11 +435,27 @@ class Singletons {
   bool get notYetInitialized => SelfSave.notYetInitialized();
 
   void initWallet(Uint8List s1, Uint8List s2) {
-    _wallet = Wallet.fromSeed(s1, s2)..save();
+    final keys = Down4Keys.fromRandom(s1, s2);
+    g.boxes.personal.put("ix", -1);
+    g.boxes.personal.put("keys", jsonEncode(keys));
+    _wallet = Wallet(
+        keys: keys,
+        // payments: WalletManager.payments,
+        // utxos: WalletManager.utxos,
+        // getUtxo: WalletManager.getUtxo,
+        // getPayment: WalletManager.getPayment,
+        // removeUtxo: WalletManager.removeUtxo,
+        // removePayment: WalletManager.removePayment,
+        // setSpent: WalletManager.setSpent,
+        // isSpent: WalletManager.isSpent,
+        // setPayment: WalletManager.setPayment,
+        // setUtxo: WalletManager.setUtxo,
+        // setIx: WalletManager.setIx,
+        ix: null);
   }
 
-  void initSelf(Identifier id, NodeMedia media, Down4Keys neuter, String name,
-      String? lastName) {
+  void initSelf(
+      ID id, NodeMedia media, Down4Keys neuter, String name, String? lastName) {
     _self = Self(
       id: id,
       media: media,
@@ -387,4 +470,49 @@ class Singletons {
       snips: {},
     )..save();
   }
+}
+
+Future<void> writePalette2<T>(
+  T node,
+  Map<ID, Down4Object> state,
+  Future<List<ButtonsInfo2>> Function(T)? bGen,
+  void Function()? onSel, {
+  bool h = false,
+  bool? sel,
+}) async {
+  // return right away if not a BaseNode
+  if (node is! BaseNode) {
+    return print("SORRY BRO, BUT ISN'T BASE NODE LOL");
+  }
+
+  // isSelected will check first if it's an argument, else it will check
+  // if the palette is a reload and use it's current status, or else it will
+  // default to false
+  bool? selectionIfReload;
+  final Palette2? pInState = state[node.id] as Palette2?;
+  selectionIfReload = pInState?.selected;
+  bool isSelected = sel ?? selectionIfReload ?? false;
+
+  // if node is chatable, we want to load previews
+  Pair<String, bool>? previewInfo;
+  if (h && node is ChatableNode) {
+    previewInfo = await node.previewInfo();
+  }
+
+  void Function()? onSelect = onSel == null
+      ? null
+      : () async {
+          await writePalette2(node, state, bGen, onSel, h: h, sel: !isSelected);
+          onSel.call();
+        };
+
+  state[node.id] = Palette2(
+      node: node,
+      selected: isSelected,
+      messagePreview: previewInfo?.first,
+      imPress: onSelect,
+      bodyPress: onSelect,
+      buttonsInfo2: await bGen?.call(node) ?? []);
+
+  print("SUCCESS FULLY WROTE ${node.id} TO STATE = $state");
 }

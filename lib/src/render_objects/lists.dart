@@ -10,12 +10,63 @@ import 'chat_message.dart';
 import 'palette_maker.dart';
 import '_down4_flutter_utils.dart';
 
+class FutureList extends StatefulWidget {
+  final Stream<Widget> stream;
+  const FutureList({required this.stream, Key? key}) : super(key: key);
+
+  @override
+  State<FutureList> createState() => _FutureListState();
+}
+
+class _FutureListState extends State<FutureList> {
+  List<Widget> items = [];
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+        stream: widget.stream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Text('Loading');
+          } else if (snapshot.connectionState == ConnectionState.done) {
+            return DynamicList(list: items);
+          } else if (snapshot.hasError) {
+            return Text('Error!');
+          } else {
+            items.add(snapshot.data!);
+            return DynamicList(list: items);
+          }
+        });
+  }
+}
+
+// class FutureList extends StatelessWidget {
+//   final Stream<Widget> items;
+//   final bool? isReversed;
+
+//   const FutureList({required this.items, this.isReversed, Key? key})
+//       : super(key: key);
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return StreamBuilder(
+//         stream: items,
+//         builder: (context, snapshot) {
+//           if (snapshot.hasData &&
+//               snapshot.connectionState == ConnectionState.done) {
+//             return snapshot.requireData;
+//           } else {
+//             return const SizedBox.shrink();
+//           }
+//         });
+//   }
+// }
+
 class DynamicList extends StatelessWidget {
   final ScrollController? scrollController;
   final List<Widget> list;
   final Future<void> Function()? onRefresh;
-  final Map<Identifier, Widget>? asMap;
-  final List<Identifier>? orderedKeys;
+  final Map<ID, Widget>? asMap;
+  final List<ID>? orderedKeys;
   final Iterable<Widget>? iterables;
   final int? iterableLen;
   final bool reversed;
@@ -38,20 +89,18 @@ class DynamicList extends StatelessWidget {
   Widget build(BuildContext context) {
     if (onRefresh != null) {
       return ScrollConfiguration(
-        behavior: NoGlow(),
-        child: RefreshIndicator(
-          onRefresh: onRefresh!,
-          color: PinkTheme.qrColor,
-          backgroundColor: PinkTheme.backGroundColor,
-          child: ListView.builder(
-            controller: scrollController,
-            padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
-            reverse: reversed,
-            itemBuilder: (_, i) => asMap![orderedKeys![i]]!,
-            itemCount: iterableLen ?? iterables?.length ?? list.length,
-          ),
-        ),
-      );
+          behavior: NoGlow(),
+          child: RefreshIndicator(
+              onRefresh: onRefresh!,
+              color: PinkTheme.qrColor,
+              backgroundColor: PinkTheme.backGroundColor,
+              child: ListView.builder(
+                controller: scrollController,
+                padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
+                reverse: reversed,
+                itemBuilder: (_, i) => asMap?[orderedKeys?[i]] ?? list[i],
+                itemCount: asMap?.length ?? list.length,
+              )));
     }
 
     return ScrollConfiguration(
@@ -61,7 +110,7 @@ class DynamicList extends StatelessWidget {
         padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
         reverse: reversed,
         itemBuilder: (_, i) => asMap?[orderedKeys?[i]] ?? list[i],
-        itemCount: iterableLen ?? iterables?.length ?? list.length,
+        itemCount: asMap?.length ?? list.length,
       ),
     );
   }

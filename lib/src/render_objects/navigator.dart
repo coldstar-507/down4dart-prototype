@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 // import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../globals.dart';
@@ -12,6 +14,7 @@ class Down4Page {
   final ScrollController? scrollController;
   final String title;
   final List<Widget>? _list;
+  final Stream<Widget>? stream;
   final Future<void> Function()? onRefresh;
   final Map<String, Widget>? asMap;
   final List<String>? orderedKeys;
@@ -24,6 +27,7 @@ class Down4Page {
     required this.title,
     this.scrollController,
     this.asMap,
+    this.stream,
     this.orderedKeys,
     this.onRefresh,
     this.isChatPage = false,
@@ -59,7 +63,7 @@ class Andrew extends StatefulWidget {
   State<Andrew> createState() => _AndrewState();
 }
 
-class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
+class _AndrewState extends State<Andrew> {
   int curPos = 0;
 
   @override
@@ -70,7 +74,6 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
 
   void goRight() {
     if (curPos < widget.pages.length - 1) {
-      print("going right");
       curPos++;
       setState(() {});
       widget.onPageChange?.call(curPos);
@@ -79,7 +82,6 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
 
   void goLeft() {
     if (curPos > 0) {
-      print("going left!");
       curPos--;
       widget.onPageChange?.call(curPos);
       setState(() {});
@@ -93,8 +95,17 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
 
   Down4Page get curPage => widget.pages[curPos];
 
-  List<String> get titles =>
-      widget.pages.map((page) => page.title).toList(growable: false);
+  List<String> get titles {
+    return widget.pages.map((page) => page.title).toList(growable: false);
+    // final unTransformed =
+    // final maxLen = unTransformed.fold<int>(0, (prev, q) => max(prev, q.length));
+    // return unTransformed.map((e) {
+    //   final toPad = maxLen - e.length;
+    //   // final padLeft = (toPad / 2).ceil();
+    //   // final padRight = (toPad / 2).floor();
+    //   return e.padLeft(toPad); // .padRight(padRight);
+    // }).toList(growable: false);
+  }
 
   Widget get pageHeader => Row(
         textDirection: TextDirection.ltr,
@@ -109,7 +120,7 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                   color: Colors.white.withOpacity(curPos == e.key ? 1 : 0.3),
                   fontSize: 20,
                 ),
-                child: Text(" ${e.value} ", softWrap: true)))
+                child: Text("  ${e.value}  ")))
             .toList(growable: false),
       );
 
@@ -137,20 +148,21 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
                                   reversed: page.value.reversedList,
                                   scrollController: page.value.scrollController,
                                   topPadding: page.value.isChatPage ? 4 : null,
-                                  list: page.value.list,
-                                )
-                              : DynamicList(
-                                  // refreshController: page.value.refreshController,
-                                  // onLoading: page.value.onLoading,
-                                  onRefresh: page.value.onRefresh,
-                                  reversed: page.value.reversedList,
-                                  asMap: page.value.asMap,
-                                  orderedKeys: page.value.orderedKeys,
-                                  scrollController: page.value.scrollController,
-                                  topPadding: page.value.isChatPage ? 4 : null,
-                                  iterables: page.value.iterables,
-                                  iterableLen: page.value.iterableLen,
-                                  list: page.value.list),
+                                  list: page.value.list)
+                              : page.value.stream != null
+                                  ? FutureList(stream: page.value.stream!)
+                                  : DynamicList(
+                                      onRefresh: page.value.onRefresh,
+                                      reversed: page.value.reversedList,
+                                      asMap: page.value.asMap,
+                                      orderedKeys: page.value.orderedKeys,
+                                      scrollController:
+                                          page.value.scrollController,
+                                      topPadding:
+                                          page.value.isChatPage ? 4 : null,
+                                      iterables: page.value.iterables,
+                                      iterableLen: page.value.iterableLen,
+                                      list: page.value.list),
                         )))
                     .toList(growable: false),
               ),
@@ -181,7 +193,11 @@ class _AndrewState extends State<Andrew> with TickerProviderStateMixin {
             children: [
               ...widget.pages[curPos].stackWidgets ?? [],
               Container(
-                color: PinkTheme.backGroundColor,
+                decoration: const BoxDecoration(
+                    color: PinkTheme.backGroundColor,
+                    image: DecorationImage(
+                        image: AssetImage("assets/images/triangles.png"),
+                        fit: BoxFit.fill)),
                 child: Column(
                   children: [
                     pageBody,

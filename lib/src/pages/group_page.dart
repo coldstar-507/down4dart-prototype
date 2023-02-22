@@ -22,16 +22,20 @@ import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
 import '../render_objects/_down4_flutter_utils.dart';
 
-class GroupPage extends StatefulWidget {
-  final List<Palette> homePalettes, transitionedHomePalettes;
+class GroupPage extends StatefulWidget implements Down4PageWidget {
+  @override
+  ID get id => "GroupPage";
+  final List<Palette2> homePalettes, palettesForTransition;
   final Iterable<Person> people;
+  final int nHidden;
   final void Function() back;
   final void Function(r.GroupRequest) groupRequest;
   final double initialOffset;
 
   const GroupPage({
     required this.people,
-    required this.transitionedHomePalettes,
+    required this.nHidden,
+    required this.palettesForTransition,
     required this.back,
     required this.groupRequest,
     required this.homePalettes,
@@ -44,14 +48,15 @@ class GroupPage extends StatefulWidget {
 }
 
 class _GroupPageState extends State<GroupPage> {
+  // GlobalKey mediaModeKey = GlobalKey(); // TODO this button is not in group
   Console? _console;
-  late List<Widget> _items = [...widget.homePalettes, groupMaker(fold: false)];
+  late List<Widget> _items = [...widget.homePalettes];
   var _tec = TextEditingController();
   var _tec2 = TextEditingController();
   bool _private = true;
+  late final double offset = Palette.fullHeight * (widget.nHidden + 1);
   late var _scrollController = ScrollController(
-    initialScrollOffset:
-        widget.initialOffset + Palette.gapSize + Palette.paletteHeight,
+    initialScrollOffset: widget.initialOffset,
   );
 
   NodeMedia? _groupImage;
@@ -85,10 +90,11 @@ class _GroupPageState extends State<GroupPage> {
 
   Future<void> animatedTransition() async {
     Future(() => setState(() {
-          _items = [
-            ...widget.transitionedHomePalettes,
-            groupMaker(fold: false)
-          ];
+          print(
+            "PALETTES FOR TRANSITION = ${widget.palettesForTransition.map((e) => e.node.name).toList()}",
+          );
+          _items = [...widget.palettesForTransition, groupMaker(fold: false)];
+          _scrollController.jumpTo(widget.initialOffset + offset);
           _scrollController.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
@@ -168,7 +174,8 @@ class _GroupPageState extends State<GroupPage> {
           _groupImage = NodeMedia(
               data: file.bytes!, id: mediaID, metadata: mediaMetadata);
           loadBaseConsole();
-          animatedTransition();
+          reloadItems();
+          // animatedTransition();
         } else {
           final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
           MessageMedia(id: mediaID, path: f.path, metadata: mediaMetadata)
@@ -222,12 +229,22 @@ class _GroupPageState extends State<GroupPage> {
     }
   }
 
+  void reloadItems() {
+    setState(() {
+      _items = [
+        ..._items.sublist(0, _items.length - 1),
+        groupMaker(fold: false),
+      ];
+    });
+  }
+
   void loadMediaConsole({bool images = true, bool forGroupImage = false}) {
     void selectMedia(MessageMedia media) {
       if (forGroupImage) {
         _groupImage = media.asNodeMedia();
         loadBaseConsole();
-        animatedTransition();
+        reloadItems();
+        // animatedTransition();
       } else {
         send(mediaInput: media);
       }

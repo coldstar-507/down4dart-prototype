@@ -1,6 +1,7 @@
 import 'dart:math' show max;
 import 'dart:typed_data' show Uint8List;
 
+import 'package:down4/src/render_objects/qr.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -13,7 +14,7 @@ import '../themes.dart';
 import '_down4_flutter_utils.dart';
 
 class ChatReplyInfo {
-  final Identifier messageRefID, senderID; // senderName,
+  final ID messageRefID, senderID; // senderName,
   final String body;
   final void Function() onPressReply;
   const ChatReplyInfo({
@@ -48,14 +49,17 @@ class ChatTextInfo {
   });
 }
 
-class ChatMessage extends StatelessWidget {
+class ChatMessage extends StatelessWidget implements Down4Object {
+  @override
+  ID get id => message.id;
+
   static const double headerHeight = 18.0;
   final bool myMessage, selected, isPost;
-  final void Function(Identifier id)? select;
+  final void Function(ID id)? select;
   final Message message;
   final bool hasGap, hasHeader;
 
-  final ChatTextInfo? textInfo;
+  // final ChatTextInfo? textInfo;
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
 
@@ -65,7 +69,7 @@ class ChatMessage extends StatelessWidget {
     required this.myMessage,
     required this.hasGap,
     required this.mediaInfo,
-    required this.textInfo,
+    // required this.textInfo,
     required this.repliesInfo,
     this.isPost = false,
     this.selected = false,
@@ -78,7 +82,7 @@ class ChatMessage extends StatelessWidget {
       message: message,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
-      textInfo: textInfo,
+      // textInfo: textInfo,
       isPost: isPost,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -94,7 +98,7 @@ class ChatMessage extends StatelessWidget {
       isPost: isPost,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
-      textInfo: textInfo,
+      // textInfo: textInfo,
       hasHeader: hasHeader,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -112,7 +116,7 @@ class ChatMessage extends StatelessWidget {
         mediaInfo: mediaInfo
           ?..videoController?.pause()
           ..videoController?.seekTo(Duration.zero),
-        textInfo: textInfo,
+        // textInfo: textInfo,
         hasHeader: hasHeader,
         myMessage: myMessage,
         hasGap: hasGap,
@@ -124,10 +128,17 @@ class ChatMessage extends StatelessWidget {
     }
   }
 
-  static TextStyle get textStyle => const TextStyle(fontFamily: "Alice");
+  static TextStyle get textStyle =>
+      const TextStyle(fontFamily: "Alice", color: Colors.black);
 
-  static TextStyle get dateStyle =>
-      const TextStyle(fontFamily: "Alice", fontSize: 10);
+  static TextStyle get globalDateStyle => const TextStyle(
+      fontFamily: "Alice", fontSize: 10, color: Colors.black45, height: 0.8);
+
+  // TextStyle get localDateStyle => TextStyle(
+  //     fontFamily: "Alice",
+  //     fontSize: 10,
+  //     color: Colors.black45,
+  //     height: (textInfo?.lastStringOnSameLine ?? false) ? 2 : 1.5);
 
   static double get maxMessageWidth => g.sizes.w * 0.76;
 
@@ -138,7 +149,19 @@ class ChatMessage extends StatelessWidget {
   static double get maxTextWidth =>
       maxMessageWidth - textPadding - messageBorder;
 
-  bool get hasText => textInfo != null;
+  Color get messageColor =>
+      myMessage ? PinkTheme.myBubblesColor : PinkTheme.buttonColor;
+
+  Down4TextBubble? get bubble => !hasText
+      ? null
+      : Down4TextBubble(
+          text: message.text!,
+          dateText: timeString(message),
+          inheritedWidth: hasMedia ? maxTextWidth : null);
+
+  double? get bubbleWidth => !hasText ? null : bubble!.calcWidth + textPadding;
+
+  bool get hasText => (message.text ?? "").isNotEmpty; // textInfo != null;
 
   bool get hasMedia => mediaInfo != null;
 
@@ -163,153 +186,15 @@ class ChatMessage extends StatelessWidget {
     } else {
       timeStr = "$tsHour:$tsMin";
     }
-    return timeStr;
+    return "    $timeStr";
   }
 
-  static ChatTextInfo? generateTextInfo(Message message) {
-    if (message.text?.isEmpty ?? true) return null;
-    print("GENERATING TEXT INFO");
-
-    List<String>? specialDisplayText;
-    double neededWidth;
-    bool lastStringAndDateOnSameLine = false;
-    double heightIfNotOnSameLine = 0.0;
-    double oneLineTextHeight = 0.0;
-
-    specialDisplayText = [];
-    neededWidth = 0.0;
-
-    final text = message.text!;
-    final transform1 = text.split("\n");
-    final transform2 = transform1.join(" \n ");
-
-    final words = transform2.split(" ")..add(timeString(message));
-    var previousString = "";
-
-    // pervious string should always be < max
-    for (final word in words) {
-      if (word == words.last) {
-        double dateWidth;
-        double prevWidth = 0;
-        String dateString = "      $word";
-        final timeTp = TextPainter(
-          text: TextSpan(text: dateString, style: ChatMessage.dateStyle),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        dateWidth = timeTp.width;
-        if (previousString.isNotEmpty) {
-          final prevTp = TextPainter(
-            text: TextSpan(text: previousString, style: ChatMessage.textStyle),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          prevWidth = prevTp.width;
-        }
-        specialDisplayText.add(previousString);
-        specialDisplayText.add(dateString);
-        if (dateWidth + prevWidth > ChatMessage.maxTextWidth) {
-          // in this case, prevString + date is too wide
-          if (prevWidth > neededWidth) neededWidth = prevWidth;
-          lastStringAndDateOnSameLine = false;
-          heightIfNotOnSameLine = timeTp.height;
-        } else {
-          if (prevWidth + dateWidth > neededWidth) {
-            neededWidth = prevWidth + dateWidth;
-          }
-          lastStringAndDateOnSameLine = true;
-        }
-      } else if (word == "\n") {
-        specialDisplayText.add(previousString);
-        final specialTp = TextPainter(
-          text: TextSpan(text: previousString, style: ChatMessage.textStyle),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        if (specialTp.width > neededWidth) {
-          neededWidth = specialTp.width;
-        }
-        previousString = "";
-      } else if (word.isNotEmpty) {
-        final wordTp = TextPainter(
-          text: TextSpan(text: word, style: ChatMessage.textStyle),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        var wordLen = wordTp.width;
-        var words = [word];
-        while (wordLen > ChatMessage.maxTextWidth) {
-          final splitLen = (words.first.length / 2).ceil();
-          words = words
-              .map((w) => [w.substring(0, splitLen), w.substring(splitLen)])
-              .expand((element) => element)
-              .toList();
-          wordLen = words
-              .map((w) => TextPainter(
-                  text: TextSpan(text: w, style: ChatMessage.textStyle),
-                  textDirection: TextDirection.ltr)
-                ..layout())
-              .map((e) => e.width)
-              .reduce(max);
-        }
-        if (words.length > 1) {
-          // we have a word split
-          if (previousString.isNotEmpty) {
-            specialDisplayText.add(previousString);
-          }
-          for (final word in words) {
-            specialDisplayText.add(word);
-          }
-          oneLineTextHeight = wordTp.height;
-          if (wordLen > neededWidth) neededWidth = wordLen;
-          previousString = "";
-        } else {
-          final currentString =
-              previousString.isEmpty ? word : "$previousString $word";
-
-          final previousTp = TextPainter(
-            text: TextSpan(text: previousString, style: ChatMessage.textStyle),
-            textDirection: TextDirection.ltr,
-          )..layout();
-
-          final currentTp = TextPainter(
-            text: TextSpan(text: currentString, style: ChatMessage.textStyle),
-            textDirection: TextDirection.ltr,
-          )..layout();
-
-          oneLineTextHeight = currentTp.height;
-
-          // if the current text is larger than the available width
-          if (currentTp.width >= ChatMessage.maxTextWidth) {
-            // we add the previousString to the list of display text
-            specialDisplayText.add(previousString);
-            // if the previous layout is bigger than our current biggest width,
-            // it because the new biggest width
-            if (previousTp.width > neededWidth) {
-              neededWidth = previousTp.width;
-            }
-            // now we set the previous string as the word
-            previousString = word;
-          } else {
-            // if the current text is not larger than available width
-            // we simply update it
-            previousString = currentString;
-          }
-        }
-      }
-    }
-
-    return ChatTextInfo(
-      specialDisplayTexts: specialDisplayText,
-      heightIfNotOnSameLine: heightIfNotOnSameLine,
-      lastStringOnSameLine: lastStringAndDateOnSameLine,
-      neededWidth: neededWidth,
-      singleLineHeight: oneLineTextHeight,
-    );
-  }
-
-  static ChatMediaInfo? generateMediaInfo(Message message) {
+  static Future<ChatMediaInfo?> generateMediaInfo(Message message) async {
     if (message.mediaID == null) return null;
-    print("GENERATING MEDIA INFO");
+    // print("GENERATING MEDIA INFO");
     double mediaHeight = 0;
     double mediaWidth = 0;
-    MessageMedia? media = message.mediaID!.getLocalMessageMedia();
+    MessageMedia? media = await message.mediaID!.getLocalMessageMedia();
     if (media == null) return null;
     mediaWidth = ChatMessage.maxMessageWidth - ChatMessage.messageBorder;
     mediaHeight = mediaWidth *
@@ -326,25 +211,43 @@ class ChatMessage extends StatelessWidget {
         videoController: vpc);
   }
 
-  static List<ChatReplyInfo>? generateRepliesInfo(
-      Message message, void Function(String) goToReply) {
+  static Future<List<ChatReplyInfo>?> generateRepliesInfo(
+      Message message, void Function(String) goToReply) async {
     if (message.replies == null) return null;
-    print("GENERATING REPLIES INFO");
-    return message.replies!
-        .map((replyID) {
-          final replyMsg = replyID.getLocalMessage();
-          if (replyMsg == null) return null;
-          final String replyBody = replyMsg.text?.isNotEmpty ?? false
-              ? replyMsg.text!
-              : "&attachment";
-          return ChatReplyInfo(
-              onPressReply: () => goToReply.call(replyID),
-              senderID: replyMsg.senderID,
-              messageRefID: replyMsg.id,
-              body: replyBody);
-        })
-        .whereType<ChatReplyInfo>()
-        .toList(growable: false);
+    List<ChatReplyInfo> chatReplies = [];
+    for (final replyID in message.replies!) {
+      final reply = await replyID.getLocalMessage();
+      if (reply == null) continue;
+      final String replyBody =
+          reply.text?.isNotEmpty ?? false ? reply.text! : "&attachment";
+
+      final info = ChatReplyInfo(
+          onPressReply: () => goToReply.call(replyID),
+          senderID: reply.senderID,
+          messageRefID: reply.id,
+          body: replyBody);
+
+      chatReplies.add(info);
+    }
+
+    return chatReplies;
+
+    // print("GENERATING REPLIES INFO");
+    // return message.replies!
+    //     .map((replyID) async {
+    //       final replyMsg = await replyID.getLocalMessage();
+    //       if (replyMsg == null) return null;
+    //       final String replyBody = replyMsg.text?.isNotEmpty ?? false
+    //           ? replyMsg.text!
+    //           : "&attachment";
+    //       return ChatReplyInfo(
+    //           onPressReply: () => goToReply.call(replyID),
+    //           senderID: replyMsg.senderID,
+    //           messageRefID: replyMsg.id,
+    //           body: replyBody);
+    //     })
+    //     .whereType<ChatReplyInfo>()
+    //     .toList(growable: false);
   }
 
   static bool displayGap(Message msg, Message prevMsg) {
@@ -387,13 +290,14 @@ class ChatMessage extends StatelessWidget {
               ),
             ),
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Text(
                 replyData.body,
                 style: const TextStyle(fontSize: 11, color: Colors.black54),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
+              // const Spacer(),
             ),
           ],
         ),
@@ -418,7 +322,7 @@ class ChatMessage extends StatelessWidget {
   Widget? get header2 {
     if (!hasHeader) return null;
     return SizedBox(
-        height: headerHeight,
+        height: headerHeight * 0.8,
         child: Row(children: [
           const Spacer(),
           Text(
@@ -432,6 +336,7 @@ class ChatMessage extends StatelessWidget {
   Widget? get media {
     final mi = mediaInfo;
     if (mi == null) return null;
+
     Widget mediaBody({required Widget child}) {
       return GestureDetector(
           onTap: () => select?.call(message.id),
@@ -440,9 +345,10 @@ class ChatMessage extends StatelessWidget {
               height: mi.precalculatedMediaSize.height,
               width: mi.precalculatedMediaSize.width,
               decoration: BoxDecoration(
+                color: messageColor,
                 borderRadius: BorderRadius.vertical(
                     top: const Radius.circular(4),
-                    bottom: Radius.circular(textInfo != null ? 0 : 4)),
+                    bottom: Radius.circular(hasText ? 0 : 4)),
               ),
               child: child));
     }
@@ -466,66 +372,20 @@ class ChatMessage extends StatelessWidget {
   }
 
   Widget? get text {
-    final ti = textInfo;
-    if (ti == null) return null;
-    final dateText = ti.specialDisplayTexts.last;
-    final nSpecialText = ti.specialDisplayTexts.length;
-    final beforeLast = ti.specialDisplayTexts[nSpecialText - 2];
-    final texts = ti.specialDisplayTexts.sublist(0, nSpecialText - 1);
+    if (!hasText) return null;
     return GestureDetector(
-      onTap: () => select?.call(message.id),
-      child: Container(
-        padding: const EdgeInsets.all(6.0),
-        clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-            color: myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(mediaInfo != null ? 0 : 4),
-              bottom: const Radius.circular(4),
-            )),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: texts
-              .map(
-                (str) => str != beforeLast
-                    ? Text(str, maxLines: 1)
-                    : ti.lastStringOnSameLine
-                        ? Row(
-                            textDirection: TextDirection.ltr,
-                            children: [
-                              Text(str, maxLines: 1),
-                              const Spacer(),
-                              Text(
-                                dateText,
-                                maxLines: 1,
-                                style: const TextStyle(
-                                    fontSize: 10, color: Colors.black54),
-                              )
-                            ],
-                          )
-                        : Column(
-                            textDirection: TextDirection.ltr,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(str, maxLines: 1),
-                              Row(
-                                children: [
-                                  const Spacer(),
-                                  Text(
-                                    dateText,
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                        fontSize: 10, color: Colors.black54),
-                                  )
-                                ],
-                              ),
-                            ],
-                          ),
-              )
-              .toList(growable: false),
-        ),
-      ),
-    );
+        onTap: () => select?.call(message.id),
+        child: Container(
+            padding: const EdgeInsets.all(6.0),
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+                color:
+                    myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(mediaInfo != null ? 0 : 4),
+                  bottom: const Radius.circular(4),
+                )),
+            child: bubble));
   }
 
   Widget animatedContainer({required Widget child}) {
@@ -549,78 +409,49 @@ class ChatMessage extends StatelessWidget {
     );
   }
 
-  Size get chatMessageSize {
-    final headerSize = hasHeader ? headerHeight : 0;
-    final repliesHeight = (repliesInfo?.length ?? 0) * headerHeight;
-    final nLines = hasText ? textInfo!.specialDisplayTexts.length - 1 : 0;
-
-    var messageHeight = (mediaInfo?.precalculatedMediaSize.height ?? 0) +
-        messageBorder +
-        headerSize +
-        repliesHeight;
-
-    messageHeight += hasText
-        ? (nLines * textInfo!.singleLineHeight) +
-            textPadding +
-            textInfo!.heightIfNotOnSameLine
-        : 0;
-
-    final messageWidth = mediaInfo != null
-        ? maxMessageWidth
-        : hasText
-            ? textInfo!.neededWidth + textPadding + messageBorder
-            : 0.0; // TODO, will be forwarding nodes, or messages
-
-    return Size(messageWidth, messageHeight);
-  }
-
   Widget get chatMessage {
-    return Align(
-      alignment: isPost
-          ? Alignment.bottomCenter
-          : myMessage
-              ? Alignment.bottomRight
-              : Alignment.bottomLeft,
-      child: Container(
-          margin: const EdgeInsets.only(left: 22.0, right: 22.0),
-          height: chatMessageSize.height,
-          width: chatMessageSize.width,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              replies ?? const SizedBox.shrink(),
-              animatedContainer(
-                child: Container(
-                  decoration: BoxDecoration(
-                      borderRadius:
-                          const BorderRadius.all(Radius.circular(6.0)),
-                      border: Border.all(
-                        width: 2.0,
-                        color: selected ? Colors.black : Colors.transparent,
-                      )),
-                  child: Column(
-                    textDirection: TextDirection.ltr,
-                    mainAxisSize: MainAxisSize.max,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      media ?? const SizedBox.shrink(),
-                      text ?? const SizedBox.shrink(),
-                    ],
-                  ),
-                ),
+    return Container(
+      margin: const EdgeInsets.only(left: 22.0, right: 22.0),
+      constraints: BoxConstraints(maxWidth: bubbleWidth ?? maxMessageWidth),
+      child: Column(
+        crossAxisAlignment:
+            myMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          replies ?? const SizedBox.shrink(),
+          animatedContainer(
+            child: Container(
+              decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+                  border: Border.all(
+                    width: 2.0,
+                    color: selected ? Colors.black : Colors.transparent,
+                  )),
+              child: Column(
+                textDirection: TextDirection.ltr,
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  media ?? const SizedBox.shrink(),
+                  text ?? const SizedBox.shrink(),
+                ],
               ),
-              header2 ?? const SizedBox.shrink(),
-            ],
-          )),
+            ),
+          ),
+          header2 ?? const SizedBox.shrink(),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      hasGap ? const SizedBox(height: 20) : const SizedBox.shrink(),
-      chatMessage,
-      const SizedBox(height: 4),
-    ]);
+    return Column(
+      crossAxisAlignment:
+          myMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        hasGap ? const SizedBox(height: 20) : const SizedBox.shrink(),
+        chatMessage,
+        const SizedBox(height: 4),
+      ],
+    );
   }
 }

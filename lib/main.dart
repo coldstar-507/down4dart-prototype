@@ -20,11 +20,14 @@ import 'src/globals.dart';
 Future<void> _initBox() async {
   await Hive.openBox("Personal");
   await Hive.openBox("MessageQueue");
-  await Hive.openBox("Nodes");
-  await Hive.openBox("Messages");
-  await Hive.openBox("Bills");
-  await Hive.openBox("Payments");
-  await Hive.openBox("Medias");
+  await Hive.openLazyBox("Hidden");
+  await Hive.openLazyBox("Nodes");
+  await Hive.openLazyBox("Messages");
+  await Hive.openLazyBox("Bills");
+  await Hive.openLazyBox("Payments");
+  await Hive.openLazyBox("Medias");
+  await Hive.openLazyBox("Utxos");
+  await Hive.openLazyBox("Spents");
 }
 
 // Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {

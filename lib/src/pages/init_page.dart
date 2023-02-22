@@ -11,7 +11,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../web_requests.dart' as r;
 import '../_down4_dart_utils.dart' as u;
-import '../data_objects.dart' show Identifier;
+import '../data_objects.dart' show ID;
 
 import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
@@ -27,7 +27,8 @@ class UserMakerPage extends StatefulWidget {
     required String imPath,
     required String imExtension,
     required double imAspectRatio,
-    required bool toReverse,
+    required bool isSquared,
+    required bool isReversed,
   }) initUser;
 
   const UserMakerPage({
@@ -50,7 +51,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
   Console? _console;
   dynamic _inputs;
   double _imageAspectRatio = 1.0;
-  bool _toReverse = false;
+  bool _isReversed = false;
+  bool _isSquared = false;
   bool _onBaseConsole = true;
   List<Future<bool>> _calls = [];
   bool _isValidUsername = false;
@@ -128,7 +130,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         ConsoleButton(name: "Camera", onPress: camConsole),
         ConsoleButton(name: "Recover", onPress: () => print("TODO")),
         ConsoleButton(
-            key: buttonKey,
+            // key: buttonKey,
             isActivated: isReady && activatedProceed,
             greyedOut: !isReady,
             name: "Proceed",
@@ -141,7 +143,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
                 imPath: _imagePath,
                 imExtension: _imageExtension,
                 imAspectRatio: _imageAspectRatio,
-                toReverse: _toReverse,
+                isReversed: _isReversed,
+                isSquared: _isSquared,
               );
               if (_errorTryAgain) {
                 baseConsole();
@@ -211,7 +214,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
             name: "Accept",
             onPress: () async {
               _imagePath = path;
-              _toReverse = cam == 1;
+              _isReversed = cam == 1;
+              _isSquared = true;
               _imageAspectRatio = ctrl!.value.aspectRatio;
               _imageExtension = p.extension(path);
               baseConsole();
@@ -250,6 +254,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
           if (r?.files.single.path != null && r?.files.single.bytes != null) {
             final String thePath = r!.files.single.path as String;
             final imageSize = await decodeImageSize(r.files.single.bytes!);
+            _isSquared = false;
             _imageAspectRatio = imageSize.aspectRatio;
             _imagePath = thePath;
             _imageExtension = p.extension(thePath);

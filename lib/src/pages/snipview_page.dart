@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import '../globals.dart';
+import '../data_objects.dart' show ID;
 import '../render_objects/console.dart';
+import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
 
-class SnipViewPage extends StatelessWidget {
+class SnipViewPage extends StatelessWidget implements Down4PageWidget {
+  @override
+  ID get id => "SnipViewPage";
+
   final Widget displayMedia;
   final String? text;
   final void Function() back;
