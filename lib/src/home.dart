@@ -76,9 +76,9 @@ class _HomeState extends State<Home> {
       }
       pm.refresh(homePage());
     } else if (cp is MoneyPage) {
-      pm.refresh(moneyPage(fromHome: false));
+      pm.refresh(moneyPage());
     } else if (cp is PaymentPage) {
-      pm.refresh(moneyPage(fromHome: false));
+      pm.refresh(moneyPage());
     } else if (cp is AddFriendPage) {
       pm.refresh(searchPage());
     } else if (cp is NodePage) {
@@ -206,29 +206,6 @@ class _HomeState extends State<Home> {
     }
   }
 
-  // Future<void> loadHomePalettes2() async {
-  //   writePalette2(g.self, _palettes, bGen, refreshHome, h: true);
-
-  //   var groupPeopleIDs = Set<Identifier>.identity();
-  //   for (final nodeKey in g.boxes.nodes.keys) {
-  //     nodeKey as Identifier;
-  //     final node = await nodeKey.getLocalNode();
-  //     if (node == null) continue;
-  //     if (node is GroupNode) groupPeopleIDs.addAll(node.group);
-  //     writePalette2(node, _palettes, bGen, refreshHome, h: true);
-  //   }
-
-  //   final homePeopleIDs = _palettes.values.asIds().toSet();
-  //   final toFetchIDs = groupPeopleIDs.difference(homePeopleIDs);
-  //   final fetchedNodes = await r.getNodes(toFetchIDs);
-  //   for (final fetchedNode in fetchedNodes ?? <BaseNode>[]) {
-  //     writePalette2(fetchedNode, _hiddenPalettes, null, null);
-  //   }
-  //   setState(() => pm
-  //     ..pop()
-  //     ..put(homePage()));
-  // }
-
   void connectToMessages() {
     var msgQueue = db.child("Users").child(g.self.id).child("M");
     var messagesRef = db.child("Messages");
@@ -345,7 +322,7 @@ class _HomeState extends State<Home> {
         g.exchangeRate.rate = rate;
         g.exchangeRate.lastUpdate = rightNow;
         g.exchangeRate.save();
-        if (pm.currentPage is MoneyPage) refresh(moneyPage(fromHome: false));
+        if (pm.currentPage is MoneyPage) refresh(moneyPage());
       }
     }
   }
@@ -437,7 +414,9 @@ class _HomeState extends State<Home> {
           ..messages.add(req.message.id)
           ..updateActivity()
           ..save();
-        req.message.save();
+        req.message
+          ..isRead = true
+          ..save();
         await writePalette2(node, _palettes, bGen, refreshHome, h: true);
 
         pm
@@ -617,7 +596,7 @@ class _HomeState extends State<Home> {
       palettes: formattedHomePalettes,
       hyperchat: () => push(hyperchatPage()),
       group: () => push(groupPage()),
-      money: () => push(moneyPage(fromHome: true)),
+      money: () => push(moneyPage()),
       ping: (pingRequest) {
         _requests.add(pingRequest);
         processWebRequests();
@@ -676,7 +655,7 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget moneyPage({bool fromHome = true}) {
+  ru.Down4PageWidget moneyPage() {
     final transition = homeTransition();
     return MoneyPage(
         initialOffset: homeScroll,
@@ -743,7 +722,7 @@ class _HomeState extends State<Home> {
           }
           await localPalettesRoutine();
         },
-        forwardNodes: forwardPage,
+        forwardNodes: (pals) => push(forwardPage(pals)),
         back: pop);
   }
 

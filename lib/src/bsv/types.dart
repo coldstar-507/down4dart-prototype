@@ -21,7 +21,9 @@ class Down4Payment {
   final List<Down4TX> txs;
   final bool safe;
   final String textNote;
-  Down4Payment(this.txs, this.safe, {required this.textNote});
+  final int tsSeconds;
+  Down4Payment(this.txs, this.safe, {required this.textNote, int? ts})
+      : tsSeconds = ts ?? timeStamp() ~/ 1000;
 
   int get independentGets => txs.last.txsOut
       .firstWhere((txOut) => !(txOut.isFee || txOut.isChange))
@@ -72,7 +74,9 @@ class Down4Payment {
 
   String get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    return sha256(idFold.toUint8List()).toHex();
+    final dataPart = sha256(idFold.toUint8List()).toBase58();
+    final tsPart = tsSeconds.toRadixString(36);
+    return "$tsPart-$dataPart";
   }
 
   int get lastConfirmations => txs.last.confirmations;
@@ -171,6 +175,7 @@ class Down4Payment {
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,
         "safe": safe,
+        "ts": tsSeconds,
         if (textNote.isNotEmpty) "txt": textNote,
       };
 
@@ -189,6 +194,7 @@ class Down4Payment {
           .map((e) => Down4TX.fromJson(e))
           .toList(),
       decodedJson["safe"],
+      ts: decodedJson["ts"],
       textNote: decodedJson["txt"] ?? "", // TODO ?? "" should be temporary
     );
   }

@@ -33,8 +33,9 @@ class ConsoleButton extends StatelessWidget {
   final void Function()? onLongPressUp;
   final double leftEpsilon, bottomEpsilon, widthEpsilon, heightEpsilon;
   final bool invertColors;
+  final BorderRadius? border;
 
-  ConsoleButton({
+  const ConsoleButton({
     this.invertColors = false,
     required this.name,
     required this.onPress,
@@ -51,6 +52,7 @@ class ConsoleButton extends StatelessWidget {
     this.isActivated = true,
     this.onLongPress,
     this.onLongPressUp,
+    this.border,
     Key? key,
   }) : super(key: key);
 
@@ -60,6 +62,29 @@ class ConsoleButton extends StatelessWidget {
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
         invertColors: true,
+        leftEpsilon: leftEpsilon,
+        bottomEpsilon: bottomEpsilon,
+        greyedOut: greyedOut,
+        widthEpsilon: widthEpsilon,
+        heightEpsilon: heightEpsilon,
+        extraButtons: extraButtons,
+        showExtra: showExtra,
+        shouldBeDownButIsnt: shouldBeDownButIsnt,
+        isMode: isMode,
+        isSpecial: isSpecial,
+        isActivated: isActivated,
+        key: key,
+        border: border,
+        // key: key,
+      );
+
+  ConsoleButton withBorder(BorderRadius border) => ConsoleButton(
+        name: name,
+        onPress: onPress,
+        onLongPress: onLongPress,
+        onLongPressUp: onLongPressUp,
+        invertColors: invertColors,
+        border: border,
         leftEpsilon: leftEpsilon,
         bottomEpsilon: bottomEpsilon,
         greyedOut: greyedOut,
@@ -105,15 +130,14 @@ class ConsoleButton extends StatelessWidget {
         onLongPressUp: isActivated ? onLongPressUp : () {},
         child: Container(
           decoration: BoxDecoration(
+              borderRadius: border,
               color: invertColors
                   ? Colors.black12
                   : greyedOut
                       ? PinkTheme.inactivatedButtonColor
                       : PinkTheme.buttonColor,
               border: Border.all(
-                color: Console.contourColor,
-                width: Console.contourWidth,
-              )),
+                  color: Console.contourColor, width: Console.contourWidth)),
           child: SizedBox(
             height: Console.buttonHeight,
             child: Center(
@@ -147,7 +171,9 @@ class ConsoleInput extends StatelessWidget {
   final void Function(String)? inputCallBack;
   final TextEditingController tec;
   final bool show;
+  final BorderRadius? borderRadius;
   const ConsoleInput({
+    this.borderRadius,
     this.show = true,
     this.type = TextInputType.text,
     this.inputCallBack,
@@ -163,8 +189,25 @@ class ConsoleInput extends StatelessWidget {
 
   bool get isMultiLine => maxLines > 1;
 
+  ConsoleInput withRadius(BorderRadius radius) {
+    return ConsoleInput(
+      borderRadius: radius,
+      type: type,
+      placeHolder: placeHolder,
+      tec: tec,
+      activated: activated,
+      value: value,
+      maxLines: maxLines,
+      prefix: prefix,
+      suffix: suffix,
+      inputCallBack: inputCallBack,
+      show: show,
+    );
+  }
+
   ConsoleInput animated({required bool show}) {
     return ConsoleInput(
+      borderRadius: borderRadius,
       type: type,
       placeHolder: placeHolder,
       tec: tec,
@@ -221,6 +264,7 @@ class ConsoleInput extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
               color: activated ? Colors.white : Colors.grey,
+              borderRadius: borderRadius,
               border: Border.all(
                   width: show ? Console.contourWidth : 0,
                   color: Console.contourColor)),
@@ -395,11 +439,22 @@ class Console extends StatelessWidget {
     }).toList();
   }
 
+  static double get consoleRad => 10;
+
   static double get buttonHeight => g.sizes.h * 0.044;
 
-  double get consoleGap => g.sizes.w * 0.022;
-  static double get contourWidth => 0.9; //0.9;
-  static Color get contourColor => Colors.black54;
+  bool get bottomButtonsHasTop =>
+      _topButtons != null ||
+      _bottomInputs != null ||
+      _topButtons != null ||
+      hasGadgets;
+
+  bool get topButtonsHasTop =>
+      _bottomInputs != null || _topInputs != null || hasGadgets;
+
+  double get consoleGap => g.sizes.w * 0.015;
+  static double get contourWidth => .6; // 0.9;
+  static Color get contourColor => Colors.black45;
   double get consoleWidth => g.sizes.w - (2.0 * consoleGap);
   double get trueWidth => consoleWidth - (4 * contourWidth);
   double get bbWidth => consoleWidth - (2 * contourWidth);
@@ -418,16 +473,7 @@ class Console extends StatelessWidget {
     }
   }
 
-  // static ConsoleMedias consoleMedias2({
-  //   required bool? showImages,
-  //   required void Function(MessageMedia) onSelectedMedia,
-  // }) =>
-  //     ConsoleMedias(
-  //       show: showImages != null,
-  //       medias: medias(showImages ?? true),
-  //       onSelectMedia: onSelectedMedia,
-  //       nMedias: nMedias(showImages ?? true),
-  //     );
+  bool get bottomInputsHasTop => _topInputs != null;
 
   static Duration get animationDuration =>
       Duration(milliseconds: (100 * golden).toInt());
@@ -482,12 +528,39 @@ class Console extends StatelessWidget {
   List<ConsoleInput> get topConsoleInputs =>
       _topInputs
           ?.map((input) => input.animated(show: !hasGadgets))
+          .toList()
+          .asMap()
+          .map((i, e) => MapEntry(
+              i,
+              e.withRadius(BorderRadius.only(
+                topLeft: Radius.circular(i == 0 ? consoleRad : 0),
+                topRight: Radius.circular(
+                    i == _topInputs!.length - 1 ? consoleRad : 0),
+                bottomLeft: const Radius.circular(0),
+                bottomRight: const Radius.circular(0),
+              ))))
+          .values
           .toList(growable: false) ??
       [];
 
   List<ConsoleInput> get bottomConsoleInputs =>
       _bottomInputs
           ?.map((input) => input.animated(show: !hasGadgets))
+          .toList()
+          .asMap()
+          .map((i, e) => MapEntry(
+              i,
+              e.withRadius(BorderRadius.only(
+                topLeft: Radius.circular(
+                    !bottomInputsHasTop && i == 0 ? consoleRad : 0),
+                topRight: Radius.circular(
+                    !bottomInputsHasTop && i == _bottomInputs!.length - 1
+                        ? consoleRad
+                        : 0),
+                bottomLeft: const Radius.circular(0),
+                bottomRight: const Radius.circular(0),
+              ))))
+          .values
           .toList(growable: false) ??
       [];
 
@@ -496,7 +569,9 @@ class Console extends StatelessWidget {
   double get mediaCelSize => trueWidth / mediaPerRow;
 
   Widget consoleMedias() {
-    if (initializationConsole) return const SizedBox.shrink();
+    // if (initializationConsole) return const SizedBox.shrink();
+    if (consoleMedias2 == null) return const SizedBox.shrink();
+
     // final mi = mediasInfo;
     // if (mi == null) return const SizedBox.shrink();
     final nMedia = nMedias(consoleMedias2?.showImages ?? true);
@@ -509,65 +584,61 @@ class Console extends StatelessWidget {
 
     final showingImages = consoleMedias2?.showImages ?? true;
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
           color: Console.contourColor,
-          border: Border.all(
-            color: contourColor,
-            width: consoleMedias2 != null ? contourWidth : 0,
-          )),
+          border: Border.all(color: contourColor, width: contourWidth)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: consoleMedias2 != null ? trueRows * mediaCelSize : 0,
-          maxWidth: trueWidth,
-        ),
-        child: ListView.builder(
-            itemCount: theoreticalRows,
-            itemBuilder: ((context, index) {
-              Widget f(int i) {
-                return FutureBuilder(
-                  future: medias(showingImages).elementAt(i),
-                  builder: ((context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.done &&
-                        snapshot.hasData) {
-                      return GestureDetector(
-                        onTap: () => consoleMedias2?.onSelectMedia
-                            .call(snapshot.requireData),
-                        child: Down4ImageViewer(
-                            media: snapshot.requireData,
-                            displaySize: Size.square(mediaCelSize),
-                            forceSquareAnyways: true),
-                      );
-                    } else {
-                      return const SizedBox.shrink();
-                    }
-                  }),
-                );
-                // if (i < nMedia) {
-                //   final theMedia = await medias(showingImages).elementAt(i);
-                //   return GestureDetector(
-                //     onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
-                //     child: Down4ImageViewer(
-                //       media: theMedia,
-                //       displaySize: Size.square(mediaCelSize),
-                //       forceSquareAnyways: true,
-                //     ),
-                //   );
-                // } else {
-                //   return const SizedBox.shrink();
-                // }
-              }
+          constraints: BoxConstraints(
+              maxHeight: trueRows * mediaCelSize, maxWidth: trueWidth),
+          child: ListView.builder(
+              itemCount: theoreticalRows,
+              itemBuilder: ((context, index) {
+                Widget f(int i) {
+                  return FutureBuilder(
+                    future: medias(showingImages).elementAt(i),
+                    builder: ((context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.done &&
+                          snapshot.hasData) {
+                        return GestureDetector(
+                          onTap: () => consoleMedias2?.onSelectMedia
+                              .call(snapshot.requireData),
+                          child: Down4ImageViewer(
+                              media: snapshot.requireData,
+                              displaySize: Size.square(mediaCelSize),
+                              forceSquareAnyways: true),
+                        );
+                      } else {
+                        return const SizedBox.shrink();
+                      }
+                    }),
+                  );
+                  // if (i < nMedia) {
+                  //   final theMedia = await medias(showingImages).elementAt(i);
+                  //   return GestureDetector(
+                  //     onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
+                  //     child: Down4ImageViewer(
+                  //       media: theMedia,
+                  //       displaySize: Size.square(mediaCelSize),
+                  //       forceSquareAnyways: true,
+                  //     ),
+                  //   );
+                  // } else {
+                  //   return const SizedBox.shrink();
+                  // }
+                }
 
-              return Row(
-                children: [
-                  f((index * 5)),
-                  f((index * 5) + 1),
-                  f((index * 5) + 2),
-                  f((index * 5) + 3),
-                  f((index * 5) + 4)
-                ],
-              );
-            })),
-      ),
+                return Row(
+                  children: [
+                    f((index * 5)),
+                    f((index * 5) + 1),
+                    f((index * 5) + 2),
+                    f((index * 5) + 3),
+                    f((index * 5) + 4)
+                  ],
+                );
+              }))),
     );
   }
 
@@ -579,6 +650,7 @@ class Console extends StatelessWidget {
         return Flexible(
             child: Container(
                 decoration: BoxDecoration(
+                    borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
                     border:
                         Border.all(color: contourColor, width: contourWidth)),
                 child: Row(
@@ -603,6 +675,7 @@ class Console extends StatelessWidget {
         return Flexible(
             child: Container(
                 decoration: BoxDecoration(
+                    borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
                     color: obj.myMessage
                         ? PinkTheme.myBubblesColor
                         : PinkTheme.buttonColor,
@@ -620,153 +693,39 @@ class Console extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return
-        // Container(
-        //     decoration: BoxDecoration(
-        //         color: null,
-        //         border: Border.all(color: contourColor, width: contourWidth)),
-        //     child:
-        SizedBox(
-            height: buttonHeight + (2 * contourWidth),
-            width: trueWidth + (2 * contourWidth),
-            child: Row(
-                // crossAxisAlignment: CrossAxisAlignment.stretch,
-                // crossAxisAlignment: CrossAxisAlignment.end,
-                textDirection: TextDirection.ltr,
-                children: forwardingObjects!
-                    .map((e) => individualObject(e))
-                    .toList()));
-
-    // return Container(
-    //   decoration: BoxDecoration(
-    //       color: PinkTheme.black,
-    //       border: Border.all(color: contourColor, width: contourWidth)),
-    //   child: SizedBox(
-    //     height: Console.buttonHeight,
-    //     width: consoleWidth,
-    //     child: Row(
-    //       crossAxisAlignment: CrossAxisAlignment.stretch,
-    //       textDirection: TextDirection.ltr,
-    //       children: forwardingPalette!
-    //           .map((palette) => Flexible(
-    //               child: DecoratedBox(
-    //                   position: DecorationPosition.foreground,
-    //                   decoration: BoxDecoration(
-    //                     border: Border.all(width: 0.5),
-    //                   ),
-    //                   child: Row(
-    //                       textDirection: TextDirection.ltr,
-    //                       crossAxisAlignment: CrossAxisAlignment.stretch,
-    //                       children: [
-    //                         SizedBox(
-    //                             width: Console.buttonHeight,
-    //                             height: Console.buttonHeight,
-    //                             child: palette.image),
-    //                         Expanded(
-    //                             child: Container(
-    //                                 padding: const EdgeInsets.all(2.0),
-    //                                 color: PinkTheme
-    //                                     .nodeColors[palette.node.colorCode],
-    //                                 child: Text(palette.node.name,
-    //                                     overflow: TextOverflow.clip)))
-    //                       ]))))
-    //           .toList(),
-    //     ),
-    //   ),
-    // );
-
-    // return ConstrainedBox(
-    //     constraints: BoxConstraints(
-    //         maxHeight: buttonHeight + (2 * contourWidth),
-    //         maxWidth: trueWidth + (2 * contourWidth)),
-    //     child: Row(
-    //         mainAxisSize: MainAxisSize.max,
-    //         crossAxisAlignment: CrossAxisAlignment.stretch,
-    //         textDirection: TextDirection.ltr,
-    //         // mainAxisSize: MainAxisSize.min,
-    //         children:
-    //             forwardingObjects!.map((e) => individualObject(e)).toList()));
-
-    //       .map((object) => object is Palette2
-    //           ? Flexible(
-    //               child: DecoratedBox(
-    //                   position: DecorationPosition.foreground,
-    //                   decoration: BoxDecoration(
-    //                     border: Border.all(width: 0.5),
-    //                   ),
-    //                   child: Row(
-    //                       textDirection: TextDirection.ltr,
-    //                       crossAxisAlignment: CrossAxisAlignment.stretch,
-    //                       children: [
-    //                         SizedBox(
-    //                             width: Console.buttonHeight,
-    //                             height: Console.buttonHeight,
-    //                             child: object.image),
-    //                         Expanded(
-    //                             child: Container(
-    //                                 padding: const EdgeInsets.all(2.0),
-    //                                 color: PinkTheme
-    //                                     .nodeColors[object.node.colorCode],
-    //                                 child: Text(object.node.name,
-    //                                     overflow: TextOverflow.clip)))
-    //                       ])))
-    //           : object is Message
-    //               ? Flexible(
-    //                   child: DecoratedBox(
-    //                       position: DecorationPosition.foreground,
-    //                       decoration: BoxDecoration(
-    //                         border: Border.all(width: 0.5),
-    //                       ),
-    //                       child: Row(
-    //                           textDirection: TextDirection.ltr,
-    //                           crossAxisAlignment: CrossAxisAlignment.stretch,
-    //                           children: [
-    //                             SizedBox(
-    //                                 width: Console.buttonHeight,
-    //                                 height: Console.buttonHeight,
-    //                                 child: object.image),
-    //                             Expanded(
-    //                                 child: Container(
-    //                                     padding: const EdgeInsets.all(2.0),
-    //                                     color: PinkTheme
-    //                                         .nodeColors[object.node.colorCode],
-    //                                     child: Text(object.node.name,
-    //                                         overflow: TextOverflow.clip)))
-    //                           ])))
-    //               : const SizedBox.shrink())
-    //       .toList(),
-    // );
+    return SizedBox(
+        height: buttonHeight + (2 * contourWidth),
+        width: trueWidth + (2 * contourWidth),
+        child: Row(
+            textDirection: TextDirection.ltr,
+            children:
+                forwardingObjects!.map((e) => individualObject(e)).toList()));
   }
 
   Widget consoleCamera() {
     final camCtrl = cameraController;
     if (camCtrl == null) return const SizedBox.shrink();
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
           color: contourColor,
           border: Border.all(color: contourColor, width: contourWidth)),
-      child: SizedBox(
-          height: trueWidth,
-          width: trueWidth,
-          child: ClipRect(
-              child: Transform.scale(
-                  scaleY: camCtrl.value.aspectRatio,
-                  child: CameraPreview(camCtrl)))),
+      child: SizedBox.square(
+          dimension: trueWidth,
+          child: Transform.scale(
+              scaleY: camCtrl.value.aspectRatio,
+              child: CameraPreview(camCtrl))),
     );
-
-    // return Transform.scale(
-    //   scale: 1.0,
-    //   // scaleY: camCtrl.value.aspectRatio,
-    //   child: Center(child: CameraPreview(camCtrl)),
-    // );
   }
 
   Widget videoPreview() {
     final vfp = videoForPreview;
     if (vfp == null) return const SizedBox.shrink();
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-          color: contourColor,
+          borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
           border: Border.all(color: contourColor, width: contourWidth)),
       child: SizedBox(
           height: trueWidth,
@@ -778,24 +737,17 @@ class Console extends StatelessWidget {
               isReversed: vfp.isReversed,
               isSquared: true)),
     );
-    // return Down4VideoTransform(
-    //   displaySize: Size.square(trueWidth),
-    //   videoAspectRatio: vfp.videoAspectRatio,
-    //   video: vfp.videoPlayer,
-    //   isReversed: vfp.isReversed,
-    //   isSquared: true,
-    // );
   }
 
   Widget imagePreview() {
     final ifp = imageForPreview;
     if (ifp == null) return const SizedBox.shrink();
     return Container(
-        // clipBehavior: Clip.hardEdge,
+        clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: PinkTheme.black,
-          border: Border.all(color: contourColor, width: contourWidth),
-        ),
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(consoleRad)),
+            border: Border.all(color: contourColor, width: contourWidth)),
         child: SizedBox(
           height: trueWidth,
           width: trueWidth,
@@ -805,35 +757,7 @@ class Console extends StatelessWidget {
             child: Image.file(io.File(ifp.path), fit: BoxFit.cover),
           ),
         ));
-
-    // return Down4ImageTransform(
-    //   image: theImage,
-    //   imageAspectRatio: ifp.imageAspectRatio,
-    //   displaySize: Size.square(trueWidth),
-    //   isSquared: true,
-    //   isReversed: ifp.isReversed,
-    // );
   }
-
-  // bool get showingGadgets =>
-  //     imageForPreview != null ||
-  //     videoForPreview != null ||
-  //     cameraController != null ||
-  //     scanner != null ||
-  //     (mediasInfo != null && (mediasInfo?.show ?? false));
-
-  // double get bbHeight {
-  //   if (imageForPreview != null ||
-  //       videoForPreview != null ||
-  //       cameraController != null ||
-  //       scanner != null) {
-  //     return bbWidth;
-  //   } else if (mediasInfo != null && (mediasInfo?.show ?? false)) {
-  //     return mediasHeight;
-  //   } else {
-  //     return 0;
-  //   }
-  // }
 
   Widget get rotatingLogo {
     return AnimatedRotation(
@@ -842,78 +766,108 @@ class Console extends StatelessWidget {
         child: down4Logo(trueWidth));
   }
 
-  // Widget bbContainer({required Widget child}) {
-  //   return AnimatedContainer(
-  //     duration: animationDuration,
-  //     height: bbHeight,
-  //     width: bbWidth,
-  //     clipBehavior: Clip.hardEdge,
-  //     decoration: BoxDecoration(
-  //       color: PinkTheme.qrColor,
-  //       border: Border.all(color: contourColor, width: contourWidth),
-  //     ),
-  //     child: child,
-  //   );
-  // }
-
   Widget consoleScanner() {
     if (scanner == null) return const SizedBox.shrink();
-    return DecoratedBox(
+    return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-          color: contourColor,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
           border: Border.all(width: contourWidth, color: contourColor)),
       child: Stack(
         children: [
-          SizedBox.square(
-              dimension: trueWidth + (contourWidth * 2),
-              child: Center(
-                  child: SizedBox(
-                      height: trueWidth, width: trueWidth, child: scanner!))),
+          Center(
+            child: SizedBox(
+              height: trueWidth,
+              width: trueWidth,
+              child: scanner!,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  List<ConsoleButton> get bottomConsoleButtons => invertedColors
-      ? _bottomButtons.map((e) => e.invertedColors()).toList()
-      // .toList()
-      // .asMap()
-      // .map((key, value) => MapEntry(
-      //     key,
-      //     value.invertedColors(
-      //         key: ButtonKeys.instance.bottomButtonKeys[key])))
-      // .values
-      // .toList(growable: false)
-      : _bottomButtons;
-  // .asMap()
-  // .map((key, value) => MapEntry(key,
-  //     value.withKey(key: ButtonKeys.instance.bottomButtonKeys[key])))
-  // .values
-  // .toList(growable: false);
+  List<ConsoleButton> get bottomConsoleButtons {
+    return invertedColors
+        ? _bottomButtons
+            .map((e) => e.invertedColors())
+            .toList()
+            .asMap()
+            .map((i, value) => MapEntry(
+                i,
+                value.withBorder(BorderRadius.only(
+                  topLeft: Radius.circular(
+                      !bottomButtonsHasTop && i == 0 ? consoleRad : 0),
+                  topRight: Radius.circular(
+                      !bottomButtonsHasTop && i == _bottomButtons.length - 1
+                          ? 6
+                          : 0),
+                  bottomLeft: Radius.circular(i == 0 ? consoleRad : 0),
+                  bottomRight: Radius.circular(
+                      i == _bottomButtons.length - 1 ? consoleRad : 0),
+                ))))
+            .values
+            .toList(growable: false)
+        : _bottomButtons
+            .asMap()
+            .map((i, value) => MapEntry(
+                i,
+                value.withBorder(BorderRadius.only(
+                  topLeft: Radius.circular(
+                      !bottomButtonsHasTop && i == 0 ? consoleRad : 0),
+                  topRight: Radius.circular(
+                      !bottomButtonsHasTop && i == _bottomButtons.length - 1
+                          ? 6
+                          : 0),
+                  bottomLeft: Radius.circular(i == 0 ? consoleRad : 0),
+                  bottomRight: Radius.circular(
+                      i == _bottomButtons.length - 1 ? consoleRad : 0),
+                ))))
+            .values
+            .toList(growable: false);
+  }
 
   List<ConsoleButton> get topConsoleButtons => invertedColors
-      ? (_topButtons ?? []).map((e) => e.invertedColors()).toList()
-      // .asMap()
-      // .map((key, value) => MapEntry(
-      //     key,
-      //     value.invertedColors(
-      //         key: ButtonKeys.instance.topButtonKeys[key])))
-      // .values
-      // .toList(growable: false)
-      : (_topButtons ?? []);
-  // .asMap()
-  // .map((key, value) => MapEntry(
-  //     key, value.withKey(key: ButtonKeys.instance.topButtonKeys[key])))
-  // .values
-  // .toList(growable: false);
+      ? (_topButtons ?? [])
+          .map((e) => e.invertedColors())
+          .toList()
+          .asMap()
+          .map((i, value) => MapEntry(
+              i,
+              value.withBorder(BorderRadius.only(
+                topLeft: Radius.circular(
+                    !topButtonsHasTop && i == 0 ? consoleRad : 0),
+                topRight: Radius.circular(
+                    !topButtonsHasTop && i == _topButtons!.length - 1
+                        ? consoleRad
+                        : 0),
+                bottomLeft: const Radius.circular(0),
+                bottomRight: const Radius.circular(0),
+              ))))
+          .values
+          .toList(growable: false)
+      : (_topButtons ?? [])
+          .asMap()
+          .map((i, value) => MapEntry(
+              i,
+              value.withBorder(BorderRadius.only(
+                topLeft: Radius.circular(
+                    !topButtonsHasTop && i == 0 ? consoleRad : 0),
+                topRight: Radius.circular(
+                    !topButtonsHasTop && i == _topButtons!.length - 1
+                        ? consoleRad
+                        : 0),
+                bottomLeft: const Radius.circular(0),
+                bottomRight: const Radius.circular(0),
+              ))))
+          .values
+          .toList(growable: false);
 
   Widget get anyGadgets {
     return AnimatedSize(
         duration: animationDuration,
         curve: Curves.easeInOut,
         child: Column(
-          // mainAxisSize: MainAxisSize.min,
-          // mainAxisAlignment: MainAxisAlignment.end,
           children: [
             consoleScanner(),
             consoleCamera(),
@@ -957,6 +911,7 @@ class Console extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      clipBehavior: Clip.hardEdge,
       margin: EdgeInsets.only(
         left: consoleGap,
         right: consoleGap,
@@ -964,6 +919,7 @@ class Console extends StatelessWidget {
       ),
       decoration: BoxDecoration(
           color: contourColor,
+          borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
           border: Border.all(width: contourWidth, color: contourColor)),
       child: Column(
         mainAxisSize: MainAxisSize.min,

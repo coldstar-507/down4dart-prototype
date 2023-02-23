@@ -381,8 +381,8 @@ class Palette2 extends StatelessWidget implements Down4Object {
 }
 
 class Palette extends StatelessWidget {
-  static double get paletteHeight => g.sizes.h * 0.1032;
-  static double get gapSize => g.sizes.h * 0.0153;
+  static double get paletteHeight => g.sizes.h * 0.1036;
+  static double get gapSize => g.sizes.h * 0.0159;
   static double get paletteMargin => g.sizes.w * 0.042;
   static double get blurRadius => 6.0;
   static double get spreadRadius => -7.0;

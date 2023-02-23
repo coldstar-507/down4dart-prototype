@@ -74,7 +74,7 @@ class _ChatPageState extends State<ChatPage> {
     final nToLoad = nLoaded + 30 < nTotal ? nLoaded + 30 : nTotal;
     final toLoad = ordered.sublist(nLoaded, nToLoad);
     await messages2(toLoad).toList();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<List<ButtonsInfo2>> buttonsOfNode(BaseNode node) async {

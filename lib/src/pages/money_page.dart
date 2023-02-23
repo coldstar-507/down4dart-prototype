@@ -641,9 +641,14 @@ class _MoneyPageState extends State<MoneyPage> {
       bottomButtons: [
         ConsoleButton(
           name: "Back",
-          onPress: () => widget.people.isEmpty
-              ? loadEmptyViewConsole()
-              : loadMainViewConsole(),
+          onPress: () {
+            _extra = false;
+            if (widget.people.isEmpty) {
+              loadEmptyViewConsole();
+            } else {
+              loadMainViewConsole();
+            }
+          },
         ),
         ConsoleButton(
           name: "Check",
