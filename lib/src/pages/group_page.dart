@@ -64,20 +64,20 @@ class _GroupPageState extends State<GroupPage> {
 
   MessageMedia? _cameraInput;
 
-  ConsoleMedias consoleMedias({required bool images, required bool show}) {
-    return ConsoleMedias(
-      show: show,
-      medias: images
-          ? g.self.images
-              .map((mediaID) => mediaID.getLocalMessageMedia())
-              .whereType<MessageMedia>()
-          : g.self.videos
-              .map((mediaID) => mediaID.getLocalMessageMedia())
-              .whereType<MessageMedia>(),
-      onSelectMedia: (media) => send(mediaInput: media),
-      nMedias: images ? g.self.images.length : g.self.videos.length,
-    );
-  }
+  // ConsoleMedias consoleMedias({required bool images, required bool show}) {
+  //   return ConsoleMedias(
+  //     show: show,
+  //     medias: images
+  //         ? g.self.images
+  //             .map((mediaID) => mediaID.getLocalMessageMedia())
+  //             .whereType<MessageMedia>()
+  //         : g.self.videos
+  //             .map((mediaID) => mediaID.getLocalMessageMedia())
+  //             .whereType<MessageMedia>(),
+  //     onSelectMedia: (media) => send(mediaInput: media),
+  //     nMedias: images ? g.self.images.length : g.self.videos.length,
+  //   );
+  // }
 
   ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: _tec);
 

@@ -22,8 +22,8 @@ class Down4Payment {
   final bool safe;
   final String textNote;
   final int tsSeconds;
-  Down4Payment(this.txs, this.safe, {required this.textNote, int? ts})
-      : tsSeconds = ts ?? timeStamp() ~/ 1000;
+  Down4Payment(this.txs, this.safe, {required this.textNote, int? tsSeconds})
+      : tsSeconds = tsSeconds ?? (timeStamp() ~/ 1000);
 
   int get independentGets => txs.last.txsOut
       .firstWhere((txOut) => !(txOut.isFee || txOut.isChange))
@@ -74,8 +74,8 @@ class Down4Payment {
 
   String get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    final dataPart = sha256(idFold.toUint8List()).toBase58();
-    final tsPart = tsSeconds.toRadixString(36);
+    final dataPart = sha1(idFold.toUint8List()).toBase58();
+    final tsPart = makePrefix(tsSeconds);
     return "$tsPart-$dataPart";
   }
 
@@ -93,6 +93,7 @@ class Down4Payment {
         ...utf8.encode(textNote), // this needs to be utf8 obviously
         ...VarInt.fromInt(txs.length).data,
         ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
+        ...utf8.encode(tsSeconds.toRadixString(34)),
       ];
 
   factory Down4Payment.fromCompressed(Uint8List buf) {
@@ -119,7 +120,9 @@ class Down4Payment {
       offset = offset + pair.second;
     }
 
-    return Down4Payment(txs, safe, textNote: textNote);
+    final ts = int.parse(utf8.decode(buf.sublist(offset)), radix: 34);
+
+    return Down4Payment(txs, safe, textNote: textNote, tsSeconds: ts);
   }
 
   List<String> get asQrData {
@@ -194,7 +197,7 @@ class Down4Payment {
           .map((e) => Down4TX.fromJson(e))
           .toList(),
       decodedJson["safe"],
-      ts: decodedJson["ts"],
+      tsSeconds: decodedJson["ts"],
       textNote: decodedJson["txt"] ?? "", // TODO ?? "" should be temporary
     );
   }

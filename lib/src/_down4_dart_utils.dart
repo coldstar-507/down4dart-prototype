@@ -27,6 +27,13 @@ const imageExtensions = [
 
 const animatedImageExtensions = [".apng", ".gif"];
 
+String makePrefix(int ms) {
+  const differ = 78364164096; // 36^6
+  final inSeconds = ms ~/ 1000;
+  final diffed = differ - inSeconds;
+  return diffed.toRadixString(36);
+}
+
 extension TrimmedExtensions on List<String> {
   List<String> withoutDots() => map((e) => e.substring(1)).toList();
 }

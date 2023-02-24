@@ -69,7 +69,6 @@ class _Down4State extends State<Down4> {
     required String imPath,
     required String imExtension,
     required double imAspectRatio,
-    required bool isSquared,
     required bool isReversed,
   }) async {
     final token = await FirebaseMessaging.instance.getToken();
@@ -93,7 +92,7 @@ class _Down4State extends State<Down4> {
         elementAspectRatio: imAspectRatio,
         extension: imExtension,
         isReversed: isReversed,
-        isSquared: isSquared,
+        isSquared: true, // all node images are squared
       ),
     );
 

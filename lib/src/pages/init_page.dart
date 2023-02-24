@@ -27,7 +27,6 @@ class UserMakerPage extends StatefulWidget {
     required String imPath,
     required String imExtension,
     required double imAspectRatio,
-    required bool isSquared,
     required bool isReversed,
   }) initUser;
 
@@ -52,7 +51,6 @@ class _UserMakerPageState extends State<UserMakerPage> {
   dynamic _inputs;
   double _imageAspectRatio = 1.0;
   bool _isReversed = false;
-  bool _isSquared = false;
   bool _onBaseConsole = true;
   List<Future<bool>> _calls = [];
   bool _isValidUsername = false;
@@ -94,6 +92,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
       // preloading inputs here so they don't redraw on setState because the redraw hides the keyboard which is very undesirable
       ConsoleInput(
           tec: tec1,
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
           inputCallBack: (id) async {
             _calls.add(r.usernameIsValid(id));
             _id = id.toLowerCase();
@@ -137,15 +137,13 @@ class _UserMakerPageState extends State<UserMakerPage> {
             onPress: () async {
               baseConsole(activatedProceed: false);
               _errorTryAgain = !await widget.initUser(
-                id: _id,
-                name: _name,
-                lastName: _lastName,
-                imPath: _imagePath,
-                imExtension: _imageExtension,
-                imAspectRatio: _imageAspectRatio,
-                isReversed: _isReversed,
-                isSquared: _isSquared,
-              );
+                  id: _id,
+                  name: _name,
+                  lastName: _lastName,
+                  imPath: _imagePath,
+                  imExtension: _imageExtension,
+                  imAspectRatio: _imageAspectRatio,
+                  isReversed: _isReversed);
               if (_errorTryAgain) {
                 baseConsole();
               } else {
@@ -215,7 +213,6 @@ class _UserMakerPageState extends State<UserMakerPage> {
             onPress: () async {
               _imagePath = path;
               _isReversed = cam == 1;
-              _isSquared = true;
               _imageAspectRatio = ctrl!.value.aspectRatio;
               _imageExtension = p.extension(path);
               baseConsole();
@@ -254,7 +251,6 @@ class _UserMakerPageState extends State<UserMakerPage> {
           if (r?.files.single.path != null && r?.files.single.bytes != null) {
             final String thePath = r!.files.single.path as String;
             final imageSize = await decodeImageSize(r.files.single.bytes!);
-            _isSquared = false;
             _imageAspectRatio = imageSize.aspectRatio;
             _imagePath = thePath;
             _imageExtension = p.extension(thePath);

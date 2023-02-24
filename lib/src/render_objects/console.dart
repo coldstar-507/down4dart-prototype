@@ -296,18 +296,18 @@ class ConsoleInput extends StatelessWidget {
   }
 }
 
-class ConsoleMedias {
-  final Iterable<MessageMedia> medias;
-  final void Function(MessageMedia) onSelectMedia;
-  final int nMedias;
-  final bool show;
-  const ConsoleMedias({
-    required this.show,
-    required this.medias,
-    required this.onSelectMedia,
-    required this.nMedias,
-  });
-}
+// class ConsoleMedias {
+//   final Iterable<MessageMedia> medias;
+//   final void Function(MessageMedia) onSelectMedia;
+//   final int nMedias;
+//   final bool show;
+//   const ConsoleMedias({
+//     required this.show,
+//     required this.medias,
+//     required this.onSelectMedia,
+//     required this.nMedias,
+//   });
+// }
 
 class ConsoleMedias2 {
   final void Function(MessageMedia) onSelectMedia;
@@ -345,10 +345,7 @@ class Console extends StatelessWidget {
 
   final List<dynamic>? forwardingObjects;
   final List<Palette>? forwardingPalette;
-  // final List<Message>? forwardingMessage;
   final bool invertedColors, initializationConsole;
-  // final bool? showImage;
-  // final ConsoleMedias? mediasInfo;
   final ConsoleMedias2? consoleMedias2;
   final ImagePreview? imageForPreview;
   final VideoPreview? videoForPreview;
@@ -357,16 +354,9 @@ class Console extends StatelessWidget {
 
   static GlobalKey get widgetCaptureKey => GlobalKey();
 
-  // int get nMediaRow =>
-  //     mediasInfo == null ? 0 : (mediasInfo!.nMedias / nMediaPerRow).ceil();
   int get nMediaPerRow => 5;
   int get maximumMediaRows => 3;
   double get rowHeight => (consoleWidth / nMediaPerRow); // squared element
-  // double get mediasHeight => nMediaRow == 0
-  //     ? rowHeight
-  //     : nMediaRow <= maximumMediaRows
-  //         ? rowHeight * nMediaRow
-  //         : rowHeight * maximumMediaRows;
 
   List<Widget> get extraTopButtons {
     List<Widget> extras = [];
@@ -482,6 +472,7 @@ class Console extends StatelessWidget {
       imageForPreview != null ||
       videoForPreview != null ||
       cameraController != null ||
+      forwardingObjects != null ||
       scanner != null ||
       consoleMedias2 != null;
 
@@ -569,11 +560,8 @@ class Console extends StatelessWidget {
   double get mediaCelSize => trueWidth / mediaPerRow;
 
   Widget consoleMedias() {
-    // if (initializationConsole) return const SizedBox.shrink();
     if (consoleMedias2 == null) return const SizedBox.shrink();
 
-    // final mi = mediasInfo;
-    // if (mi == null) return const SizedBox.shrink();
     final nMedia = nMedias(consoleMedias2?.showImages ?? true);
     final theoreticalRows = (nMedia / mediaPerRow).ceil();
     final trueRows = theoreticalRows > 0
@@ -648,46 +636,54 @@ class Console extends StatelessWidget {
     Widget individualObject(Down4Object obj) {
       if (obj is Palette2) {
         return Flexible(
-            child: Container(
-                decoration: BoxDecoration(
-                    borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-                    border:
-                        Border.all(color: contourColor, width: contourWidth)),
-                child: Row(
+            child:
+                //  Container(
+                //     decoration: BoxDecoration(
+                //         borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
+                //         border:
+                //             Border.all(color: contourColor, width: contourWidth)),
+                //     child:
+                Row(
                     textDirection: TextDirection.ltr,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(
-                          width: Console.buttonHeight,
-                          height: Console.buttonHeight,
-                          child: obj.image),
-                      Expanded(
-                          child: Container(
-                              padding: const EdgeInsets.all(4.0),
-                              color: PinkTheme.nodeColors[obj.node.colorCode],
-                              child: Text(
-                                obj.node.name,
-                                overflow: TextOverflow.clip,
-                                maxLines: 1,
-                              )))
-                    ])));
+              SizedBox(
+                  width: Console.buttonHeight,
+                  height: Console.buttonHeight,
+                  child: obj.image),
+              Expanded(
+                  child: Container(
+                      padding: const EdgeInsets.all(4.0),
+                      color: PinkTheme.nodeColors[obj.node.colorCode],
+                      child: Text(
+                        obj.node.name,
+                        overflow: TextOverflow.clip,
+                        maxLines: 1,
+                      )))
+            ])
+            // )
+            );
       } else if (obj is ChatMessage) {
         return Flexible(
-            child: Container(
-                decoration: BoxDecoration(
-                    borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-                    color: obj.myMessage
-                        ? PinkTheme.myBubblesColor
-                        : PinkTheme.buttonColor,
-                    border:
-                        Border.all(color: contourColor, width: contourWidth)),
-                child: Expanded(
+            child:
+                // Container(
+                //     decoration: BoxDecoration(
+                //         borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
+                //         color: obj.myMessage
+                //             ? PinkTheme.myBubblesColor
+                //             : PinkTheme.buttonColor,
+                //         border:
+                //             Border.all(color: contourColor, width: contourWidth)),
+                //     child:
+                Expanded(
                     child: Text(
                         (obj.message.text ?? "").isEmpty
                             ? "&attachment"
                             : obj.message.text!,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis))));
+                        overflow: TextOverflow.ellipsis))
+            // )
+            );
       }
 
       return const SizedBox.shrink();
@@ -696,10 +692,15 @@ class Console extends StatelessWidget {
     return SizedBox(
         height: buttonHeight + (2 * contourWidth),
         width: trueWidth + (2 * contourWidth),
-        child: Row(
-            textDirection: TextDirection.ltr,
-            children:
-                forwardingObjects!.map((e) => individualObject(e)).toList()));
+        child: Container(
+            decoration: BoxDecoration(
+                borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
+                border: Border.all(color: contourColor, width: contourWidth)),
+            child: Row(
+                textDirection: TextDirection.ltr,
+                children: forwardingObjects!
+                    .map((e) => individualObject(e))
+                    .toList())));
   }
 
   Widget consoleCamera() {
