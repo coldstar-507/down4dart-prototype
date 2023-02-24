@@ -975,19 +975,19 @@ class Down4Keys {
 }
 
 void main() {
-  var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
-  // var f = io.File("/home/scott/jeff.txt");
+  // var f = io.File("C:\\Users\\coton\\Desktop\\jeff.txt");
+  var f = io.File("/home/scott/jeff.txt");
   var pkHex = f.readAsStringSync();
 
   // final seed1 = safeSeed(32);
   // final seed2 = safeSeed(32);
 
-  // var pair0_ = Down4Keys.fromRandom(seed1, seed2);
+  // var pair0 = Down4Keys.fromRandom(seed1, seed2);
 
   // final f = io.File("/home/scott/jeff.txt");
   // final pkHex = f.readAsStringSync();
 
-  // io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
+  // io.File("/home/scott/jeff.txt").writeAsString(pair0.privKeyHex!);
 
   final pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
   final pair1 = pair0.derive(makeUint32(1))!;

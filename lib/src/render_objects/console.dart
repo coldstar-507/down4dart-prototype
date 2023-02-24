@@ -271,7 +271,11 @@ class ConsoleInput extends StatelessWidget {
           child: ConstrainedBox(
             constraints: BoxConstraints(
                 // this is higher than maxfields in the textInput allows
-                maxHeight: show ? 8 * Console.buttonHeight : 0,
+                maxHeight: show && activated
+                    ? 8 * Console.buttonHeight
+                    : show && !activated
+                        ? Console.buttonHeight
+                        : 0,
                 minHeight: show ? Console.buttonHeight : 0),
             child: activated ? activatedField : unactivatedField,
           ),

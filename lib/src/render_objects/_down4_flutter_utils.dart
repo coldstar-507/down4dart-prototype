@@ -696,8 +696,8 @@ extension ImageOfNodes on BaseNode {
           ? Image.memory(n.media!.data,
               fit: BoxFit.cover,
               gaplessPlayback: true,
-              cacheHeight: Palette.paletteHeight.toInt(),
-              cacheWidth: Palette.paletteHeight.toInt())
+              cacheHeight: (Palette.paletteHeight * 2).toInt(),
+              cacheWidth: (Palette.paletteHeight * 2).toInt())
           : Image.asset('assets/images/hashirama.jpg',
               fit: BoxFit.cover,
               cacheHeight: Palette.paletteHeight.toInt(),

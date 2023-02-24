@@ -177,21 +177,6 @@ class _ChatPageState extends State<ChatPage> {
     reload();
   }
 
-  // ConsoleMedias consoleMedias({required bool images, required bool show}) {
-  //   return ConsoleMedias(
-  //     show: show,
-  //     medias: images
-  //         ? g.self.images
-  //             .map((mediaID) => mediaID.getLocalMessageMedia())
-  //             .whereType<MessageMedia>()
-  //         : g.self.videos
-  //             .map((mediaID) => mediaID.getLocalMessageMedia())
-  //             .whereType<MessageMedia>(),
-  //     onSelectMedia: (media) => send2(mediaInput: media),
-  //     nMedias: images ? g.self.images.length : g.self.videos.length,
-  //   );
-  // }
-
   Future<ChatMessage?> getChatMessage(
     ID msgID,
     ID? prevMsgID,

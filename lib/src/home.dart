@@ -745,8 +745,10 @@ class _HomeState extends State<Home> {
       );
     }
 
-    void nextCam() {
-      snipPage(ctrl: ctrl, camera: (camera + 1) % 2, reload: true, res: res);
+    Future<void> nextCam() async {
+      pm.pop();
+      push(await snipPage(
+          ctrl: ctrl, camera: (camera + 1) % 2, reload: true, res: res));
     }
 
     Future<ru.Down4PageWidget> snip() async {

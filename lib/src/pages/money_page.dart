@@ -151,38 +151,23 @@ class _PaymentPageState extends State<PaymentPage> {
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "MoneyPage";
-  // final List<Palette> paymentAsPalettes;
   final Iterable<Palette2> homePalettes;
-  // final Iterable<Person> trueTargets;
-  // final bool animate;
   final List<Palette2> palettesForTransition;
   final Iterable<Person> people;
   final int nHidden;
   final void Function(Down4Payment) openPayment;
-  // final Triple<List<Palette2>, Iterable<Person>, int> transition;
   final void Function() back;
-  final void Function(Down4Payment) makePayment; //, scanOrImport;
-  // final void Function(r.Request req) paymentRequest;
-  // final int pageIndex;
-  // final void Function(int) onPageChange;
+  final void Function(Down4Payment) makePayment;
   final double initialOffset;
 
   const MoneyPage({
-    // required this.animate,
-    // required this.scanOrImport,
-    // required this.trueTargets,
-    // required this.transition,
     required this.palettesForTransition,
     required this.openPayment,
     required this.people,
     required this.nHidden,
     required this.homePalettes,
-    // required this.paymentAsPalettes,
     required this.back,
-    // required this.pageIndex,
-    // required this.onPageChange,
     required this.makePayment,
-    // required this.paymentRequest,
     required this.initialOffset,
     Key? key,
   }) : super(key: key);
@@ -227,7 +212,6 @@ class _MoneyPageState extends State<MoneyPage> {
 
   Future<void> loadMorePayments(int n) async {
     await payments3(n).toList();
-    // await payments.skip(_payments.length).take(4).toList();
     setState(() {});
   }
 
@@ -620,16 +604,13 @@ class _MoneyPageState extends State<MoneyPage> {
 
       if (payment == null) return;
       g.wallet.parsePayment(g.self.id, payment);
+      _extra = false;
+      loadBalance();
+      loadMainViewInput();
       if (widget.people.isEmpty) {
-        loadMainViewInput();
-        loadEmptyViewConsole(
-            // reloadInput: true
-            );
+        loadEmptyViewConsole();
       } else {
-        loadMainViewInput();
-        loadMainViewConsole(
-            // reloadInput: true
-            );
+        loadMainViewConsole();
       }
     }
 
