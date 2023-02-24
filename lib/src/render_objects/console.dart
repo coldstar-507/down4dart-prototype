@@ -390,14 +390,21 @@ class Console extends StatelessWidget {
     return extras;
   }
 
+  int get nConsoleLayers {
+    int n = 1;
+    if (_topButtons != null) n++;
+    if (_bottomInputs != null) n++;
+    if (_topInputs != null) n++;
+    return n;
+  }
+
   List<Widget> get extraBottomButtons {
     return bottomConsoleButtons.map((b) {
       if (b.showExtra) {
+        final nExtraButtons = b.extraButtons!.length;
         final key = b.key as GlobalKey;
-        // final renderBox = key.currentContext?;
         final context = key.currentContext;
         final renderBox = context!.findRenderObject() as RenderBox;
-        // final RenderBox renderBox = b.renderBox as RenderBox;
         final Offset position = renderBox.localToGlobal(Offset.zero);
         final semantics = renderBox.semanticBounds;
         final buttonWidth = semantics.width;
@@ -410,6 +417,15 @@ class Console extends StatelessWidget {
         Sizes.h:       ${g.sizes.h}
         """);
 
+        b.extraButtons!.first = b.extraButtons!.first.withBorder(
+            BorderRadius.only(
+                topLeft: Radius.circular(nExtraButtons == nConsoleLayers - 1
+                    ? Console.consoleRad
+                    : 0),
+                topRight: Radius.circular(nExtraButtons > nConsoleLayers - 1
+                    ? Console.consoleRad
+                    : 0)));
+
         return Positioned(
           left: position.dx - contourWidth,
           top: position.dy -
@@ -417,11 +433,20 @@ class Console extends StatelessWidget {
               contourWidth -
               (buttonHeight * (b.extraButtons!.length)),
           child: Container(
+            clipBehavior: Clip.hardEdge,
             width: buttonWidth + (2 * contourWidth),
             height: buttonHeight * b.extraButtons!.length + (2 * contourWidth),
             decoration: BoxDecoration(
-                border: Border.all(width: contourWidth, color: contourColor),
-                color: contourColor),
+              border: Border.all(width: contourWidth, color: contourColor),
+              color: contourColor,
+              borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(nExtraButtons == nConsoleLayers - 1
+                      ? Console.consoleRad
+                      : 0),
+                  topRight: Radius.circular(nExtraButtons > nConsoleLayers - 1
+                      ? Console.consoleRad
+                      : 0)),
+            ),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: b.extraButtons!),
@@ -686,7 +711,7 @@ class Console extends StatelessWidget {
                             : obj.message.text!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis))
-            // )
+            //)
             );
       }
 
@@ -697,8 +722,10 @@ class Console extends StatelessWidget {
         height: buttonHeight + (2 * contourWidth),
         width: trueWidth + (2 * contourWidth),
         child: Container(
+            clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(consoleRad)),
                 border: Border.all(color: contourColor, width: contourWidth)),
             child: Row(
                 textDirection: TextDirection.ltr,

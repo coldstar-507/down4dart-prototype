@@ -80,21 +80,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
         }));
   }
 
-  // ConsoleMedias consoleMedias({required bool images, required bool show}) {
-  //   return ConsoleMedias(
-  //     show: show,
-  //     medias: images
-  //         ? g.self.images
-  //             .map((mediaID) => mediaID.getLocalMessageMedia())
-  //             .whereType<MessageMedia>()
-  //         : g.self.videos
-  //             .map((mediaID) => mediaID.getLocalMessageMedia())
-  //             .whereType<MessageMedia>(),
-  //     onSelectMedia: (media) => send(mediaInput: media),
-  //     nMedias: images ? g.self.images.length : g.self.videos.length,
-  //   );
-  // }
-
   Future<void> send({MessageMedia? mediaInput}) async {
     if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
       return;
@@ -317,7 +302,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
                 loadBaseConsole();
               }),
           ConsoleButton(
-            name: cam == 0 ? "Front" : "Rear",
+            name: cam == 0 ? "Rear" : "Front",
             onPress: nextCam,
             isMode: true,
           ),

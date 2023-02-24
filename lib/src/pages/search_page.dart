@@ -65,18 +65,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
     ];
   }
 
-  // Home palettes are all chatables. Friends, non-friends, hyperchats, groups
-  // void writePalette2(ChatableNode node, {required bool selected}) {
-  //   final lastMessagePreviewInfo = node.previewInfo();
-  //   _palettes[node.id] = Palette2(
-  //       node: node,
-  //       selected: selected,
-  //       messagePreview: lastMessagePreviewInfo.first,
-  //       imPress: () => writePalette2(node, selected: !selected),
-  //       bodyPress: () => writePalette2(node, selected: !selected),
-  //       buttonsInfo2: [buttonsOfNode(node, lastMessagePreviewInfo.second)]);
-  // }
-
   Map<ID, Palette2> searchs = {};
 
   void reload() => setState(() {});

@@ -472,6 +472,12 @@ class Singletons {
   }
 }
 
+void unselectedSelectedPalettes(Map<ID, Palette2> state) {
+  for (final p in state.values) {
+    if (p.selected) state[p.id] = p.select();
+  }
+}
+
 Future<void> writePalette2<T>(
   T node,
   Map<ID, Down4Object> state,

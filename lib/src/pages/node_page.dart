@@ -12,42 +12,27 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => node.id;
+  ID get id => "n-${node.id}";
 
   final BaseNode node;
-  // final int pageIndex;
-  // final void Function(int) onPageChange;
-  // final List<Palette2>? palettes;
-  // final BaseNode node;
-  // final Palette? Function(BaseNode, {String at}) nodeToPalette;
   final void Function(BaseNode) openNode, openChat, payNode;
   final void Function() back;
 
   const NodePage({
-    // required this.pageIndex,
-    // required this.onPageChange,
     required this.node,
     required this.payNode,
     required this.openNode,
     required this.openChat,
-    // required this.node,
-    // required this.nodeToPalette,
     required this.back,
-    // this.palettes,
     Key? key,
   }) : super(key: key);
 
   @override
-  _NodePageState createState() => _NodePageState();
+  State<NodePage> createState() => _NodePageState();
 }
 
 class _NodePageState extends State<NodePage> {
   Widget? _view;
-
-  // List<Etat> get views => g.curState.e;
-  // List<ScrollController> scrolls = [];
-
-  // BaseNode get node => g.curState.n as BaseNode;
 
   @override
   void initState() {
@@ -80,15 +65,15 @@ class _NodePageState extends State<NodePage> {
   Console get userPaletteConsole => Console(
         topButtons: [
           ConsoleButton(
-            name: "Pay",
-            onPress: () => widget.payNode(widget.node),
+            name: "Message",
+            onPress: () => widget.openChat(widget.node),
           ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.back),
           ConsoleButton(
-            name: "Forward",
-            onPress: () => print("TODO"), // "TODO: forward"
+            name: "Pay",
+            onPress: () => widget.payNode(widget.node),
           ),
         ],
       );

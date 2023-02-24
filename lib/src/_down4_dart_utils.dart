@@ -53,6 +53,40 @@ class Triple<E, F, G> {
   Triple(this.first, this.second, this.third);
 }
 
+class Quadruple<E, F, G, H> {
+  final E first;
+  final F second;
+  final G third;
+  final H fourth;
+  Quadruple(this.first, this.second, this.third, this.fourth);
+}
+
+class Quintuple<E, F, G, H, K> {
+  final E first;
+  final F second;
+  final G third;
+  final H fourth;
+  final K fifth;
+  Quintuple(this.first, this.second, this.third, this.fourth, this.fifth);
+}
+
+class Sixtuple<E, F, G, H, K, J> {
+  final E first;
+  final F second;
+  final G third;
+  final H fourth;
+  final K fifth;
+  final J sixth;
+  Sixtuple(
+    this.first,
+    this.second,
+    this.third,
+    this.fourth,
+    this.fifth,
+    this.sixth,
+  );
+}
+
 Future<bool> hasNetwork() async {
   try {
     final result = await InternetAddress.lookup('amazon.com');

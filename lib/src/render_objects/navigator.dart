@@ -172,48 +172,46 @@ class _AndrewState extends State<Andrew> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: g.sizes.headerHeight,
-        title: pageHeader,
-        backgroundColor: PinkTheme.qrColor,
-      ),
-      body: SafeArea(
-        child: GestureDetector(
-          onHorizontalDragUpdate: (DragUpdateDetails details) {
-            if ((details.primaryDelta ?? 0) > 0) {
-              print("go left!");
-              goLeft();
-            } else if ((details.primaryDelta ?? 0) < 0) {
-              print("go right!");
-              goRight();
-            }
-          },
-          child: Stack(
-            children: [
-              ...widget.pages[curPos].stackWidgets ?? [],
-              Container(
-                decoration: const BoxDecoration(
-                    color: PinkTheme.backGroundColor,
-                    image: DecorationImage(
-                        image: AssetImage("assets/images/triangles.png"),
-                        fit: BoxFit.fill)),
-                child: Column(
+    return Container(
+      decoration: const BoxDecoration(
+          color: PinkTheme.backGroundColor,
+          image: DecorationImage(
+              image: AssetImage("assets/images/triangles.png"),
+              fit: BoxFit.cover)),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          toolbarHeight: g.sizes.headerHeight,
+          title: pageHeader,
+          backgroundColor: PinkTheme.qrColor,
+        ),
+        body: SafeArea(
+          child: GestureDetector(
+            onHorizontalDragUpdate: (DragUpdateDetails details) {
+              if ((details.primaryDelta ?? 0) > 0) {
+                print("go left!");
+                goLeft();
+              } else if ((details.primaryDelta ?? 0) < 0) {
+                print("go right!");
+                goRight();
+              }
+            },
+            child: Stack(
+              children: [
+                ...widget.pages[curPos].stackWidgets ?? [],
+                Column(
                   children: [
                     pageBody,
                     curPage.console ?? const SizedBox.shrink(),
                   ],
                 ),
-              ),
-              // ),
-              // pageHeader,
-              ...curPage.console?.extraTopButtons ?? [],
-              ...curPage.console?.extraBottomButtons ?? [],
-            ],
+                ...curPage.console?.extraTopButtons ?? [],
+                ...curPage.console?.extraBottomButtons ?? [],
+              ],
+            ),
           ),
         ),
       ),
-      // ),
     );
   }
 }

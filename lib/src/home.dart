@@ -54,6 +54,7 @@ class _HomeState extends State<Home> {
   ru.PageManager pm = ru.PageManager()..put(const LoadingPage2());
 
   void push(ru.Down4PageWidget page) {
+    print("PUSHED PAGE = $page");
     pm.put(page);
     setState(() {});
   }
@@ -61,9 +62,11 @@ class _HomeState extends State<Home> {
   void pop() async {
     // first we pop
     final popedPage = pm.currentPage;
+    print("POPPED PAGE = $popedPage");
     pm.pop();
     // reloading currentPage is a smart thing to do
     final cp = pm.currentPage;
+    print("CURRENT PAGE = $cp");
     if (cp is HomePage) {
       // if we are going in home page and
       // the poped page has a node, we want to refresh that palette
@@ -72,7 +75,7 @@ class _HomeState extends State<Home> {
         await writePalette2(popedPage.node, _palettes, bGen, refreshHome,
             h: true);
       } else if (popedPage is SnipViewPage) {
-        // TODO this fucking shit right here dog
+        // Already taking care of this else where
       }
       pm.refresh(homePage());
     } else if (cp is MoneyPage) {
@@ -189,6 +192,7 @@ class _HomeState extends State<Home> {
         ButtonsInfo2(
             assetPath: 'assets/images/redArrow.png',
             pressFunc: () async => push(await snipView(node)),
+            longPressFunc: () => push(nodePage(node)),
             rightMost: true)
       ];
     } else {
@@ -201,6 +205,7 @@ class _HomeState extends State<Home> {
                 ? 'assets/images/50.png'
                 : 'assets/images/filled.png',
             pressFunc: () => push(chatPage(node)),
+            longPressFunc: () => push(nodePage(node)),
             rightMost: true)
       ];
     }
@@ -539,7 +544,8 @@ class _HomeState extends State<Home> {
     pop();
   }
 
-  Triple<List<Palette2>, Iterable<Person>, int> homeTransition() {
+  Sixtuple<List<Palette2>, Iterable<Person>, int, double, Map<ID, Palette2>,
+      List<Palette2>> homeTransition() {
     final allHomePalettes = formattedHomePalettes;
     final originalOrder = allHomePalettes.asIds();
     final visibleHomePalettes = allHomePalettes;
@@ -581,10 +587,13 @@ class _HomeState extends State<Home> {
     };
 
     print("pals=${pals.map((e) => e.node.name).toList()}");
-    return Triple(
+    return Sixtuple(
       pals.inThatOrder(originalOrder.followedBy(unHide.asIds())),
       pals.where((p) => !p.fold).asNodes<Person>(),
       unHide.length,
+      _homeScrollController.offset,
+      _palettes,
+      formattedHomePalettes,
     );
   }
 
@@ -596,7 +605,7 @@ class _HomeState extends State<Home> {
       palettes: formattedHomePalettes,
       hyperchat: () => push(hyperchatPage()),
       group: () => push(groupPage()),
-      money: () => push(moneyPage()),
+      money: () => push(moneyPage(transition: homeTransition())),
       ping: (pingRequest) {
         _requests.add(pingRequest);
         processWebRequests();
@@ -655,19 +664,24 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget moneyPage() {
-    final transition = homeTransition();
+  ru.Down4PageWidget moneyPage({
+    Sixtuple<List<Palette2>, Iterable<Person>, int, double, Map<ID, Palette2>,
+            List<Palette2>>?
+        transition,
+    Person? node,
+  }) {
+    if (transition == null && node == null) throw 'need either or';
     return MoneyPage(
-        initialOffset: homeScroll,
-        palettesForTransition: transition.first,
-        people: transition.second,
-        nHidden: transition.third,
+        initialOffset: transition?.fourth ?? 0,
+        palettesAfterTransition: transition?.first ?? [Palette2(node: node!)],
+        people: transition?.second ?? [node!],
+        nHidden: transition?.third ?? 0,
         openPayment: (payment) => push(paymentPage(payment)),
-        homePalettes: formattedHomePalettes,
+        palettesBeforeTransition: transition?.sixth ?? [Palette2(node: node!)],
         makePayment: (payment) {
           push(paymentPage(payment));
           g.wallet.parsePayment(g.self.id, payment);
-          unselectSelection();
+          if (transition != null) unselectedSelectedPalettes(transition.fifth);
         },
         back: pop);
   }
@@ -709,7 +723,7 @@ class _HomeState extends State<Home> {
 
   ru.Down4PageWidget searchPage() {
     return AddFriendPage(
-        openNode: (node) => push(chatPage(node as ChatableNode)),
+        openNode: (node) => push(nodePage(node)),
         add: (pals) async {
           for (final p in pals) {
             if (!p.selected) continue;
@@ -781,14 +795,18 @@ class _HomeState extends State<Home> {
         node: node,
         openChat: (node_) => push(chatPage(node_ as ChatableNode)),
         openNode: (node_) => push(nodePage(node_)),
-        payNode: (node) => print("TODO PAY NODE"),
+        payNode: (node) => push(moneyPage(node: node as Person)),
         back: pop);
   }
 
   ru.Down4PageWidget chatPage(ChatableNode node) {
+    if (!_palettes.values.asIds().contains(node.id)) {
+      writePalette2(node..save(), _palettes, bGen, refreshHome, h: true);
+    }
+
     return ChatPage(
         node: node,
-        openNode: (node_) => push(chatPage(node_ as ChatableNode)),
+        openNode: (node_) => push(nodePage(node_)),
         subNodes: node is GroupNode
             ? node.group
                 .map((e) => homeNode(e) ?? hiddenNode(e))

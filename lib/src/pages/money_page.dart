@@ -151,8 +151,7 @@ class _PaymentPageState extends State<PaymentPage> {
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "MoneyPage";
-  final Iterable<Palette2> homePalettes;
-  final List<Palette2> palettesForTransition;
+  final List<Palette2> palettesBeforeTransition, palettesAfterTransition;
   final Iterable<Person> people;
   final int nHidden;
   final void Function(Down4Payment) openPayment;
@@ -161,11 +160,11 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   final double initialOffset;
 
   const MoneyPage({
-    required this.palettesForTransition,
+    required this.palettesAfterTransition,
     required this.openPayment,
     required this.people,
     required this.nHidden,
-    required this.homePalettes,
+    required this.palettesBeforeTransition,
     required this.back,
     required this.makePayment,
     required this.initialOffset,
@@ -200,7 +199,7 @@ class _MoneyPageState extends State<MoneyPage> {
     "l": ["Each", "Split"],
     "i": 0,
   };
-  late var palettes = widget.homePalettes;
+  late var palettes = widget.palettesBeforeTransition;
   late final _offset = widget.nHidden * Palette.fullHeight;
   late ScrollController scrollController0 = ScrollController(
     initialScrollOffset: widget.initialOffset,
@@ -258,7 +257,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
   Future<void> animatedTransition() async {
     Future(() => setState(() {
-          palettes = widget.palettesForTransition;
+          palettes = widget.palettesAfterTransition;
           scrollController0.jumpTo(widget.initialOffset + _offset);
           scrollController0.animateTo(0,
               duration: const Duration(milliseconds: 600),
