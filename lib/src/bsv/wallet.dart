@@ -198,13 +198,14 @@ class Wallet {
     }
     for (final utxo in pay.txs.last.txsOut) {
       final spent = await isSpent(utxo.id);
-      if (utxo.receiver == selfID && !spent) setUtxo(utxo);
+      if (utxo.receiver == selfID && !spent) await setUtxo(utxo);
     }
     for (final txin in pay.txs.last.txsIn) {
-      if (txin.spender == selfID) removeUtxo(txin.utxoID);
+      if (txin.spender == selfID) await removeUtxo(txin.utxoID);
     }
-    setPayment(pay);
-    _trySettlement(pay);
+    await setPayment(pay);
+    await _trySettlement(pay);
+    return;
   }
 
   Future<Down4Payment?> importMoney(String pkBase68, ID selfID) async {

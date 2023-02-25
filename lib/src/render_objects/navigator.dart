@@ -178,24 +178,24 @@ class _AndrewState extends State<Andrew> {
           image: DecorationImage(
               image: AssetImage("assets/images/triangles.png"),
               fit: BoxFit.cover)),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          toolbarHeight: g.sizes.headerHeight,
-          title: pageHeader,
-          backgroundColor: PinkTheme.qrColor,
-        ),
-        body: SafeArea(
-          child: GestureDetector(
-            onHorizontalDragUpdate: (DragUpdateDetails details) {
-              if ((details.primaryDelta ?? 0) > 0) {
-                print("go left!");
-                goLeft();
-              } else if ((details.primaryDelta ?? 0) < 0) {
-                print("go right!");
-                goRight();
-              }
-            },
+      child: GestureDetector(
+        onHorizontalDragUpdate: (DragUpdateDetails details) {
+          if ((details.primaryDelta ?? 0) > 0) {
+            print("go left!");
+            goLeft();
+          } else if ((details.primaryDelta ?? 0) < 0) {
+            print("go right!");
+            goRight();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            toolbarHeight: g.sizes.headerHeight,
+            title: pageHeader,
+            backgroundColor: PinkTheme.qrColor,
+          ),
+          body: SafeArea(
             child: Stack(
               children: [
                 ...widget.pages[curPos].stackWidgets ?? [],

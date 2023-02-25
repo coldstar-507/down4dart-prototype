@@ -315,8 +315,9 @@ extension WalletManager on Wallet {
     return Down4TXOUT.fromJson(jsonDecode(json));
   }
 
-  void removeUtxo(ID id) {
-    g.boxes.utxos.delete(id);
+  Future<void> removeUtxo(ID id) async {
+    await g.boxes.utxos.delete(id);
+    return;
   }
 
   Future<Down4Payment?> getPayment(ID id) async {
@@ -329,12 +330,14 @@ extension WalletManager on Wallet {
     g.boxes.payments.delete(id);
   }
 
-  void setPayment(Down4Payment payment) {
-    g.boxes.payments.put(payment.id, jsonEncode(payment));
+  Future<void> setPayment(Down4Payment payment) async {
+    await g.boxes.payments.put(payment.id, jsonEncode(payment));
+    return;
   }
 
-  void setUtxo(Down4TXOUT utxo) {
-    g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
+  Future<void> setUtxo(Down4TXOUT utxo) async {
+    await g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
+    return;
   }
 
   Future<bool> isSpent(ID utxoID) async {
@@ -342,8 +345,9 @@ extension WalletManager on Wallet {
     return spent ?? false;
   }
 
-  void setSpent(ID id, bool spent) {
-    g.boxes.spents.put(id, spent);
+  Future<void> setSpent(ID id, bool spent) async {
+    await g.boxes.spents.put(id, spent);
+    return;
   }
 
   static Wallet load() {

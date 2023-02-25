@@ -234,8 +234,8 @@ List<int> sha256(List<int> data) {
   return s256.SHA256Digest().process(data.toUint8List());
 }
 
-Uint8List md5(Uint8List data) {
-  return hash_md5.MD5Digest().process(data);
+List<int> md5(List<int> data) {
+  return hash_md5.MD5Digest().process(data.toUint8List());
 }
 
 List<int> hash256(List<int> data) {

@@ -588,6 +588,9 @@ class Hyperchat extends GroupNode {
 
 class Payment extends BaseNode {
   @override
+  int get activity => _payment.tsSeconds;
+
+  @override
   final NodeMedia? media = null;
   final Down4Payment _payment;
   final ID selfID;

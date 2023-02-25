@@ -79,7 +79,12 @@ class _HomeState extends State<Home> {
       }
       pm.refresh(homePage());
     } else if (cp is MoneyPage) {
-      pm.refresh(moneyPage());
+      final pp = pm.prevPage;
+      if (pp is HomePage) {
+        pm.refresh(moneyPage(transition: homeTransition()));
+      } else if (pp is NodePage) {
+        pm.refresh(moneyPage(node: pp.node as Person));
+      }
     } else if (cp is PaymentPage) {
       pm.refresh(moneyPage());
     } else if (cp is AddFriendPage) {
@@ -227,7 +232,17 @@ class _HomeState extends State<Home> {
         final payment = await r.getPayment(eventKey);
         if (payment == null) return;
         await g.wallet.parsePayment(g.self.id, payment);
-        if (pm.currentPage is MoneyPage) refresh(moneyPage());
+        if (pm.currentPage is MoneyPage) {
+          final pv = pm.prevPage;
+          if (pv is NodePage) {
+            refresh(moneyPage(node: pv.node as Person, paymentUpdate: payment));
+          } else if (pv is HomePage) {
+            refresh(moneyPage(
+              transition: homeTransition(),
+              paymentUpdate: payment,
+            ));
+          }
+        }
         return;
       } else if (eventPayload == "m") {
         // MESSAGE!
@@ -245,19 +260,6 @@ class _HomeState extends State<Home> {
           if (rootNode is GroupNode) {
             await rootNode.save();
             await localPalettesRoutine();
-            // TODO should we await this?
-
-            // final userIDs = homePalettes.whereNodeIs<Person>().asIds().toSet();
-            // final toFetch = rootNode.group.difference(userIDs);
-            // if (toFetch.isNotEmpty) {
-            //   final fetchNodes = await r.getNodes(toFetch);
-            //   if (fetchNodes != null) {
-            //     for (var fNode in fetchNodes) {
-            //       await writePalette2(fNode, _palettes, bGen, refreshHome,
-            //           h: true);
-            //     }
-            //   }
-            // }
           }
         }
 
@@ -366,7 +368,8 @@ class _HomeState extends State<Home> {
           ..updateActivity()
           ..save();
 
-        if (pm.currentPage is ChatPage && pm.currentID == root) {
+        final cp = pm.currentPage;
+        if (cp is ChatPage && cp.node.id == root) {
           refresh(chatPage(node));
         }
 
@@ -669,8 +672,11 @@ class _HomeState extends State<Home> {
             List<Palette2>>?
         transition,
     Person? node,
+    Down4Payment? paymentUpdate, // this is for when we are in money view, and
+    // we receive an online payment, this let us update status with this new
+    // payment, it would not be necessary if listeners work on lazy box, but
+    // haven't found a way to make the listener work yet...
   }) {
-    if (transition == null && node == null) throw 'need either or';
     return MoneyPage(
         initialOffset: transition?.fourth ?? 0,
         palettesAfterTransition: transition?.first ?? [Palette2(node: node!)],
@@ -678,10 +684,11 @@ class _HomeState extends State<Home> {
         nHidden: transition?.third ?? 0,
         openPayment: (payment) => push(paymentPage(payment)),
         palettesBeforeTransition: transition?.sixth ?? [Palette2(node: node!)],
-        makePayment: (payment) {
-          push(paymentPage(payment));
-          g.wallet.parsePayment(g.self.id, payment);
+        paymentUpdate: paymentUpdate,
+        makePayment: (payment) async {
+          await g.wallet.parsePayment(g.self.id, payment);
           if (transition != null) unselectedSelectedPalettes(transition.fifth);
+          push(paymentPage(payment));
         },
         back: pop);
   }

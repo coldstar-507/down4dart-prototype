@@ -19,7 +19,8 @@ import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
-import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
+import '../render_objects/_down4_flutter_utils.dart'
+    show Down4PageWidget, Palette2Extensions;
 
 final base85 = Base85Codec(Alphabets.z85);
 
@@ -139,7 +140,7 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
-        title: sha1(widget.payment.txs.last.txID.data).toBase58(),
+        title: md5(widget.payment.txs.last.txID.data).toBase58(),
         // stackWidgets: qrs2.isNotEmpty ? [qrs2[listIndex]] : null,
         stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
         console: theConsole,
@@ -155,8 +156,10 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   final Iterable<Person> people;
   final int nHidden;
   final void Function(Down4Payment) openPayment;
+  final Down4Payment? paymentUpdate;
+  // final void Function() refreshMoneyPage;
   final void Function() back;
-  final void Function(Down4Payment) makePayment;
+  final Future<void> Function(Down4Payment) makePayment;
   final double initialOffset;
 
   const MoneyPage({
@@ -166,8 +169,10 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
     required this.nHidden,
     required this.palettesBeforeTransition,
     required this.back,
+    // required this.refreshMoneyPage,
     required this.makePayment,
     required this.initialOffset,
+    this.paymentUpdate,
     Key? key,
   }) : super(key: key);
 
@@ -205,6 +210,26 @@ class _MoneyPageState extends State<MoneyPage> {
     initialScrollOffset: widget.initialOffset,
   );
 
+  // late final paymentListen = g.boxes.payments.watch().listen((event) {
+  //   print("NEW PAYMENT!!!");
+  //   if (event.deleted) return;
+  //   final payment = Down4Payment.fromJson(jsonDecode(event.value));
+  //   final asNode = Payment(payment: payment, selfID: g.self.id);
+  //   _payments.putIfAbsent(
+  //       payment.id,
+  //       () => Palette2(
+  //             node: asNode,
+  //             messagePreview: payment.textNote,
+  //             buttonsInfo2: [
+  //               ButtonsInfo2(
+  //                   assetPath: "assets/images/50.png",
+  //                   pressFunc: () => widget.openPayment(payment),
+  //                   rightMost: true)
+  //             ],
+  //           ));
+  //   loadInputsAndConsole();
+  // });
+
   int? _balance;
 
   Map<ID, Palette2> _payments = {};
@@ -214,21 +239,30 @@ class _MoneyPageState extends State<MoneyPage> {
     setState(() {});
   }
 
+  Palette2 paymentToPalette(Down4Payment payment) {
+    return Palette2(
+      node: Payment(payment: payment, selfID: g.self.id),
+      messagePreview: payment.textNote,
+      buttonsInfo2: [
+        ButtonsInfo2(
+            assetPath: "assets/images/50.png",
+            pressFunc: () => widget.openPayment(payment),
+            rightMost: true)
+      ],
+    );
+  }
+
+  Future<void> loadPayment(ID id) async {
+    final payment = await g.wallet.getPayment(id);
+    if (payment == null) return;
+    _payments.putIfAbsent(id, () => paymentToPalette(payment));
+    return setState(() {});
+  }
+
   Stream<void> payments3(int n) async* {
     await for (final p in g.wallet.payments.skip(_payments.length).take(n)) {
       final asNode = Payment(payment: p, selfID: g.self.id);
-      _payments.putIfAbsent(
-          p.id,
-          () => Palette2(
-                node: asNode,
-                messagePreview: p.textNote,
-                buttonsInfo2: [
-                  ButtonsInfo2(
-                      assetPath: "assets/images/50.png",
-                      pressFunc: () => widget.openPayment(p),
-                      rightMost: true)
-                ],
-              ));
+      _payments.putIfAbsent(p.id, () => paymentToPalette(p));
     }
   }
 
@@ -275,21 +309,13 @@ class _MoneyPageState extends State<MoneyPage> {
     super.dispose();
   }
 
-  void onReceivedPayment() async {
-    await loadBalance();
-    loadMainViewInput();
-    final consoleKey = _console?.key;
-    if (consoleKey == mainViewConsoleKey) {
-      loadMainViewConsole();
-    } else if (consoleKey == emptyViewConsoleKey) {
-      loadInputsAndConsole();
-    }
-  }
-
   @override
   void didUpdateWidget(MoneyPage old) {
     super.didUpdateWidget(old);
-    onReceivedPayment();
+    if (widget.paymentUpdate != null) {
+      _payments.putIfAbsent(widget.paymentUpdate!.id,
+          () => paymentToPalette(widget.paymentUpdate!));
+    }
   }
 
   int usdToSatoshis(double usds) =>
@@ -362,16 +388,15 @@ class _MoneyPageState extends State<MoneyPage> {
 
         print("the payment = $payment");
 
-        // widget.scanOrImport(payment);
         print("Parsing the payment!");
         scannedData = {};
         scannedDataLength = -1;
 
         _scanning = false;
         await g.wallet.parsePayment(g.self.id, payment);
-        await loadInputsAndConsole();
-        await loadMorePayments(1);
-        // loadEmptyViewConsole(reloadInput: true);
+        await loadPayment(payment.id);
+        loadInputsAndConsole();
+        print("Should literally work");
       }
     }
   }
@@ -552,11 +577,12 @@ class _MoneyPageState extends State<MoneyPage> {
           textNote: textNoteTec.value.text);
       // print("The pay: ${pay?.toJson()}");
       if (pay != null) {
-        widget.makePayment(pay);
+        await widget.makePayment(pay);
         tec.clear();
         textNoteTec.clear();
-        await loadMorePayments(1);
-        await loadInputsAndConsole();
+        // await loadPayment(pay.id);
+        // await loadInputsAndConsole();
+        // widget.refreshMoneyPage();
       }
     }
 
@@ -655,7 +681,7 @@ class _MoneyPageState extends State<MoneyPage> {
         Down4Page(
             onRefresh: () => loadMorePayments(20),
             title: "Status",
-            list: _payments.values.toList(),
+            list: _payments.values.toList().formatted(),
             console: _console!),
       ],
     );

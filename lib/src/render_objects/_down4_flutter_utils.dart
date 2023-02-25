@@ -33,6 +33,8 @@ class PageManager {
         pages = {};
 
   Down4PageWidget get currentPage => pages[_idStack.last]!;
+  Down4PageWidget get prevPage => pages[_idStack[_idStack.length - 2]]!;
+
   ID get currentID => _idStack.last;
   Iterable<ID> get path => _idStack
       .asMap()

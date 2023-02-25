@@ -120,7 +120,9 @@ class Down4Payment {
       offset = offset + pair.second;
     }
 
-    final ts = int.parse(utf8.decode(buf.sublist(offset)), radix: 34);
+    final tsBuf = buf.sublist(offset, offset + 7);
+    final tsString = utf8.decode(tsBuf);
+    final ts = int.parse(tsString, radix: 34);
 
     return Down4Payment(txs, safe, textNote: textNote, tsSeconds: ts);
   }
