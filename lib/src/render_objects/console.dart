@@ -487,8 +487,15 @@ class Console extends StatelessWidget {
   static Stream<MessageMedia> medias(bool images) async* {
     final ids = List<ID>.from(images ? g.self.images : g.self.videos);
     for (final mediaID in ids) {
-      final media = await mediaID.getLocalMessageMedia();
-      if (media != null) yield media;
+      if (g.cachedConsoleMedias[mediaID] != null) {
+        yield g.cachedConsoleMedias[mediaID]!;
+      } else {
+        final media = await mediaID.getLocalMessageMedia();
+        if (media != null) {
+          g.cachedConsoleMedias[media.id] = media;
+          yield media;
+        }
+      }
     }
   }
 
@@ -627,7 +634,7 @@ class Console extends StatelessWidget {
                               forceSquareAnyways: true),
                         );
                       } else {
-                        return const SizedBox.shrink();
+                        return SizedBox.square(dimension: mediaCelSize);
                       }
                     }),
                   );

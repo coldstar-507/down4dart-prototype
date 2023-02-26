@@ -197,7 +197,7 @@ class _HomeState extends State<Home> {
         ButtonsInfo2(
             assetPath: 'assets/images/redArrow.png',
             pressFunc: () async => push(await snipView(node)),
-            longPressFunc: () => push(nodePage(node)),
+            longPressFunc: () => node is Person ? push(nodePage(node)) : null,
             rightMost: true)
       ];
     } else {
@@ -210,7 +210,7 @@ class _HomeState extends State<Home> {
                 ? 'assets/images/50.png'
                 : 'assets/images/filled.png',
             pressFunc: () => push(chatPage(node)),
-            longPressFunc: () => push(nodePage(node)),
+            longPressFunc: () => node is Person ? push(nodePage(node)) : null,
             rightMost: true)
       ];
     }
@@ -615,15 +615,15 @@ class _HomeState extends State<Home> {
       },
       snip: () async => push(await snipPage()),
       search: () => push(searchPage()),
-      delete: () {
+      delete: () async {
         for (final p in List<Palette2>.from(homePalettes)) {
           if (p.selected) {
             _palettes.remove(p.node.id);
-            g.boxes.nodes.delete(p.node.id);
+            await g.boxes.nodes.delete(p.node.id);
           }
         }
         refresh(homePage());
-        localPalettesRoutine();
+        await localPalettesRoutine();
       },
       forward: () => push(forwardPage(homePalettes.selected().toList())),
     );
@@ -731,9 +731,8 @@ class _HomeState extends State<Home> {
   ru.Down4PageWidget searchPage() {
     return AddFriendPage(
         openNode: (node) => push(nodePage(node)),
-        add: (pals) async {
-          for (final p in pals) {
-            if (!p.selected) continue;
+        add: (selectedPals) async {
+          for (final p in selectedPals) {
             var node = homeNode(p.id) ?? p.node;
             if (node is User) {
               node.isFriend = true;

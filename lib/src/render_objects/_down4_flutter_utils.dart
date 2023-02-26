@@ -12,6 +12,10 @@ import 'palette.dart';
 
 import '../data_objects.dart';
 import 'chat_message.dart' show ChatMessage;
+import 'package:flutter_video_info/flutter_video_info.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import '../globals.dart';
 
 Image down4Logo(double dimension) {
   return Image.asset(
@@ -509,18 +513,25 @@ class Down4ImageTransform extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("ar: $imageAspectRatio, ds = $displaySize, squared = $isSquared");
     return ClipRect(
-      clipper: MediaSizeClipper(displaySize),
+      // clipper: MediaSizeClipper(displaySize),
       child: Transform(
         alignment: Alignment.center,
         transform: Matrix4.rotationY(isReversed ? math.pi : 0),
         child: Transform.scale(
-            scaleY: isSquared && imageAspectRatio > 1 ? imageAspectRatio : null,
-            scaleX: isSquared && imageAspectRatio <= 1
-                ? 1 / imageAspectRatio
-                : null,
-            scale: !isSquared ? 1.0 : null,
-            child: SizedBox.fromSize(size: displaySize, child: image)),
+          scaleY: isSquared && imageAspectRatio < 1 ? imageAspectRatio : null,
+          scaleX:
+              isSquared && imageAspectRatio > 1 ? 1 / imageAspectRatio : null,
+          scale: !isSquared || imageAspectRatio == 1 ? 1.0 : null,
+          child: Transform.scale(
+              scale: isSquared
+                  ? imageAspectRatio > 1
+                      ? imageAspectRatio
+                      : 1 / imageAspectRatio
+                  : 1.0,
+              child: SizedBox.fromSize(size: displaySize, child: image)),
+        ),
       ),
     );
   }
@@ -539,25 +550,23 @@ class Down4ImageViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final forcedSquared = media.metadata.isSquared || forceSquareAnyways;
+    final isSquared = media.metadata.isSquared || forceSquareAnyways;
     final isReversed = media.metadata.isReversed;
     final aspectRatio = media.metadata.elementAspectRatio;
     final theImage = media.file != null
-        ? Image.file(
-            media.file!,
-            cacheHeight: displaySize.height.toInt(),
-            cacheWidth: displaySize.width.toInt(),
-            fit: BoxFit.cover,
-          )
-        : Image.network(
-            media.url,
-            cacheHeight: displaySize.height.toInt(),
-            cacheWidth: displaySize.width.toInt(),
-            fit: BoxFit.cover,
-          );
+        ? Image.file(media.file!,
+            gaplessPlayback: true,
+            cacheHeight: displaySize.height.toInt() * (isSquared ? 1 : 2),
+            cacheWidth: displaySize.width.toInt() * (isSquared ? 1 : 2),
+            fit: BoxFit.cover)
+        : Image.network(media.url,
+            gaplessPlayback: true,
+            cacheHeight: displaySize.height.toInt() * (isSquared ? 1 : 2),
+            cacheWidth: displaySize.width.toInt() * (isSquared ? 1 : 2),
+            fit: BoxFit.cover);
     return Down4ImageTransform(
       displaySize: displaySize,
-      isSquared: forcedSquared,
+      isSquared: isSquared,
       imageAspectRatio: aspectRatio,
       isReversed: isReversed,
       image: theImage,
@@ -684,7 +693,7 @@ extension ImageOfNodes on BaseNode {
           image: nodeImage,
           imageAspectRatio: media!.metadata.elementAspectRatio,
           displaySize: Size.square(Palette.paletteHeight),
-          isSquared: media!.metadata.isSquared,
+          isSquared: true,
           isReversed: media!.metadata.isReversed);
     } else {
       return nodeImage;
@@ -698,8 +707,8 @@ extension ImageOfNodes on BaseNode {
           ? Image.memory(n.media!.data,
               fit: BoxFit.cover,
               gaplessPlayback: true,
-              cacheHeight: (Palette.paletteHeight * 2).toInt(),
-              cacheWidth: (Palette.paletteHeight * 2).toInt())
+              cacheHeight: (Palette.paletteHeight * 3).toInt(),
+              cacheWidth: (Palette.paletteHeight * 3).toInt())
           : Image.asset('assets/images/hashirama.jpg',
               fit: BoxFit.cover,
               cacheHeight: Palette.paletteHeight.toInt(),
@@ -708,8 +717,8 @@ extension ImageOfNodes on BaseNode {
       return Image.memory(n.media.data,
           fit: BoxFit.cover,
           gaplessPlayback: true,
-          cacheHeight: Palette.paletteHeight.toInt(),
-          cacheWidth: Palette.paletteHeight.toInt());
+          cacheHeight: Palette.paletteHeight.toInt() * 3,
+          cacheWidth: Palette.paletteHeight.toInt() * 3);
     } else if (n is Payment) {
       return n.payment.independentGets < 2000000
           ? Image.asset('assets/images/Dollar_Sign_1.png',
@@ -726,11 +735,13 @@ extension ImageOfNodes on BaseNode {
                   cacheHeight: Palette.paletteHeight.toInt(),
                   cacheWidth: Palette.paletteHeight.toInt());
     } else if (n is Self) {
-      return Image.memory(n.media.data,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          cacheHeight: Palette.paletteHeight.toInt(),
-          cacheWidth: Palette.paletteHeight.toInt());
+      return Image.memory(
+        n.media.data,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        cacheHeight: Palette.paletteHeight.toInt() * 3,
+        cacheWidth: Palette.paletteHeight.toInt() * 3,
+      );
     }
     throw 'stop breaking my app';
   }
@@ -861,4 +872,99 @@ Future<List<Pair<String, String>>> randomPrompts(int qty) async {
 Future<void> clearAppCache() async {
   var tempDir = await getTemporaryDirectory();
   Directory(tempDir.path).delete(recursive: true);
+}
+
+Future<NodeMedia?> importNodeMedia() async {
+  final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: imageExtensions.withoutDots(),
+      allowMultiple: false,
+      allowCompression: true,
+      withData: true);
+
+  if (result == null) return null;
+  final bytes = result.files.single.bytes;
+  final mediaID = deterministicMediaID(bytes!, g.self.id);
+  final size = await decodeImageSize(bytes);
+  return NodeMedia(
+      data: bytes,
+      id: mediaID,
+      metadata: MediaMetadata(
+          isSquared: true,
+          owner: g.self.id,
+          timestamp: timeStamp(),
+          elementAspectRatio: 1.0 / size.aspectRatio,
+          extension: result.files.single.path!.extension()));
+}
+
+Future<void> importConsoleMedias({required bool images}) async {
+  if (images) {
+    final results = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: imageExtensions.withoutDots(),
+        allowMultiple: true,
+        allowCompression: true,
+        withData: true);
+    if (results == null) return;
+    for (final file in results.files) {
+      if (file.path == null && file.bytes != null) continue;
+      final mediaID = deterministicMediaID(file.bytes!, g.self.id);
+      final size = await decodeImageSize(file.bytes!);
+      final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
+      MessageMedia(
+          id: mediaID,
+          isSaved: true,
+          path: f.path,
+          metadata: MediaMetadata(
+              isSquared: false,
+              isReversed: false,
+              extension: file.path!.extension(),
+              timestamp: timeStamp(),
+              owner: g.self.id,
+              elementAspectRatio: 1.0 / size.aspectRatio))
+        ..isSaved = true
+        ..save();
+
+      g.self.images.add(mediaID);
+    }
+  } else {
+    final videos = await FilePicker.platform.pickFiles(
+        allowedExtensions: videoExtensions.withoutDots(),
+        type: FileType.custom,
+        withData: true,
+        allowCompression: true,
+        allowMultiple: true);
+    if (videos == null) return;
+    for (final video in videos.files) {
+      if (video.path == null || video.bytes == null) continue;
+      final videoInfoGetter = FlutterVideoInfo();
+      final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
+      final mediaID = deterministicMediaID(video.bytes!, g.self.id);
+      final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
+      final tn = await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
+      String? thumbnailPath;
+      if (tn != null) {
+        final f = await writeMedia(
+            mediaData: tn, mediaID: mediaID, isThumbnail: true);
+        thumbnailPath = f.path;
+      }
+
+      MessageMedia(
+          id: mediaID,
+          path: f.path,
+          thumbnail: thumbnailPath,
+          metadata: MediaMetadata(
+              isReversed: false,
+              isSquared: false,
+              extension: video.path!.extension(),
+              timestamp: timeStamp(),
+              owner: g.self.id,
+              elementAspectRatio:
+                  (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
+        ..isSaved = true
+        ..save();
+
+      g.self.videos.add(mediaID);
+    }
+  }
 }

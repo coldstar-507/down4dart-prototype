@@ -89,7 +89,7 @@ class _Down4State extends State<Down4> {
       metadata: MediaMetadata(
         owner: id,
         timestamp: d4utils.timeStamp(),
-        elementAspectRatio: imAspectRatio,
+        elementAspectRatio: 1 / imAspectRatio,
         extension: imExtension,
         isReversed: isReversed,
         isSquared: true, // all node images are squared

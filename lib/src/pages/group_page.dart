@@ -135,84 +135,84 @@ class _GroupPageState extends State<GroupPage> {
     widget.groupRequest(grpReq);
   }
 
-  Future<void> handleImport({
-    bool groupImageImport = false,
-    bool importImages = true,
-  }) async {
-    if (importImages) {
-      final result = await FilePicker.platform.pickFiles(
-          allowMultiple: !groupImageImport,
-          allowedExtensions: u.imageExtensions.withoutDots(),
-          type: FileType.custom,
-          withData: true);
-      if (result == null) return;
-      for (final file in result.files) {
-        if (file.path == null || file.bytes == null) continue;
-        final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-        final size = await decodeImageSize(file.bytes!);
-        final mediaMetadata = MediaMetadata(
-            owner: g.self.id,
-            timestamp: u.timeStamp(),
-            elementAspectRatio: 1 / size.aspectRatio,
-            extension: file.path!.extension());
-        if (groupImageImport) {
-          _groupImage = NodeMedia(
-              data: file.bytes!, id: mediaID, metadata: mediaMetadata);
-          loadBaseConsole();
-          reloadItems();
-          // animatedTransition();
-        } else {
-          final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-          MessageMedia(id: mediaID, path: f.path, metadata: mediaMetadata)
-            ..isSaved = true
-            ..save();
-          g.self.images.add(mediaID);
-          loadMediaConsole();
-        }
-      }
-      g.self.save();
-    } else {
-      final result = await FilePicker.platform.pickFiles(
-          allowMultiple: true,
-          allowedExtensions: u.videoExtensions.withoutDots(),
-          type: FileType.custom,
-          withData: true);
-      if (result == null) return;
-      for (final file in result.files) {
-        if (file.path == null || file.bytes == null) continue;
-        final fvi = FlutterVideoInfo();
-        final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-        final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-        final videoInfo = await fvi.getVideoInfo(file.path!);
-        final ar = (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0);
-        final tn =
-            await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
-        String? thumbnailPath;
-        if (tn != null) {
-          final f = await writeMedia(
-              mediaData: tn, mediaID: mediaID, isThumbnail: true);
-          thumbnailPath = f.path;
-        }
-        MessageMedia(
-            id: mediaID,
-            path: f.path,
-            isSaved: true,
-            thumbnail: thumbnailPath,
-            metadata: MediaMetadata(
-                extension: file.path!.extension(),
-                isSquared: false,
-                isReversed: false,
-                elementAspectRatio: ar,
-                timestamp: u.timeStamp(),
-                owner: g.self.id))
-          ..isSaved = true
-          ..save();
-        g.self.videos.add(mediaID);
-        loadMediaConsole(images: false);
-      }
-      g.self.save();
-    }
-  }
+  // Future<void> handleImport({
+  //   bool groupImageImport = false,
+  //   bool importImages = true,
+  // }) async {
+  //   if (importImages) {
+  //     final result = await FilePicker.platform.pickFiles(
+  //         allowMultiple: !groupImageImport,
+  //         allowedExtensions: u.imageExtensions.withoutDots(),
+  //         type: FileType.custom,
+  //         withData: true);
+  //     if (result == null) return;
+  //     for (final file in result.files) {
+  //       if (file.path == null || file.bytes == null) continue;
+  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
+  //       final size = await decodeImageSize(file.bytes!);
+  //       final mediaMetadata = MediaMetadata(
+  //           owner: g.self.id,
+  //           timestamp: u.timeStamp(),
+  //           elementAspectRatio: 1 / size.aspectRatio,
+  //           extension: file.path!.extension());
+  //       if (groupImageImport) {
+  //         _groupImage = NodeMedia(
+  //             data: file.bytes!, id: mediaID, metadata: mediaMetadata);
+  //         loadBaseConsole();
+  //         reloadItems();
+  //         // animatedTransition();
+  //       } else {
+  //         final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
+  //         MessageMedia(id: mediaID, path: f.path, metadata: mediaMetadata)
+  //           ..isSaved = true
+  //           ..save();
+  //         g.self.images.add(mediaID);
+  //         loadMediaConsole();
+  //       }
+  //     }
+  //     g.self.save();
+  //   } else {
+  //     final result = await FilePicker.platform.pickFiles(
+  //         allowMultiple: true,
+  //         allowedExtensions: u.videoExtensions.withoutDots(),
+  //         type: FileType.custom,
+  //         withData: true);
+  //     if (result == null) return;
+  //     for (final file in result.files) {
+  //       if (file.path == null || file.bytes == null) continue;
+  //       final fvi = FlutterVideoInfo();
+  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
+  //       final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
+  //       final videoInfo = await fvi.getVideoInfo(file.path!);
+  //       final ar = (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0);
+  //       final tn =
+  //           await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
+  //       String? thumbnailPath;
+  //       if (tn != null) {
+  //         final f = await writeMedia(
+  //             mediaData: tn, mediaID: mediaID, isThumbnail: true);
+  //         thumbnailPath = f.path;
+  //       }
+  //       MessageMedia(
+  //           id: mediaID,
+  //           path: f.path,
+  //           isSaved: true,
+  //           thumbnail: thumbnailPath,
+  //           metadata: MediaMetadata(
+  //               extension: file.path!.extension(),
+  //               isSquared: false,
+  //               isReversed: false,
+  //               elementAspectRatio: ar,
+  //               timestamp: u.timeStamp(),
+  //               owner: g.self.id))
+  //         ..isSaved = true
+  //         ..save();
+  //       g.self.videos.add(mediaID);
+  //       loadMediaConsole(images: false);
+  //     }
+  //     g.self.save();
+  //   }
+  // }
 
   void reloadItems() {
     setState(() {
@@ -229,7 +229,6 @@ class _GroupPageState extends State<GroupPage> {
         _groupImage = media.asNodeMedia();
         loadBaseConsole();
         reloadItems();
-        // animatedTransition();
       } else {
         send(mediaInput: media);
       }
@@ -240,7 +239,21 @@ class _GroupPageState extends State<GroupPage> {
       consoleMedias2: ConsoleMedias2(
           showImages: images, onSelectMedia: (media) => selectMedia(media)),
       topButtons: [
-        ConsoleButton(name: "Import", onPress: handleImport),
+        ConsoleButton(
+            name: "Import",
+            onPress: () async {
+              if (forGroupImage) {
+                final nodeMedia = await importNodeMedia();
+                if (nodeMedia != null) {
+                  _groupImage = nodeMedia;
+                  loadBaseConsole();
+                  reloadItems();
+                } else {
+                  await importConsoleMedias(images: images);
+                  loadMediaConsole();
+                }
+              }
+            }),
       ],
       bottomButtons: [
         ConsoleButton(

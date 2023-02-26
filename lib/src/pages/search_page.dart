@@ -166,7 +166,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         ConsoleButton(
           name: "Add",
           onPress: () {
-            final selectedSearchs = searchs.values.selected();
+            final selectedSearchs = searchs.values.selected().toList();
             for (final s in selectedSearchs) {
               final n = s.node;
               if (n is User) n.isFriend = true;

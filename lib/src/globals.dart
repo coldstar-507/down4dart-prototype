@@ -436,26 +436,15 @@ class Singletons {
   Sizes get sizes => _sizes ??= Sizes._();
   ExchangeRate get exchangeRate => _exchangeRate ??= ExchangeRateSave.load();
 
+  Map<ID, MessageMedia> cachedConsoleMedias = {};
+
   bool get notYetInitialized => SelfSave.notYetInitialized();
 
   void initWallet(Uint8List s1, Uint8List s2) {
     final keys = Down4Keys.fromRandom(s1, s2);
     g.boxes.personal.put("ix", -1);
     g.boxes.personal.put("keys", jsonEncode(keys));
-    _wallet = Wallet(
-        keys: keys,
-        // payments: WalletManager.payments,
-        // utxos: WalletManager.utxos,
-        // getUtxo: WalletManager.getUtxo,
-        // getPayment: WalletManager.getPayment,
-        // removeUtxo: WalletManager.removeUtxo,
-        // removePayment: WalletManager.removePayment,
-        // setSpent: WalletManager.setSpent,
-        // isSpent: WalletManager.isSpent,
-        // setPayment: WalletManager.setPayment,
-        // setUtxo: WalletManager.setUtxo,
-        // setIx: WalletManager.setIx,
-        ix: null);
+    _wallet = Wallet(keys: keys, ix: null);
   }
 
   void initSelf(

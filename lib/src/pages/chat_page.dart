@@ -229,80 +229,80 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Future<void> handleImport({required bool importImages}) async {
-    if (importImages) {
-      final results = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: u.imageExtensions.withoutDots(),
-          allowMultiple: true,
-          allowCompression: true,
-          withData: true);
-      if (results == null) return;
-      for (final file in results.files) {
-        if (file.path == null && file.bytes != null) continue;
-        print("THE PATH = ${file.path}");
-        final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-        final size = await decodeImageSize(file.bytes!);
-        final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-        MessageMedia(
-            id: mediaID,
-            isSaved: true,
-            path: f.path,
-            metadata: MediaMetadata(
-                isSquared: false,
-                isReversed: false,
-                extension: file.path!.extension(),
-                timestamp: u.timeStamp(),
-                owner: g.self.id,
-                elementAspectRatio: 1.0 / size.aspectRatio))
-          ..isSaved = true
-          ..save();
-        g.self.images.add(mediaID);
-        loadMediasConsole();
-      }
-    } else {
-      final videos = await FilePicker.platform.pickFiles(
-          allowedExtensions: u.videoExtensions.withoutDots(),
-          type: FileType.custom,
-          withData: true,
-          allowCompression: true,
-          allowMultiple: true);
-      if (videos == null) return;
-      for (final video in videos.files) {
-        if (video.path == null || video.bytes == null) continue;
-        final videoInfoGetter = FlutterVideoInfo();
-        final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
-        final mediaID = u.deterministicMediaID(video.bytes!, g.self.id);
-        final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
-        final tn =
-            await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
-        String? thumbnailPath;
-        if (tn != null) {
-          final f = await writeMedia(
-              mediaData: tn, mediaID: mediaID, isThumbnail: true);
-          thumbnailPath = f.path;
-        }
+  // Future<void> handleImport({required bool importImages}) async {
+  //   if (importImages) {
+  //     final results = await FilePicker.platform.pickFiles(
+  //         type: FileType.custom,
+  //         allowedExtensions: u.imageExtensions.withoutDots(),
+  //         allowMultiple: true,
+  //         allowCompression: true,
+  //         withData: true);
+  //     if (results == null) return;
+  //     for (final file in results.files) {
+  //       if (file.path == null && file.bytes != null) continue;
+  //       print("THE PATH = ${file.path}");
+  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
+  //       final size = await decodeImageSize(file.bytes!);
+  //       final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
+  //       MessageMedia(
+  //           id: mediaID,
+  //           isSaved: true,
+  //           path: f.path,
+  //           metadata: MediaMetadata(
+  //               isSquared: false,
+  //               isReversed: false,
+  //               extension: file.path!.extension(),
+  //               timestamp: u.timeStamp(),
+  //               owner: g.self.id,
+  //               elementAspectRatio: 1.0 / size.aspectRatio))
+  //         ..isSaved = true
+  //         ..save();
+  //       g.self.images.add(mediaID);
+  //       loadMediasConsole();
+  //     }
+  //   } else {
+  //     final videos = await FilePicker.platform.pickFiles(
+  //         allowedExtensions: u.videoExtensions.withoutDots(),
+  //         type: FileType.custom,
+  //         withData: true,
+  //         allowCompression: true,
+  //         allowMultiple: true);
+  //     if (videos == null) return;
+  //     for (final video in videos.files) {
+  //       if (video.path == null || video.bytes == null) continue;
+  //       final videoInfoGetter = FlutterVideoInfo();
+  //       final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
+  //       final mediaID = u.deterministicMediaID(video.bytes!, g.self.id);
+  //       final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
+  //       final tn =
+  //           await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
+  //       String? thumbnailPath;
+  //       if (tn != null) {
+  //         final f = await writeMedia(
+  //             mediaData: tn, mediaID: mediaID, isThumbnail: true);
+  //         thumbnailPath = f.path;
+  //       }
 
-        MessageMedia(
-            id: mediaID,
-            path: f.path,
-            thumbnail: thumbnailPath,
-            metadata: MediaMetadata(
-                isReversed: false,
-                isSquared: false,
-                extension: video.path!.extension(),
-                timestamp: u.timeStamp(),
-                owner: g.self.id,
-                elementAspectRatio:
-                    (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
-          ..isSaved = true
-          ..save();
-        g.self.videos.add(mediaID);
-        loadMediasConsole();
-      }
-    }
-    g.self.save();
-  }
+  //       MessageMedia(
+  //           id: mediaID,
+  //           path: f.path,
+  //           thumbnail: thumbnailPath,
+  //           metadata: MediaMetadata(
+  //               isReversed: false,
+  //               isSquared: false,
+  //               extension: video.path!.extension(),
+  //               timestamp: u.timeStamp(),
+  //               owner: g.self.id,
+  //               elementAspectRatio:
+  //                   (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
+  //         ..isSaved = true
+  //         ..save();
+  //       g.self.videos.add(mediaID);
+  //       loadMediasConsole();
+  //     }
+  //   }
+  //   g.self.save();
+  // }
 
   void loadSavingConsole() {
     _console = Console(
@@ -575,12 +575,14 @@ class _ChatPageState extends State<ChatPage> {
       consoleMedias2: ConsoleMedias2(
           showImages: images,
           onSelectMedia: (media) => send2(mediaInput: media)),
-      // mediasInfo: consoleMedias(images: images, show: true),
       bottomInputs: [_consoleInput],
       topButtons: [
         ConsoleButton(
           name: "Import",
-          onPress: () => handleImport(importImages: images),
+          onPress: () async {
+            await importConsoleMedias(images: images);
+            loadMediasConsole(images: images, mode: mode, extra: extra);
+          },
         ),
       ],
       bottomButtons: [
