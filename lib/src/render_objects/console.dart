@@ -27,7 +27,7 @@ class ConsoleButton extends StatelessWidget {
       shouldBeDownButIsnt,
       isActivated,
       showExtra,
-      greyedOut;
+      isGreyedOut;
   final void Function() onPress;
   final void Function()? onLongPress;
   final void Function()? onLongPressUp;
@@ -44,7 +44,7 @@ class ConsoleButton extends StatelessWidget {
     this.widthEpsilon = 0.0,
     this.heightEpsilon = 0.0,
     this.extraButtons,
-    this.greyedOut = false,
+    this.isGreyedOut = false,
     this.showExtra = false,
     this.shouldBeDownButIsnt = false,
     this.isMode = false,
@@ -64,7 +64,7 @@ class ConsoleButton extends StatelessWidget {
         invertColors: true,
         leftEpsilon: leftEpsilon,
         bottomEpsilon: bottomEpsilon,
-        greyedOut: greyedOut,
+        isGreyedOut: isGreyedOut,
         widthEpsilon: widthEpsilon,
         heightEpsilon: heightEpsilon,
         extraButtons: extraButtons,
@@ -87,7 +87,7 @@ class ConsoleButton extends StatelessWidget {
         border: border,
         leftEpsilon: leftEpsilon,
         bottomEpsilon: bottomEpsilon,
-        greyedOut: greyedOut,
+        isGreyedOut: isGreyedOut,
         widthEpsilon: widthEpsilon,
         heightEpsilon: heightEpsilon,
         extraButtons: extraButtons,
@@ -133,7 +133,7 @@ class ConsoleButton extends StatelessWidget {
               borderRadius: border,
               color: invertColors
                   ? Colors.black12
-                  : greyedOut
+                  : isGreyedOut
                       ? PinkTheme.inactivatedButtonColor
                       : PinkTheme.buttonColor,
               border: Border.all(
@@ -426,16 +426,18 @@ class Console extends StatelessWidget {
                     ? Console.consoleRad
                     : 0)));
 
+        final topPosition = buttonHeight * b.extraButtons!.length;
+        final nButton = b.extraButtons!.length;
+        final tp = (buttonHeight + (2 * contourWidth)) * nButton;
+
         return Positioned(
           left: position.dx - contourWidth,
           top: position.dy -
               g.sizes.viewPaddingHeight -
               contourWidth -
-              (buttonHeight * (b.extraButtons!.length)),
+              (nButton * (buttonHeight)),
           child: Container(
             clipBehavior: Clip.hardEdge,
-            width: buttonWidth + (2 * contourWidth),
-            height: buttonHeight * b.extraButtons!.length + (2 * contourWidth),
             decoration: BoxDecoration(
               border: Border.all(width: contourWidth, color: contourColor),
               color: contourColor,
@@ -447,9 +449,13 @@ class Console extends StatelessWidget {
                       ? Console.consoleRad
                       : 0)),
             ),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: b.extraButtons!),
+            child: SizedBox(
+              height: buttonHeight * nButton,
+              width: buttonWidth,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: b.extraButtons!),
+            ),
           ),
         );
       } else {
@@ -508,7 +514,7 @@ class Console extends StatelessWidget {
       imageForPreview != null ||
       videoForPreview != null ||
       cameraController != null ||
-      forwardingObjects != null ||
+      // forwardingObjects != null ||
       scanner != null ||
       consoleMedias2 != null;
 
@@ -912,7 +918,7 @@ class Console extends StatelessWidget {
             consoleCamera(),
             imagePreview(),
             videoPreview(),
-            forwardingPalettes(),
+            // forwardingPalettes(),
             consoleMedias(),
           ],
         ));
@@ -971,6 +977,7 @@ class Console extends StatelessWidget {
           // video from said camera, and the saved medias
           animatedInputs ? inputs : staticInputs,
           anyGadgets,
+          forwardingPalettes(),
           buttons,
         ],
       ),

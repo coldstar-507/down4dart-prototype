@@ -170,7 +170,8 @@ class Message implements Down4Object {
   @override
   final ID id;
   final ID senderID;
-  final ID? root, forwarderID, mediaID;
+  // final ID? root,
+  final ID? forwardedFromID, mediaID;
   final String? text;
   final int timestamp;
   final List<ID>? replies, nodes;
@@ -183,20 +184,24 @@ class Message implements Down4Object {
     this.mediaID,
     this.isRead = false,
     this.isSaved = false,
-    this.root,
-    this.forwarderID,
+    // this.root,
+    this.forwardedFromID,
     this.text,
     this.nodes,
     this.replies,
   });
 
   Message forwarded(BaseNode self) {
+    // when forwarding ,we become the sender, but it was fowarded from,
+    // the previous sender,
+    // this only applies if the sender wasn't self, else, there isn't real
+    // forwarding and it won't be visible
     return Message(
       id: id,
       text: text,
       timestamp: timestamp,
-      senderID: senderID,
-      forwarderID: self.id != senderID ? self.id : null,
+      senderID: self.id,
+      forwardedFromID: self.id != senderID ? senderID : null,
       mediaID: mediaID,
       nodes: nodes,
       replies: replies,
@@ -207,13 +212,13 @@ class Message implements Down4Object {
     return Message(
       id: decodedJson["id"],
       senderID: decodedJson["s"],
-      forwarderID: decodedJson["f"],
+      forwardedFromID: decodedJson["f"],
       isRead: decodedJson["rs"] ?? false,
       isSaved: decodedJson["sv"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
       timestamp: decodedJson["ts"],
-      root: decodedJson["rt"],
+      // root: decodedJson["rt"],
       replies: (decodedJson["r"] ?? "").isNotEmpty
           ? List<String>.from(decodedJson["r"].split(" "))
           : null,
@@ -225,14 +230,14 @@ class Message implements Down4Object {
 
   Map<String, dynamic> toJson({bool toLocal = false}) => {
         'id': id,
-        if (root != null) 'rt': root!,
+        // if (root != null) 'rt': root!,
         if (text != null) 'txt': text,
         's': senderID,
         'ts': timestamp,
         if (mediaID != null) 'm': mediaID,
         if (toLocal) 'rs': isRead,
         if (toLocal) 'sv': isSaved,
-        if (forwarderID != null) 'f': forwarderID,
+        if (forwardedFromID != null) 'f': forwardedFromID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
       };
@@ -247,7 +252,7 @@ abstract class BaseNode implements Down4Object {
   NodesColor get colorCode;
   String get name;
   String get displayID;
-  Map toJson({bool toLocal});
+  Map<String, dynamic> toJson({bool toLocal});
   int activity;
   BaseNode({required this.id, int? activity}) : activity = activity ?? 0;
   void updateActivity([int? newActivity]) =>
@@ -433,7 +438,7 @@ class User extends Person {
       isFriend ? NodesColor.friend : NodesColor.nonFriend;
 
   @override
-  Map toJson({bool toLocal = true, bool withMedia = true}) => {
+  Map<String, dynamic> toJson({bool toLocal = true}) => {
         "t": Nodes.user.name,
         "id": id,
         if (toLocal) "if": isFriend,
@@ -444,8 +449,7 @@ class User extends Person {
         if (toLocal) "snp": snips.toList(),
         if (toLocal) "a": activity,
         if (lastName != null) "ln": lastName,
-        if (media != null)
-          "im": withMedia ? media!.toJson() : {"id": media!.id},
+        if (toLocal) "im": media!.toJson() else "im": media!.id,
       };
 }
 
@@ -531,7 +535,7 @@ class Group extends GroupNode {
   NodesColor get colorCode => NodesColor.group;
 
   @override
-  Map toJson({bool toLocal = true}) => {
+  Map<String, dynamic> toJson({bool toLocal = true}) => {
         "t": Nodes.group.name,
         "pv": isPrivate,
         "im": toLocal ? media.toJson() : media.id,
@@ -573,7 +577,7 @@ class Hyperchat extends GroupNode {
   NodesColor get colorCode => NodesColor.hyperchat;
 
   @override
-  Map toJson({bool toLocal = true}) => {
+  Map<String, dynamic> toJson({bool toLocal = true}) => {
         "t": Nodes.hyperchat.name,
         "id": id,
         "nm": firstWord,
@@ -615,7 +619,7 @@ class Payment extends BaseNode {
           : NodesColor.safeTx;
 
   @override
-  Map toJson({bool toLocal = true}) => {
+  Map<String, dynamic> toJson({bool toLocal = true}) => {
         // "t": Nodes.payment.name,
         // "selfID": selfID,
         // "pay": _payment.toYouKnow(),

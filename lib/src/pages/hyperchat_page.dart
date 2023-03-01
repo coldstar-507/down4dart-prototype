@@ -24,26 +24,22 @@ import '../render_objects/_down4_flutter_utils.dart' as ru;
 class HyperchatPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "HyperchatPage";
   final double initialOffset;
-  // final u.Triple<List<Palette2>, Iterable<Person>, int> transition;
   final List<Palette2> palettesForTransition;
   final int nHidden;
   final Iterable<Person> people;
-  final List<Palette2> homePalettes; //, transitionedHomePalettes;
-  // final Iterable<Person> people;
-  final void Function(r.HyperchatRequest) hyperchatRequest;
-  final void Function(r.PingRequest) ping;
+  final List<Palette2> homePalettes;
+  final void Function(String text) ping;
   final void Function() back;
-  // final Self self;
+  final void Function(List<String> pairs, Message msg, MessageMedia? media)
+      makeHyperchat;
 
   const HyperchatPage({
     required this.initialOffset,
-    // required this.transition,
     required this.palettesForTransition,
     required this.nHidden,
     required this.people,
-    // required this.transitionedHomePalettes,
     required this.homePalettes,
-    required this.hyperchatRequest,
+    required this.makeHyperchat,
     required this.back,
     required this.ping,
     Key? key,
@@ -81,44 +77,29 @@ class _HyperchatPageState extends State<HyperchatPage> {
   }
 
   Future<void> send({MessageMedia? mediaInput}) async {
-    if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
-      return;
-    }
+    final media = mediaInput ?? _cameraInput;
+    final text = _tec.value.text;
+    if (text.isEmpty && media == null) return;
 
     final messageID = messagePushId();
-    final ts = u.timeStamp();
-    final idd = utf8.encode(messageID + ts.toRadixString(16));
-    final randomRoot = sha1(idd).toBase58();
 
     final msg = Message(
-      root: randomRoot,
-      id: messageID,
-      senderID: g.self.id,
-      timestamp: u.timeStamp(),
-      text: _tec.value.text,
-      mediaID: mediaInput?.id ?? _cameraInput?.id,
-    );
+        id: messageID,
+        senderID: g.self.id,
+        timestamp: u.timeStamp(),
+        text: text,
+        mediaID: media?.id);
 
     final pairs = (await ru.randomPrompts(10))
         .map((pair) => "${pair.first} ${pair.second}")
         .toList(growable: false);
 
-    final targets = widget.people.whereType<User>().asIds().toSet();
-    final hcReq = r.HyperchatRequest(
-      message: msg,
-      targets: targets.toList(growable: false),
-      wordPairs: pairs,
-      media: mediaInput ?? _cameraInput,
-    );
-    widget.hyperchatRequest(hcReq);
+    widget.makeHyperchat(pairs, msg, media);
   }
 
   void ping() {
     if (_tec.value.text.isEmpty) return;
-    widget.ping(r.PingRequest(
-        senderID: g.self.id,
-        text: _tec.value.text,
-        targets: widget.people.asIds().toList()));
+    widget.ping(_tec.value.text);
     _tec.clear();
   }
 
@@ -179,80 +160,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
     );
     setState(() {});
   }
-
-  // Future<void> handleImport({required bool importImages}) async {
-  //   if (importImages) {
-  //     final results = await FilePicker.platform.pickFiles(
-  //         type: FileType.custom,
-  //         allowedExtensions: u.imageExtensions.withoutDots(),
-  //         allowMultiple: true,
-  //         allowCompression: true,
-  //         withData: true);
-  //     if (results == null) return;
-  //     for (final file in results.files) {
-  //       if (file.path == null && file.bytes != null) continue;
-  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-  //       final size = await decodeImageSize(file.bytes!);
-  //       final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-  //       MessageMedia(
-  //           id: mediaID,
-  //           isSaved: true,
-  //           path: f.path,
-  //           metadata: MediaMetadata(
-  //               isSquared: false,
-  //               isReversed: false,
-  //               extension: file.path!.extension(),
-  //               timestamp: u.timeStamp(),
-  //               owner: g.self.id,
-  //               elementAspectRatio: 1.0 / size.aspectRatio))
-  //         ..isSaved = true
-  //         ..save();
-  //       g.self.images.add(mediaID);
-  //       loadMediaConsole();
-  //     }
-  //   } else {
-  //     final videos = await FilePicker.platform.pickFiles(
-  //         allowedExtensions: u.videoExtensions.withoutDots(),
-  //         type: FileType.custom,
-  //         withData: true,
-  //         allowCompression: true,
-  //         allowMultiple: true);
-  //     if (videos == null) return;
-  //     for (final video in videos.files) {
-  //       if (video.path == null || video.bytes == null) continue;
-  //       final videoInfoGetter = FlutterVideoInfo();
-  //       final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
-  //       final mediaID = u.deterministicMediaID(video.bytes!, g.self.id);
-  //       final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
-  //       final tn =
-  //           await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
-  //       String? thumbnailPath;
-  //       if (tn != null) {
-  //         final f = await writeMedia(
-  //             mediaData: tn, mediaID: mediaID, isThumbnail: true);
-  //         thumbnailPath = f.path;
-  //       }
-  //       MessageMedia(
-  //           id: mediaID,
-  //           path: f.path,
-  //           thumbnail: thumbnailPath,
-  //           metadata: MediaMetadata(
-  //               isReversed: false,
-  //               isSquared: false,
-  //               extension: video.path!.extension(),
-  //               timestamp: u.timeStamp(),
-  //               owner: g.self.id,
-  //               elementAspectRatio:
-  //                   (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
-  //         ..isSaved = true
-  //         ..save();
-  //       g.self.videos.add(mediaID);
-  //       loadMediaConsole();
-  //       // _cachedSavedVideos[mediaID] = down4Media;
-  //     }
-  //   }
-  //   g.self.save();
-  // }
 
   Future<void> loadSquaredCameraConsole({
     CameraController? ctrl,

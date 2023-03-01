@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -11,18 +12,60 @@ import 'package:hive/hive.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import 'package:firebase_database/firebase_database.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
+import 'web_requests.dart' show getNodes;
 
 final g = Singletons.instance;
 final db = FirebaseDatabase.instance.ref();
-// var _fs = FirebaseFirestore.instance;
+var _fs = FirebaseFirestore.instance;
 final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+
+Future<bool> uploadPayment(Down4Payment pay) async {
+  try {
+    await _st.ref(pay.id).putData(pay.compressed.toUint8List());
+    return true;
+  } catch (e) {
+    print("Error uploading payment: $e");
+    return false;
+  }
+}
+
+Future<bool> uploadNode(BaseNode node) async {
+  Future<bool> uploadImage() async {
+    final media = node.media;
+    if (media == null) return true;
+    try {
+      await _st_node.ref(media.id).putData(media.data,
+          SettableMetadata(customMetadata: media.metadata.toJson()));
+      return true;
+    } catch (e) {
+      print("Error uploading node image: $e");
+      return false;
+    }
+  }
+
+  Future<bool> uploadNode() async {
+    final body = node.toJson(toLocal: false);
+    try {
+      await _fs.doc(node.id).set(body);
+      return true;
+    } catch (e) {
+      print("Failure uploading node: $e");
+      return false;
+    }
+  }
+
+  List<Future<bool>> successes = [uploadImage(), uploadNode()];
+
+  final success = Future.wait(successes).then((s) => s.every((e) => e));
+  return success;
+}
 
 String _mediaPath(String mediaID, {bool isThumbnail = false}) =>
     "${g.boxes.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
@@ -110,6 +153,16 @@ Future<bool> uploadOrUpdateMedia(
         return false;
       }
     }
+  }
+}
+
+Future<bool> uploadMessage(Message msg) async {
+  try {
+    await db.child("Messages").child(msg.id).set(msg.toJson());
+    return true;
+  } catch (e) {
+    print("Error uploading messageID: ${msg.id}, error: $e");
+    return false;
   }
 }
 
@@ -463,6 +516,17 @@ class Singletons {
       snips: {},
     )..save();
   }
+}
+
+Future<List<BaseNode>> getNodesFromEverywhere(Set<ID> ids) async {
+  final toFetch = ids.difference(g.boxes.nodes.keys.toSet());
+  final local = ids.difference(toFetch);
+  final onlineFetch = getNodes(toFetch);
+  final localFetch = local.map((e) => e.getLocalNode()).toList();
+
+  final locals = await Future.wait(localFetch);
+  final onlines = await onlineFetch;
+  return locals.whereType<BaseNode>().followedBy(onlines ?? []).toList();
 }
 
 void unselectedSelectedPalettes(Map<ID, Palette2> state) {

@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data' show Uint8List;
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
+import '_down4_dart_utils.dart' show Pair;
 import 'bsv/types.dart' show Down4Payment, Down4TX;
 
 Future<bool> usernameIsValid(String username) async {
@@ -63,6 +65,20 @@ Future<Media?> getMessageMedia(String id) async {
   final res = await http.post(url, body: id);
   if (res.statusCode != 200) return null;
   return MessageMedia.fromJson(jsonDecode(res.body));
+}
+
+Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
+  List<String> pairs,
+) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/imageGenerationRequest",
+  );
+  final imageGenRes = await http.post(url, body: jsonEncode(pairs));
+  if (imageGenRes.statusCode != 200) return null;
+  final json = jsonDecode(imageGenRes.body);
+  final image = base64Decode(json["image"]);
+  final prompt = (json["prompt"] as String).split(" ");
+  return Pair(image, Pair(prompt.first, prompt.last));
 }
 
 // TODO Might need adjustment for big batches
@@ -147,205 +163,213 @@ Future<List<Message>?> getPosts(List<String> ids) async {
   return null;
 }
 
-abstract class Request {
+class RequestData {
   final List<ID> targets;
-  const Request({required this.targets});
-  Map<String, dynamic> toJson();
-  send();
-}
+  final String notifHeader, notifBody, data;
+  final Uint8List? notifThumbnail;
+  const RequestData({
+    required this.targets,
+    required this.notifHeader,
+    required this.notifBody,
+    required this.data,
+    this.notifThumbnail,
+  });
 
-abstract class MessageRequest extends Request {
-  final Message message;
-  final MessageMedia? media;
-  MessageRequest({
-    required List<ID> targets,
-    required this.message,
-    this.media,
-  }) : super(targets: targets);
-}
-
-class ChatRequest extends MessageRequest {
-  final String? groupName;
-  ChatRequest({
-    MessageMedia? media,
-    required Message message,
-    required List<ID> targets,
-    this.groupName,
-  }) : super(targets: targets, message: message, media: media);
-
-  @override
-  Future<bool> send() async {
+  Future<bool> process() async {
     final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
     );
-    final res = await http.post(url, body: jsonEncode(this));
-    return res.statusCode == 200;
-  }
 
-  @override
-  Map<String, dynamic> toJson() => {
-        if (groupName != null) "gn": groupName,
-        "msg": message.toJson(),
-        "tr": targets,
-      };
-}
-
-class PingRequest extends Request {
-  final String senderID, text;
-  PingRequest({
-    required this.senderID,
-    required this.text,
-    required List<ID> targets,
-  }) : super(targets: targets);
-
-  @override
-  Map<String, dynamic> toJson() => {
-        "s": senderID,
-        "txt": text,
-        "tr": targets,
-      };
-
-  @override
-  Future<bool> send() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
-    );
-    final res = await http.post(url, body: jsonEncode(this));
-    return res.statusCode == 200;
-  }
-}
-
-class SnipRequest extends Request {
-  String senderID, mediaID;
-  String? groupName, root;
-  SnipRequest({
-    required this.mediaID,
-    required this.senderID,
-    this.root,
-    this.groupName,
-    required List<ID> targets,
-  }) : super(targets: targets);
-
-  @override
-  Map<String, dynamic> toJson() => {
-        "m": mediaID,
-        "rt": root,
-        "s": senderID,
-        "tr": targets,
-        if (groupName != null) "gn": groupName,
-      };
-
-  @override
-  Future<bool> send() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
-    );
-    final res = await http.post(url, body: jsonEncode(this));
-    return res.statusCode == 200;
-  }
-}
-
-class HyperchatRequest extends MessageRequest {
-  List<String> wordPairs;
-
-  HyperchatRequest({
-    required Message message,
-    MessageMedia? media,
-    required List<ID> targets,
-    required this.wordPairs,
-  }) : super(targets: targets, message: message, media: media);
-
-  @override
-  Future<Hyperchat?> send() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
-    );
     final res = await http.post(url, body: jsonEncode(this));
     if (res.statusCode == 200) {
-      return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
+      return true;
     } else {
-      return null;
+      return false;
     }
   }
 
-  @override
-  Map<String, dynamic> toJson() => {
-        "msg": message.toJson(),
-        "wp": wordPairs,
+  Map toJson() => {
         "tr": targets,
+        "hd": notifHeader,
+        "bd": notifBody,
+        "d": data,
+        if (notifThumbnail != null) "tn": base64Encode(notifThumbnail!),
       };
 }
 
-class GroupRequest extends MessageRequest {
-  final ID groupID;
-  final String name;
-  final bool private;
-  final NodeMedia groupMedia;
-  GroupRequest({
-    required this.groupID,
-    required this.private,
-    required this.name,
-    required this.groupMedia,
-    required Message message,
-    MessageMedia? media,
-    required List<ID> targets,
-  }) : super(targets: targets, message: message, media: media);
+// abstract class Request {
+//   final RequestData reqData;
+//   const Request({required this.reqData});
+//   Future<dynamic> send();
+//   Map toJson();
+// }
 
-  @override
-  Future<Group?> send() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
-    );
-    final res = await http.post(url, body: jsonEncode(this));
-    if (res.statusCode == 200) {
-      final jsonDecodedBody = jsonDecode(res.body) as Map;
-      print("JSON KEYS = ${jsonDecodedBody.keys.toList()}");
-      print("JSON DATA IMAGE DATA = ${jsonDecodedBody["d"]}");
-      return BaseNode.fromJson(jsonDecodedBody) as Group;
-    } else {
-      return null;
-    }
-  }
+// class PingRequest extends Request {
+//   const PingRequest({required RequestData reqData}) : super(reqData: reqData);
 
-  @override
-  Map<String, dynamic> toJson() => {
-        "id": groupID,
-        "msg": message.toJson(),
-        "pv": private,
-        "gn": name,
-        "gm": groupMedia.toJson(),
-        "tr": targets,
-      };
-}
+//   @override
+//   Map<String, dynamic> toJson() => {
+//         "rd": reqData.toJson(),
+//       };
 
-class PaymentRequest extends Request {
-  final Down4Payment payment;
-  final String sender;
-  final String? textNote;
-  String get id => payment.id;
+//   @override
+//   Future<bool> send() async {
+//     final url = Uri.parse(
+//       "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePingRequest",
+//     );
+//     final res = await http.post(url, body: jsonEncode(this));
+//     return res.statusCode == 200;
+//   }
+// }
 
-  PaymentRequest({
-    required List<ID> targets,
-    required this.payment,
-    required this.sender,
-    this.textNote,
-  }) : super(targets: targets);
+// class ChatRequest extends Request {
+//   final ID messageID, root;
+//   const ChatRequest({
+//     required RequestData reqData,
+//     required this.root,
+//     required this.messageID,
+//   }) : super(reqData: reqData);
 
-  @override
-  Future<bool> send() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
-    );
-    final res = await http.post(url, body: jsonEncode(this));
-    return res.statusCode == 200;
-  }
+//   @override
+//   Future<bool> send() async {
+//     final url = Uri.parse(
+//       "https://us-east1-down4-26ee1.cloudfunctions.net/HandleChatRequest",
+//     );
+//     final res = await http.post(url, body: jsonEncode(this));
+//     return res.statusCode == 200;
+//   }
 
-  @override
-  Map<String, dynamic> toJson() => {
-        "s": sender,
-        "id": id,
-        "tr": targets,
-        "pay": payment.toYouKnow(),
-        if (payment.textNote.isNotEmpty) "txt": payment.textNote,
-      };
-}
+//   @override
+//   Map<String, dynamic> toJson() => {
+//         "rt": root,
+//         "msg": messageID,
+//         "rd": reqData.toJson(),
+//       };
+// }
+
+// class SnipRequest extends Request {
+//   final ID mediaID, root;
+//   const SnipRequest({
+//     required RequestData reqData,
+//     required this.mediaID,
+//     required this.root,
+//   }) : super(reqData: reqData);
+
+//   @override
+//   Map<String, dynamic> toJson() => {
+//         "m": mediaID,
+//         "rt": root,
+//         "rd": reqData.toJson(),
+//       };
+
+//   @override
+//   Future<bool> send() async {
+//     final url = Uri.parse(
+//       "https://us-east1-down4-26ee1.cloudfunctions.net/HandleSnipRequest",
+//     );
+//     final res = await http.post(url, body: jsonEncode(this));
+//     return res.statusCode == 200;
+//   }
+// }
+
+// class HyperchatRequest extends Request {
+//   final List<String> wordPairs;
+//   final ID root, msgID;
+
+//   const HyperchatRequest({
+//     required RequestData reqData,
+//     required this.root,
+//     required this.msgID,
+//     required this.wordPairs,
+//   }) : super(reqData: reqData);
+
+//   @override
+//   Future<Hyperchat?> send() async {
+//     final url = Uri.parse(
+//       "https://us-east1-down4-26ee1.cloudfunctions.net/HandleHyperchatRequest",
+//     );
+//     final res = await http.post(url, body: jsonEncode(this));
+//     if (res.statusCode == 200) {
+//       return BaseNode.fromJson(jsonDecode(res.body)) as Hyperchat;
+//     } else {
+//       return null;
+//     }
+//   }
+
+//   @override
+//   Map<String, dynamic> toJson() => {
+//         "msg": msgID,
+//         "rt": root,
+//         "wp": wordPairs,
+//         "rd": reqData.toJson(),
+//       };
+// }
+
+// class GroupRequest extends Request {
+//   final ID groupID, root, msgID;
+//   final String name;
+//   final bool private;
+//   final NodeMedia groupMedia;
+//   const GroupRequest({
+//     required RequestData reqData,
+//     required this.root,
+//     required this.msgID,
+//     required this.groupID,
+//     required this.private,
+//     required this.name,
+//     required this.groupMedia,
+//   }) : super(reqData: reqData);
+
+//   @override
+//   Future<Group?> send() async {
+//     final url = Uri.parse(
+//       "https://us-east1-down4-26ee1.cloudfunctions.net/HandleGroupRequest",
+//     );
+//     final res = await http.post(url, body: jsonEncode(this));
+//     if (res.statusCode == 200) {
+//       final jsonDecodedBody = jsonDecode(res.body) as Map;
+//       print("JSON KEYS = ${jsonDecodedBody.keys.toList()}");
+//       print("JSON DATA IMAGE DATA = ${jsonDecodedBody["d"]}");
+//       return BaseNode.fromJson(jsonDecodedBody) as Group;
+//     } else {
+//       return null;
+//     }
+//   }
+
+//   @override
+//   Map<String, dynamic> toJson() => {
+//         "gid": groupID,
+//         "rt": root,
+//         "msg": msgID,
+//         "pv": private,
+//         "gn": name,
+//         "gm": groupMedia.toJson(),
+//         "rd": reqData.toJson(),
+//       };
+// }
+
+// class PaymentRequest extends Request {
+//   final Down4Payment payment;
+//   String get id => payment.id;
+
+//   PaymentRequest({
+//     required RequestData reqData,
+//     required this.payment,
+//   }) : super(reqData: reqData);
+
+//   @override
+//   Future<bool> send() async {
+//     final url = Uri.parse(
+//       "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePaymentRequest",
+//     );
+//     final res = await http.post(url, body: jsonEncode(this));
+//     return res.statusCode == 200;
+//   }
+
+//   @override
+//   Map<String, dynamic> toJson() => {
+//         "id": id,
+//         "pay": payment.toYouKnow(),
+//         "rd": reqData.toJson(),
+//       };
+// }

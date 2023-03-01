@@ -5,13 +5,15 @@ import 'package:down4/src/render_objects/qr.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import '../_down4_dart_utils.dart' show Pair;
+import '../_down4_dart_utils.dart' show Pair, golden;
 
 import '../data_objects.dart';
 import '../globals.dart';
 import '../themes.dart';
+import '../web_requests.dart' show getNodes;
 
 import '_down4_flutter_utils.dart';
+import 'palette.dart' show Palette;
 
 class ChatReplyInfo {
   final ID messageRefID, senderID; // senderName,
@@ -58,8 +60,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   final void Function(ID id)? select;
   final Message message;
   final bool hasGap, hasHeader;
+  final void Function(BaseNode) openNode;
 
-  // final ChatTextInfo? textInfo;
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
 
@@ -69,6 +71,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     required this.myMessage,
     required this.hasGap,
     required this.mediaInfo,
+    required this.openNode,
     // required this.textInfo,
     required this.repliesInfo,
     this.isPost = false,
@@ -82,6 +85,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       message: message,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
+      openNode: openNode,
       // textInfo: textInfo,
       isPost: isPost,
       myMessage: myMessage,
@@ -98,6 +102,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       isPost: isPost,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
+      openNode: openNode,
       // textInfo: textInfo,
       hasHeader: hasHeader,
       myMessage: myMessage,
@@ -117,6 +122,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
           ?..videoController?.pause()
           ..videoController?.seekTo(Duration.zero),
         // textInfo: textInfo,
+        openNode: openNode,
         hasHeader: hasHeader,
         myMessage: myMessage,
         hasGap: hasGap,
@@ -133,12 +139,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   static TextStyle get globalDateStyle => const TextStyle(
       fontFamily: "Alice", fontSize: 10, color: Colors.black45, height: 0.8);
-
-  // TextStyle get localDateStyle => TextStyle(
-  //     fontFamily: "Alice",
-  //     fontSize: 10,
-  //     color: Colors.black45,
-  //     height: (textInfo?.lastStringOnSameLine ?? false) ? 2 : 1.5);
 
   static double get maxMessageWidth => g.sizes.w * 0.76;
 
@@ -186,7 +186,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     } else {
       timeStr = "$tsHour:$tsMin";
     }
-    return "    $timeStr";
+
+    if (message.forwardedFromID == null) {
+      return "    $timeStr";
+    } else {
+      return "${message.forwardedFromID}    $timeStr";
+    }
   }
 
   static Future<ChatMediaInfo?> generateMediaInfo(Message message) async {
@@ -329,8 +334,102 @@ class ChatMessage extends StatelessWidget implements Down4Object {
             "-${message.senderID}   ",
             style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
           ),
-          // const Spacer(),
         ]));
+  }
+
+  Widget? get forwarderHeader {
+    if (message.forwardedFromID == null) return null;
+    return SizedBox(
+        height: headerHeight * 0.8,
+        child: Row(children: [
+          Text(
+            ">>${message.forwardedFromID}   ",
+            style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
+          ),
+        ]));
+  }
+
+  Widget? get messagePalettes {
+    if ((message.nodes ?? []).isEmpty) return null;
+    double mpHeight() => Palette.paletteHeight / golden;
+    Widget unloadedPalette(ID id) {
+      return Container(
+        height: mpHeight(),
+        color: Colors.black54,
+        child: Row(
+          children: [
+            Image.asset("assets/images/down4_inverted.png",
+                cacheHeight: (mpHeight() * 2).toInt(),
+                cacheWidth: (mpHeight() * 2).toInt()),
+            Expanded(
+                child: Padding(
+                    padding: const EdgeInsets.only(top: 12.0, left: 12.0),
+                    child: Text(id)))
+          ],
+        ),
+      );
+    }
+
+    Widget loadedPalette(BaseNode node) {
+      Image nodeImage() => node.media?.data != null
+          ? Image.memory(node.media!.data,
+              cacheHeight: (mpHeight() * 2).toInt(),
+              cacheWidth: (mpHeight() * 2).toInt())
+          : Image.asset("assets/images/hashirama.jpg",
+              cacheHeight: (mpHeight() * 2).toInt(),
+              cacheWidth: (mpHeight() * 2).toInt());
+
+      return Container(
+        height: mpHeight(),
+        color: PinkTheme.nodeColors[node.colorCode],
+        child: Row(
+          children: [
+            nodeImage(),
+            Expanded(
+                child: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                  child: Text(node.name)),
+              Padding(
+                  padding: const EdgeInsets.only(top: 6.0, left: 12.0),
+                  child: Text(node.displayID))
+            ])),
+            GestureDetector(
+                onTap: () => openNode(node),
+                child: Padding(
+                    padding: const EdgeInsets.only(top: 8.0, left: 8.0),
+                    child: Image.asset("assets/images/50.png",
+                        cacheHeight: (mpHeight() * 2).toInt(),
+                        cacheWidth: (mpHeight() * 2).toInt())))
+          ],
+        ),
+      );
+    }
+
+    return FutureBuilder(
+      future: getNodesFromEverywhere(message.nodes!.toSet()),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return ClipRect(
+            child: Column(
+              children:
+                  message.nodes!.map((id) => unloadedPalette(id)).toList(),
+            ),
+          );
+        } else if (snapshot.connectionState == ConnectionState.done &&
+            snapshot.hasData) {
+          return ClipRect(
+            child: Column(
+              children: snapshot.requireData
+                  .map((node) => loadedPalette(node))
+                  .toList(),
+            ),
+          );
+        } else {
+          return const SizedBox.shrink();
+        }
+      },
+    );
   }
 
   Widget? get media {
@@ -417,25 +516,24 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         crossAxisAlignment:
             myMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          replies ?? const SizedBox.shrink(),
+          forwarderHeader ?? replies ?? const SizedBox.shrink(),
           animatedContainer(
-            child: Container(
-              decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-                  border: Border.all(
-                    width: 2.0,
-                    color: selected ? Colors.black : Colors.transparent,
-                  )),
-              child: Column(
-                textDirection: TextDirection.ltr,
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  media ?? const SizedBox.shrink(),
-                  text ?? const SizedBox.shrink(),
-                ],
-              ),
-            ),
-          ),
+              child: Container(
+                  decoration: BoxDecoration(
+                      borderRadius:
+                          const BorderRadius.all(Radius.circular(6.0)),
+                      border: Border.all(
+                        width: 2.0,
+                        color: selected ? Colors.black : Colors.transparent,
+                      )),
+                  child: Column(
+                      textDirection: TextDirection.ltr,
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        media ?? const SizedBox.shrink(),
+                        text ?? const SizedBox.shrink(),
+                        messagePalettes ?? const SizedBox.shrink()
+                      ]))),
           header2 ?? const SizedBox.shrink(),
         ],
       ),

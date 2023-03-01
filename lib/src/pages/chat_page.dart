@@ -26,23 +26,18 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "c-${node.id}";
 
-  final void Function(r.ChatRequest) send;
+  final void Function(Message, MessageMedia?) sendMessage;
   final ChatableNode node;
   final Iterable<BaseNode>? subNodes;
   final void Function() back;
   final void Function(BaseNode) openNode;
 
   const ChatPage({
-    // required this.senders,
-    // required this.node,
+    required this.sendMessage,
     required this.subNodes,
-    required this.send,
     required this.back,
     required this.node,
     required this.openNode,
-    // required this.nodeToPalette,
-    // this.pageIndex = 0,
-    // this.onPageChange,
     Key? key,
   }) : super(key: key);
 
@@ -192,16 +187,16 @@ class _ChatPageState extends State<ChatPage> {
         key: GlobalKey(),
         hasGap: hasGap,
         message: msg,
-        // textInfo: ChatMessage.generateTextInfo(msg),
         mediaInfo: await ChatMessage.generateMediaInfo(msg),
         repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
           print("TODO, GO TO REPLY ID = $replyID");
         }),
         hasHeader: hasHeader,
+        openNode: widget.openNode,
         myMessage: g.self.id == msg.senderID,
         select: (id) {
           _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
-          reload();
+          setState(() {});
         });
   }
 
@@ -228,81 +223,6 @@ class _ChatPageState extends State<ChatPage> {
       placeHolder: ":)",
     );
   }
-
-  // Future<void> handleImport({required bool importImages}) async {
-  //   if (importImages) {
-  //     final results = await FilePicker.platform.pickFiles(
-  //         type: FileType.custom,
-  //         allowedExtensions: u.imageExtensions.withoutDots(),
-  //         allowMultiple: true,
-  //         allowCompression: true,
-  //         withData: true);
-  //     if (results == null) return;
-  //     for (final file in results.files) {
-  //       if (file.path == null && file.bytes != null) continue;
-  //       print("THE PATH = ${file.path}");
-  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-  //       final size = await decodeImageSize(file.bytes!);
-  //       final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-  //       MessageMedia(
-  //           id: mediaID,
-  //           isSaved: true,
-  //           path: f.path,
-  //           metadata: MediaMetadata(
-  //               isSquared: false,
-  //               isReversed: false,
-  //               extension: file.path!.extension(),
-  //               timestamp: u.timeStamp(),
-  //               owner: g.self.id,
-  //               elementAspectRatio: 1.0 / size.aspectRatio))
-  //         ..isSaved = true
-  //         ..save();
-  //       g.self.images.add(mediaID);
-  //       loadMediasConsole();
-  //     }
-  //   } else {
-  //     final videos = await FilePicker.platform.pickFiles(
-  //         allowedExtensions: u.videoExtensions.withoutDots(),
-  //         type: FileType.custom,
-  //         withData: true,
-  //         allowCompression: true,
-  //         allowMultiple: true);
-  //     if (videos == null) return;
-  //     for (final video in videos.files) {
-  //       if (video.path == null || video.bytes == null) continue;
-  //       final videoInfoGetter = FlutterVideoInfo();
-  //       final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
-  //       final mediaID = u.deterministicMediaID(video.bytes!, g.self.id);
-  //       final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
-  //       final tn =
-  //           await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
-  //       String? thumbnailPath;
-  //       if (tn != null) {
-  //         final f = await writeMedia(
-  //             mediaData: tn, mediaID: mediaID, isThumbnail: true);
-  //         thumbnailPath = f.path;
-  //       }
-
-  //       MessageMedia(
-  //           id: mediaID,
-  //           path: f.path,
-  //           thumbnail: thumbnailPath,
-  //           metadata: MediaMetadata(
-  //               isReversed: false,
-  //               isSquared: false,
-  //               extension: video.path!.extension(),
-  //               timestamp: u.timeStamp(),
-  //               owner: g.self.id,
-  //               elementAspectRatio:
-  //                   (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
-  //         ..isSaved = true
-  //         ..save();
-  //       g.self.videos.add(mediaID);
-  //       loadMediasConsole();
-  //     }
-  //   }
-  //   g.self.save();
-  // }
 
   void loadSavingConsole() {
     _console = Console(
@@ -374,43 +294,28 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void send2({MessageMedia? mediaInput}) {
+    final media = mediaInput ?? _cameraInput;
     if (_tec.value.text == "" && mediaInput == null && _cameraInput == null) {
       return;
     }
     final ts = u.timeStamp();
-    final theNode = widget.node;
-    List<ID> targets;
-    if (theNode is GroupNode) {
-      targets = List<ID>.from((theNode.group))..remove(g.self.id);
-    } else {
-      targets = [theNode.id];
-    }
+
     var msg = Message(
-      root: widget.node is GroupNode ? widget.node.id : null,
-      id: messagePushId(),
-      timestamp: ts,
-      senderID: g.self.id,
-      mediaID: mediaInput?.id ?? _cameraInput?.id,
-      text: _tec.value.text,
-      replies: _cachedMessages.values
-          .where((msg) => msg.selected)
-          .map((msg) => msg.message.id)
-          .toList(growable: false),
-    );
+        id: messagePushId(),
+        timestamp: ts,
+        senderID: g.self.id,
+        mediaID: media?.id,
+        text: _tec.value.text,
+        replies: _cachedMessages.values
+            .where((msg) => msg.selected)
+            .map((msg) => msg.message.id)
+            .toList(growable: false))
+      ..isRead = true
+      ..save();
+
+    widget.sendMessage(msg, media);
 
     unselectSelectedMessage();
-
-    print("TARGETS ===== $targets");
-
-    var req = r.ChatRequest(
-      message: msg,
-      targets: targets,
-      media: mediaInput ?? _cameraInput,
-    );
-
-    widget.send(req);
-    _tec.clear();
-    _cameraInput = null;
   }
 
   Future<void> loadFullCamera() async {

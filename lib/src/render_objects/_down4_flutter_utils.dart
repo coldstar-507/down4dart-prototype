@@ -39,6 +39,8 @@ class PageManager {
   Down4PageWidget get currentPage => pages[_idStack.last]!;
   Down4PageWidget get prevPage => pages[_idStack[_idStack.length - 2]]!;
 
+  int get nPages => _idStack.length;
+
   ID get currentID => _idStack.last;
   Iterable<ID> get path => _idStack
       .asMap()
@@ -967,4 +969,5 @@ Future<void> importConsoleMedias({required bool images}) async {
       g.self.videos.add(mediaID);
     }
   }
+  g.self.save();
 }

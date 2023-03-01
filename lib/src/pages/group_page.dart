@@ -29,7 +29,7 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
   final Iterable<Person> people;
   final int nHidden;
   final void Function() back;
-  final void Function(r.GroupRequest) groupRequest;
+  final void Function(Group group, Message msg, MessageMedia? media) makeGroup;
   final double initialOffset;
 
   const GroupPage({
@@ -37,7 +37,7 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
     required this.nHidden,
     required this.palettesForTransition,
     required this.back,
-    required this.groupRequest,
+    required this.makeGroup,
     required this.homePalettes,
     required this.initialOffset,
     Key? key,
@@ -102,10 +102,10 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   Future<void> send({MessageMedia? mediaInput}) async {
+    final media = mediaInput ?? _cameraInput;
+    final text = _tec.value.text;
     if (_groupImage == null || _groupName.isEmpty) return;
-    if (_cameraInput == null && _tec.value.text.isEmpty && mediaInput == null) {
-      return;
-    }
+    if (text.isEmpty && media == null) return;
 
     final ts = u.timeStamp();
     final idd =
@@ -113,106 +113,26 @@ class _GroupPageState extends State<GroupPage> {
     final groupID = sha1(idd).toBase58();
 
     final msg = Message(
-      root: groupID,
-      id: messagePushId(),
-      senderID: g.self.id,
-      timestamp: u.timeStamp(),
-      mediaID: mediaInput?.id ?? _cameraInput?.id,
-      text: _tec.value.text,
-    );
+        // root: groupID,
+        id: messagePushId(),
+        senderID: g.self.id,
+        timestamp: u.timeStamp(),
+        mediaID: media?.id,
+        text: text);
 
-    final targets = widget.people.whereType<User>().asIds().toSet();
-    final grpReq = r.GroupRequest(
-      groupID: groupID,
-      name: _groupName,
-      groupMedia: _groupImage!,
-      message: msg,
-      private: _private,
-      targets: targets.toList(),
-      media: mediaInput ?? _cameraInput,
-    );
+    final members = widget.people.asIds().toSet()..add(g.self.id);
 
-    widget.groupRequest(grpReq);
+    final Group group = Group(
+        isPrivate: _private,
+        name: _groupName,
+        id: groupID,
+        media: _groupImage!,
+        group: members,
+        messages: {},
+        snips: {});
+
+    widget.makeGroup(group, msg, media);
   }
-
-  // Future<void> handleImport({
-  //   bool groupImageImport = false,
-  //   bool importImages = true,
-  // }) async {
-  //   if (importImages) {
-  //     final result = await FilePicker.platform.pickFiles(
-  //         allowMultiple: !groupImageImport,
-  //         allowedExtensions: u.imageExtensions.withoutDots(),
-  //         type: FileType.custom,
-  //         withData: true);
-  //     if (result == null) return;
-  //     for (final file in result.files) {
-  //       if (file.path == null || file.bytes == null) continue;
-  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-  //       final size = await decodeImageSize(file.bytes!);
-  //       final mediaMetadata = MediaMetadata(
-  //           owner: g.self.id,
-  //           timestamp: u.timeStamp(),
-  //           elementAspectRatio: 1 / size.aspectRatio,
-  //           extension: file.path!.extension());
-  //       if (groupImageImport) {
-  //         _groupImage = NodeMedia(
-  //             data: file.bytes!, id: mediaID, metadata: mediaMetadata);
-  //         loadBaseConsole();
-  //         reloadItems();
-  //         // animatedTransition();
-  //       } else {
-  //         final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-  //         MessageMedia(id: mediaID, path: f.path, metadata: mediaMetadata)
-  //           ..isSaved = true
-  //           ..save();
-  //         g.self.images.add(mediaID);
-  //         loadMediaConsole();
-  //       }
-  //     }
-  //     g.self.save();
-  //   } else {
-  //     final result = await FilePicker.platform.pickFiles(
-  //         allowMultiple: true,
-  //         allowedExtensions: u.videoExtensions.withoutDots(),
-  //         type: FileType.custom,
-  //         withData: true);
-  //     if (result == null) return;
-  //     for (final file in result.files) {
-  //       if (file.path == null || file.bytes == null) continue;
-  //       final fvi = FlutterVideoInfo();
-  //       final mediaID = u.deterministicMediaID(file.bytes!, g.self.id);
-  //       final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-  //       final videoInfo = await fvi.getVideoInfo(file.path!);
-  //       final ar = (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0);
-  //       final tn =
-  //           await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
-  //       String? thumbnailPath;
-  //       if (tn != null) {
-  //         final f = await writeMedia(
-  //             mediaData: tn, mediaID: mediaID, isThumbnail: true);
-  //         thumbnailPath = f.path;
-  //       }
-  //       MessageMedia(
-  //           id: mediaID,
-  //           path: f.path,
-  //           isSaved: true,
-  //           thumbnail: thumbnailPath,
-  //           metadata: MediaMetadata(
-  //               extension: file.path!.extension(),
-  //               isSquared: false,
-  //               isReversed: false,
-  //               elementAspectRatio: ar,
-  //               timestamp: u.timeStamp(),
-  //               owner: g.self.id))
-  //         ..isSaved = true
-  //         ..save();
-  //       g.self.videos.add(mediaID);
-  //       loadMediaConsole(images: false);
-  //     }
-  //     g.self.save();
-  //   }
-  // }
 
   void reloadItems() {
     setState(() {
@@ -263,7 +183,7 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
           isMode: true,
           isActivated: !forGroupImage,
-          greyedOut: forGroupImage,
+          isGreyedOut: forGroupImage,
           name: images ? "Images" : "Videos",
           onPress: () => loadMediaConsole(images: !images),
         ),
@@ -284,7 +204,7 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
           isMode: true,
           isActivated: false,
-          greyedOut: true,
+          isGreyedOut: true,
           name: _private ? "Private" : "Public",
           onPress: () {
             _private = !_private;

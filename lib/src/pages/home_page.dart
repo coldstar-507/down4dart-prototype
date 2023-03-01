@@ -40,13 +40,10 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   ID get id => "HomePage";
   final ScrollController scrollController;
   final List<Palette2> palettes;
-  final void Function(PingRequest) ping;
+  final void Function(String text) ping;
   final void Function() hyperchat, group, money, search, delete, forward, snip;
-  // final void Function(ChatableNode) openChat, snipView;
   const HomePage({
     required this.scrollController,
-    // required this.openChat,
-    // required this.snipView,
     required this.palettes,
     required this.hyperchat,
     required this.group,
@@ -72,46 +69,13 @@ class _HomePageState extends State<HomePage> {
     loadBaseConsole();
   }
 
-  // ButtonsInfo2 buttonsOfNode(ChatableNode node, [bool lastMsgWasRead = true]) {
-  //   if (node.snips.isNotEmpty) {
-  //     return ButtonsInfo2(
-  //         assetPath: 'assets/images/snip.png',
-  //         pressFunc: () => widget.snipView(node),
-  //         rightMost: true);
-  //   } else {
-  //     return ButtonsInfo2(
-  //         assetPath: lastMsgWasRead
-  //             ? 'assets/images/50.png'
-  //             : 'assets/images/filled.png',
-  //         pressFunc: () => widget.openChat(node),
-  //         rightMost: true);
-  //   }
-  // }
-
-  // // Home palettes are all chatables. Friends, non-friends, hyperchats, groups
-  // void writePalette2(ChatableNode node, {required bool selected}) {
-  //   final lastMessagePreviewInfo = node.previewInfo();
-  //   _palettes[node.id] = Palette2(
-  //     node: node,
-  //     selected: selected,
-  //     messagePreview: lastMessagePreviewInfo.first,
-  //     imPress: () => writePalette2(node, selected: !selected),
-  //     bodyPress: () => writePalette2(node, selected: !selected),
-  //     buttonsInfo2: [buttonsOfNode(node, lastMessagePreviewInfo.second)],
-  //   );
-  // }
-
   late Console _homeConsole;
 
   var _tec = TextEditingController();
 
   void ping() {
     if (_tec.value.text.isEmpty) return;
-    final pr = PingRequest(
-        text: _tec.value.text,
-        targets: widget.palettes.selected().allPeopleIds().toList(),
-        senderID: g.self.id);
-    widget.ping(pr);
+    widget.ping(_tec.value.text);
     _tec.clear();
   }
 

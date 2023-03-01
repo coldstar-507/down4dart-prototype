@@ -132,7 +132,7 @@ class _UserMakerPageState extends State<UserMakerPage> {
         ConsoleButton(
             // key: buttonKey,
             isActivated: isReady && activatedProceed,
-            greyedOut: !isReady,
+            isGreyedOut: !isReady,
             name: "Proceed",
             onPress: () async {
               baseConsole(activatedProceed: false);

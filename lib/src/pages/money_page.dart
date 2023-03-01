@@ -35,13 +35,13 @@ class PaymentPage extends StatefulWidget implements Down4PageWidget {
   final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentAsList;
-  final void Function(r.PaymentRequest) paymentRequest;
+  final void Function(Down4Payment) sendPayment;
 
   PaymentPage({
     required this.ok,
     required this.back,
     required this.payment,
-    required this.paymentRequest,
+    required this.sendPayment,
     Key? key,
   })  : paymentAsList = payment.asQrData,
         super(key: key);
@@ -120,16 +120,17 @@ class _PaymentPageState extends State<PaymentPage> {
                 // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
                 final spender = widget.payment.txs.last.txsIn.first.spender;
                 if (spender == g.self.id) {
-                  final pr = r.PaymentRequest(
-                    sender: spender!,
-                    payment: widget.payment,
-                    targets: widget.payment.txs.last.txsOut
-                        .where((txout) => txout.isGets)
-                        .map((txout) => txout.receiver)
-                        .whereType<String>()
-                        .toList(growable: false),
-                  );
-                  widget.paymentRequest(pr);
+                  widget.sendPayment(widget.payment);
+                  // final pr = r.PaymentRequest(
+                  //   sender: spender!,
+                  //   payment: widget.payment,
+                  //   targets: widget.payment.txs.last.txsOut
+                  //       .where((txout) => txout.isGets)
+                  //       .map((txout) => txout.receiver)
+                  //       .whereType<String>()
+                  //       .toList(growable: false),
+                  // );
+                  // widget.paymentRequest(pr);
                   widget.ok();
                 }
               })
@@ -209,26 +210,6 @@ class _MoneyPageState extends State<MoneyPage> {
   late ScrollController scrollController0 = ScrollController(
     initialScrollOffset: widget.initialOffset,
   );
-
-  // late final paymentListen = g.boxes.payments.watch().listen((event) {
-  //   print("NEW PAYMENT!!!");
-  //   if (event.deleted) return;
-  //   final payment = Down4Payment.fromJson(jsonDecode(event.value));
-  //   final asNode = Payment(payment: payment, selfID: g.self.id);
-  //   _payments.putIfAbsent(
-  //       payment.id,
-  //       () => Palette2(
-  //             node: asNode,
-  //             messagePreview: payment.textNote,
-  //             buttonsInfo2: [
-  //               ButtonsInfo2(
-  //                   assetPath: "assets/images/50.png",
-  //                   pressFunc: () => widget.openPayment(payment),
-  //                   rightMost: true)
-  //             ],
-  //           ));
-  //   loadInputsAndConsole();
-  // });
 
   int? _balance;
 
@@ -495,15 +476,13 @@ class _MoneyPageState extends State<MoneyPage> {
     setState(() {});
   }
 
-  void loadMainViewConsole(
-      // {bool reloadInput = false, bool extra = false}
-      ) {
-    // if (reloadInput) loadMainViewInput();
+  void loadMainViewConsole() {
     _console = Console(
       key: mainViewConsoleKey,
       bottomInputs: [_cachedMainViewInput ?? temporaryInput],
       topButtons: [
-        ConsoleButton(name: "Bill", onPress: () => print("TODO")),
+        ConsoleButton(
+            name: "Bill", onPress: () => print("TODO"), isGreyedOut: true),
         ConsoleButton(
             name: "Pay",
             onPress: () {
