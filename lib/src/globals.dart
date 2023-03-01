@@ -104,6 +104,18 @@ Future<MessageMedia?> downloadAndWriteMedia(
   }
 }
 
+Future<bool> uploadTemporaryNodeMedia(NodeMedia media) async {
+  var mediaRef = _st.ref(media.id);
+  try {
+    await mediaRef.putData(
+        media.data, SettableMetadata(customMetadata: media.metadata.toJson()));
+    return true;
+  } catch (e) {
+    print("Error uploading temporary node media: $e");
+    return false;
+  }
+}
+
 Future<bool> uploadOrUpdateMedia(
   MessageMedia media, {
   bool skipCheck = false, // usually for camera uploads

@@ -163,14 +163,14 @@ Future<List<Message>?> getPosts(List<String> ids) async {
   return null;
 }
 
-class RequestData {
+class MessageRequest {
   final List<ID> targets;
-  final String notifHeader, notifBody, data;
+  final String header, body, data;
   final Uint8List? notifThumbnail;
-  const RequestData({
+  const MessageRequest({
     required this.targets,
-    required this.notifHeader,
-    required this.notifBody,
+    required this.header,
+    required this.body,
     required this.data,
     this.notifThumbnail,
   });
@@ -190,8 +190,8 @@ class RequestData {
 
   Map toJson() => {
         "tr": targets,
-        "hd": notifHeader,
-        "bd": notifBody,
+        "hd": header,
+        "bd": body,
         "d": data,
         if (notifThumbnail != null) "tn": base64Encode(notifThumbnail!),
       };

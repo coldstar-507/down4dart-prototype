@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
+import 'package:down4/src/bsv/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:down4/src/data_objects.dart';
@@ -532,10 +533,10 @@ class _HomeState extends State<Home> {
     for (final node in selectedPalettes.asNodes()) {
       if (node is GroupNode) {
         final targets = homePalettes.those(node.group).whereNodeIs<User>();
-        successes.add(r.RequestData(
+        successes.add(r.MessageRequest(
           targets: targets.asIds().toList(),
-          notifHeader: "${g.self.name} pinged ${node.name}",
-          notifBody: "&attachment",
+          header: "${g.self.name} pinged ${node.name}",
+          body: "&attachment",
           data: "s-${media.id}-${node.id}",
         ).process());
       } else {
@@ -544,10 +545,10 @@ class _HomeState extends State<Home> {
     }
 
     if (personTargets.isNotEmpty) {
-      successes.add(r.RequestData(
+      successes.add(r.MessageRequest(
         targets: personTargets,
-        notifHeader: "${g.self.name} pinged you",
-        notifBody: "&attachment",
+        header: "${g.self.name} pinged you",
+        body: "&attachment",
         data: "s-${media.id}-${g.self.id}",
       ).process());
     }
@@ -622,19 +623,19 @@ class _HomeState extends State<Home> {
         // Ping group nodes
         homePalettes.selected().asNodes<GroupNode>().forEach((gn) {
           final targets = List<ID>.from(gn.group)..remove(g.self.id);
-          r.RequestData(
+          r.MessageRequest(
             targets: targets,
-            notifHeader: "${g.self.name} pinged ${gn.name}",
-            notifBody: text,
+            header: "${g.self.name} pinged ${gn.name}",
+            body: text,
             data: "",
           ).process();
         });
         // Ping user nodes
         homePalettes.selected().asNodes<Person>().forEach((pn) {
-          r.RequestData(
+          r.MessageRequest(
             targets: [pn.id],
-            notifHeader: "${g.self.name} pinged you",
-            notifBody: text,
+            header: "${g.self.name} pinged you",
+            body: text,
             data: "",
           ).process();
         });
@@ -691,11 +692,11 @@ class _HomeState extends State<Home> {
             .toList(growable: false);
         final success = await uploadPayment(pay);
         if (success) {
-          r.RequestData(
+          r.MessageRequest(
             targets: targets,
             data: "p-${payment.id}",
-            notifHeader: "${g.self.id} payed you",
-            notifBody: pay.textNote,
+            header: "${g.self.id} payed you",
+            body: pay.textNote,
           ).process();
           goHome();
         }
@@ -742,20 +743,49 @@ class _HomeState extends State<Home> {
       makeHyperchat: (prompts, msg, media) async {
         final hc = await r.getHyperchat(prompts);
         if (hc == null) return;
+        final hcID = sha1(hc.first).toBase58();
+        final hyper = Hyperchat(
+          id: sha1(hc.first).toBase58(),
+          firstWord: hc.second.first,
+          secondWord: hc.second.second,
+          group: Set<ID>.from(transition.second.asIds())..add(g.self.id),
+          messages: {msg.id},
+          snips: {},
+          media: NodeMedia(
+              data: hc.first,
+              id: sha1(utf8.encode(hcID)).toBase58(),
+              metadata: MediaMetadata(
+                  owner: g.self.id,
+                  timestamp: msg.timestamp,
+                  elementAspectRatio: 1.0,
+                  extension: ".png")),
+        )..save();
+
+        await writePalette2(hyper, _palettes, bGen, refreshHome);
 
         List<Future<bool>> ss = [uploadMessage(msg)];
+        ss.add(uploadTemporaryNodeMedia(hyper.media));
         if (media != null) ss.add(uploadOrUpdateMedia(media));
         final success = await Future.wait(ss).then((s) => s.every((e) => e));
-        if (success) {}
+        if (success) {
+          final t = List<ID>.from(hyper.group)..remove(g.self.id);
+          final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
+          final h = "${g.self.name} formed ${hyper.name}";
+          final d =
+              "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
+          r.MessageRequest(targets: t, body: b, header: h, data: d).process();
+        }
       },
       // hyperchatRequest: (hyperchatRequest) {
       //   _requests.add(hyperchatRequest);
       //   processWebRequests();
       // },
       back: pop,
-      ping: (pingRequest) {
-        _requests.add(pingRequest);
-        processWebRequests();
+      ping: (text) {
+        final t = List<ID>.from(transition.second.asIds())..remove(g.self.id);
+        final b = text;
+        final h = "${g.self.name} pinged you";
+        r.MessageRequest(data: "", targets: t, header: h, body: b).process();
       },
     );
   }
@@ -765,10 +795,28 @@ class _HomeState extends State<Home> {
     return GroupPage(
         initialOffset: homeScroll,
         back: pop,
-        groupRequest: (groupRequest) {
-          _requests.add(groupRequest);
-          processWebRequests();
+        makeGroup: (group, msg, media) async {
+          push(loadingPage());
+          List<Future<bool>> ss = [];
+          ss.addAll([uploadMessage(msg), uploadNode(group)]);
+          if (media != null) uploadOrUpdateMedia(media);
+          final success = await Future.wait(ss).then((s) => s.every((b) => b));
+          if (success) {
+            group
+              ..messages.add(msg.id)
+              ..save();
+            await writePalette2(group, _palettes, bGen, refreshHome);
+            final h = "${g.self.name} formed ${group.name}";
+            final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
+            final t = List<ID>.from(group.group)..remove(g.self.id);
+            final d = "m-${msg.id}-${group.id}";
+            r.MessageRequest(targets: t, data: d, header: h, body: b).process();
+          }
         },
+        // groupRequest: (groupRequest) {
+        //   _requests.add(groupRequest);
+        //   processWebRequests();
+        // },
         palettesForTransition: transition.first,
         people: transition.second,
         nHidden: transition.third,
@@ -865,10 +913,25 @@ class _HomeState extends State<Home> {
                 .map((e) => homeNode(e) ?? hiddenNode(e))
                 .whereType<ChatableNode>()
             : null, // TODO, will need future nodes
-        send: (messageRequest) {
-          _requests.add(messageRequest);
-          processWebRequests();
+        sendMessage: (msg, media) async {
+          List<Future<bool>> ss = [];
+          ss.add(uploadMessage(msg));
+          if (media != null) ss.add(uploadOrUpdateMedia(media));
+          final success = await Future.wait(ss).then((s) => s.every((b) => b));
+          if (success) {
+            final t = node is GroupNode
+                ? (List<ID>.from(node.group)..remove(g.self.id))
+                : [node.id];
+            final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
+            final h = g.self.name + (node is Group ? " in ${node.name}" : "");
+            final d = "m-${msg.id}-${node.id}";
+            r.MessageRequest(targets: t, header: h, body: b, data: d).process();
+          }
         },
+        // send: (messageRequest) {
+        //   _requests.add(messageRequest);
+        //   processWebRequests();
+        // },
         back: pop);
   }
 
