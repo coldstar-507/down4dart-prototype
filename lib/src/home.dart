@@ -104,7 +104,15 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
-  List<r.Request> _requests = [];
+  void goHome() {
+    final nPages = pm.nPages;
+    for (int i = 0; i < nPages - 1; i++) {
+      pm.pop();
+    }
+    refresh(homePage());
+  }
+
+  // List<r.Request> _requests = [];
 
   Map<ID, Palette2> _palettes = {};
   Map<ID, Palette2> _hiddenPalettes = {};
@@ -136,7 +144,7 @@ class _HomeState extends State<Home> {
     g.wallet.walletRoutine();
     g.wallet.printWalletInfo();
     connectToMessages();
-    processWebRequests();
+    // processWebRequests();
     updateExchangeRate();
   }
 
@@ -223,13 +231,13 @@ class _HomeState extends State<Home> {
     _messageListener = msgQueue.onChildAdded.listen((event) async {
       print("New message!");
       final eventKey = event.snapshot.key;
-      final eventPayload = event.snapshot.value as String;
-      if (eventKey == null) return;
-      msgQueue.child(eventKey).remove(); // consume it
+      final eventPayload = (event.snapshot.value as String).split("-");
+      msgQueue.child(eventKey!).remove(); // consume it
 
-      if (eventPayload == "p") {
+      if (eventPayload.first == "p") {
         // PAYMENT!
-        final payment = await r.getPayment(eventKey);
+        final paymentID = eventPayload[1];
+        final payment = await r.getPayment(paymentID);
         if (payment == null) return;
         await g.wallet.parsePayment(g.self.id, payment);
         if (pm.currentPage is MoneyPage) {
@@ -244,17 +252,18 @@ class _HomeState extends State<Home> {
           }
         }
         return;
-      } else if (eventPayload == "m") {
+      } else if (eventPayload.first == "m") {
         // MESSAGE!
-        final snapshot = await messagesRef.child(eventKey).get();
+        final msgID = eventPayload[1];
+        final root = eventPayload[2];
+        final snapshot = await messagesRef.child(msgID).get();
         if (!snapshot.exists) return;
         final msgJson = Map<String, dynamic>.from(snapshot.value as Map);
         final msg = Message.fromJson(msgJson);
-        final theRoot = msg.root ?? msg.senderID;
-        ChatableNode? rootNode = homeNode(theRoot) as ChatableNode?;
+        ChatableNode? rootNode = homeNode(root) as ChatableNode?;
         if (rootNode == null) {
           // need to download it
-          final singleNodeList = await r.getNodes([theRoot]);
+          final singleNodeList = await r.getNodes([root]);
           if (singleNodeList == null || singleNodeList.length != 1) return;
           rootNode = singleNodeList.first as ChatableNode;
           if (rootNode is GroupNode) {
@@ -272,15 +281,15 @@ class _HomeState extends State<Home> {
 
         await writePalette2(rootNode, _palettes, bGen, refreshHome, h: true);
 
-        if (pm.currentPage is HomePage) {
+        final cp = pm.currentPage;
+        if (cp is HomePage) {
           refresh(homePage());
-        } else if (pm.currentPage is ChatPage && pm.currentID == theRoot) {
+        } else if (cp is ChatPage && cp.node.id == root) {
           refresh(chatPage(rootNode));
         }
-      } else {
-        // SNIP! The payload is senderID OR senderID@root
-        final String root = eventPayload;
-        final String mediaID = eventKey;
+      } else if (eventPayload.first == "s") {
+        final String mediaID = eventPayload[1];
+        final String root = eventPayload[2];
 
         ChatableNode? nodeRoot;
         nodeRoot = homeNode(root) as ChatableNode?;
@@ -343,147 +352,147 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<void> processWebRequests() async {
-    Future<bool> processWebRequest(r.Request req) async {
-      if (req is r.ChatRequest) {
-        final root = req.message.root ?? req.targets.first;
-        var node = homeNode(root) as ChatableNode;
+  // Future<void> processWebRequests() async {
+  //   Future<bool> processWebRequest(r.Request req) async {
+  //     if (req is r.ChatRequest) {
+  //       final root = req.message.root ?? req.targets.first;
+  //       var node = homeNode(root) as ChatableNode;
 
-        final bool sendingToSelf = node.id == g.self.id;
-        // first, save the message, if we are sending it to self,
-        // it's a saved message, hence isSaved will be true
-        req.message
-          ..isRead = true
-          ..isSaved = sendingToSelf
-          ..save();
+  //       final bool sendingToSelf = node.id == g.self.id;
+  //       // first, save the message, if we are sending it to self,
+  //       // it's a saved message, hence isSaved will be true
+  //       req.message
+  //         ..isRead = true
+  //         ..isSaved = sendingToSelf
+  //         ..save();
 
-        // if there is a media, we need to save it and add
-        // the reference of the message to it
-        req.media
-          ?..references.add(req.message.id)
-          ..save();
+  //       // if there is a media, we need to save it and add
+  //       // the reference of the message to it
+  //       req.media
+  //         ?..references.add(req.message.id)
+  //         ..save();
 
-        node
-          ..messages.add(req.message.id)
-          ..updateActivity()
-          ..save();
+  //       node
+  //         ..messages.add(req.message.id)
+  //         ..updateActivity()
+  //         ..save();
 
-        final cp = pm.currentPage;
-        if (cp is ChatPage && cp.node.id == root) {
-          refresh(chatPage(node));
-        }
+  //       final cp = pm.currentPage;
+  //       if (cp is ChatPage && cp.node.id == root) {
+  //         refresh(chatPage(node));
+  //       }
 
-        // // we refresh or write the home palette
-        // // the current state after a pop is always refresh, hence we will
-        // // see the changes when we go back home
-        // await writePalette2(node, _palettes, bGen, refreshHome, h: true);
-        // We don't need to do this anymore.
+  //       // // we refresh or write the home palette
+  //       // // the current state after a pop is always refresh, hence we will
+  //       // // see the changes when we go back home
+  //       // await writePalette2(node, _palettes, bGen, refreshHome, h: true);
+  //       // We don't need to do this anymore.
 
-        // we don't do the request if we are sending this message to self
-        if (!sendingToSelf) {
-          if (req.media != null) {
-            await uploadOrUpdateMedia(
-              req.media!,
-              skipCheck: req.media!.metadata.canSkipCheck,
-            );
-          }
-          return req.send();
-        }
+  //       // we don't do the request if we are sending this message to self
+  //       if (!sendingToSelf) {
+  //         if (req.media != null) {
+  //           await uploadOrUpdateMedia(
+  //             req.media!,
+  //             skipCheck: req.media!.metadata.canSkipCheck,
+  //           );
+  //         }
+  //         return req.send();
+  //       }
 
-        return true;
-      } else if (req is r.PingRequest) {
-        final success = req.send();
-        _tec.clear();
-        unselectSelection();
-        refresh(homePage());
-        return success;
-      } else if (req is r.SnipRequest) {
-        final success = req.send();
-        await unselectSelection();
-        refreshHome();
-        return success;
-      } else if (req is r.HyperchatRequest) {
-        push(loadingPage());
+  //       return true;
+  //     } else if (req is r.PingRequest) {
+  //       final success = req.send();
+  //       _tec.clear();
+  //       unselectSelection();
+  //       refresh(homePage());
+  //       return success;
+  //     } else if (req is r.SnipRequest) {
+  //       final success = req.send();
+  //       await unselectSelection();
+  //       refreshHome();
+  //       return success;
+  //     } else if (req is r.HyperchatRequest) {
+  //       push(loadingPage());
 
-        if (req.media != null) {
-          await uploadOrUpdateMedia(
-            req.media!,
-            skipCheck: req.media!.metadata.canSkipCheck,
-          );
-        }
+  //       if (req.media != null) {
+  //         await uploadOrUpdateMedia(
+  //           req.media!,
+  //           skipCheck: req.media!.metadata.canSkipCheck,
+  //         );
+  //       }
 
-        var node = await req.send();
-        if (node == null) {
-          refreshHome();
-          return false;
-        }
-        await unselectSelection();
-        node
-          ..messages.add(req.message.id)
-          ..updateActivity()
-          ..save();
-        req.message
-          ..isRead = true
-          ..save();
-        await writePalette2(node, _palettes, bGen, refreshHome, h: true);
+  //       var node = await req.send();
+  //       if (node == null) {
+  //         refreshHome();
+  //         return false;
+  //       }
+  //       await unselectSelection();
+  //       node
+  //         ..messages.add(req.message.id)
+  //         ..updateActivity()
+  //         ..save();
+  //       req.message
+  //         ..isRead = true
+  //         ..save();
+  //       await writePalette2(node, _palettes, bGen, refreshHome, h: true);
 
-        pm
-          ..pop()
-          ..pop()
-          ..put(chatPage(node));
-        setState(() {});
+  //       pm
+  //         ..pop()
+  //         ..pop()
+  //         ..put(chatPage(node));
+  //       setState(() {});
 
-        return true;
-      } else if (req is r.GroupRequest) {
-        push(loadingPage());
+  //       return true;
+  //     } else if (req is r.GroupRequest) {
+  //       push(loadingPage());
 
-        if (req.media != null) {
-          await uploadOrUpdateMedia(
-            req.media!,
-            skipCheck: req.media!.metadata.canSkipCheck,
-          );
-        }
+  //       if (req.media != null) {
+  //         await uploadOrUpdateMedia(
+  //           req.media!,
+  //           skipCheck: req.media!.metadata.canSkipCheck,
+  //         );
+  //       }
 
-        var node = await req.send();
-        if (node == null) {
-          refreshHome();
-          return false;
-        }
-        await unselectSelection();
+  //       var node = await req.send();
+  //       if (node == null) {
+  //         refreshHome();
+  //         return false;
+  //       }
+  //       await unselectSelection();
 
-        req.message.save();
+  //       req.message.save();
 
-        node
-          ..messages.add(req.message.id)
-          ..updateActivity()
-          ..save();
+  //       node
+  //         ..messages.add(req.message.id)
+  //         ..updateActivity()
+  //         ..save();
 
-        await writePalette2(node, _palettes, bGen, refreshHome, h: true);
+  //       await writePalette2(node, _palettes, bGen, refreshHome, h: true);
 
-        pm
-          ..pop()
-          ..pop()
-          ..put(chatPage(node));
+  //       pm
+  //         ..pop()
+  //         ..pop()
+  //         ..put(chatPage(node));
 
-        setState(() {});
+  //       setState(() {});
 
-        return true;
-      } else if (req is r.PaymentRequest) {
-        g.wallet.parsePayment(g.self.id, req.payment);
-        return await req.send();
-      } else {
-        return false;
-      }
-    }
+  //       return true;
+  //     } else if (req is r.PaymentRequest) {
+  //       g.wallet.parsePayment(g.self.id, req.payment);
+  //       return await req.send();
+  //     } else {
+  //       return false;
+  //     }
+  //   }
 
-    final requestsToProcess = List<r.Request>.from(_requests);
-    print("There are ${requestsToProcess.length} requests to process!");
-    for (final req in requestsToProcess) {
-      final success = await processWebRequest(req);
-      if (success) _requests.remove(req);
-    }
-    print("There are now ${_requests.length} requests to process!");
-  }
+  //   final requestsToProcess = List<r.Request>.from(_requests);
+  //   print("There are ${requestsToProcess.length} requests to process!");
+  //   for (final req in requestsToProcess) {
+  //     final success = await processWebRequest(req);
+  //     if (success) _requests.remove(req);
+  //   }
+  //   print("There are now ${_requests.length} requests to process!");
+  // }
 
   Future<void> sendSnip({
     required String path,
@@ -491,6 +500,9 @@ class _HomeState extends State<Home> {
     required double aspectRatio,
     String? text,
   }) async {
+    // image from camera are cached files, so they are
+    // automatically deleted on boot
+
     final timestamp = timeStamp();
     pm.pop();
     push(loadingPage());
@@ -514,35 +526,32 @@ class _HomeState extends State<Home> {
     if (!success) return print("Snip media upload unsucessful!");
 
     var personTargets = <ID>[];
-    var snipRequests = <r.SnipRequest>[];
+    List<Future<bool>> successes = [];
 
     final selectedPalettes = homePalettes.selected();
     for (final node in selectedPalettes.asNodes()) {
       if (node is GroupNode) {
         final targets = homePalettes.those(node.group).whereNodeIs<User>();
-        final sr = r.SnipRequest(
-            mediaID: media.id,
-            root: node.id,
-            groupName: node.name,
-            senderID: g.self.id,
-            targets: targets.asIds().toList(growable: false));
-        snipRequests.add(sr);
+        successes.add(r.RequestData(
+          targets: targets.asIds().toList(),
+          notifHeader: "${g.self.name} pinged ${node.name}",
+          notifBody: "&attachment",
+          data: "s-${media.id}-${node.id}",
+        ).process());
       } else {
         personTargets.add(node.id);
       }
     }
 
     if (personTargets.isNotEmpty) {
-      final targets = selectedPalettes.asNodes().whereType<Person>().asIds();
-      final sr = r.SnipRequest(
-          mediaID: media.id,
-          senderID: g.self.id,
-          targets: targets.toList(growable: false));
-      snipRequests.add(sr);
+      successes.add(r.RequestData(
+        targets: personTargets,
+        notifHeader: "${g.self.name} pinged you",
+        notifBody: "&attachment",
+        data: "s-${media.id}-${g.self.id}",
+      ).process());
     }
 
-    _requests.addAll(snipRequests);
-    processWebRequests();
     await unselectSelection();
     pop();
   }
@@ -609,9 +618,26 @@ class _HomeState extends State<Home> {
       hyperchat: () => push(hyperchatPage()),
       group: () => push(groupPage()),
       money: () => push(moneyPage(transition: homeTransition())),
-      ping: (pingRequest) {
-        _requests.add(pingRequest);
-        processWebRequests();
+      ping: (text) {
+        // Ping group nodes
+        homePalettes.selected().asNodes<GroupNode>().forEach((gn) {
+          final targets = List<ID>.from(gn.group)..remove(g.self.id);
+          r.RequestData(
+            targets: targets,
+            notifHeader: "${g.self.name} pinged ${gn.name}",
+            notifBody: text,
+            data: "",
+          ).process();
+        });
+        // Ping user nodes
+        homePalettes.selected().asNodes<Person>().forEach((pn) {
+          r.RequestData(
+            targets: [pn.id],
+            notifHeader: "${g.self.name} pinged you",
+            notifBody: text,
+            data: "",
+          ).process();
+        });
       },
       snip: () async => push(await snipPage()),
       search: () => push(searchPage()),
@@ -658,9 +684,21 @@ class _HomeState extends State<Home> {
         pm.pop();
         refresh(homePage());
       }),
-      paymentRequest: (pr) {
-        _requests.add(pr);
-        processWebRequests();
+      sendPayment: (pay) async {
+        final targets = pay.txs.last.txsOut
+            .map((utxo) => utxo.isGets ? utxo.receiver : null)
+            .whereType<String>()
+            .toList(growable: false);
+        final success = await uploadPayment(pay);
+        if (success) {
+          r.RequestData(
+            targets: targets,
+            data: "p-${payment.id}",
+            notifHeader: "${g.self.id} payed you",
+            notifBody: pay.textNote,
+          ).process();
+          goHome();
+        }
       },
       back: pop,
       payment: payment,
@@ -701,10 +739,19 @@ class _HomeState extends State<Home> {
       people: transition.second,
       nHidden: transition.third,
       homePalettes: formattedHomePalettes,
-      hyperchatRequest: (hyperchatRequest) {
-        _requests.add(hyperchatRequest);
-        processWebRequests();
+      makeHyperchat: (prompts, msg, media) async {
+        final hc = await r.getHyperchat(prompts);
+        if (hc == null) return;
+
+        List<Future<bool>> ss = [uploadMessage(msg)];
+        if (media != null) ss.add(uploadOrUpdateMedia(media));
+        final success = await Future.wait(ss).then((s) => s.every((e) => e));
+        if (success) {}
       },
+      // hyperchatRequest: (hyperchatRequest) {
+      //   _requests.add(hyperchatRequest);
+      //   processWebRequests();
+      // },
       back: pop,
       ping: (pingRequest) {
         _requests.add(pingRequest);
