@@ -93,7 +93,7 @@ class _HomeState extends State<Home> {
     } else if (cp is NodePage) {
       pm.refresh(nodePage(cp.node));
     } else if (cp is ChatPage) {
-      pm.refresh(chatPage(cp.node));
+      pm.refresh(chatPage(cp.node, cp.fObjects));
     } else if (cp is ForwardingPage) {
       pm.refresh(forwardPage(cp.forwardingObjects));
     }
@@ -113,7 +113,10 @@ class _HomeState extends State<Home> {
     refresh(homePage());
   }
 
-  // List<r.Request> _requests = [];
+  Transition homeTransition() => selectionTransition(
+      state: _palettes,
+      hiddenState: _hiddenPalettes,
+      scrollOffset: _homeScrollController.offset);
 
   Map<ID, Palette2> _palettes = {};
   Map<ID, Palette2> _hiddenPalettes = {};
@@ -235,7 +238,37 @@ class _HomeState extends State<Home> {
       final eventPayload = (event.snapshot.value as String).split("-");
       msgQueue.child(eventKey!).remove(); // consume it
 
-      if (eventPayload.first == "p") {
+      if (eventPayload.first == "h") {
+        // "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
+        // HYPERCHAT
+        final msgID = eventPayload[1];
+        final hcID = eventPayload[2];
+        final mediaID = eventPayload[3];
+        final firstWord = eventPayload[4];
+        final secondWord = eventPayload[5];
+        final members = eventPayload[6].split(" ");
+
+        final hcMedia = downloadMessageMediaAsNodeMedia(mediaID);
+        final msg = downloadMessage(msgID);
+
+        Future.wait([hcMedia, msg]).then((value) async {
+          if (value.first == null) return;
+          await (value[1] as Message?)?.onReceipt();
+          final hyperchat = Hyperchat(
+              id: hcID,
+              firstWord: firstWord,
+              secondWord: secondWord,
+              group: members.toSet(),
+              messages: {msgID},
+              snips: {},
+              media: value.first as NodeMedia)
+            ..save();
+
+          await writePalette2(hyperchat, _palettes, bGen, refreshHome);
+          await localPalettesRoutine();
+          refresh(homePage());
+        });
+      } else if (eventPayload.first == "p") {
         // PAYMENT!
         final paymentID = eventPayload[1];
         final payment = await r.getPayment(paymentID);
@@ -257,10 +290,8 @@ class _HomeState extends State<Home> {
         // MESSAGE!
         final msgID = eventPayload[1];
         final root = eventPayload[2];
-        final snapshot = await messagesRef.child(msgID).get();
-        if (!snapshot.exists) return;
-        final msgJson = Map<String, dynamic>.from(snapshot.value as Map);
-        final msg = Message.fromJson(msgJson);
+        final msg = await downloadMessage(msgID);
+        if (msg == null) return;
         ChatableNode? rootNode = homeNode(root) as ChatableNode?;
         if (rootNode == null) {
           // need to download it
@@ -353,147 +384,74 @@ class _HomeState extends State<Home> {
     }
   }
 
-  // Future<void> processWebRequests() async {
-  //   Future<bool> processWebRequest(r.Request req) async {
-  //     if (req is r.ChatRequest) {
-  //       final root = req.message.root ?? req.targets.first;
-  //       var node = homeNode(root) as ChatableNode;
+  // =========================== PAGES FUNCTIONS ======================== //
 
-  //       final bool sendingToSelf = node.id == g.self.id;
-  //       // first, save the message, if we are sending it to self,
-  //       // it's a saved message, hence isSaved will be true
-  //       req.message
-  //         ..isRead = true
-  //         ..isSaved = sendingToSelf
-  //         ..save();
+  void forward(objects, targets, text, media) async {
+    Message? msg;
+    final nodes = objects.whereType<Palette2>().asIds();
+    if (text.isNotEmpty || media != null || nodes.isNotEmpty) {
+      msg = Message(
+          senderID: g.self.id,
+          timestamp: timeStamp(),
+          id: messagePushId(),
+          text: text,
+          mediaID: media?.id,
+          nodes: nodes.toList());
+    }
 
-  //       // if there is a media, we need to save it and add
-  //       // the reference of the message to it
-  //       req.media
-  //         ?..references.add(req.message.id)
-  //         ..save();
+    List<Future<bool>> ss = [];
+    if (msg != null) ss.add(uploadMessage(msg));
+    if (media != null) ss.add(uploadOrUpdateMedia(media));
+    final success = await Future.wait(ss).then((s) => s.every((b) => b));
 
-  //       node
-  //         ..messages.add(req.message.id)
-  //         ..updateActivity()
-  //         ..save();
+    if (!success) return;
 
-  //       final cp = pm.currentPage;
-  //       if (cp is ChatPage && cp.node.id == root) {
-  //         refresh(chatPage(node));
-  //       }
+    final fMessages = objects.whereType<ChatMessage>().asIDs().toList();
 
-  //       // // we refresh or write the home palette
-  //       // // the current state after a pop is always refresh, hence we will
-  //       // // see the changes when we go back home
-  //       // await writePalette2(node, _palettes, bGen, refreshHome, h: true);
-  //       // We don't need to do this anymore.
-
-  //       // we don't do the request if we are sending this message to self
-  //       if (!sendingToSelf) {
-  //         if (req.media != null) {
-  //           await uploadOrUpdateMedia(
-  //             req.media!,
-  //             skipCheck: req.media!.metadata.canSkipCheck,
-  //           );
-  //         }
-  //         return req.send();
-  //       }
-
-  //       return true;
-  //     } else if (req is r.PingRequest) {
-  //       final success = req.send();
-  //       _tec.clear();
-  //       unselectSelection();
-  //       refresh(homePage());
-  //       return success;
-  //     } else if (req is r.SnipRequest) {
-  //       final success = req.send();
-  //       await unselectSelection();
-  //       refreshHome();
-  //       return success;
-  //     } else if (req is r.HyperchatRequest) {
-  //       push(loadingPage());
-
-  //       if (req.media != null) {
-  //         await uploadOrUpdateMedia(
-  //           req.media!,
-  //           skipCheck: req.media!.metadata.canSkipCheck,
-  //         );
-  //       }
-
-  //       var node = await req.send();
-  //       if (node == null) {
-  //         refreshHome();
-  //         return false;
-  //       }
-  //       await unselectSelection();
-  //       node
-  //         ..messages.add(req.message.id)
-  //         ..updateActivity()
-  //         ..save();
-  //       req.message
-  //         ..isRead = true
-  //         ..save();
-  //       await writePalette2(node, _palettes, bGen, refreshHome, h: true);
-
-  //       pm
-  //         ..pop()
-  //         ..pop()
-  //         ..put(chatPage(node));
-  //       setState(() {});
-
-  //       return true;
-  //     } else if (req is r.GroupRequest) {
-  //       push(loadingPage());
-
-  //       if (req.media != null) {
-  //         await uploadOrUpdateMedia(
-  //           req.media!,
-  //           skipCheck: req.media!.metadata.canSkipCheck,
-  //         );
-  //       }
-
-  //       var node = await req.send();
-  //       if (node == null) {
-  //         refreshHome();
-  //         return false;
-  //       }
-  //       await unselectSelection();
-
-  //       req.message.save();
-
-  //       node
-  //         ..messages.add(req.message.id)
-  //         ..updateActivity()
-  //         ..save();
-
-  //       await writePalette2(node, _palettes, bGen, refreshHome, h: true);
-
-  //       pm
-  //         ..pop()
-  //         ..pop()
-  //         ..put(chatPage(node));
-
-  //       setState(() {});
-
-  //       return true;
-  //     } else if (req is r.PaymentRequest) {
-  //       g.wallet.parsePayment(g.self.id, req.payment);
-  //       return await req.send();
-  //     } else {
-  //       return false;
-  //     }
-  //   }
-
-  //   final requestsToProcess = List<r.Request>.from(_requests);
-  //   print("There are ${requestsToProcess.length} requests to process!");
-  //   for (final req in requestsToProcess) {
-  //     final success = await processWebRequest(req);
-  //     if (success) _requests.remove(req);
-  //   }
-  //   print("There are now ${_requests.length} requests to process!");
-  // }
+    for (final node in targets) {
+      if (node is GroupNode) {
+        final t = List<ID>.from(node.group)..remove(g.self.id);
+        if (msg != null) {
+          r.MessageRequest(
+            sender: g.self.id,
+            targets: t,
+            header: "${g.self.name} in ${node.name}",
+            body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
+            data: "m-${msg.id}-${node.id}",
+          ).process();
+        }
+        for (final fMsg in fMessages) {
+          r.MessageRequest(
+            sender: g.self.id,
+            targets: t,
+            header: "${g.self.name} in ${node.name}",
+            body: ">>forwarded message",
+            data: "f-$fMsg-${node.id}-${g.self.id}",
+          ).process();
+        }
+      } else {
+        if (msg != null) {
+          r.MessageRequest(
+            sender: g.self.id,
+            targets: [node.id],
+            header: g.self.name,
+            body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
+            data: "m-${msg.id}-${g.self.id}",
+          ).process();
+        }
+        for (final fMsg in fMessages) {
+          r.MessageRequest(
+            sender: g.self.id,
+            targets: [node.id],
+            header: g.self.name,
+            body: ">>forwarded message",
+            data: "f-$fMsg-${g.self.id}-${g.self.id}",
+          ).process();
+        }
+      }
+    }
+    // TODO FORWARDING MULTIPLE OBJECTS TO MULTIPLE TARGETS
+  }
 
   Future<void> sendSnip({
     required String path,
@@ -534,6 +492,7 @@ class _HomeState extends State<Home> {
       if (node is GroupNode) {
         final targets = homePalettes.those(node.group).whereNodeIs<User>();
         successes.add(r.MessageRequest(
+          sender: g.self.id,
           targets: targets.asIds().toList(),
           header: "${g.self.name} pinged ${node.name}",
           body: "&attachment",
@@ -546,6 +505,7 @@ class _HomeState extends State<Home> {
 
     if (personTargets.isNotEmpty) {
       successes.add(r.MessageRequest(
+        sender: g.self.id,
         targets: personTargets,
         header: "${g.self.name} pinged you",
         body: "&attachment",
@@ -555,59 +515,6 @@ class _HomeState extends State<Home> {
 
     await unselectSelection();
     pop();
-  }
-
-  Sixtuple<List<Palette2>, Iterable<Person>, int, double, Map<ID, Palette2>,
-      List<Palette2>> homeTransition() {
-    final allHomePalettes = formattedHomePalettes;
-    final originalOrder = allHomePalettes.asIds();
-    final visibleHomePalettes = allHomePalettes;
-    final hidden = _hiddenPalettes.values;
-    final selected = visibleHomePalettes.selected();
-    final unselected = visibleHomePalettes.notSelected();
-    final idsInGroups = selected
-        .asNodes()
-        .whereType<GroupNode>()
-        .map((g) => g.group)
-        .expand((id) => id)
-        .toSet();
-    final selectedUsers = selected.whereNodeIs<Person>();
-    final selectedGroups = selected.whereNodeIs<GroupNode>();
-    final unselectedGroups = unselected.whereNodeIs<GroupNode>();
-    final unselectedUsers = unselected.whereNodeIs<Person>();
-    final unHide = hidden.those(idsInGroups);
-    // final keepHiding = hidden.notThose(idsInGroups);
-    final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
-    final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
-    // groups are folded
-    // unHide should get a left to right show transition
-    // not selected should get a fold transition
-    // selected are unselected
-    // all are deactivated
-    final pals = <Palette2>{
-      ...unHide, //.deactivated().map((e) => e.withoutButton()),
-      ...selectedUsers.map(
-          (e) => e.deactivated().animated(selected: false, fadeButton: true)),
-      ...unselectedUserInGroups
-          .deactivated()
-          .map((e) => e.animated(fadeButton: true)),
-      ...unselectedGroups
-          .map((e) => e.animated(fadeButton: true, fade: true, fold: true)),
-      ...selectedGroups
-          .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
-      ...unselectedUsersNotInGroups
-          .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
-    };
-
-    print("pals=${pals.map((e) => e.node.name).toList()}");
-    return Sixtuple(
-      pals.inThatOrder(originalOrder.followedBy(unHide.asIds())),
-      pals.where((p) => !p.fold).asNodes<Person>(),
-      unHide.length,
-      _homeScrollController.offset,
-      _palettes,
-      formattedHomePalettes,
-    );
   }
 
   // ============================== PAGES ============================== //
@@ -624,6 +531,7 @@ class _HomeState extends State<Home> {
         homePalettes.selected().asNodes<GroupNode>().forEach((gn) {
           final targets = List<ID>.from(gn.group)..remove(g.self.id);
           r.MessageRequest(
+            sender: g.self.id,
             targets: targets,
             header: "${g.self.name} pinged ${gn.name}",
             body: text,
@@ -633,6 +541,7 @@ class _HomeState extends State<Home> {
         // Ping user nodes
         homePalettes.selected().asNodes<Person>().forEach((pn) {
           r.MessageRequest(
+            sender: g.self.id,
             targets: [pn.id],
             header: "${g.self.name} pinged you",
             body: text,
@@ -662,19 +571,14 @@ class _HomeState extends State<Home> {
 
   ru.Down4PageWidget forwardPage(List<Down4Object> forwardingObjects) {
     return ForwardingPage(
+        hiddenState: _hiddenPalettes,
         possibleTargets: formattedHomePalettes.reversed.asNodes<ChatableNode>(),
-        singleForward: (objects, single) {
-          for (var object in objects) {
-            // TODO FORWARDING MULTIPLE OBJECTS
-          }
-        },
         forwardingObjects: forwardingObjects,
-        forward: (objects, targets) {
-          // TODO FORWARDING MULTIPLE OBJECTS TO MULTIPLE TARGETS
+        openNode: (fObjects, node) => push(chatPage(node, fObjects.toList())),
+        hyper: (fObjects, transition) {
+          return hyperchatPage();
         },
-        hyperForward: (objects, targets) {
-          // TODO FORWARDING MULTIPLE OBJECTS IN HYPERCHAT
-        },
+        forward: forward,
         back: pop);
   }
 
@@ -693,6 +597,7 @@ class _HomeState extends State<Home> {
         final success = await uploadPayment(pay);
         if (success) {
           r.MessageRequest(
+            sender: g.self.id,
             targets: targets,
             data: "p-${payment.id}",
             header: "${g.self.id} payed you",
@@ -706,27 +611,26 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget moneyPage({
-    Sixtuple<List<Palette2>, Iterable<Person>, int, double, Map<ID, Palette2>,
-            List<Palette2>>?
-        transition,
-    Person? node,
-    Down4Payment? paymentUpdate, // this is for when we are in money view, and
-    // we receive an online payment, this let us update status with this new
-    // payment, it would not be necessary if listeners work on lazy box, but
-    // haven't found a way to make the listener work yet...
-  }) {
+  ru.Down4PageWidget moneyPage(
+      {Transition? transition, Person? node, Down4Payment? paymentUpdate
+      // payment update is for when we are in money view, and
+      // we receive an online payment, this let us update status with this new
+      // payment, it would not be necessary if listeners work on lazy box, but
+      // haven't found a way to make the listener work yet...
+      }) {
     return MoneyPage(
-        initialOffset: transition?.fourth ?? 0,
-        palettesAfterTransition: transition?.first ?? [Palette2(node: node!)],
-        people: transition?.second ?? [node!],
-        nHidden: transition?.third ?? 0,
+        initialOffset: transition?.scroll ?? 0,
+        palettesAfterTransition:
+            transition?.postTransition ?? [Palette2(node: node!)],
+        people: transition?.trueTargets ?? [node!],
+        nHidden: transition?.nHidden ?? 0,
         openPayment: (payment) => push(paymentPage(payment)),
-        palettesBeforeTransition: transition?.sixth ?? [Palette2(node: node!)],
+        palettesBeforeTransition:
+            transition?.preTransition ?? [Palette2(node: node!)],
         paymentUpdate: paymentUpdate,
         makePayment: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
-          if (transition != null) unselectedSelectedPalettes(transition.fifth);
+          if (transition != null) unselectedSelectedPalettes(transition.state);
           push(paymentPage(payment));
         },
         back: pop);
@@ -736,10 +640,10 @@ class _HomeState extends State<Home> {
     final transition = homeTransition();
     return HyperchatPage(
       initialOffset: homeScroll,
-      palettesForTransition: transition.first,
-      people: transition.second,
-      nHidden: transition.third,
-      homePalettes: formattedHomePalettes,
+      palettesForTransition: transition.postTransition,
+      people: transition.trueTargets,
+      nHidden: transition.nHidden,
+      homePalettes: transition.preTransition,
       makeHyperchat: (prompts, msg, media) async {
         final hc = await r.getHyperchat(prompts);
         if (hc == null) return;
@@ -748,7 +652,7 @@ class _HomeState extends State<Home> {
           id: sha1(hc.first).toBase58(),
           firstWord: hc.second.first,
           secondWord: hc.second.second,
-          group: Set<ID>.from(transition.second.asIds())..add(g.self.id),
+          group: Set<ID>.from(transition.trueTargets.asIds())..add(g.self.id),
           messages: {msg.id},
           snips: {},
           media: NodeMedia(
@@ -773,7 +677,13 @@ class _HomeState extends State<Home> {
           final h = "${g.self.name} formed ${hyper.name}";
           final d =
               "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
-          r.MessageRequest(targets: t, body: b, header: h, data: d).process();
+          r.MessageRequest(
+            sender: g.self.id,
+            targets: t,
+            body: b,
+            header: h,
+            data: d,
+          ).process();
         }
       },
       // hyperchatRequest: (hyperchatRequest) {
@@ -782,10 +692,17 @@ class _HomeState extends State<Home> {
       // },
       back: pop,
       ping: (text) {
-        final t = List<ID>.from(transition.second.asIds())..remove(g.self.id);
+        final t = List<ID>.from(transition.trueTargets.asIds())
+          ..remove(g.self.id);
         final b = text;
         final h = "${g.self.name} pinged you";
-        r.MessageRequest(data: "", targets: t, header: h, body: b).process();
+        r.MessageRequest(
+          sender: g.self.id,
+          data: "",
+          targets: t,
+          header: h,
+          body: b,
+        ).process();
       },
     );
   }
@@ -810,16 +727,18 @@ class _HomeState extends State<Home> {
             final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
             final t = List<ID>.from(group.group)..remove(g.self.id);
             final d = "m-${msg.id}-${group.id}";
-            r.MessageRequest(targets: t, data: d, header: h, body: b).process();
+            r.MessageRequest(
+              sender: g.self.id,
+              targets: t,
+              data: d,
+              header: h,
+              body: b,
+            ).process();
           }
         },
-        // groupRequest: (groupRequest) {
-        //   _requests.add(groupRequest);
-        //   processWebRequests();
-        // },
-        palettesForTransition: transition.first,
-        people: transition.second,
-        nHidden: transition.third,
+        palettesForTransition: transition.postTransition,
+        people: transition.trueTargets,
+        nHidden: transition.nHidden,
         homePalettes: formattedHomePalettes);
   }
 
@@ -900,18 +819,22 @@ class _HomeState extends State<Home> {
         back: pop);
   }
 
-  ru.Down4PageWidget chatPage(ChatableNode node) {
+  ru.Down4PageWidget chatPage(ChatableNode node, [List<Down4Object>? fObjs]) {
     if (!_palettes.values.asIds().contains(node.id)) {
       writePalette2(node..save(), _palettes, bGen, refreshHome, h: true);
     }
 
     return ChatPage(
         node: node,
+        fObjects: fObjs,
         openNode: (node_) => push(nodePage(node_)),
+        forward: (fObjs, node, text, media) =>
+            forward(fObjs, [node], text, media),
         subNodes: node is GroupNode
             ? node.group
                 .map((e) => homeNode(e) ?? hiddenNode(e))
                 .whereType<ChatableNode>()
+                .toList()
             : null, // TODO, will need future nodes
         sendMessage: (msg, media) async {
           List<Future<bool>> ss = [];
@@ -925,13 +848,15 @@ class _HomeState extends State<Home> {
             final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
             final h = g.self.name + (node is Group ? " in ${node.name}" : "");
             final d = "m-${msg.id}-${node.id}";
-            r.MessageRequest(targets: t, header: h, body: b, data: d).process();
+            r.MessageRequest(
+              sender: g.self.id,
+              targets: t,
+              header: h,
+              body: b,
+              data: d,
+            ).process();
           }
         },
-        // send: (messageRequest) {
-        //   _requests.add(messageRequest);
-        //   processWebRequests();
-        // },
         back: pop);
   }
 

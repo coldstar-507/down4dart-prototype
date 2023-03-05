@@ -28,16 +28,25 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
 
   final void Function(Message, MessageMedia?) sendMessage;
   final ChatableNode node;
-  final Iterable<BaseNode>? subNodes;
+  final List<BaseNode>? subNodes;
+  final List<Down4Object>? fObjects;
   final void Function() back;
   final void Function(BaseNode) openNode;
+  final void Function(
+    Iterable<Down4Object>,
+    ChatableNode,
+    String,
+    MessageMedia?,
+  ) forward;
 
   const ChatPage({
     required this.sendMessage,
     required this.subNodes,
     required this.back,
+    required this.forward,
     required this.node,
     required this.openNode,
+    this.fObjects,
     Key? key,
   }) : super(key: key);
 
@@ -539,6 +548,61 @@ class _ChatPageState extends State<ChatPage> {
           name: "Medias",
           onPress: () => loadMediasConsole(images: images),
         ),
+      ],
+    );
+    setState(() {});
+  }
+
+  void loadForwardingConsole({
+    List<Down4Object>? fObjects,
+    bool extra = false,
+  }) {
+    final f = fObjects ?? widget.fObjects;
+    if (f == null) return loadBaseConsole();
+    _console = Console(
+      bottomInputs: [_consoleInput],
+      forwardingObjects: f.toList(),
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: widget.back),
+        ConsoleButton(
+          name: "Forward",
+          onPress: () => extra
+              ? loadForwardingConsole(extra: !extra, fObjects: f)
+              : widget.forward(f, widget.node, _tec.value.text, null),
+          onLongPress: () => loadForwardingConsole(extra: !extra, fObjects: f),
+          isSpecial: true,
+          showExtra: extra,
+          extraButtons: [
+            ConsoleButton(
+                name: "Medias",
+                onPress: () => loadForwardingMediasConsole(fObjects: f)),
+          ],
+        )
+      ],
+    );
+  }
+
+  void loadForwardingMediasConsole({
+    required List<Down4Object> fObjects,
+    bool images = true,
+  }) {
+    _console = Console(
+      consoleMedias2: ConsoleMedias2(
+        showImages: images,
+        onSelectMedia: (media) =>
+            widget.forward(fObjects, widget.node, _tec.value.text, media),
+      ),
+      forwardingObjects: fObjects.toList(),
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () => loadForwardingConsole(fObjects: fObjects),
+        ),
+        ConsoleButton(
+          name: images ? "Images" : "Videos",
+          onPress: () =>
+              loadForwardingMediasConsole(fObjects: fObjects, images: !images),
+        )
       ],
     );
     setState(() {});

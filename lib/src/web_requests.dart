@@ -165,9 +165,11 @@ Future<List<Message>?> getPosts(List<String> ids) async {
 
 class MessageRequest {
   final List<ID> targets;
+  final ID sender;
   final String header, body, data;
   final Uint8List? notifThumbnail;
   const MessageRequest({
+    required this.sender,
     required this.targets,
     required this.header,
     required this.body,
@@ -189,11 +191,12 @@ class MessageRequest {
   }
 
   Map toJson() => {
-        "tr": targets,
-        "hd": header,
-        "bd": body,
+        "s": sender,
+        "t": targets,
+        "h": header,
+        "b": body,
         "d": data,
-        if (notifThumbnail != null) "tn": base64Encode(notifThumbnail!),
+        if (notifThumbnail != null) "n": base64Encode(notifThumbnail!),
       };
 }
 

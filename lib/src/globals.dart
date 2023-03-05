@@ -15,6 +15,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import 'render_objects/_down4_flutter_utils.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
@@ -81,6 +82,27 @@ Future<void> _deleteMediaFile(String path) async {
 }
 
 String messagePushId() => db.child("Messages").push().key!;
+
+Future<NodeMedia?> downloadMessageMediaAsNodeMedia(ID mediaID) async {
+  final ref = _st.ref(mediaID);
+  try {
+    final md = await ref.getMetadata();
+    final data = await ref.getData();
+    if (data == null) return null;
+    final d4md = MediaMetadata.fromJson(md.customMetadata!);
+    return NodeMedia(data: data, id: mediaID, metadata: d4md);
+  } catch (e) {
+    print("Error downloading media: $e");
+    return null;
+  }
+}
+
+Future<Message?> downloadMessage(ID msgID) async {
+  final s = await db.child("Messages").child(msgID).get();
+  if (!s.exists) return null;
+  final json = Map<String, dynamic>.from(s.value as Map);
+  return Message.fromJson(json);
+}
 
 Future<MessageMedia?> downloadAndWriteMedia(
   String mediaID, {
@@ -590,4 +612,106 @@ Future<void> writePalette2<T>(
       buttonsInfo2: await bGen?.call(node) ?? []);
 
   print("SUCCESS FULLY WROTE ${node.id} TO STATE = $state");
+}
+
+class Transition {
+  final Iterable<Person> trueTargets;
+  final List<Palette2> preTransition, postTransition;
+  final Map<ID, Palette2> state;
+  final int nHidden;
+  final double scroll;
+
+  const Transition({
+    required this.trueTargets,
+    required this.preTransition,
+    required this.postTransition,
+    required this.state,
+    required this.nHidden,
+    required this.scroll,
+  });
+}
+
+Transition selectionTransition({
+  required Map<ID, Palette2> state,
+  required Map<ID, Palette2> hiddenState,
+  required double scrollOffset,
+}) {
+  final allHomePalettes = state.values;
+  final ogOrder = allHomePalettes.asIds();
+  final visibleHomePalettes = allHomePalettes;
+  final hidden = hiddenState.values;
+  final selected = visibleHomePalettes.selected();
+  final unselected = visibleHomePalettes.notSelected();
+  final idsInGroups = selected
+      .asNodes()
+      .whereType<GroupNode>()
+      .map((g) => g.group)
+      .expand((id) => id)
+      .toSet();
+  final selectedUsers = selected.whereNodeIs<Person>();
+  final selectedGroups = selected.whereNodeIs<GroupNode>();
+  final unselectedGroups = unselected.whereNodeIs<GroupNode>();
+  final unselectedUsers = unselected.whereNodeIs<Person>();
+  final unHide = hidden.those(idsInGroups);
+  // final keepHiding = hidden.notThose(idsInGroups);
+  final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
+  final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
+  // groups are folded
+  // unHide should get a left to right show transition
+  // not selected should get a fold transition
+  // selected are unselected
+  // all are deactivated
+  final pals = <Palette2>{
+    ...unHide, //.deactivated().map((e) => e.withoutButton()),
+    ...selectedUsers.map(
+        (e) => e.deactivated().animated(selected: false, fadeButton: true)),
+    ...unselectedUserInGroups
+        .deactivated()
+        .map((e) => e.animated(fadeButton: true)),
+    ...unselectedGroups
+        .map((e) => e.animated(fadeButton: true, fade: true, fold: true)),
+    ...selectedGroups
+        .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
+    ...unselectedUsersNotInGroups
+        .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
+  };
+
+  print("pals=${pals.map((e) => e.node.name).toList()}");
+  return Transition(
+      trueTargets: pals.where((p) => !p.fold).asNodes<Person>(),
+      preTransition: allHomePalettes.toList(),
+      postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIds())),
+      state: state,
+      nHidden: unHide.length,
+      scroll: scrollOffset);
+}
+
+Transition typeTransition<T>({
+  required Map<ID, Palette2> state,
+  required Map<ID, Palette2> hiddenState,
+  required double scrollOffset,
+}) {
+  if (T is! BaseNode) throw 'T needs to be a BaseNode type';
+  final all = state.values;
+  final ogOrder = all.asIds();
+  final hidden = hiddenState.values;
+  final properType = all.whereNodeIs<T>();
+  final unProperType = all.whereNodeIsNot<T>();
+  final properTypeHidden = hidden.whereNodeIs<T>();
+  final pals = <Palette2>{
+    ...properType,
+    ...unProperType
+        .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
+    ...properTypeHidden,
+  };
+
+  print("pals=${pals.map((e) => e.node.name).toList()}");
+  return Transition(
+      trueTargets: pals.where((p) => !p.fold).asNodes<Person>(),
+      preTransition: all.toList(),
+      postTransition:
+          pals.inThatOrder(ogOrder.followedBy(properTypeHidden.asIds())),
+      state: state,
+      nHidden: properTypeHidden.length,
+      scroll: scrollOffset);
 }

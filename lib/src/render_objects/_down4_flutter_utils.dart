@@ -107,10 +107,10 @@ class Down4TextBubblePainter extends CustomPainter {
 class Down4TextBubble extends StatelessWidget {
   final String text, dateText;
   final double? inheritedWidth;
-  late TextPainter textPainter, datePainter;
-  late double calcWidth, calcHeight;
-  late bool dateOnSameLine;
-  late Offset dateOffset;
+  late final TextPainter textPainter, datePainter;
+  late final double calcWidth, calcHeight;
+  late final bool dateOnSameLine;
+  late final Offset dateOffset;
 
   Down4TextBubble({
     required this.text,
@@ -167,8 +167,8 @@ class Down4Text extends StatelessWidget {
   final Size? inheritedSize;
   final TextStyle style;
 
-  late Size calculatedSize;
-  late TextPainter painter;
+  late final Size calculatedSize;
+  late final TextPainter painter;
   Down4Text({
     required this.text,
     required this.style,
@@ -576,6 +576,10 @@ class Down4ImageViewer extends StatelessWidget {
   }
 }
 
+extension ChatMessageExtension on Iterable<ChatMessage> {
+  Iterable<ID> asIDs() => map((e) => e.id);
+}
+
 extension PaletteExtensionsMap on Map<ID, Palette> {
   Map<ID, Palette> those(List<ID> ids) {
     var map = <ID, Palette>{};
@@ -642,9 +646,9 @@ extension Palette2Extensions on List<Palette2> {
 
 extension IterablePalette2Extensions on Iterable<Palette2> {
   Iterable<Palette2> deactivated() => map((p) => p.deactivated());
-
   Iterable<Palette2> selected() => where((element) => element.selected);
   Iterable<Palette2> notSelected() => where((p) => !p.selected);
+  Iterable<Palette2> whereNodeIsNot<T>() => where((p) => p.node is! T);
   Iterable<Palette2> whereNodeIs<T>() => where((p) => p.node is T);
   Iterable<ID> asIds() => map((e) => e.node.id);
   Iterable<BaseNode> asNodes<BaseNode>() =>

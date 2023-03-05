@@ -6,7 +6,6 @@ import '../data_objects.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
-import '../web_requests.dart' show PingRequest;
 
 import '../globals.dart' show g, ChatableNodeExtensions;
 
