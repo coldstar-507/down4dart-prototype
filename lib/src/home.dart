@@ -36,6 +36,15 @@ import 'render_objects/chat_message.dart';
 import 'render_objects/_down4_flutter_utils.dart' as ru;
 import 'render_objects/console.dart';
 
+class Payload {
+  final List<Down4Object> forwardables;
+  final String text;
+  final MessageMedia? media;
+  const Payload({List<Down4Object>? forwardables, String? text, this.media})
+      : forwardables = forwardables ?? const <Down4Object>[],
+        text = text ?? "";
+}
+
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
 
@@ -386,27 +395,27 @@ class _HomeState extends State<Home> {
 
   // =========================== PAGES FUNCTIONS ======================== //
 
-  void forward(objects, targets, text, media) async {
+  Future<ID?> metaSend(Payload p, List<BaseNode> targets) async {
     Message? msg;
-    final nodes = objects.whereType<Palette2>().asIds();
-    if (text.isNotEmpty || media != null || nodes.isNotEmpty) {
+    final nodes = p.forwardables.whereType<Palette2>().asIds();
+    if (p.text.isNotEmpty || p.media != null || nodes.isNotEmpty) {
       msg = Message(
           senderID: g.self.id,
           timestamp: timeStamp(),
           id: messagePushId(),
-          text: text,
-          mediaID: media?.id,
+          text: p.text,
+          mediaID: p.media?.id,
           nodes: nodes.toList());
     }
 
     List<Future<bool>> ss = [];
     if (msg != null) ss.add(uploadMessage(msg));
-    if (media != null) ss.add(uploadOrUpdateMedia(media));
+    if (p.media != null) ss.add(uploadOrUpdateMedia(p.media!));
     final success = await Future.wait(ss).then((s) => s.every((b) => b));
 
-    if (!success) return;
+    if (!success) return null;
 
-    final fMessages = objects.whereType<ChatMessage>().asIDs().toList();
+    final fMessages = p.forwardables.whereType<ChatMessage>().asIDs().toList();
 
     for (final node in targets) {
       if (node is GroupNode) {
@@ -425,7 +434,7 @@ class _HomeState extends State<Home> {
             sender: g.self.id,
             targets: t,
             header: "${g.self.name} in ${node.name}",
-            body: ">>forwarded message",
+            body: ">> forwarded message >>",
             data: "f-$fMsg-${node.id}-${g.self.id}",
           ).process();
         }
@@ -451,6 +460,87 @@ class _HomeState extends State<Home> {
       }
     }
     // TODO FORWARDING MULTIPLE OBJECTS TO MULTIPLE TARGETS
+  }
+
+  Future<void> makeHyperchat(List<String> prompts, Payload p, Set<ID> g) async {
+    final hc = await r.getHyperchat(prompts);
+    if (hc == null) return;
+
+    final hcID = sha1(hc.first).toBase58();
+    final hyper = Hyperchat(
+      id: sha1(hc.first).toBase58(),
+      firstWord: hc.second.first,
+      secondWord: hc.second.second,
+      group: g,
+      messages: {msg.id},
+      snips: {},
+      media: NodeMedia(
+          data: hc.first,
+          id: sha1(utf8.encode(hcID)).toBase58(),
+          metadata: MediaMetadata(
+              owner: g.self.id,
+              timestamp: msg.timestamp,
+              elementAspectRatio: 1.0,
+              extension: ".png")),
+    )..save();
+
+    await writePalette2(hyper, _palettes, bGen, refreshHome);
+
+    List<Future<bool>> ss = [uploadMessage(msg)];
+    ss.add(uploadTemporaryNodeMedia(hyper.media));
+    if (media != null) ss.add(uploadOrUpdateMedia(media));
+    final success = await Future.wait(ss).then((s) => s.every((e) => e));
+    if (success) {
+      final t = List<ID>.from(hyper.group)..remove(g.self.id);
+      final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
+      final h = "${g.self.name} formed ${hyper.name}";
+      final d =
+          "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
+      r.MessageRequest(
+        sender: g.self.id,
+        targets: t,
+        body: b,
+        header: h,
+        data: d,
+      ).process();
+    }
+  }
+
+  Future<void> makeGroup(Group group, Message msg, MessageMedia? media) async {
+    push(loadingPage());
+    List<Future<bool>> ss = [];
+    ss.addAll([uploadMessage(msg), uploadNode(group)]);
+    if (media != null) uploadOrUpdateMedia(media);
+    final success = await Future.wait(ss).then((s) => s.every((b) => b));
+    if (success) {
+      group
+        ..messages.add(msg.id)
+        ..save();
+      await writePalette2(group, _palettes, bGen, refreshHome);
+      final h = "${g.self.name} formed ${group.name}";
+      final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
+      final t = List<ID>.from(group.group)..remove(g.self.id);
+      final d = "m-${msg.id}-${group.id}";
+      r.MessageRequest(
+        sender: g.self.id,
+        targets: t,
+        data: d,
+        header: h,
+        body: b,
+      ).process();
+    }
+  }
+
+  Future<void> ping(String text, List<ID> targets) async {
+    final b = text;
+    final h = "${g.self.name} pinged you";
+    r.MessageRequest(
+      sender: g.self.id,
+      data: "",
+      targets: targets,
+      header: h,
+      body: b,
+    ).process();
   }
 
   Future<void> sendSnip({
@@ -574,11 +664,10 @@ class _HomeState extends State<Home> {
         hiddenState: _hiddenPalettes,
         possibleTargets: formattedHomePalettes.reversed.asNodes<ChatableNode>(),
         forwardingObjects: forwardingObjects,
-        openNode: (fObjects, node) => push(chatPage(node, fObjects.toList())),
-        hyper: (fObjects, transition) {
-          return hyperchatPage();
-        },
-        forward: forward,
+        openNode: (fObjects, node) => push(chatPage(node, fObjects)),
+        hyper: (fObjects, transition) =>
+            push(hyperchatPage(fObjects, transition)),
+        forward: metaSend,
         back: pop);
   }
 
@@ -636,74 +725,22 @@ class _HomeState extends State<Home> {
         back: pop);
   }
 
-  ru.Down4PageWidget hyperchatPage() {
-    final transition = homeTransition();
+  ru.Down4PageWidget hyperchatPage(
+      [List<Down4Object>? fObjects, Transition? transition]) {
+    final transition_ = transition ?? homeTransition();
+    final hyperchatGroup = Set<ID>.from(transition_.trueTargets.asIds())
+      ..add(g.self.id); // everyone, including self
+    final pingGroup = transition_.trueTargets.asIds().toList(); // simply
     return HyperchatPage(
       initialOffset: homeScroll,
-      palettesForTransition: transition.postTransition,
-      people: transition.trueTargets,
-      nHidden: transition.nHidden,
-      homePalettes: transition.preTransition,
-      makeHyperchat: (prompts, msg, media) async {
-        final hc = await r.getHyperchat(prompts);
-        if (hc == null) return;
-        final hcID = sha1(hc.first).toBase58();
-        final hyper = Hyperchat(
-          id: sha1(hc.first).toBase58(),
-          firstWord: hc.second.first,
-          secondWord: hc.second.second,
-          group: Set<ID>.from(transition.trueTargets.asIds())..add(g.self.id),
-          messages: {msg.id},
-          snips: {},
-          media: NodeMedia(
-              data: hc.first,
-              id: sha1(utf8.encode(hcID)).toBase58(),
-              metadata: MediaMetadata(
-                  owner: g.self.id,
-                  timestamp: msg.timestamp,
-                  elementAspectRatio: 1.0,
-                  extension: ".png")),
-        )..save();
-
-        await writePalette2(hyper, _palettes, bGen, refreshHome);
-
-        List<Future<bool>> ss = [uploadMessage(msg)];
-        ss.add(uploadTemporaryNodeMedia(hyper.media));
-        if (media != null) ss.add(uploadOrUpdateMedia(media));
-        final success = await Future.wait(ss).then((s) => s.every((e) => e));
-        if (success) {
-          final t = List<ID>.from(hyper.group)..remove(g.self.id);
-          final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
-          final h = "${g.self.name} formed ${hyper.name}";
-          final d =
-              "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
-          r.MessageRequest(
-            sender: g.self.id,
-            targets: t,
-            body: b,
-            header: h,
-            data: d,
-          ).process();
-        }
-      },
-      // hyperchatRequest: (hyperchatRequest) {
-      //   _requests.add(hyperchatRequest);
-      //   processWebRequests();
-      // },
+      palettesForTransition: transition_.postTransition,
+      people: transition_.trueTargets,
+      nHidden: transition_.nHidden,
+      homePalettes: transition_.preTransition,
+      makeHyperchat: (prompts, msg, media) =>
+          makeHyperchat(prompts, msg, media, hyperchatGroup),
       back: pop,
-      ping: (text) {
-        final t = List<ID>.from(transition.trueTargets.asIds())
-          ..remove(g.self.id);
-        final b = text;
-        final h = "${g.self.name} pinged you";
-        r.MessageRequest(
-          sender: g.self.id,
-          data: "",
-          targets: t,
-          header: h,
-          body: b,
-        ).process();
-      },
+      ping: (text) => ping(text, pingGroup),
     );
   }
 
@@ -712,30 +749,7 @@ class _HomeState extends State<Home> {
     return GroupPage(
         initialOffset: homeScroll,
         back: pop,
-        makeGroup: (group, msg, media) async {
-          push(loadingPage());
-          List<Future<bool>> ss = [];
-          ss.addAll([uploadMessage(msg), uploadNode(group)]);
-          if (media != null) uploadOrUpdateMedia(media);
-          final success = await Future.wait(ss).then((s) => s.every((b) => b));
-          if (success) {
-            group
-              ..messages.add(msg.id)
-              ..save();
-            await writePalette2(group, _palettes, bGen, refreshHome);
-            final h = "${g.self.name} formed ${group.name}";
-            final b = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
-            final t = List<ID>.from(group.group)..remove(g.self.id);
-            final d = "m-${msg.id}-${group.id}";
-            r.MessageRequest(
-              sender: g.self.id,
-              targets: t,
-              data: d,
-              header: h,
-              body: b,
-            ).process();
-          }
-        },
+        makeGroup: makeGroup,
         palettesForTransition: transition.postTransition,
         people: transition.trueTargets,
         nHidden: transition.nHidden,
@@ -829,7 +843,7 @@ class _HomeState extends State<Home> {
         fObjects: fObjs,
         openNode: (node_) => push(nodePage(node_)),
         forward: (fObjs, node, text, media) =>
-            forward(fObjs, [node], text, media),
+            metaSend(fObjs, [node], text, media),
         subNodes: node is GroupNode
             ? node.group
                 .map((e) => homeNode(e) ?? hiddenNode(e))
