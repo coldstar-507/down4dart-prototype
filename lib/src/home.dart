@@ -462,7 +462,8 @@ class _HomeState extends State<Home> {
     // TODO FORWARDING MULTIPLE OBJECTS TO MULTIPLE TARGETS
   }
 
-  Future<void> makeHyperchat(List<String> prompts, Payload p, Set<ID> g) async {
+  Future<void> makeHyperchat(
+      List<String> prompts, Payload p, Set<ID> grp) async {
     final hc = await r.getHyperchat(prompts);
     if (hc == null) return;
 
@@ -471,7 +472,7 @@ class _HomeState extends State<Home> {
       id: sha1(hc.first).toBase58(),
       firstWord: hc.second.first,
       secondWord: hc.second.second,
-      group: g,
+      group: grp,
       messages: {msg.id},
       snips: {},
       media: NodeMedia(
