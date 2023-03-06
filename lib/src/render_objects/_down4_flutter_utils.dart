@@ -577,6 +577,7 @@ class Down4ImageViewer extends StatelessWidget {
 }
 
 extension ChatMessageExtension on Iterable<ChatMessage> {
+  Iterable<ChatMessage> selected() => where((e) => e.selected);
   Iterable<ID> asIDs() => map((e) => e.id);
 }
 
@@ -859,19 +860,19 @@ Future<Size> decodeImageSize(Uint8List d) async {
   );
 }
 
-Future<List<Pair<String, String>>> randomPrompts(int qty) async {
+Future<List<String>> randomPrompts(int qty) async {
   const String adjPath = "assets/texts/descriptive_adjectives.txt";
   const String nounsPath = "assets/texts/concrete_nouns.txt";
   final adjectives = (await rootBundle.loadString(adjPath)).split('\n');
   final nouns = (await rootBundle.loadString(nounsPath)).split('\n');
 
   final r = math.Random();
-  return List<Pair<String, String>>.generate(qty, (_) {
+  return List<String>.generate(qty, (_) {
     final i = r.nextInt(adjectives.length);
     final j = r.nextInt(nouns.length);
     final adjective = adjectives[i].trim();
     final noun = nouns[j].trim();
-    return Pair(adjective, noun);
+    return "$adjective $noun";
   });
 }
 

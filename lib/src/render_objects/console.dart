@@ -314,9 +314,9 @@ class ConsoleInput extends StatelessWidget {
 // }
 
 class ConsoleMedias2 {
-  final void Function(MessageMedia) onSelectMedia;
+  final void Function(MessageMedia) onSelect;
   final bool showImages;
-  ConsoleMedias2({required this.showImages, required this.onSelectMedia});
+  ConsoleMedias2({required this.showImages, required this.onSelect});
 }
 
 class ImagePreview {
@@ -632,7 +632,7 @@ class Console extends StatelessWidget {
                       if (snapshot.connectionState == ConnectionState.done &&
                           snapshot.hasData) {
                         return GestureDetector(
-                          onTap: () => consoleMedias2?.onSelectMedia
+                          onTap: () => consoleMedias2?.onSelect
                               .call(snapshot.requireData),
                           child: Down4ImageViewer(
                               media: snapshot.requireData,
@@ -737,8 +737,6 @@ class Console extends StatelessWidget {
         child: Container(
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(consoleRad)),
                 border: Border.all(color: contourColor, width: contourWidth)),
             child: Row(
                 textDirection: TextDirection.ltr,

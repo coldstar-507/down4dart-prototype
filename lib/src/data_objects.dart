@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 
+import 'package:down4/src/bsv/utils.dart';
+
 import '_down4_dart_utils.dart' as u;
 import 'bsv/types.dart';
 
@@ -171,7 +173,7 @@ class Message implements Down4Object {
   final ID id;
   final ID senderID;
   // final ID? root,
-  final ID? forwardedFromID, mediaID;
+  final ID? forwarderID, mediaID;
   final String? text;
   final int timestamp;
   final List<ID>? replies, nodes;
@@ -185,26 +187,30 @@ class Message implements Down4Object {
     this.isRead = false,
     this.isSaved = false,
     // this.root,
-    this.forwardedFromID,
+    this.forwarderID,
     this.text,
     this.nodes,
     this.replies,
   });
 
-  Message forwarded(BaseNode self) {
+  Message forwarded(ID forwarderID) {
     // when forwarding ,we become the sender, but it was fowarded from,
     // the previous sender,
     // this only applies if the sender wasn't self, else, there isn't real
     // forwarding and it won't be visible
+    final newTS = u.timeStamp();
+    final idData = utf8.encode(id + (newTS.toString()) + forwarderID);
+    final newID = sha1(idData).toBase58();
+
     return Message(
-      id: id,
+      id: newID,
       text: text,
-      timestamp: timestamp,
-      senderID: self.id,
-      forwardedFromID: self.id != senderID ? senderID : null,
+      timestamp: newTS,
+      senderID: senderID,
+      forwarderID: forwarderID,
       mediaID: mediaID,
       nodes: nodes,
-      replies: replies,
+      // replies: replies, // replies won't be downloaded
     );
   }
 
@@ -212,7 +218,7 @@ class Message implements Down4Object {
     return Message(
       id: decodedJson["id"],
       senderID: decodedJson["s"],
-      forwardedFromID: decodedJson["f"],
+      forwarderID: decodedJson["f"],
       isRead: decodedJson["rs"] ?? false,
       isSaved: decodedJson["sv"] ?? false,
       text: decodedJson["txt"],
@@ -237,7 +243,7 @@ class Message implements Down4Object {
         if (mediaID != null) 'm': mediaID,
         if (toLocal) 'rs': isRead,
         if (toLocal) 'sv': isSaved,
-        if (forwardedFromID != null) 'f': forwardedFromID,
+        if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),
       };

@@ -472,6 +472,35 @@ extension SelfSave on Self {
   }
 }
 
+class Payload {
+  final List<Down4Object> forwardables;
+  final List<ID> replies;
+  final String text;
+  final MessageMedia? media;
+  final Message? message;
+  Payload({
+    required List<ID>? r,
+    required List<Down4Object>? f,
+    required String? t,
+    required MessageMedia? m,
+  })  : forwardables = f ?? const <Down4Object>[],
+        replies = r ?? const <ID>[],
+        media = m,
+        text = t ?? "",
+        message = (t ?? "").isNotEmpty ||
+                m != null ||
+                (f ?? const []).whereType<Palette2>().isNotEmpty
+            ? Message(
+                senderID: g.self.id,
+                timestamp: timeStamp(),
+                id: messagePushId(),
+                mediaID: m?.id,
+                text: t,
+                replies: r,
+                nodes: f!.whereType<Palette2>().asIds().toList())
+            : null;
+}
+
 class Boxes {
   late String docPath, tempPath;
   LazyBox payments, medias, messages, bills, nodes, utxos, spents, hidden;

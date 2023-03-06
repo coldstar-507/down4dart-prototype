@@ -29,7 +29,7 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
   final Iterable<Person> people;
   final int nHidden;
   final void Function() back;
-  final void Function(Group group, Message msg, MessageMedia? media) makeGroup;
+  final void Function(Group group, Payload p) makeGroup;
   final double initialOffset;
 
   const GroupPage({
@@ -112,15 +112,9 @@ class _GroupPageState extends State<GroupPage> {
         utf8.encode(_groupName + _groupImage!.id + ts.toRadixString(16));
     final groupID = sha1(idd).toBase58();
 
-    final msg = Message(
-        // root: groupID,
-        id: messagePushId(),
-        senderID: g.self.id,
-        timestamp: u.timeStamp(),
-        mediaID: media?.id,
-        text: text);
+    final p = Payload(t: text, m: media, r: null, f: null);
 
-    final members = widget.people.asIds().toSet()..add(g.self.id);
+    final members = Set<ID>.from(widget.people.asIds())..add(g.self.id);
 
     final Group group = Group(
         isPrivate: _private,
@@ -131,7 +125,7 @@ class _GroupPageState extends State<GroupPage> {
         messages: {},
         snips: {});
 
-    widget.makeGroup(group, msg, media);
+    widget.makeGroup(group, p);
   }
 
   void reloadItems() {
@@ -157,7 +151,7 @@ class _GroupPageState extends State<GroupPage> {
     _console = Console(
       bottomInputs: [consoleInput],
       consoleMedias2: ConsoleMedias2(
-          showImages: images, onSelectMedia: (media) => selectMedia(media)),
+          showImages: images, onSelect: (media) => selectMedia(media)),
       topButtons: [
         ConsoleButton(
             name: "Import",

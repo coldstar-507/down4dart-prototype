@@ -26,24 +26,17 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "c-${node.id}";
 
-  final void Function(Message, MessageMedia?) sendMessage;
   final ChatableNode node;
   final List<BaseNode>? subNodes;
   final List<Down4Object>? fObjects;
   final void Function() back;
   final void Function(BaseNode) openNode;
-  final void Function(
-    Iterable<Down4Object>,
-    ChatableNode,
-    String,
-    MessageMedia?,
-  ) forward;
+  final void Function(Payload) send;
 
   const ChatPage({
-    required this.sendMessage,
     required this.subNodes,
     required this.back,
-    required this.forward,
+    required this.send,
     required this.node,
     required this.openNode,
     this.fObjects,
@@ -302,29 +295,23 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void send2({MessageMedia? mediaInput}) {
+  void send2({MessageMedia? mediaInput, List<Down4Object>? fObjects}) {
     final media = mediaInput ?? _cameraInput;
-    if (_tec.value.text == "" && mediaInput == null && _cameraInput == null) {
+    final text = _tec.value.text;
+    if (text == "" && media != null && fObjects != null) {
       return;
     }
     final ts = u.timeStamp();
 
-    var msg = Message(
-        id: messagePushId(),
-        timestamp: ts,
-        senderID: g.self.id,
-        mediaID: media?.id,
-        text: _tec.value.text,
-        replies: _cachedMessages.values
-            .where((msg) => msg.selected)
-            .map((msg) => msg.message.id)
-            .toList(growable: false))
-      ..isRead = true
-      ..save();
+    final r = _cachedMessages.values.selected().asIDs().toList();
 
-    widget.sendMessage(msg, media);
+    final p = Payload(m: media, t: _tec.value.text, f: fObjects, r: r);
+
+    widget.send(p);
 
     unselectSelectedMessage();
+
+    loadBaseConsole();
   }
 
   Future<void> loadFullCamera() async {
@@ -486,9 +473,7 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     _console = Console(
-      consoleMedias2: ConsoleMedias2(
-          showImages: images,
-          onSelectMedia: (media) => send2(mediaInput: media)),
+      consoleMedias2: ConsoleMedias2(showImages: images, onSelect: selectMedia),
       bottomInputs: [_consoleInput],
       topButtons: [
         ConsoleButton(
@@ -526,7 +511,6 @@ class _ChatPageState extends State<ChatPage> {
 
   void loadBaseConsole({bool images = true}) {
     _console = Console(
-      // mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [_consoleInput],
       topButtons: [
         ConsoleButton(name: "Save", onPress: loadSavingConsole),
@@ -566,9 +550,14 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
           name: "Forward",
-          onPress: () => extra
-              ? loadForwardingConsole(extra: !extra, fObjects: f)
-              : widget.forward(f, widget.node, _tec.value.text, null),
+          onPress: () {
+            if (extra) {
+              loadForwardingConsole(extra: !extra, fObjects: f);
+            } else {
+              final r = _cachedMessages.values.selected().asIDs().toList();
+              widget.send(Payload(m: null, r: r, f: f, t: _tec.value.text));
+            }
+          },
           onLongPress: () => loadForwardingConsole(extra: !extra, fObjects: f),
           isSpecial: true,
           showExtra: extra,
@@ -588,10 +577,8 @@ class _ChatPageState extends State<ChatPage> {
   }) {
     _console = Console(
       consoleMedias2: ConsoleMedias2(
-        showImages: images,
-        onSelectMedia: (media) =>
-            widget.forward(fObjects, widget.node, _tec.value.text, media),
-      ),
+          showImages: images,
+          onSelect: (media) => send2(mediaInput: media, fObjects: fObjects)),
       forwardingObjects: fObjects.toList(),
       bottomButtons: [
         ConsoleButton(

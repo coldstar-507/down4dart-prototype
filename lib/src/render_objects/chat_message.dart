@@ -187,10 +187,10 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       timeStr = "$tsHour:$tsMin";
     }
 
-    if (message.forwardedFromID == null) {
+    if (message.forwarderID == null) {
       return "    $timeStr";
     } else {
-      return "${message.forwardedFromID}    $timeStr";
+      return "${message.forwarderID}    $timeStr";
     }
   }
 
@@ -338,12 +338,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   Widget? get forwarderHeader {
-    if (message.forwardedFromID == null) return null;
+    if (message.forwarderID == null) return null;
     return SizedBox(
         height: headerHeight * 0.8,
         child: Row(children: [
           Text(
-            ">>${message.forwardedFromID}   ",
+            ">>${message.forwarderID}   ",
             style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
           ),
         ]));

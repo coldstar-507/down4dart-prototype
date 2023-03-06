@@ -14,24 +14,19 @@ import '../globals.dart';
 class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "ForwardingPage";
-  final Iterable<ChatableNode> possibleTargets;
-  final List<Down4Object> forwardingObjects;
+  final List<ChatableNode> possibleTargets;
+  final List<Down4Object> fObjects;
   final Map<ID, Palette2> hiddenState;
   final void Function() back;
   final void Function(List<Down4Object>, ChatableNode) openNode;
   final void Function(List<Down4Object>, Transition) hyper;
-  final void Function(
-    Iterable<Down4Object> objects,
-    Iterable<ChatableNode> targets,
-    String text,
-    MessageMedia? media,
-  ) forward;
+  final Future<void> Function(Payload, List<ChatableNode>) forward;
 
   const ForwardingPage({
     required this.possibleTargets,
     required this.openNode,
     required this.hyper,
-    required this.forwardingObjects,
+    required this.fObjects,
     required this.forward,
     required this.back,
     required this.hiddenState,
@@ -51,7 +46,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
     return [
       ButtonsInfo2(
           assetPath: 'assets/images/50.png',
-          pressFunc: () => widget.openNode(widget.forwardingObjects, node),
+          pressFunc: () => widget.openNode(widget.fObjects, node),
           rightMost: true)
     ];
   }
@@ -69,38 +64,9 @@ class _ForwadingPageState extends State<ForwardingPage> {
 
   ConsoleMedias2 cm(bool showImages) => ConsoleMedias2(
       showImages: showImages,
-      onSelectMedia: (media) => widget.forward(
-            widget.forwardingObjects,
-            potentialTargets.values.selected().asNodes(),
-            tec.value.text,
-            media,
-          ));
-
-  // void forward({MessageMedia? withMedia}) {
-  //   final targets = potentialTargets.values.selected().asIds().toList();
-  //   final forwardingPalettesIDs = // Ids is all we need
-  //       widget.forwardingObjects.whereType<Palette2>().asIds().toList();
-  //   final forwardingMessages = widget.forwardingObjects
-  //       .whereType<Message>()
-  //       .map((msg) => msg.forwarded(g.self))
-  //       .toList();
-  //   final myMessage = Message(
-  //       senderID: g.self.id,
-  //       timestamp: timeStamp(),
-  //       id: messagePushId(),
-  //       nodes: forwardingPalettesIDs,
-  //       text: tec.value.text,
-  //       mediaID: withMedia?.id);
-  //   for (final target in targets) {
-  //     final node = potentialTargets[target]!.node;
-  //     final specificTargets = node is GroupNode
-  //         ? (List<ID>.from(node.group)..remove(g.self.id))
-  //         : [node.id];
-  //     final root = node.id;
-  //     for (final fm in forwardingMessages) {
-  //     }
-  //   }
-  // }
+      onSelect: (media) => widget.forward(
+          Payload(f: widget.fObjects, t: tec.value.text, m: media, r: null),
+          potentialTargets.values.selected().asNodes<ChatableNode>().toList()));
 
   void reload() => setState(() {});
 
@@ -123,14 +89,14 @@ class _ForwadingPageState extends State<ForwardingPage> {
   }) {
     _console = Console(
       consoleMedias2: ConsoleMedias2(
-        showImages: images,
-        onSelectMedia: (media) => widget.forward(
-            widget.forwardingObjects,
-            potentialTargets.values.selected().asNodes(),
-            tec.value.text,
-            media),
-      ),
-      forwardingObjects: widget.forwardingObjects,
+          showImages: images,
+          onSelect: (media) => widget.forward(
+              Payload(f: widget.fObjects, t: tec.value.text, m: media, r: null),
+              potentialTargets.values
+                  .selected()
+                  .asNodes<ChatableNode>()
+                  .toList())),
+      forwardingObjects: widget.fObjects,
       bottomButtons: [
         ConsoleButton(
           name: "Back",
@@ -149,7 +115,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
     _console = Console(
       // consoleMedias2: medias ? cm(images) : null,
       bottomInputs: [ConsoleInput(placeHolder: ":)", tec: tec)],
-      forwardingObjects: widget.forwardingObjects,
+      forwardingObjects: widget.fObjects,
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
@@ -157,17 +123,23 @@ class _ForwadingPageState extends State<ForwardingPage> {
           onPress: () => extra
               ? loadBaseConsole(extra: !extra)
               : widget.forward(
-                  widget.forwardingObjects,
-                  potentialTargets.values.selected().asNodes(),
-                  tec.value.text,
-                  null),
+                  Payload(
+                    f: widget.fObjects,
+                    t: tec.value.text,
+                    r: null,
+                    m: null,
+                  ),
+                  potentialTargets.values
+                      .selected()
+                      .asNodes<ChatableNode>()
+                      .toList()),
           isSpecial: true,
           showExtra: extra,
           extraButtons: [
             ConsoleButton(
               name: "Hyper",
               onPress: () => widget.hyper(
-                widget.forwardingObjects,
+                widget.fObjects,
                 hyperTransition(),
               ),
             ),

@@ -30,8 +30,7 @@ class HyperchatPage extends StatefulWidget implements Down4PageWidget {
   final List<Palette2> homePalettes;
   final void Function(String text) ping;
   final void Function() back;
-  final void Function(List<String> pairs, Message msg, MessageMedia? media)
-      makeHyperchat;
+  final void Function(Payload p, Set<ID> group) makeHyperchat;
 
   const HyperchatPage({
     required this.initialOffset,
@@ -81,20 +80,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
     final text = _tec.value.text;
     if (text.isEmpty && media == null) return;
 
-    final messageID = messagePushId();
-
-    final msg = Message(
-        id: messageID,
-        senderID: g.self.id,
-        timestamp: u.timeStamp(),
-        text: text,
-        mediaID: media?.id);
-
-    final pairs = (await ru.randomPrompts(10))
-        .map((pair) => "${pair.first} ${pair.second}")
-        .toList(growable: false);
-
-    widget.makeHyperchat(pairs, msg, media);
+    final p = Payload(t: text, m: media, f: null, r: null);
+    final group = Set<ID>.from(widget.people.asIds())..add(g.self.id);
+    widget.makeHyperchat(p, group);
   }
 
   void ping() {
@@ -114,8 +102,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
   void loadMediaConsole([bool images = true]) {
     _console = Console(
       consoleMedias2: ConsoleMedias2(
-          showImages: images,
-          onSelectMedia: (media) => send(mediaInput: media)),
+          showImages: images, onSelect: (media) => send(mediaInput: media)),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(
