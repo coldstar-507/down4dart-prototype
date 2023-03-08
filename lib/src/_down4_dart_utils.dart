@@ -96,25 +96,6 @@ Future<bool> hasNetwork() async {
   }
 }
 
-// List<String> randomPrompts(int qty) {
-//   const String adjPath = "./assets/texts/descriptive_adjectives.txt";
-//   const String nounsPath = "./assets/texts/concrete_nouns.txt";
-
-//   final adjectives = File(adjPath).readAsStringSync().split('\n');
-//   final nouns = File(nounsPath).readAsStringSync().split('\n');
-//   nouns.forEach(print);
-//   adjectives.forEach(print);
-
-//   print(nouns);
-
-//   final r = math.Random();
-//   return List<String>.generate(qty, (_) {
-//     final i = r.nextInt(adjectives.length);
-//     final j = r.nextInt(nouns.length);
-//     return "${adjectives[i]} ${nouns[j]}";
-//   });
-// }
-
 String deterministicHyperchatRoot(List<String> ids) {
   final sortedList = ids..sort();
   final asString = sortedList.join("");

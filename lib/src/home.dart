@@ -105,19 +105,13 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
-  void popUntilHome() {
-    final nPages = pm.nPages;
-    for (int i = 0; i < nPages - 1; i++) {
-      pm.pop();
-    }
-  }
-
   void goHome() {
-    popUntilHome();
+    pm.popUntilHome();
     refresh(homePage());
   }
 
   Transition homeTransition() => selectionTransition(
+      originalList: formattedHomePalettes,
       state: _palettes,
       hiddenState: _hiddenPalettes,
       scrollOffset: _homeScrollController.offset);
@@ -239,8 +233,9 @@ class _HomeState extends State<Home> {
     _messageListener = msgQueue.onChildAdded.listen((event) async {
       print("New message!");
       final eventKey = event.snapshot.key;
-      final eventPayload = (event.snapshot.value as String).split("-");
+      final eventPayload = (event.snapshot.value as String).split("%");
       msgQueue.child(eventKey!).remove(); // consume it
+      print("KEY = $eventKey\nPAYLOAD = $eventPayload\n");
 
       if (eventPayload.first == "h") {
         // "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
@@ -391,20 +386,10 @@ class _HomeState extends State<Home> {
   // =========================== PAGES FUNCTIONS ======================== //
 
   Future<void> metaSend(Payload p, List<ChatableNode> targets) async {
-    Message? msg;
-    final nodes = p.forwardables.whereType<Palette2>().asIds();
-    final selfInTargets = targets.asIds().contains(g.self.id);
-    if (p.text.isNotEmpty || p.media != null || nodes.isNotEmpty) {
-      msg = Message(
-          senderID: g.self.id,
-          timestamp: timeStamp(),
-          id: messagePushId(),
-          text: p.text,
-          mediaID: p.media?.id,
-          nodes: nodes.toList())
-        ..isSaved = selfInTargets
-        ..save();
-    }
+    Message? msg = p.message;
+    final targetIDs = targets.asIds();
+    final selfInTargets = targetIDs.contains(g.self.id);
+    final onlySendingToSelf = targetIDs.any((id) => id != g.self.id);
 
     final messagesToForward = p.forwardables
         .whereType<ChatMessage>()
@@ -412,16 +397,24 @@ class _HomeState extends State<Home> {
         .toList();
 
     List<Future<bool>> ss = [];
-    if (msg != null) ss.add(uploadMessage(msg));
-    if (p.media != null) ss.add(uploadOrUpdateMedia(p.media!..save()));
+    if (msg != null && !onlySendingToSelf) ss.add(uploadMessage(msg));
+    if (p.media != null && !onlySendingToSelf) {
+      ss.add(uploadOrUpdateMedia(p.media!..save()));
+    }
     for (final m in messagesToForward) {
       m.isSaved = selfInTargets;
+      m.isRead = true;
       ss.add(uploadMessage(m..save()));
     }
 
-    final success = await Future.wait(ss).then((s) => s.every((b) => b));
+    bool successfulUploads;
+    if (ss.isEmpty) {
+      successfulUploads = true;
+    } else {
+      successfulUploads = await Future.wait(ss).then((s) => s.every((b) => b));
+    }
 
-    if (!success) return;
+    if (!successfulUploads) return;
 
     for (final node in targets) {
       if (node is GroupNode) {
@@ -433,9 +426,13 @@ class _HomeState extends State<Home> {
             targets: t,
             header: "${g.self.name} in ${node.name}",
             body: ">> forwarded message >>",
-            data: "m-${m.id}-${node.id}",
-          ).process();
-          node.messages.add(m.id);
+            data: "m%${m.id}%${node.id}",
+          ).process().then((_) {
+            m.isSent = true;
+            m.save();
+            node.messages.add(m.id);
+            node.save();
+          });
         }
 
         if (msg != null) {
@@ -444,34 +441,66 @@ class _HomeState extends State<Home> {
             targets: t,
             header: "${g.self.name} in ${node.name}",
             body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
-            data: "m-${msg.id}-${node.id}",
-          ).process();
-          node.messages.add(msg.id);
+            data: "m%${msg.id}%${node.id}",
+          ).process().then((_) {
+            msg.isSent = true;
+            msg.save();
+            node.messages.add(msg.id);
+            node.save();
+          });
         }
       } else {
-        for (final m in messagesToForward) {
-          r.MessageRequest(
-            sender: g.self.id,
-            targets: [node.id],
-            header: g.self.name,
-            body: ">> forwarded message >>",
-            data: "m-${m.id}-${g.self.id}",
-          ).process();
-          node.messages.add(m.id);
-        }
+        if (node.id == g.self.id) {
+          for (final m in messagesToForward) {
+            m.isSent = true;
+            m.save();
+            node.messages.add(m.id);
+          }
+          if (msg != null) {
+            msg
+              ..isSaved = true
+              ..isSent = true
+              ..isRead = true
+              ..save();
+            node.messages.add(msg.id);
+            node.save();
+          }
+        } else {
+          for (final m in messagesToForward) {
+            r.MessageRequest(
+              sender: g.self.id,
+              targets: [node.id],
+              header: g.self.name,
+              body: ">> forwarded message >>",
+              data: "m%${m.id}%${g.self.id}",
+            ).process().then((_) {
+              m.isSent = true;
+              m.isSaved = true;
+              m.save();
+              node.messages.add(m.id);
+              node.save();
+            });
+          }
 
-        if (msg != null) {
-          r.MessageRequest(
-            sender: g.self.id,
-            targets: [node.id],
-            header: g.self.name,
-            body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
-            data: "m-${msg.id}-${g.self.id}",
-          ).process();
-          node.messages.add(msg.id);
+          if (msg != null) {
+            r.MessageRequest(
+              sender: g.self.id,
+              targets: [node.id],
+              header: g.self.name,
+              body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
+              data: "m%${msg.id}%${g.self.id}",
+            ).process().then((_) {
+              msg.isSent = true;
+              msg.save();
+              node.messages.add(msg.id);
+              node.save();
+            });
+          }
         }
+        writePalette2(node, _palettes, bGen, refreshHome);
       }
     }
+    refreshHome();
   }
 
   Future<void> makeHyperchat(Payload p, Set<ID> grp) async {
@@ -500,7 +529,7 @@ class _HomeState extends State<Home> {
 
     await writePalette2(hyper, _palettes, bGen, refreshHome);
     await metaSend(p, [hyper]);
-    popUntilHome();
+    pm.popUntilHome();
     push(chatPage(hyper));
   }
 
@@ -509,7 +538,7 @@ class _HomeState extends State<Home> {
     if (success) {
       await metaSend(p, [group]);
       await writePalette2(group, _palettes, bGen, refreshHome);
-      popUntilHome();
+      pm.popUntilHome();
       push(nodePage(group));
     }
   }
@@ -569,7 +598,7 @@ class _HomeState extends State<Home> {
           targets: targets.asIds().toList(),
           header: "${g.self.name} pinged ${node.name}",
           body: "&attachment",
-          data: "s-${media.id}-${node.id}",
+          data: "s%${media.id}%${node.id}",
         ).process());
       } else {
         personTargets.add(node.id);
@@ -582,7 +611,7 @@ class _HomeState extends State<Home> {
         targets: personTargets,
         header: "${g.self.name} pinged you",
         body: "&attachment",
-        data: "s-${media.id}-${g.self.id}",
+        data: "s%${media.id}%${g.self.id}",
       ).process());
     }
 
@@ -651,7 +680,11 @@ class _HomeState extends State<Home> {
         openNode: (fObjects, node) => push(chatPage(node, fObjects)),
         hyper: (fObjects, transition) =>
             push(hyperchatPage(fObjects, transition)),
-        forward: metaSend,
+        forward: (p, t) async {
+          metaSend(p, t);
+          pm.popUntilHome();
+          refreshHome();
+        },
         back: pop);
   }
 
@@ -827,6 +860,7 @@ class _HomeState extends State<Home> {
         openNode: (node_) => push(nodePage(node_)),
         send: (payload) async {
           await metaSend(payload, [node]);
+          pm.popInBetween();
           refresh(chatPage(node));
         },
         subNodes: node is GroupNode

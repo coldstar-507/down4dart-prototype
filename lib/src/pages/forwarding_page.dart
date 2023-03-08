@@ -56,6 +56,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
 
   Transition hyperTransition() {
     return selectionTransition(
+      originalList: potentialTargets.values.toList(),
       state: potentialTargets,
       hiddenState: widget.hiddenState,
       scrollOffset: scroller.offset,

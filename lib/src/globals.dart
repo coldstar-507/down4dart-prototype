@@ -100,6 +100,7 @@ Future<NodeMedia?> downloadMessageMediaAsNodeMedia(ID mediaID) async {
 Future<Message?> downloadMessage(ID msgID) async {
   final s = await db.child("Messages").child(msgID).get();
   if (!s.exists) return null;
+  print("MESSAGE VALUE = ${s.value}");
   final json = Map<String, dynamic>.from(s.value as Map);
   return Message.fromJson(json);
 }
@@ -497,7 +498,7 @@ class Payload {
                 mediaID: m?.id,
                 text: t,
                 replies: r,
-                nodes: f!.whereType<Palette2>().asIds().toList())
+                nodes: (f ?? []).whereType<Palette2>().asIds().toList())
             : null;
 }
 
@@ -582,14 +583,24 @@ class Singletons {
 }
 
 Future<List<BaseNode>> getNodesFromEverywhere(Set<ID> ids) async {
+  bool hasSelf;
+  if (hasSelf = ids.contains(g.self.id)) {
+    ids.remove(g.self.id);
+  }
+
   final toFetch = ids.difference(g.boxes.nodes.keys.toSet());
   final local = ids.difference(toFetch);
+
   final onlineFetch = getNodes(toFetch);
   final localFetch = local.map((e) => e.getLocalNode()).toList();
 
   final locals = await Future.wait(localFetch);
   final onlines = await onlineFetch;
-  return locals.whereType<BaseNode>().followedBy(onlines ?? []).toList();
+  return locals
+      .whereType<BaseNode>()
+      .followedBy(onlines ?? [])
+      .followedBy(hasSelf ? [g.self] : [])
+      .toList();
 }
 
 void unselectedSelectedPalettes(Map<ID, Palette2> state) {
@@ -661,11 +672,12 @@ class Transition {
 }
 
 Transition selectionTransition({
+  required List<Palette2> originalList,
   required Map<ID, Palette2> state,
   required Map<ID, Palette2> hiddenState,
   required double scrollOffset,
 }) {
-  final allHomePalettes = state.values;
+  final allHomePalettes = originalList;
   final ogOrder = allHomePalettes.asIds();
   final visibleHomePalettes = allHomePalettes;
   final hidden = hiddenState.values;

@@ -185,11 +185,12 @@ class _ChatPageState extends State<ChatPage> {
         widget.node is GroupNode &&
         nextMsg?.senderID != msg.senderID;
 
-    return ChatMessage(
+    final cm = ChatMessage(
         key: GlobalKey(),
         hasGap: hasGap,
         message: msg,
         mediaInfo: await ChatMessage.generateMediaInfo(msg),
+        nodes: null,
         repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
           print("TODO, GO TO REPLY ID = $replyID");
         }),
@@ -200,6 +201,29 @@ class _ChatPageState extends State<ChatPage> {
           _cachedMessages[id] = _cachedMessages[id]!.invertedSelection();
           setState(() {});
         });
+
+    Future.microtask(() {
+      if ((msg.nodes ?? []).isNotEmpty) {
+        getNodesFromEverywhere(msg.nodes!.toSet()).then((nodes) {
+          if (nodes.isNotEmpty) {
+            _cachedMessages[msg.id] = _cachedMessages[msg.id]!.withNodes(nodes);
+            setState(() {});
+          }
+        });
+      }
+    });
+
+    // () async {
+    //   if ((msg.nodes ?? []).isNotEmpty) {
+    //     r.getNodes(msg.nodes!).then((nodes) {
+    //       if ((nodes ?? []).isNotEmpty) {
+    //         _cachedMessages[msg.id] = _cachedMessages[msg.id]!.withNodes(nodes);
+    //       }
+    //     });
+    //   }
+    // }();
+
+    return cm;
   }
 
   Stream<void> messages2(List<ID> ids) async* {
@@ -295,13 +319,15 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  void send2({MessageMedia? mediaInput, List<Down4Object>? fObjects}) {
+  Future<void> send2({
+    MessageMedia? mediaInput,
+    List<Down4Object>? fObjects,
+  }) async {
     final media = mediaInput ?? _cameraInput;
     final text = _tec.value.text;
     if (text == "" && media != null && fObjects != null) {
       return;
     }
-    final ts = u.timeStamp();
 
     final r = _cachedMessages.values.selected().asIDs().toList();
 
@@ -309,8 +335,31 @@ class _ChatPageState extends State<ChatPage> {
 
     widget.send(p);
 
-    unselectSelectedMessage();
+    final sendingToSelf = widget.node.id == g.self.id;
 
+    final fMsg = p.forwardables.whereType<ChatMessage>();
+    final msg = p.message;
+
+    for (final m in fMsg) {
+      final fm = m.message.forwarded(g.self.id);
+      fm
+        ..isRead = true
+        ..isSaved = sendingToSelf
+        ..save();
+      widget.node.messages.add(fm.id);
+      await reloadOne();
+    }
+
+    if (msg != null) {
+      msg
+        ..isRead = true
+        ..isSaved = sendingToSelf
+        ..save();
+      await reloadOne();
+    }
+
+    unselectSelectedMessage();
+    _tec.clear();
     loadBaseConsole();
   }
 
@@ -460,7 +509,10 @@ class _ChatPageState extends State<ChatPage> {
         : loadMediasConsole(images: images, mode: "Send", extra: true);
 
     void selectMedia(MessageMedia media) {
-      if (mode == "Send") return send2(mediaInput: media);
+      if (mode == "Send") {
+        send2(mediaInput: media);
+        return;
+      }
       if (!media.isVideo) {
         g.self.images.remove(media.id);
       } else {

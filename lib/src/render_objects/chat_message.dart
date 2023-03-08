@@ -10,7 +10,6 @@ import '../_down4_dart_utils.dart' show Pair, golden;
 import '../data_objects.dart';
 import '../globals.dart';
 import '../themes.dart';
-import '../web_requests.dart' show getNodes;
 
 import '_down4_flutter_utils.dart';
 import 'palette.dart' show Palette;
@@ -64,8 +63,10 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
+  final List<BaseNode>? nodes;
 
   const ChatMessage({
+    required this.nodes,
     required this.hasHeader,
     required this.message,
     required this.myMessage,
@@ -86,6 +87,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
       openNode: openNode,
+      nodes: nodes,
       // textInfo: textInfo,
       isPost: isPost,
       myMessage: myMessage,
@@ -96,14 +98,29 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
+  ChatMessage withNodes(List<BaseNode>? pNodes) {
+    return ChatMessage(
+        message: message,
+        repliesInfo: repliesInfo,
+        mediaInfo: mediaInfo,
+        openNode: openNode,
+        nodes: pNodes,
+        isPost: isPost,
+        myMessage: myMessage,
+        hasGap: hasGap,
+        hasHeader: hasHeader,
+        select: select,
+        selected: selected);
+  }
+
   ChatMessage invertedSelection() {
     return ChatMessage(
       message: message,
       isPost: isPost,
       repliesInfo: repliesInfo,
+      nodes: nodes,
       mediaInfo: mediaInfo,
       openNode: openNode,
-      // textInfo: textInfo,
       hasHeader: hasHeader,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -121,7 +138,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         mediaInfo: mediaInfo
           ?..videoController?.pause()
           ..videoController?.seekTo(Duration.zero),
-        // textInfo: textInfo,
+        nodes: nodes,
         openNode: openNode,
         hasHeader: hasHeader,
         myMessage: myMessage,
@@ -164,6 +181,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   bool get hasText => (message.text ?? "").isNotEmpty; // textInfo != null;
 
   bool get hasMedia => mediaInfo != null;
+
+  bool get hasPalettes => (nodes ?? []).isNotEmpty;
 
   static String timeString(Message message) {
     final ts = DateTime.fromMillisecondsSinceEpoch(message.timestamp).toLocal();
@@ -350,7 +369,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   Widget? get messagePalettes {
-    if ((message.nodes ?? []).isEmpty) return null;
+    if (!hasPalettes && (message.nodes ?? []).isEmpty) return null;
     double mpHeight() => Palette.paletteHeight / golden;
     Widget unloadedPalette(ID id) {
       return Container(
@@ -381,55 +400,65 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
       return Container(
         height: mpHeight(),
-        color: PinkTheme.nodeColors[node.colorCode],
+        color: node.id == g.self.id
+            ? PinkTheme.nodeColors[NodesColor.self]
+            : PinkTheme.nodeColors[node.colorCode],
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             nodeImage(),
             Expanded(
-                child: Column(children: [
-              Padding(
-                  padding: const EdgeInsets.only(top: 8.0, left: 12.0),
-                  child: Text(node.name)),
-              Padding(
-                  padding: const EdgeInsets.only(top: 6.0, left: 12.0),
-                  child: Text(node.displayID))
-            ])),
+                child: Padding(
+                    padding: const EdgeInsets.only(top: 6.0, left: 6.0),
+                    child: Text(node.name, textAlign: TextAlign.start))),
             GestureDetector(
                 onTap: () => openNode(node),
-                child: Padding(
-                    padding: const EdgeInsets.only(top: 8.0, left: 8.0),
-                    child: Image.asset("assets/images/50.png",
-                        cacheHeight: (mpHeight() * 2).toInt(),
-                        cacheWidth: (mpHeight() * 2).toInt())))
+                child: Center(
+                    child: Padding(
+                        padding: const EdgeInsets.all(6.0),
+                        child: Image.asset("assets/images/50.png",
+                            gaplessPlayback: true,
+                            cacheHeight: (mpHeight() * 2).toInt(),
+                            cacheWidth: (mpHeight() * 2).toInt()))))
           ],
         ),
       );
     }
 
-    return FutureBuilder(
-      future: getNodesFromEverywhere(message.nodes!.toSet()),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return ClipRect(
-            child: Column(
-              children:
-                  message.nodes!.map((id) => unloadedPalette(id)).toList(),
-            ),
-          );
-        } else if (snapshot.connectionState == ConnectionState.done &&
-            snapshot.hasData) {
-          return ClipRect(
-            child: Column(
-              children: snapshot.requireData
-                  .map((node) => loadedPalette(node))
-                  .toList(),
-            ),
-          );
-        } else {
-          return const SizedBox.shrink();
-        }
-      },
+    return GestureDetector(
+      onTap: () => select?.call(message.id),
+      child: Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.vertical(
+                  top: (!hasMedia && !hasText
+                      ? const Radius.circular(4.0)
+                      : Radius.zero),
+                  bottom: const Radius.circular(4.0))),
+          child: Column(
+              children: hasPalettes
+                  ? nodes!.map((node) => loadedPalette(node)).toList()
+                  : message.nodes!
+                      .map((nodeID) => unloadedPalette(nodeID))
+                      .toList())),
     );
+
+    //    FutureBuilder(
+    //     future: getNodesFromEverywhere(message.nodes!.toSet()),
+    //     builder: (context, snapshot) {
+    //       if (snapshot.connectionState == ConnectionState.waiting) {
+    //         return Column(
+    //           children:
+    //               message.nodes!.map((id) => unloadedPalette(id)).toList(),
+    //         );
+    //       } else if (snapshot.connectionState == ConnectionState.done &&
+    //           snapshot.hasData) {
+    //       } else {
+    //         return const SizedBox.shrink();
+    //       }
+    //     },
+    //   ),
+    // ));
   }
 
   Widget? get media {
@@ -447,7 +476,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                 color: messageColor,
                 borderRadius: BorderRadius.vertical(
                     top: const Radius.circular(4),
-                    bottom: Radius.circular(hasText ? 0 : 4)),
+                    bottom: Radius.circular(hasText || hasPalettes ? 0 : 4)),
               ),
               child: child));
     }
@@ -481,8 +510,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                 color:
                     myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
                 borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(mediaInfo != null ? 0 : 4),
-                  bottom: const Radius.circular(4),
+                  top: Radius.circular(hasMedia ? 0 : 4),
+                  bottom: Radius.circular(hasPalettes ? 0 : 4),
                 )),
             child: bubble));
   }

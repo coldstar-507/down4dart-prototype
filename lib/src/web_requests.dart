@@ -37,6 +37,7 @@ Future<bool> initUser(String encodedJson) async {
 }
 
 Future<List<BaseNode>?> getNodes(Iterable<String> ids) async {
+  if (ids.isEmpty) return [];
   final url =
       Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes");
   final res = await http.post(url, body: ids.join(" "));

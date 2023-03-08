@@ -57,6 +57,21 @@ class PageManager {
 
   void refresh(Down4PageWidget page) => pages[page.id] = page;
 
+  void popInBetween() {
+    final n = nPages;
+    for (int i = 1; i < n - 1; i++) {
+      pages.remove(_idStack[i]);
+      _idStack.removeAt(i);
+    }
+  }
+
+  void popUntilHome() {
+    final n = nPages;
+    for (int i = 0; i < n - 1; i++) {
+      pop();
+    }
+  }
+
   void pop() {
     final last = _idStack.removeLast();
     // id could be twice in stack because graph can be cyclic
