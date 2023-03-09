@@ -128,7 +128,7 @@ Future<MessageMedia?> downloadAndWriteMedia(
   }
 }
 
-Future<bool> uploadTemporaryNodeMedia(NodeMedia media) async {
+Future<bool> uploadHyperchatMedia(NodeMedia media) async {
   var mediaRef = _st.ref(media.id);
   try {
     await mediaRef.putData(
@@ -305,6 +305,13 @@ extension MessageSave on Message {
 
   Future<void> save() async {
     return g.boxes.messages.put(id, jsonEncode(toJson(toLocal: true)));
+  }
+
+  Future<void> deleteFrom(ChatableNode node) async {
+    sents.remove(node.id);
+    node.messages.remove(id);
+    if (sents.isEmpty) return delete();
+    return;
   }
 
   Future<void> delete() async {

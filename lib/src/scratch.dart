@@ -6,28 +6,18 @@ import 'dart:convert';
 
 import 'dart:math' as math;
 
+int jeff() {
+  return 123;
+}
+
 void main() async {
-  print(timeStamp());
-  var jeff = int.parse("12v4oc0", radix: 34);
+  print(jeff());
 
-  var andrew = Iterable.generate(10, (i) => i);
+  final g = Iterable.generate(100, (i) => i);
 
-  var b1 = andrew.contains(4);
-  var b2 = andrew.contains(11);
-  var b3 = andrew.contains(1);
+  Future(() => g.forEach(print));
 
-  print("""
-      b1 = $b1
-      b2 = $b2
-      b3 = $b3
-""");
-
-  print(jeff);
-
-  List<bool> bs = [];
-  final success = bs.every((b) => b);
-
-  print(success);
+  print(jeff());
 
   return;
 }

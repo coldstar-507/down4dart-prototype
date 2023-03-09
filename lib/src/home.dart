@@ -423,8 +423,11 @@ class _HomeState extends State<Home> {
 
     for (final m in messagesToForward) {
       for (final node in targets) {
-        node.messages.add(m.id);
-        await writePalette2(node..save(), _palettes, bGen, refreshHome);
+        node
+          ..messages.add(m.id)
+          ..updateActivity()
+          ..save();
+        await writePalette2(node, _palettes, bGen, refreshHome);
 
         final reqKey = "${node.id}%${m.id}";
 
@@ -453,8 +456,11 @@ class _HomeState extends State<Home> {
 
     if (msg != null) {
       for (final node in targets) {
-        node.messages.add(msg.id);
-        await writePalette2(node..save(), _palettes, bGen, refreshHome);
+        node
+          ..messages.add(msg.id)
+          ..updateActivity()
+          ..save();
+        await writePalette2(node, _palettes, bGen, refreshHome);
 
         final reqKey = "${node.id}%${msg.id}";
         final b = (msg.text ?? "").isNotEmpty ? msg.text! : "&attachment";
@@ -483,47 +489,74 @@ class _HomeState extends State<Home> {
 
     refreshHome();
 
-    reqs.forEach((key, value) async {
-      final d = key.split("%");
-      final nodeID = d[0];
-      final msgID = d[0];
-      msgs[msgID]!
-        ..sents[nodeID] = false
-        ..sents[nodeID] = await value
-        ..save(); // sents is also used as a reference
-      // counter, so we put it at false initialy to add the reference, then we
-      // put the real sent value afterwards
-    });
+    Future(() => reqs.forEach((key, value) async {
+          final d = key.split("%");
+          final nodeID = d[0];
+          final msgID = d[1];
+          msgs[msgID]!
+            ..sents[nodeID] = false
+            ..sents[nodeID] = await value
+            ..save(); // sents is also used as a reference
+          // counter, so we put it at false initialy to add the reference, then we
+          // put the real sent value afterwards
+        }));
+
+    return;
   }
 
   Future<void> makeHyperchat(Payload p, Set<ID> grp) async {
     push(loadingPage());
     final prompts = await ru.randomPrompts(10);
+    print("Getting hyperchat");
     final hc = await r.getHyperchat(prompts);
-    if (hc == null) return;
+    print("Got hyperchat");
+    if (hc == null) {
+      print("HC is null, returning!");
+      pm.popUntilHome();
+      return refreshHome();
+    }
 
     final hcID = sha1(hc.first).toBase58();
-    final hyper = Hyperchat(
-      id: sha1(hc.first).toBase58(),
-      firstWord: hc.second.first,
-      secondWord: hc.second.second,
-      group: grp,
-      messages: {},
-      snips: {},
-      media: NodeMedia(
-          data: hc.first,
-          id: sha1(utf8.encode(hcID)).toBase58(),
-          metadata: MediaMetadata(
-              owner: g.self.id,
-              timestamp: timeStamp(),
-              elementAspectRatio: 1.0,
-              extension: ".png")),
-    )..save();
+    final hcMedia = NodeMedia(
+        data: hc.first,
+        id: sha1(utf8.encode(hcID)).toBase58(),
+        metadata: MediaMetadata(
+            owner: g.self.id,
+            timestamp: timeStamp(),
+            elementAspectRatio: 1.0,
+            extension: ".png"));
 
-    await writePalette2(hyper, _palettes, bGen, refreshHome);
-    await metaSend(p, [hyper]);
+    final msg = p.message!
+      ..isRead = true
+      ..save();
+
+    final hyper = Hyperchat(
+        id: hcID,
+        firstWord: hc.second.first,
+        secondWord: hc.second.second,
+        group: grp,
+        messages: {msg.id},
+        snips: {},
+        media: hcMedia)
+      ..save();
+
     pm.popUntilHome();
     push(chatPage(hyper));
+
+    await writePalette2(hyper, _palettes, bGen, refreshHome);
+
+    final success = await uploadHyperchatMedia(hcMedia);
+    if (!success) {
+      print("Failed to upload hyperchat, canceling and deleting");
+      pm.popUntilHome();
+      _palettes.remove(hyper.id);
+      hyper.delete();
+      return refreshHome();
+    }
+
+    await metaSend(p, [hyper]);
+    refresh(chatPage(hyper));
+    return;
   }
 
   Future<void> makeGroup(Group group, Payload p) async {
