@@ -174,9 +174,10 @@ class Message implements Down4Object {
   final ID senderID;
   final ID? forwarderID, mediaID;
   final String? text;
-  final int timestamp;
   final List<ID>? replies, nodes;
-  bool isRead, isSaved, isSent;
+  int timestamp;
+  bool isRead, isSaved;
+  Map<ID, bool> sents;
 
   Message({
     required this.senderID,
@@ -185,29 +186,32 @@ class Message implements Down4Object {
     this.mediaID,
     this.isRead = false,
     this.isSaved = false,
-    this.isSent = false,
     this.forwarderID,
     this.text,
     this.nodes,
     this.replies,
-  });
+    Map<ID, bool>? sents,
+  }) : sents = sents ?? {};
 
-  Message forwarded(ID forwarderID) {
-    final idData = utf8.encode(id + forwarderID);
-    final newID = sha1(idData).toBase58();
-    return Message(
-      id: newID,
-      text: text,
-      timestamp: timestamp,
-      senderID: senderID,
-      forwarderID: forwarderID,
-      mediaID: mediaID,
-      nodes: nodes,
-      // replies: replies, // replies won't be downloaded, senderID will
-      // move to a forwarded from widget on top of the chat message
-      // forwarderID will be the sender widget
-    );
+  void refresh() {
+    timestamp = u.timeStamp();
   }
+
+  // Message forwarded(ID forwarderID) {
+  //   return Message(
+  //       id: id,
+  //       text: text,
+  //       timestamp: timestamp,
+  //       senderID: senderID,
+  //       forwarderID: forwarderID,
+  //       mediaID: mediaID,
+  //       nodes: nodes,
+  //       refs: refs
+  //       // replies: replies, // replies won't be downloaded, senderID will
+  //       // move to a forwarded from widget on top of the chat message
+  //       // forwarderID will be the sender widget
+  //       );
+  // }
 
   factory Message.fromJson(Map<String, dynamic> decodedJson) {
     return Message(
@@ -216,10 +220,12 @@ class Message implements Down4Object {
       forwarderID: decodedJson["f"],
       isRead: decodedJson["rs"] ?? false,
       isSaved: decodedJson["sv"] ?? false,
-      isSent: decodedJson["st"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
       timestamp: decodedJson["ts"],
+      sents: decodedJson["st"] != null
+          ? Map<ID, bool>.from(decodedJson["st"])
+          : {},
       replies: (decodedJson["r"] ?? "").isNotEmpty
           ? List<String>.from(decodedJson["r"].split(" "))
           : null,
@@ -235,9 +241,9 @@ class Message implements Down4Object {
         's': senderID,
         'ts': timestamp,
         if (mediaID != null) 'm': mediaID,
-        if (toLocal) 'st': isSent,
         if (toLocal) 'rs': isRead,
         if (toLocal) 'sv': isSaved,
+        if (toLocal) 'st': sents,
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),
         if (nodes != null) 'n': nodes!.join(" "),

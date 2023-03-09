@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/_down4_dart_utils.dart';
+import 'package:flutter/services.dart';
 import 'render_objects/palette.dart';
 // import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
@@ -54,7 +55,7 @@ Future<bool> uploadNode(BaseNode node) async {
   Future<bool> uploadNode() async {
     final body = node.toJson(toLocal: false);
     try {
-      await _fs.doc(node.id).set(body);
+      await _fs.collection("Nodes").doc(node.id).set(body);
       return true;
     } catch (e) {
       print("Failure uploading node: $e");
@@ -191,13 +192,23 @@ Future<bool> uploadOrUpdateMedia(
   }
 }
 
-Future<bool> uploadMessage(Message msg) async {
-  try {
-    await db.child("Messages").child(msg.id).set(msg.toJson());
+Future<bool> uploadMessage(Message msg, {required bool skipCheck}) async {
+  if (msg.timestamp.shouldBeUpdated || skipCheck) {
+    try {
+      final msgRef = db.child("Messages").child(msg.id);
+      final getTs = await msgRef.child("ts").get();
+      if (!getTs.exists) {
+        msgRef.set(msg.toJson());
+      } else {
+        msgRef.child("ts").set(msg.timestamp);
+      }
+      return true;
+    } catch (e) {
+      print("Error uploading messageID: ${msg.id}, error: $e");
+      return false;
+    }
+  } else {
     return true;
-  } catch (e) {
-    print("Error uploading messageID: ${msg.id}, error: $e");
-    return false;
   }
 }
 
@@ -546,6 +557,8 @@ class Singletons {
   Boxes? _boxes;
   ExchangeRate? _exchangeRate;
 
+  late Image fifty, black, red;
+
   late List<CameraDescription> cameras;
   Self get self => _self ??= SelfSave.load();
   Wallet get wallet => _wallet ??= WalletManager.load();
@@ -677,12 +690,10 @@ Transition selectionTransition({
   required Map<ID, Palette2> hiddenState,
   required double scrollOffset,
 }) {
-  final allHomePalettes = originalList;
-  final ogOrder = allHomePalettes.asIds();
-  final visibleHomePalettes = allHomePalettes;
-  final hidden = hiddenState.values;
-  final selected = visibleHomePalettes.selected();
-  final unselected = visibleHomePalettes.notSelected();
+  final ogOrder = originalList.asIds();
+  final hidden = List<Palette2>.from(hiddenState.values);
+  final selected = originalList.selected();
+  final unselected = originalList.notSelected();
   final idsInGroups = selected
       .asNodes()
       .whereType<GroupNode>()
@@ -694,7 +705,6 @@ Transition selectionTransition({
   final unselectedGroups = unselected.whereNodeIs<GroupNode>();
   final unselectedUsers = unselected.whereNodeIs<Person>();
   final unHide = hidden.those(idsInGroups);
-  // final keepHiding = hidden.notThose(idsInGroups);
   final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
   final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
   // groups are folded
@@ -703,7 +713,7 @@ Transition selectionTransition({
   // selected are unselected
   // all are deactivated
   final pals = <Palette2>{
-    ...unHide, //.deactivated().map((e) => e.withoutButton()),
+    ...unHide,
     ...selectedUsers.map(
         (e) => e.deactivated().animated(selected: false, fadeButton: true)),
     ...unselectedUserInGroups
@@ -720,7 +730,7 @@ Transition selectionTransition({
   print("pals=${pals.map((e) => e.node.name).toList()}");
   return Transition(
       trueTargets: pals.where((p) => !p.fold).asNodes<Person>(),
-      preTransition: allHomePalettes.toList(),
+      preTransition: originalList,
       postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIds())),
       state: state,
       nHidden: unHide.length,

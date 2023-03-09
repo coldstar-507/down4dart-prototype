@@ -158,7 +158,6 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   final int nHidden;
   final void Function(Down4Payment) openPayment;
   final Down4Payment? paymentUpdate;
-  // final void Function() refreshMoneyPage;
   final void Function() back;
   final Future<void> Function(Down4Payment) makePayment;
   final double initialOffset;
@@ -226,7 +225,7 @@ class _MoneyPageState extends State<MoneyPage> {
       messagePreview: payment.textNote,
       buttonsInfo2: [
         ButtonsInfo2(
-            assetPath: "assets/images/50.png",
+            asset: g.fifty,
             pressFunc: () => widget.openPayment(payment),
             rightMost: true)
       ],
@@ -250,6 +249,7 @@ class _MoneyPageState extends State<MoneyPage> {
   @override
   void initState() {
     super.initState();
+    animatedTransition();
     loadMorePayments(4);
     loadInputsAndConsole();
     if (widget.people.isEmpty) {
@@ -257,7 +257,6 @@ class _MoneyPageState extends State<MoneyPage> {
     } else {
       loadMainViewConsole();
     }
-    animatedTransition();
   }
 
   Future<void> loadInputsAndConsole() async {

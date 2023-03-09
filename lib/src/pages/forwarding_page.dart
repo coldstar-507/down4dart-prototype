@@ -45,7 +45,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
   Future<List<ButtonsInfo2>> bGen(ChatableNode node) async {
     return [
       ButtonsInfo2(
-          assetPath: 'assets/images/50.png',
+          asset: g.fifty,
           pressFunc: () => widget.openNode(widget.fObjects, node),
           rightMost: true)
     ];

@@ -205,7 +205,7 @@ class _HomeState extends State<Home> {
     if (node.snips.isNotEmpty) {
       return [
         ButtonsInfo2(
-            assetPath: 'assets/images/redArrow.png',
+            asset: g.red,
             pressFunc: () async => push(await snipView(node)),
             longPressFunc: () => node is Person ? push(nodePage(node)) : null,
             rightMost: true)
@@ -216,9 +216,7 @@ class _HomeState extends State<Home> {
           : await node.messages.last.getLocalMessage();
       return [
         ButtonsInfo2(
-            assetPath: lastMsg?.isRead ?? true
-                ? 'assets/images/50.png'
-                : 'assets/images/filled.png',
+            asset: lastMsg?.isRead ?? true ? g.fifty : g.black,
             pressFunc: () => push(chatPage(node)),
             longPressFunc: () => node is Person ? push(nodePage(node)) : null,
             rightMost: true)
@@ -391,20 +389,21 @@ class _HomeState extends State<Home> {
     final selfInTargets = targetIDs.contains(g.self.id);
     final onlySendingToSelf = targetIDs.any((id) => id != g.self.id);
 
-    final messagesToForward = p.forwardables
-        .whereType<ChatMessage>()
-        .map((cm) => cm.message.forwarded(g.self.id))
-        .toList();
+    final messagesToForward =
+        p.forwardables.whereType<ChatMessage>().map((cm) => cm.message);
 
     List<Future<bool>> ss = [];
-    if (msg != null && !onlySendingToSelf) ss.add(uploadMessage(msg));
-    if (p.media != null && !onlySendingToSelf) {
-      ss.add(uploadOrUpdateMedia(p.media!..save()));
-    }
-    for (final m in messagesToForward) {
-      m.isSaved = selfInTargets;
-      m.isRead = true;
-      ss.add(uploadMessage(m..save()));
+    if (!onlySendingToSelf) {
+      if (msg != null) ss.add(uploadMessage(msg, skipCheck: true));
+      if (p.media != null) ss.add(uploadOrUpdateMedia(p.media!));
+      for (final m in messagesToForward) {
+        m
+          ..refresh()
+          ..isSaved = selfInTargets
+          ..isRead = true
+          ..save();
+        ss.add(uploadMessage(m, skipCheck: false));
+      }
     }
 
     bool successfulUploads;
@@ -415,92 +414,86 @@ class _HomeState extends State<Home> {
     }
 
     if (!successfulUploads) return;
+    Map<ID, Future<bool>> reqs = {};
+    Map<ID, Message> msgs = messagesToForward
+        .followedBy(msg == null ? [] : [msg])
+        .toList()
+        .asMap()
+        .map((key, value) => MapEntry(value.id, value));
 
-    for (final node in targets) {
-      if (node is GroupNode) {
-        final t = List<ID>.from(node.group)..remove(g.self.id);
+    for (final m in messagesToForward) {
+      for (final node in targets) {
+        node.messages.add(m.id);
+        await writePalette2(node..save(), _palettes, bGen, refreshHome);
 
-        for (final m in messagesToForward) {
-          r.MessageRequest(
-            sender: g.self.id,
-            targets: t,
-            header: "${g.self.name} in ${node.name}",
-            body: ">> forwarded message >>",
-            data: "m%${m.id}%${node.id}",
-          ).process().then((_) {
-            m.isSent = true;
-            m.save();
-            node.messages.add(m.id);
-            node.save();
-          });
-        }
+        final reqKey = "${node.id}%${m.id}";
 
-        if (msg != null) {
-          r.MessageRequest(
-            sender: g.self.id,
-            targets: t,
-            header: "${g.self.name} in ${node.name}",
-            body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
-            data: "m%${msg.id}%${node.id}",
-          ).process().then((_) {
-            msg.isSent = true;
-            msg.save();
-            node.messages.add(msg.id);
-            node.save();
-          });
-        }
-      } else {
-        if (node.id == g.self.id) {
-          for (final m in messagesToForward) {
-            m.isSent = true;
-            m.save();
-            node.messages.add(m.id);
-          }
-          if (msg != null) {
-            msg
-              ..isSaved = true
-              ..isSent = true
-              ..isRead = true
-              ..save();
-            node.messages.add(msg.id);
-            node.save();
-          }
+        if (node is GroupNode) {
+          final t = List<ID>.from(node.group)..remove(g.self.id);
+          final req = r.MessageRequest(
+              sender: g.self.id,
+              targets: t,
+              header: "${g.self.name} in ${node.name}",
+              body: ">> forwarded message >>",
+              data: "f%${m.id}%${node.id}%${g.self.id}");
+          reqs[reqKey] = req.process();
+        } else if (node.id == g.self.id) {
+          reqs[reqKey] = Future.value(true);
         } else {
-          for (final m in messagesToForward) {
-            r.MessageRequest(
+          final req = r.MessageRequest(
               sender: g.self.id,
               targets: [node.id],
               header: g.self.name,
               body: ">> forwarded message >>",
-              data: "m%${m.id}%${g.self.id}",
-            ).process().then((_) {
-              m.isSent = true;
-              m.isSaved = true;
-              m.save();
-              node.messages.add(m.id);
-              node.save();
-            });
-          }
+              data: "f%${m.id}%${g.self.id}%${g.self.id}");
+          reqs[reqKey] = req.process();
+        }
+      }
+    }
 
-          if (msg != null) {
-            r.MessageRequest(
+    if (msg != null) {
+      for (final node in targets) {
+        node.messages.add(msg.id);
+        await writePalette2(node..save(), _palettes, bGen, refreshHome);
+
+        final reqKey = "${node.id}%${msg.id}";
+        final b = (msg.text ?? "").isNotEmpty ? msg.text! : "&attachment";
+        if (node is GroupNode) {
+          final t = List<ID>.from(node.group)..remove(g.self.id);
+          final req = r.MessageRequest(
+              sender: g.self.id,
+              targets: t,
+              header: "${g.self.name} in ${node.name}",
+              body: b,
+              data: "m%${msg.id}%${node.id}");
+          reqs[reqKey] = req.process();
+        } else if (node.id == g.self.id) {
+          reqs[reqKey] = Future.value(true);
+        } else {
+          final req = r.MessageRequest(
               sender: g.self.id,
               targets: [node.id],
               header: g.self.name,
-              body: (msg.text ?? "").isEmpty ? "&attachment" : msg.text!,
-              data: "m%${msg.id}%${g.self.id}",
-            ).process().then((_) {
-              msg.isSent = true;
-              msg.save();
-              node.messages.add(msg.id);
-              node.save();
-            });
-          }
+              body: b,
+              data: "m%${msg.id}%${g.self.id}");
+          reqs[reqKey] = req.process();
         }
-        writePalette2(node, _palettes, bGen, refreshHome);
       }
     }
+
     refreshHome();
+
+    reqs.forEach((key, value) async {
+      final d = key.split("%");
+      final nodeID = d[0];
+      final msgID = d[0];
+      msgs[msgID]!
+        ..sents[nodeID] = false
+        ..sents[nodeID] = await value
+        ..save(); // sents is also used as a reference
+      // counter, so we put it at false initialy to add the reference, then we
+      // put the real sent value afterwards
+    });
   }
 
   Future<void> makeHyperchat(Payload p, Set<ID> grp) async {

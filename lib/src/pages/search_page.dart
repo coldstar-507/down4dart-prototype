@@ -59,7 +59,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
   Future<List<ButtonsInfo2>> bGen(BaseNode node) async {
     return [
       ButtonsInfo2(
-          assetPath: 'assets/images/50.png',
+          asset: g.fifty,
           pressFunc: () => widget.openNode(node),
           rightMost: true)
     ];

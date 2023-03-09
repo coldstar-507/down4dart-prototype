@@ -71,7 +71,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<List<ButtonsInfo2>> buttonsOfNode(BaseNode node) async {
     return [
       ButtonsInfo2(
-          assetPath: 'assets/images/50.png',
+          asset: g.fifty,
           pressFunc: () => widget.openNode(node),
           rightMost: true)
     ];
@@ -109,13 +109,12 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    mIds = widget.node.messages.toList();
-    ordered = mIds.reversed.toList();
     reloadOne();
-    print("DID UPDATE THE WIDGET");
   }
 
   Future<void> reloadOne() async {
+    mIds = widget.node.messages.toList();
+    ordered = mIds.reversed.toList();
     if (ordered.isEmpty) return;
     final last = ordered.first;
     if (loaded.isNotEmpty && loaded.first != last) {
@@ -325,9 +324,7 @@ class _ChatPageState extends State<ChatPage> {
   }) async {
     final media = mediaInput ?? _cameraInput;
     final text = _tec.value.text;
-    if (text == "" && media != null && fObjects != null) {
-      return;
-    }
+    if (text == "" && media != null && fObjects != null) return;
 
     final r = _cachedMessages.values.selected().asIDs().toList();
 
@@ -341,12 +338,11 @@ class _ChatPageState extends State<ChatPage> {
     final msg = p.message;
 
     for (final m in fMsg) {
-      final fm = m.message.forwarded(g.self.id);
-      fm
+      m.message
         ..isRead = true
         ..isSaved = sendingToSelf
         ..save();
-      widget.node.messages.add(fm.id);
+      widget.node.messages.add(m.id);
       await reloadOne();
     }
 
@@ -355,6 +351,7 @@ class _ChatPageState extends State<ChatPage> {
         ..isRead = true
         ..isSaved = sendingToSelf
         ..save();
+      widget.node.messages.add(msg.id);
       await reloadOne();
     }
 

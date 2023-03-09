@@ -117,6 +117,16 @@ Future<void> main() async {
   await _initBox();
   g.boxes.docPath = appDir.path;
   g.boxes.tempPath = tempDir.path;
+
+  {
+    final d1 = await rootBundle.load("assets/images/50.png");
+    final d2 = await rootBundle.load("assets/images/filled.png");
+    final d3 = await rootBundle.load("assets/images/redArrow.png");
+    g.fifty = Image.memory(d1.buffer.asUint8List(), gaplessPlayback: true);
+    g.black = Image.memory(d2.buffer.asUint8List(), gaplessPlayback: true);
+    g.red = Image.memory(d3.buffer.asUint8List(), gaplessPlayback: true);
+  }
+
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   try {

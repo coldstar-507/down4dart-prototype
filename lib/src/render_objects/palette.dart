@@ -42,11 +42,8 @@ class BasicActionButton extends StatelessWidget {
                 )
               : null,
         ),
-        child: Image.asset(
-          assetPathFromLib,
-          fit: BoxFit.contain,
-          // gaplessPlayback: true,
-        ),
+        child: Image.asset(assetPathFromLib,
+            fit: BoxFit.contain, gaplessPlayback: true),
       ),
     );
   }
@@ -69,11 +66,9 @@ class BasicActionButton2 extends StatelessWidget {
               borderRadius: bi.rightMost
                   ? const BorderRadius.only(
                       topRight: Radius.circular(4.0),
-                      bottomRight: Radius.circular(4.0),
-                    )
+                      bottomRight: Radius.circular(4.0))
                   : null),
-          child: Image.asset(bi.assetPath,
-              fit: BoxFit.contain, gaplessPlayback: true)),
+          child: bi.asset),
     );
   }
 }
@@ -98,19 +93,19 @@ class ButtonsInfo {
 }
 
 class ButtonsInfo2 {
-  final String assetPath;
+  final Image asset;
   final void Function() pressFunc;
   final void Function()? longPressFunc;
   final bool rightMost;
   ButtonsInfo2({
-    required this.assetPath,
+    required this.asset,
     required this.pressFunc,
     required this.rightMost,
     this.longPressFunc,
   });
 
   ButtonsInfo2 thatDoesNothing() => ButtonsInfo2(
-        assetPath: assetPath,
+        asset: asset,
         pressFunc: () {},
         rightMost: rightMost,
       );
@@ -126,31 +121,6 @@ class Palette2 extends StatelessWidget implements Down4Object {
   final List<ButtonsInfo2> buttonsInfo2;
   final int containerMS, fadeMS, fadeButtonMS;
   final String? messagePreview;
-
-  // Image get nodeImage {
-  //   final n = node;
-  //   if (n is User) {
-  //     return n.media != null
-  //         ? Image.memory(n.media!.data,
-  //             fit: BoxFit.cover, gaplessPlayback: true)
-  //         : Image.asset('assets/images/hashirama.jpg', fit: BoxFit.cover);
-  //   } else if (n is GroupNode) {
-  //     return Image.memory(n.media.data,
-  //         fit: BoxFit.cover, gaplessPlayback: true);
-  //   } else if (n is Payment) {
-  //     return n.payment.independentGets < 2000000
-  //         ? Image.asset('assets/images/Dollar_Sign_1.png', fit: BoxFit.cover)
-  //         : n.payment.independentGets < 10000000
-  //             ? Image.asset('assets/images/Dollar_Sign_2.png',
-  //                 fit: BoxFit.cover)
-  //             : Image.asset('assets/images/Dollar_Sign_3.png',
-  //                 fit: BoxFit.cover);
-  //   } else if (n is Self) {
-  //     return Image.memory(n.media.data,
-  //         fit: BoxFit.cover, gaplessPlayback: true);
-  //   }
-  //   throw 'stop breaking my app';
-  // }
 
   const Palette2({
     required this.node,
@@ -183,11 +153,9 @@ class Palette2 extends StatelessWidget implements Down4Object {
       fadeButtonMS: fadeButtonMS,
       fadeMS: fadeMS,
       messagePreview: messagePreview,
-      // snipOrMessageToRead: snipOrMessageToRead,
       selected: !selected,
       imPress: imPress,
       buttonsInfo2: buttonsInfo2,
-      // messagePreviewWasRead: messagePreviewWasRead,
       imLongPress: imLongPress,
       bodyPress: bodyPress,
       bodyLongPress: bodyLongPress,
@@ -240,6 +208,24 @@ class Palette2 extends StatelessWidget implements Down4Object {
 
   Palette2 withoutButton() {
     return Palette2(squish: squish, fold: fold, node: node);
+  }
+
+  Palette2 copy() {
+    return Palette2(
+        fold: fold,
+        squish: squish,
+        node: node,
+        fade: fade,
+        fadeButton: fadeButton,
+        fadeButtonMS: fadeButtonMS,
+        fadeMS: fadeMS,
+        messagePreview: messagePreview,
+        selected: selected,
+        imPress: imPress,
+        buttonsInfo2: buttonsInfo2,
+        imLongPress: imLongPress,
+        bodyPress: bodyPress,
+        bodyLongPress: bodyLongPress);
   }
 
   Widget get buttons => AnimatedOpacity(
