@@ -110,6 +110,13 @@ class _HomeState extends State<Home> {
     refresh(homePage());
   }
 
+  void popAll() {
+    final n = pm.nPages;
+    for (int i = 0; i < n; i++) {
+      pm.pop();
+    }
+  }
+
   Transition homeTransition() => selectionTransition(
       originalList: formattedHomePalettes,
       state: _palettes,
@@ -507,13 +514,11 @@ class _HomeState extends State<Home> {
   Future<void> makeHyperchat(Payload p, Set<ID> grp) async {
     push(loadingPage());
     final prompts = await ru.randomPrompts(10);
-    print("Getting hyperchat");
     final hc = await r.getHyperchat(prompts);
-    print("Got hyperchat");
     if (hc == null) {
-      print("HC is null, returning!");
-      pm.popUntilHome();
-      return refreshHome();
+      popAll();
+      await unselectSelection(updateActivity: false);
+      return push(homePage(prompt: "Failed to create hyperchat!"));
     }
 
     final hcID = sha1(hc.first).toBase58();
@@ -540,7 +545,9 @@ class _HomeState extends State<Home> {
         media: hcMedia)
       ..save();
 
-    pm.popUntilHome();
+    unselectSelection();
+    popAll();
+    pm.put(homePage());
     push(chatPage(hyper));
 
     await writePalette2(hyper, _palettes, bGen, refreshHome);
@@ -548,10 +555,12 @@ class _HomeState extends State<Home> {
     final success = await uploadHyperchatMedia(hcMedia);
     if (!success) {
       print("Failed to upload hyperchat, canceling and deleting");
-      pm.popUntilHome();
       _palettes.remove(hyper.id);
       hyper.delete();
-      return refreshHome();
+      popAll();
+      return push(
+        homePage(prompt: "Failed to upload Hyperchat. Please retry."),
+      );
     }
 
     await metaSend(p, [hyper]);
@@ -560,12 +569,18 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> makeGroup(Group group, Payload p) async {
+    push(loadingPage());
     final success = await uploadNode(group);
     if (success) {
       await metaSend(p, [group]);
       await writePalette2(group, _palettes, bGen, refreshHome);
-      pm.popUntilHome();
+      await unselectSelection();
+      popAll();
+      pm.put(homePage());
       push(nodePage(group));
+    } else {
+      popAll();
+      push(homePage(prompt: "Failed to create group"));
     }
   }
 
@@ -647,11 +662,18 @@ class _HomeState extends State<Home> {
 
   // ============================== PAGES ============================== //
 
-  ru.Down4PageWidget homePage() {
+  ru.Down4PageWidget homePage({String? prompt}) {
     return HomePage(
+      openNode: (n, f) => push(chatPage(n, f)),
+      send: (p, t) async {
+        await metaSend(p, t);
+        unselectSelection(updateActivity: true);
+        popAll();
+        push(homePage(prompt: "Sent messages!"));
+      },
       scrollController: _homeScrollController,
       palettes: formattedHomePalettes,
-      hyperchat: () => push(hyperchatPage()),
+      hyperchat: (fo) => push(hyperchatPage(fo)),
       group: () => push(groupPage()),
       money: () => push(moneyPage(transition: homeTransition())),
       ping: (text) {
@@ -689,7 +711,6 @@ class _HomeState extends State<Home> {
         refresh(homePage());
         await localPalettesRoutine();
       },
-      forward: () => push(forwardPage(homePalettes.selected().toList())),
     );
   }
 
@@ -707,20 +728,19 @@ class _HomeState extends State<Home> {
         hyper: (fObjects, transition) =>
             push(hyperchatPage(fObjects, transition)),
         forward: (p, t) async {
-          metaSend(p, t);
-          pm.popUntilHome();
-          refreshHome();
+          await metaSend(p, t);
+          popAll();
+          push(homePage());
         },
         back: pop);
   }
 
   ru.Down4PageWidget paymentPage(Down4Payment payment) {
     return PaymentPage(
-      ok: () => setState(() {
-        pm.pop();
-        pm.pop();
-        refresh(homePage());
-      }),
+      ok: () {
+        popAll();
+        push(homePage());
+      },
       sendPayment: (pay) async {
         final targets = pay.txs.last.txsOut
             .map((utxo) => utxo.isGets ? utxo.receiver : null)
@@ -735,7 +755,8 @@ class _HomeState extends State<Home> {
             header: "${g.self.id} payed you",
             body: pay.textNote,
           ).process();
-          goHome();
+          popAll();
+          push(homePage());
         }
       },
       back: pop,
@@ -762,7 +783,8 @@ class _HomeState extends State<Home> {
         paymentUpdate: paymentUpdate,
         makePayment: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
-          if (transition != null) unselectedSelectedPalettes(transition.state);
+          popAll();
+          pm.put(homePage());
           push(paymentPage(payment));
         },
         back: pop);
@@ -878,6 +900,7 @@ class _HomeState extends State<Home> {
   ru.Down4PageWidget chatPage(ChatableNode node, [List<Down4Object>? fObjs]) {
     if (!_palettes.values.asIds().contains(node.id)) {
       writePalette2(node..save(), _palettes, bGen, refreshHome, h: true);
+      localPalettesRoutine();
     }
 
     return ChatPage(

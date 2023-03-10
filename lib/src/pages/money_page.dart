@@ -431,9 +431,6 @@ class _MoneyPageState extends State<MoneyPage> {
           key: backButttonKey,
           name: "Back",
           isSpecial: true,
-          widthEpsilon: 0.5,
-          heightEpsilon: 0.5,
-          bottomEpsilon: -0.5,
           showExtra: _extra,
           onPress: () {
             if (_extra) {

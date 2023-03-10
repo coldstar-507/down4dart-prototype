@@ -49,6 +49,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
 
 class _ChatPageState extends State<ChatPage> {
   GlobalKey mediaModeKey = GlobalKey();
+  GlobalKey mediaForwardModeKey = GlobalKey();
   late Console _console;
   late ConsoleInput _consoleInput = consoleInput;
   var _tec = TextEditingController();
@@ -94,7 +95,11 @@ class _ChatPageState extends State<ChatPage> {
     ordered = mIds.reversed.toList();
     _loadSome();
     loadMembers();
-    loadBaseConsole();
+    if (widget.fObjects != null) {
+      loadForwardingConsole();
+    } else {
+      loadBaseConsole();
+    }
   }
 
   @override
@@ -117,12 +122,14 @@ class _ChatPageState extends State<ChatPage> {
     ordered = mIds.reversed.toList();
     if (ordered.isEmpty) return;
     final last = ordered.first;
-    if (loaded.isNotEmpty && loaded.first != last) {
+    if (loaded.first != last) {
       ID? prev = loaded.isEmpty ? null : loaded.first;
       final msg = await getChatMessage(last, prev, null, true);
       if (msg != null) {
-        _cachedMessages[msg.id] = msg;
-        loaded.insert(0, msg.id);
+        if (!loaded.contains(msg.id)) {
+          loaded.insert(0, msg.id);
+          _cachedMessages[msg.id] = msg;
+        }
       }
       setState(() {});
     }
@@ -338,20 +345,20 @@ class _ChatPageState extends State<ChatPage> {
     final msg = p.message;
 
     for (final m in fMsg) {
+      widget.node.messages.add(m.id);
       m.message
         ..isRead = true
-        ..isSaved = sendingToSelf
-        ..save();
-      widget.node.messages.add(m.id);
+        ..isSaved = sendingToSelf;
+      await m.message.save();
       await reloadOne();
     }
 
     if (msg != null) {
+      widget.node.messages.add(msg.id);
       msg
         ..isRead = true
-        ..isSaved = sendingToSelf
-        ..save();
-      widget.node.messages.add(msg.id);
+        ..isSaved = sendingToSelf;
+      await msg.save();
       await reloadOne();
     }
 
@@ -598,6 +605,7 @@ class _ChatPageState extends State<ChatPage> {
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
+          key: mediaForwardModeKey,
           name: "Forward",
           onPress: () {
             if (extra) {
@@ -618,6 +626,7 @@ class _ChatPageState extends State<ChatPage> {
         )
       ],
     );
+    setState(() {});
   }
 
   void loadForwardingMediasConsole({
@@ -625,6 +634,7 @@ class _ChatPageState extends State<ChatPage> {
     bool images = true,
   }) {
     _console = Console(
+      bottomInputs: [consoleInput],
       consoleMedias2: ConsoleMedias2(
           showImages: images,
           onSelect: (media) => send2(mediaInput: media, fObjects: fObjects)),

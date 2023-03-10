@@ -31,7 +31,6 @@ class ConsoleButton extends StatelessWidget {
   final void Function() onPress;
   final void Function()? onLongPress;
   final void Function()? onLongPressUp;
-  final double leftEpsilon, bottomEpsilon, widthEpsilon, heightEpsilon;
   final bool invertColors;
   final BorderRadius? border;
 
@@ -39,10 +38,6 @@ class ConsoleButton extends StatelessWidget {
     this.invertColors = false,
     required this.name,
     required this.onPress,
-    this.leftEpsilon = 0.0,
-    this.bottomEpsilon = 0.0,
-    this.widthEpsilon = 0.0,
-    this.heightEpsilon = 0.0,
     this.extraButtons,
     this.isGreyedOut = false,
     this.showExtra = false,
@@ -62,11 +57,7 @@ class ConsoleButton extends StatelessWidget {
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
         invertColors: true,
-        leftEpsilon: leftEpsilon,
-        bottomEpsilon: bottomEpsilon,
         isGreyedOut: isGreyedOut,
-        widthEpsilon: widthEpsilon,
-        heightEpsilon: heightEpsilon,
         extraButtons: extraButtons,
         showExtra: showExtra,
         shouldBeDownButIsnt: shouldBeDownButIsnt,
@@ -85,11 +76,7 @@ class ConsoleButton extends StatelessWidget {
         onLongPressUp: onLongPressUp,
         invertColors: invertColors,
         border: border,
-        leftEpsilon: leftEpsilon,
-        bottomEpsilon: bottomEpsilon,
         isGreyedOut: isGreyedOut,
-        widthEpsilon: widthEpsilon,
-        heightEpsilon: heightEpsilon,
         extraButtons: extraButtons,
         showExtra: showExtra,
         shouldBeDownButIsnt: shouldBeDownButIsnt,
