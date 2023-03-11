@@ -22,7 +22,7 @@ import '../render_objects/navigator.dart';
 import '../render_objects/_down4_flutter_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget implements Down4PageWidget {
-  ID get id => "HyperchatPage";
+  ID get id => "hyper";
   final double initialOffset;
   final List<Palette2> palettesForTransition;
   final int nHidden;

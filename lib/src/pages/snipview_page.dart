@@ -6,7 +6,7 @@ import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
 
 class SnipViewPage extends StatelessWidget implements Down4PageWidget {
   @override
-  ID get id => "SnipViewPage";
+  ID get id => "snipview";
 
   final Widget displayMedia;
   final String? text;

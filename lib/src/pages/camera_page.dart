@@ -13,7 +13,7 @@ import '../globals.dart';
 
 class SnipCamera extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "SnipCamera";
+  ID get id => "snip";
 
   final CameraController ctrl;
   final double minZoom, maxZoom;

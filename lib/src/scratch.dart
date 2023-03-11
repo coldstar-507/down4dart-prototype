@@ -6,18 +6,13 @@ import 'dart:convert';
 
 import 'dart:math' as math;
 
-int jeff() {
-  return 123;
-}
-
 void main() async {
-  print(jeff());
+  final g = Iterable.generate(100, (i) => i).toList();
 
-  final g = Iterable.generate(100, (i) => i);
-
-  Future(() => g.forEach(print));
-
-  print(jeff());
+  while (g.isNotEmpty) {
+    final i = g.removeLast();
+    print(i);
+  }
 
   return;
 }

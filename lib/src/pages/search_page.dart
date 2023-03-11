@@ -21,7 +21,7 @@ import '../render_objects/qr.dart';
 
 class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "SearchPage";
+  ID get id => "search";
 
   // final Self self;
   // final List<Palette> palettes;

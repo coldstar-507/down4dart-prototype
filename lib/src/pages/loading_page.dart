@@ -10,7 +10,7 @@ import '../render_objects/_down4_flutter_utils.dart'
 
 class LoadingPage2 extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "LoadingPage";
+  ID get id => "loading";
 
   final String? seed;
   const LoadingPage2({this.seed, Key? key}) : super(key: key);

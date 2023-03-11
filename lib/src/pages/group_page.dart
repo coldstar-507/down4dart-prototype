@@ -24,7 +24,7 @@ import '../render_objects/_down4_flutter_utils.dart';
 
 class GroupPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "GroupPage";
+  ID get id => "group";
   final List<Palette2> homePalettes, palettesForTransition;
   final Iterable<Person> people;
   final int nHidden;

@@ -176,53 +176,38 @@ class Message implements Down4Object {
   final String? text;
   final List<ID>? replies, nodes;
   int timestamp;
-  bool isRead, isSaved;
-  Map<ID, bool> sents;
+  Map<ID, bool> sents, reads;
+
+  bool read(ID id) => reads[id] ?? false;
+  bool sent(ID id) => sents[id] ?? false;
 
   Message({
     required this.senderID,
     required this.timestamp,
     required this.id,
     this.mediaID,
-    this.isRead = false,
-    this.isSaved = false,
     this.forwarderID,
     this.text,
     this.nodes,
     this.replies,
     Map<ID, bool>? sents,
-  }) : sents = sents ?? {};
+    Map<ID, bool>? reads,
+  })  : sents = sents ?? {},
+        reads = reads ?? {};
 
-  void refresh() {
-    timestamp = u.timeStamp();
-  }
-
-  // Message forwarded(ID forwarderID) {
-  //   return Message(
-  //       id: id,
-  //       text: text,
-  //       timestamp: timestamp,
-  //       senderID: senderID,
-  //       forwarderID: forwarderID,
-  //       mediaID: mediaID,
-  //       nodes: nodes,
-  //       refs: refs
-  //       // replies: replies, // replies won't be downloaded, senderID will
-  //       // move to a forwarded from widget on top of the chat message
-  //       // forwarderID will be the sender widget
-  //       );
-  // }
+  void refresh() => timestamp = u.timeStamp();
 
   factory Message.fromJson(Map<String, dynamic> decodedJson) {
     return Message(
       id: decodedJson["id"],
       senderID: decodedJson["s"],
       forwarderID: decodedJson["f"],
-      isRead: decodedJson["rs"] ?? false,
-      isSaved: decodedJson["sv"] ?? false,
       text: decodedJson["txt"],
       mediaID: decodedJson["m"],
       timestamp: decodedJson["ts"],
+      reads: decodedJson["rd"] != null
+          ? Map<ID, bool>.from(decodedJson["rd"])
+          : {},
       sents: decodedJson["st"] != null
           ? Map<ID, bool>.from(decodedJson["st"])
           : {},
@@ -241,8 +226,7 @@ class Message implements Down4Object {
         's': senderID,
         'ts': timestamp,
         if (mediaID != null) 'm': mediaID,
-        if (toLocal) 'rs': isRead,
-        if (toLocal) 'sv': isSaved,
+        if (toLocal) 'rd': reads,
         if (toLocal) 'st': sents,
         if (forwarderID != null) 'f': forwarderID,
         if (replies != null) 'r': replies!.join(" "),

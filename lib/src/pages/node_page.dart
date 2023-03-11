@@ -12,7 +12,7 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "n-${node.id}";
+  ID get id => "node-${node.id}";
 
   final BaseNode node;
   final void Function(BaseNode) openNode, openChat, payNode;
@@ -34,12 +34,25 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
 class _NodePageState extends State<NodePage> {
   Widget? _view;
 
+  late final ScrollController scroller =
+      ScrollController(initialScrollOffset: g.vm.cv.cp.scroll)
+        ..addListener(() {
+          g.vm.cv.cp.scroll = scroller.offset;
+        });
+
+  @override
+  void dispose() {
+    scroller.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
     if (widget.node is Person) {
       _view = Andrew(pages: [
         Down4Page(
+          scrollController: scroller,
           reversedList: false,
           title: widget.node.name,
           console: userPaletteConsole,

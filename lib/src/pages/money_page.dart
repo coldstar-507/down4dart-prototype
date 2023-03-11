@@ -31,7 +31,7 @@ void printWrapped(String text) {
 
 class PaymentPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "PaymentPage";
+  ID get id => "payment";
   final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentAsList;
@@ -152,7 +152,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "MoneyPage";
+  ID get id => "money";
   final List<Palette2> palettesBeforeTransition, palettesAfterTransition;
   final Iterable<Person> people;
   final int nHidden;
@@ -206,9 +206,16 @@ class _MoneyPageState extends State<MoneyPage> {
   };
   late var palettes = widget.palettesBeforeTransition;
   late final _offset = widget.nHidden * Palette.fullHeight;
-  late ScrollController scrollController0 = ScrollController(
+  late ScrollController scroller0 = ScrollController(
     initialScrollOffset: widget.initialOffset,
-  );
+  )..addListener(() {
+      g.vm.cv.pages[0].scroll = scroller0.offset;
+    });
+  late ScrollController scroller1 = ScrollController(
+    initialScrollOffset: g.vm.cv.pages[1].scroll,
+  )..addListener(() {
+      g.vm.cv.pages[1].scroll = scroller1.offset;
+    });
 
   int? _balance;
 
@@ -272,8 +279,8 @@ class _MoneyPageState extends State<MoneyPage> {
   Future<void> animatedTransition() async {
     Future(() => setState(() {
           palettes = widget.palettesAfterTransition;
-          scrollController0.jumpTo(widget.initialOffset + _offset);
-          scrollController0.animateTo(0,
+          scroller0.jumpTo(widget.initialOffset + _offset);
+          scroller0.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
         }));
@@ -285,7 +292,7 @@ class _MoneyPageState extends State<MoneyPage> {
     importTec.dispose();
     textNoteTec.dispose();
     scanner?.dispose();
-    scrollController0.dispose();
+    scroller0.dispose();
     super.dispose();
   }
 
@@ -644,11 +651,11 @@ class _MoneyPageState extends State<MoneyPage> {
   @override
   Widget build(BuildContext context) {
     return Andrew(
-      // initialPageIndex: g.curState.i,
-      // onPageChange: (idx) => g.curState.i = idx,
+      initialPageIndex: g.vm.cv.ci,
+      onPageChange: (idx) => g.vm.cv.ci = idx,
       pages: [
         Down4Page(
-            scrollController: scrollController0,
+            scrollController: scroller0,
             staticList: true,
             title: "Money",
             list: palettes.toList(growable: false),

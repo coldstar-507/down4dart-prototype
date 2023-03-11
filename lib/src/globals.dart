@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/_down4_dart_utils.dart';
 import 'package:flutter/services.dart';
 import 'render_objects/palette.dart';
-// import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:hive/hive.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -17,6 +15,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'render_objects/_down4_flutter_utils.dart';
+import 'render_objects/chat_message.dart';
+
 import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
@@ -280,25 +280,26 @@ extension Getters on ID {
 }
 
 extension MessageSave on Message {
-  Future<void> onReceipt() async {
+  Future<void> onReceipt({required ID root}) async {
+    reads[root] = false;
     await save();
     if (mediaID != null) {
       MessageMedia? media = await mediaID?.getLocalMessageMedia();
       media ??= await downloadAndWriteMedia(mediaID!);
       if (media != null && media.extension.isVideoExtension()) {
         // we generate a thumbnail
-        final tn =
-            await VideoThumbnail.thumbnailData(video: media.path, quality: 90);
+        final tn = await VideoThumbnail.thumbnailData(
+          video: media.path,
+          quality: 90,
+        );
         if (tn != null) {
           final f = await writeMedia(
               mediaData: tn, mediaID: mediaID!, isThumbnail: true);
           media.thumbnail = f.path;
         }
       }
-
-      media
-        ?..references.add(id)
-        ..save();
+      media?.references.add(id);
+      await media?.save();
     }
     return;
   }
@@ -308,9 +309,9 @@ extension MessageSave on Message {
   }
 
   Future<void> deleteFrom(ChatableNode node) async {
-    sents.remove(node.id);
+    reads.remove(node.id);
     node.messages.remove(id);
-    if (sents.isEmpty) return delete();
+    if (reads.isEmpty) return delete();
     return;
   }
 
@@ -343,9 +344,9 @@ extension NodeSave on BaseNode {
     if (node is ChatableNode && node is! Self) {
       for (var messageID in node.messages) {
         var msg = await messageID.getLocalMessage();
-        if (msg != null && !msg.isSaved) msg.delete();
+        await msg?.deleteFrom(node);
       }
-      g.boxes.nodes.delete(id);
+      await g.boxes.nodes.delete(id);
     }
   }
 }
@@ -356,7 +357,7 @@ extension ChatableNodeExtensions on ChatableNode {
     bool? lastMessageWasRead;
     if (messages.isNotEmpty) {
       final lastMessage = await messages.last.getLocalMessage();
-      lastMessageWasRead = lastMessage?.isRead ?? true;
+      lastMessageWasRead = lastMessage?.reads[id] ??= false;
       if ((lastMessage?.text ?? "").isEmpty) {
         lastMessagePreview = "&attachment";
       } else {
@@ -491,6 +492,60 @@ extension SelfSave on Self {
   }
 }
 
+class P {
+  double scroll;
+  Map<ID, Down4Object> objects;
+  P({double? scroll, Map<ID, Down4Object>? objects})
+      : scroll = scroll ?? 0.0,
+        objects = objects ?? {};
+}
+
+class V {
+  final BaseNode? node;
+  final ID id;
+  final List<P> pages;
+  int ci;
+
+  V({required this.id, required this.pages, int? ix, this.node}) : ci = ix ?? 0;
+
+  P get cp => pages[ci];
+}
+
+// view IDs code
+// Homepage      -> 'home'
+// GroupPage     -> 'group'
+// HyperchatPage -> 'hyper'
+// SearchPage    -> 'search'
+// SnipPage      -> 'snip'
+// ChatPage      -> 'c-{nodeID}'
+// NodePage      -> 'n-{nodeID}'
+// ForwardPage   -> 'forward'
+// MoneyPage     -> 'money'
+// LoadingPage   -> 'loading'
+class ViewManager {
+  List<V> views;
+  ViewManager(this.views);
+  V get cv => views.last;
+  V get pv => views[views.length - 2];
+
+  V get home => views.first;
+
+  void push(V v) => views.add(v);
+  V pop() => views.removeLast();
+  void popUntilHome() {
+    final nv = views.length;
+    for (int i = 0; i < nv - 1; i++) {
+      pop();
+    }
+  }
+
+  void popInBetween() {
+    final last = pop();
+    popUntilHome();
+    push(last);
+  }
+}
+
 class Payload {
   final List<Down4Object> forwardables;
   final List<ID> replies;
@@ -564,8 +619,13 @@ class Singletons {
   Boxes? _boxes;
   ExchangeRate? _exchangeRate;
 
-  late Image fifty, black, red;
+  ViewManager vm = ViewManager([
+    V(id: 'home', pages: [P(), P()]) // left is homeState, right is hiddenState
+  ]);
 
+  List<Down4Object> fo = [];
+
+  late Image fifty, black, red;
   late List<CameraDescription> cameras;
   Self get self => _self ??= SelfSave.load();
   Wallet get wallet => _wallet ??= WalletManager.load();
@@ -772,4 +832,118 @@ Transition typeTransition<T>({
       state: state,
       nHidden: properTypeHidden.length,
       scroll: scrollOffset);
+}
+
+Future<ChatMessage?> getChatMessage({
+  required Map<ID, ChatMessage> state,
+  required ChatableNode node,
+  required ID msgID,
+  required ID? prevMsgID,
+  required ID? nextMsgID,
+  required bool isLast,
+  required void Function(BaseNode) openNode,
+  required void Function() refreshCallback,
+}) async {
+  Message? msg = await msgID.getLocalMessage();
+  if (msg == null) return null;
+  Message? prevMsg, nextMsg;
+  ChatMessage? prevChatMessage = state[prevMsgID];
+  // If new message while in chat, we might want to remove the header of the
+  // previous last message
+  if (isLast &&
+      prevMsgID != null &&
+      prevChatMessage != null &&
+      prevChatMessage.hasHeader &&
+      msg.senderID == prevChatMessage.message.senderID &&
+      msg.senderID != g.self.id) {
+    // we need to remove its header
+    state[prevMsgID] = prevChatMessage.withHeader(hasHeader: false);
+    // and update it's size
+  }
+
+  if (state[msgID] != null) return state[msgID]!;
+
+  prevMsg = await prevMsgID?.getLocalMessage();
+  nextMsg = await nextMsgID?.getLocalMessage();
+
+  bool hasGap = false;
+  if (prevMsg != null) hasGap = ChatMessage.displayGap(msg, prevMsg);
+
+  // mark as read
+  if (!msg.read(node.id)) {
+    msg.reads[node.id] = true;
+    await msg.save();
+  }
+
+  final bool senderIsSelf = msg.senderID == g.self.id;
+  final bool hasHeader =
+      !senderIsSelf && node is GroupNode && nextMsg?.senderID != msg.senderID;
+
+  final cm = ChatMessage(
+      key: GlobalKey(),
+      hasGap: hasGap,
+      message: msg,
+      mediaInfo: await ChatMessage.generateMediaInfo(msg),
+      nodes: null,
+      repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
+        print("TODO, GO TO REPLY ID = $replyID");
+      }),
+      hasHeader: hasHeader,
+      openNode: openNode,
+      myMessage: g.self.id == msg.senderID,
+      select: (_) {
+        state[msgID] = state[msgID]!.invertedSelection();
+        refreshCallback();
+      });
+
+  Future.microtask(() {
+    if ((msg.nodes ?? []).isNotEmpty) {
+      getNodesFromEverywhere(msg.nodes!.toSet()).then((nodes) {
+        if (nodes.isNotEmpty) {
+          state[msg.id] = state[msg.id]!.withNodes(nodes);
+          refreshCallback();
+        }
+      });
+    }
+  });
+
+  return cm;
+}
+
+Future<void> writeMessages({
+  required ChatableNode node,
+  required List<ID> ordered,
+  required Map<ID, ChatMessage> state,
+  required void Function() refresh,
+  required void Function(BaseNode) openNode,
+  Set<ID>? msgsWithVideo,
+  int limit = 20,
+}) async {
+  final orderedSet = ordered.toSet();
+  final loadedSet = state.keys.toSet();
+  final toLoad = orderedSet.difference(loadedSet).toList();
+  if (toLoad.isEmpty) return;
+  final allN = ordered.length;
+  final nLoad = toLoad.length > limit ? limit : toLoad.length;
+  final ixOfFirst = orderedSet.toList().indexOf(toLoad.first);
+  for (int i = 0; i < nLoad; i++) {
+    final ixInFull = ixOfFirst + i;
+    final msgID = toLoad[i];
+    final nxt = ixInFull == 0 ? null : ordered[ixInFull - 1];
+    final prv = ixInFull < allN - 1 ? ordered[ixInFull + 1] : null;
+    final isFirst = msgID == orderedSet.first;
+    final m = await getChatMessage(
+        state: state,
+        node: node,
+        msgID: msgID,
+        prevMsgID: prv,
+        nextMsgID: nxt,
+        isLast: isFirst,
+        openNode: openNode,
+        refreshCallback: refresh);
+    if (m != null) {
+      state[m.id] = m;
+      if (m.mediaInfo?.media.isVideo ?? false) msgsWithVideo?.add(m.id);
+    }
+  }
 }
