@@ -71,6 +71,9 @@ class _Down4State extends State<Down4> {
     required double imAspectRatio,
     required bool isReversed,
   }) async {
+    _view = const LoadingPage2();
+    setState(() {});
+
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
       print("error getting firebase messaging token");

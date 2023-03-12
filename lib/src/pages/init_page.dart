@@ -128,7 +128,8 @@ class _UserMakerPageState extends State<UserMakerPage> {
       bottomInputs: [_inputs[1], _inputs[2]],
       bottomButtons: [
         ConsoleButton(name: "Camera", onPress: camConsole),
-        ConsoleButton(name: "Recover", onPress: () => print("TODO")),
+        ConsoleButton(
+            name: "Recover", isGreyedOut: true, onPress: () => print("TODO")),
         ConsoleButton(
             // key: buttonKey,
             isActivated: isReady && activatedProceed,

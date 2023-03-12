@@ -24,8 +24,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final ChatableNode node;
   // final List<BaseNode>? subNodes;
   final Map<ID, ChatMessage> messages;
+  final Map<ID, Palette2> members;
   final List<ID> ordered;
-  final List<Palette2>? members;
   final List<Down4Object>? fObjects;
   final void Function(int) onPageChange;
   final void Function() back;
@@ -637,20 +637,18 @@ class _ChatPageState extends State<ChatPage> {
     final pages = widget.node is GroupNode
         ? [
             Down4Page(
-              scrollController: scroller0,
-              isChatPage: true,
-              title: widget.node.name,
-              console: _console,
-              asMap: widget.messages,
-              orderedKeys: widget.ordered,
-              onRefresh: widget.loadMore,
-              // onRefresh: widget.messages.isEmpty ? null : loadSome,
-            ),
+                scrollController: scroller0,
+                isChatPage: true,
+                title: widget.node.name,
+                console: _console,
+                asMap: widget.messages,
+                orderedKeys: widget.ordered,
+                onRefresh: widget.loadMore),
             Down4Page(
               scrollController: scroller1,
               title: "Members",
               console: _console,
-              list: widget.members,
+              list: widget.members.values.toList(),
             ),
           ]
         : [

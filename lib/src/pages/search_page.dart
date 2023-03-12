@@ -65,7 +65,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     ];
   }
 
-  Map<ID, Palette2> searchs = {};
+  Map<ID, Palette2> get searchs => g.vm.cv.cp.objects.cast();
 
   void reload() => setState(() {});
 
