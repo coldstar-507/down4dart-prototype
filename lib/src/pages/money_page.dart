@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
@@ -9,8 +7,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr/qr.dart';
 
 import '../data_objects.dart';
-import '../web_requests.dart' as r;
-import '../bsv/wallet.dart';
 import '../bsv/types.dart';
 import '../bsv/utils.dart';
 import '../globals.dart';
@@ -20,7 +16,7 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
 import '../render_objects/_down4_flutter_utils.dart'
-    show Down4PageWidget, Palette2Extensions;
+    show Down4PageWidget, Palette2Extensions, IterablePalette2Extensions;
 
 final base85 = Base85Codec(Alphabets.z85);
 
@@ -153,26 +149,39 @@ class _PaymentPageState extends State<PaymentPage> {
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "money";
-  final List<Palette2> palettesBeforeTransition, palettesAfterTransition;
-  final Iterable<Person> people;
-  final int nHidden;
-  final void Function(Down4Payment) openPayment;
-  final Down4Payment? paymentUpdate;
+  // final List<Palette2>? palettesBeforeTransition, palettesAfterTransition;
+  // final Iterable<Person> people;
+  final Transition? transition;
+  final Palette2? single;
+  final void Function(Down4Payment) onScan;
+  // final int? nHidden;
+  // final (List<Palette2>, List<Palette2>, int)? transition;
+  // final void Function(Down4Payment) openPayment;
+  // final Down4Payment? paymentUpdate;
+  final Future<void> Function() loadMorePayments;
   final void Function() back;
   final Future<void> Function(Down4Payment) makePayment;
-  final double initialOffset;
+  // final double initialOffset;
 
   const MoneyPage({
-    required this.palettesAfterTransition,
-    required this.openPayment,
-    required this.people,
-    required this.nHidden,
-    required this.palettesBeforeTransition,
+    required this.loadMorePayments,
+    required this.onScan,
     required this.back,
-    // required this.refreshMoneyPage,
     required this.makePayment,
-    required this.initialOffset,
-    this.paymentUpdate,
+    this.transition,
+    this.single,
+    // required this.refreshMoneyPage,
+    // required this.palettesAfterTransition,
+    // required this.openPayment,
+    // required this.people,
+    // required this.nHidden,
+    // required this.palettesBeforeTransition,
+    // required this.onScan,
+    // required this.back,
+    // required this.refreshMoneyPage,
+    // required this.makePayment,
+    // required this.initialOffset,
+    // this.paymentUpdate,
     Key? key,
   }) : super(key: key);
 
@@ -204,10 +213,19 @@ class _MoneyPageState extends State<MoneyPage> {
     "l": ["Each", "Split"],
     "i": 0,
   };
-  late var palettes = widget.palettesBeforeTransition;
-  late final _offset = widget.nHidden * Palette.fullHeight;
+  late var palettes = widget.transition != null
+      ? widget.transition!.preTransition
+      : widget.single != null
+          ? [widget.single!]
+          : _users.values.toList();
+
+  late final _offset = (widget.transition?.nHidden ?? 0) * Palette.fullHeight;
   late ScrollController scroller0 = ScrollController(
-    initialScrollOffset: widget.initialOffset,
+    initialScrollOffset: widget.transition != null
+        ? widget.transition!.scroll
+        : widget.single != null
+            ? 0
+            : g.vm.cv.pages[0].scroll,
   )..addListener(() {
       g.vm.cv.pages[0].scroll = scroller0.offset;
     });
@@ -221,47 +239,49 @@ class _MoneyPageState extends State<MoneyPage> {
 
   Map<ID, Palette2> get _users => g.vm.cv.pages[0].objects.cast();
 
+  List<Person> get people => _users.values.asNodes<Person>().toList();
+
   Map<ID, Palette2> get _payments => g.vm.cv.pages[1].objects.cast();
 
-  Future<void> loadMorePayments(int n) async {
-    await payments3(n).toList();
-    setState(() {});
-  }
+  // Future<void> loadMorePayments(int n) async {
+  //   await payments3(n).toList();
+  //   setState(() {});
+  // }
 
-  Palette2 paymentToPalette(Down4Payment payment) {
-    return Palette2(
-      node: Payment(payment: payment, selfID: g.self.id),
-      messagePreview: payment.textNote,
-      buttonsInfo2: [
-        ButtonsInfo2(
-            asset: g.fifty,
-            pressFunc: () => widget.openPayment(payment),
-            rightMost: true)
-      ],
-    );
-  }
+  // Palette2 paymentToPalette(Down4Payment payment) {
+  //   return Palette2(
+  //     node: Payment(payment: payment, selfID: g.self.id),
+  //     messagePreview: payment.textNote,
+  //     buttonsInfo2: [
+  //       ButtonsInfo2(
+  //           asset: g.fifty,
+  //           pressFunc: () => widget.openPayment(payment),
+  //           rightMost: true)
+  //     ],
+  //   );
+  // }
 
-  Future<void> loadPayment(ID id) async {
-    final payment = await g.wallet.getPayment(id);
-    if (payment == null) return;
-    _payments.putIfAbsent(id, () => paymentToPalette(payment));
-    return setState(() {});
-  }
+  // Future<void> loadPayment(ID id) async {
+  //   final payment = await g.wallet.getPayment(id);
+  //   if (payment == null) return;
+  //   _payments.putIfAbsent(id, () => paymentToPalette(payment));
+  //   return setState(() {});
+  // }
 
-  Stream<void> payments3(int n) async* {
-    await for (final p in g.wallet.payments.skip(_payments.length).take(n)) {
-      final asNode = Payment(payment: p, selfID: g.self.id);
-      _payments.putIfAbsent(p.id, () => paymentToPalette(p));
-    }
-  }
+  // Stream<void> payments3(int n) async* {
+  //   await for (final p in g.wallet.payments.skip(_payments.length).take(n)) {
+  //     final asNode = Payment(payment: p, selfID: g.self.id);
+  //     _payments.putIfAbsent(p.id, () => paymentToPalette(p));
+  //   }
+  // }
 
   @override
   void initState() {
     super.initState();
-    animatedTransition();
-    loadMorePayments(4);
+    if (widget.transition != null) animatedTransition();
+    // loadMorePayments(4);
     loadInputsAndConsole();
-    if (widget.people.isEmpty) {
+    if (people.isEmpty) {
       loadEmptyViewConsole();
     } else {
       loadMainViewConsole();
@@ -271,7 +291,7 @@ class _MoneyPageState extends State<MoneyPage> {
   Future<void> loadInputsAndConsole() async {
     await loadBalance();
     loadMainViewInput();
-    if (widget.people.isEmpty) {
+    if (people.isEmpty) {
       loadEmptyViewConsole();
     } else {
       loadMainViewConsole();
@@ -280,8 +300,8 @@ class _MoneyPageState extends State<MoneyPage> {
 
   Future<void> animatedTransition() async {
     Future(() => setState(() {
-          palettes = widget.palettesAfterTransition;
-          scroller0.jumpTo(widget.initialOffset + _offset);
+          palettes = widget.transition!.postTransition;
+          scroller0.jumpTo(widget.transition!.scroll + _offset);
           scroller0.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
@@ -301,10 +321,10 @@ class _MoneyPageState extends State<MoneyPage> {
   @override
   void didUpdateWidget(MoneyPage old) {
     super.didUpdateWidget(old);
-    if (widget.paymentUpdate != null) {
-      _payments.putIfAbsent(widget.paymentUpdate!.id,
-          () => paymentToPalette(widget.paymentUpdate!));
-    }
+    // if (widget.paymentUpdate != null) {
+    //   _payments.putIfAbsent(widget.paymentUpdate!.id,
+    //       () => paymentToPalette(widget.paymentUpdate!));
+    // }
   }
 
   int usdToSatoshis(double usds) =>
@@ -343,50 +363,53 @@ class _MoneyPageState extends State<MoneyPage> {
         (_paymentMethod["l"] as List<String>).length;
   }
 
-  dynamic onScan(Barcode bc, MobileScannerArguments? args) async {
+  Down4Payment? onScan(Barcode bc, MobileScannerArguments? args) {
     final raw = bc.rawValue;
     print("Trying to scan some good stuff right here!");
-    if (raw != null) {
-      final isFirst = raw[0] == "_";
-      if (!isFirst) {
-        final prefixEnd = raw.indexOf(";");
-        final ix = int.parse(raw.substring(0, prefixEnd));
-        scannedData.putIfAbsent(ix, () => raw.substring(prefixEnd + 1));
-      } else {
-        final countPrefixEnd = raw.indexOf(",");
-        scannedDataLength = int.parse(raw.substring(1, countPrefixEnd));
-        scannedData.putIfAbsent(0, () => raw.substring(countPrefixEnd + 1));
-      }
+    if (raw == null) return null;
 
-      if (scannedData.keys.length == scannedDataLength) {
-        // we have all the data
-        print("WE HAVE ALL THE DATA, SENDING!!!!");
-        await scanner?.stop();
-        final sortedKeys = scannedData.keys.toList(growable: false)..sort();
-        final sortedData = sortedKeys
-            .map((e) => scannedData[e])
-            .toList(growable: false)
-            .join();
+    final isFirst = raw[0] == "_";
+    if (!isFirst) {
+      final prefixEnd = raw.indexOf(";");
+      final ix = int.parse(raw.substring(0, prefixEnd));
+      scannedData.putIfAbsent(ix, () => raw.substring(prefixEnd + 1));
+    } else {
+      final countPrefixEnd = raw.indexOf(",");
+      scannedDataLength = int.parse(raw.substring(1, countPrefixEnd));
+      scannedData.putIfAbsent(0, () => raw.substring(countPrefixEnd + 1));
+    }
 
-        print("SORTED KEYS = $sortedKeys");
+    if (scannedData.keys.length == scannedDataLength) {
+      // we have all the data
+      print("WE HAVE ALL THE DATA, SENDING!!!!");
 
-        final base85DecodedData = base85.decode(sortedData);
+      print("RESETTING SCAN");
+      scanner?.stop();
+      scannedData = {};
+      scannedDataLength = -1;
+      _scanning = false;
 
-        final payment = Down4Payment.fromCompressed(base85DecodedData);
-        print(payment.txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
+      final sortedKeys = scannedData.keys.toList(growable: false)..sort();
+      final sortedData =
+          sortedKeys.map((e) => scannedData[e]).toList(growable: false).join();
 
-        print("the payment = $payment");
+      print("SORTED KEYS = $sortedKeys");
 
-        print("Parsing the payment!");
-        scannedData = {};
-        scannedDataLength = -1;
+      final base85DecodedData = base85.decode(sortedData);
 
-        _scanning = false;
-        await g.wallet.parsePayment(g.self.id, payment);
-        await loadPayment(payment.id);
-        loadInputsAndConsole();
-        print("Should literally work");
-      }
+      final payment = Down4Payment.fromCompressed(base85DecodedData);
+      return payment;
+
+      // print(payment.txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
+
+      // print("the payment = $payment");
+
+      // print("Parsing the payment!");
+
+      // await g.wallet.parsePayment(g.self.id, payment);
+      // await loadPayment(payment.id);
+      // loadInputsAndConsole();
+      // print("Should literally work");
     }
   }
 
@@ -545,17 +568,17 @@ class _MoneyPageState extends State<MoneyPage> {
     int asSats;
     if (inputCurrency == "USD") {
       asUSD = num.parse(tec.value.text).toDouble() *
-          (method == "Split" ? 1.0 : widget.people.length);
+          (method == "Split" ? 1.0 : people.length);
       asSats = usdToSatoshis(asUSD);
     } else {
       asSats = num.parse(tec.value.text).toInt() *
-          (method == "Split" ? 1 : widget.people.length);
+          (method == "Split" ? 1 : people.length);
       asUSD = satoshisToUSD(asSats);
     }
 
     void confirmPayment() async {
       final pay = await g.wallet.payPeople(
-          people: widget.people.toList(growable: false),
+          people: people,
           selfID: g.self.id,
           amount: Sats(asSats),
           textNote: textNoteTec.value.text);
@@ -616,7 +639,7 @@ class _MoneyPageState extends State<MoneyPage> {
       _extra = false;
       loadBalance();
       loadMainViewInput();
-      if (widget.people.isEmpty) {
+      if (people.isEmpty) {
         loadEmptyViewConsole();
       } else {
         loadMainViewConsole();
@@ -633,7 +656,7 @@ class _MoneyPageState extends State<MoneyPage> {
           name: "Back",
           onPress: () {
             _extra = false;
-            if (widget.people.isEmpty) {
+            if (people.isEmpty) {
               loadEmptyViewConsole();
             } else {
               loadMainViewConsole();
@@ -660,10 +683,10 @@ class _MoneyPageState extends State<MoneyPage> {
             scrollController: scroller0,
             staticList: true,
             title: "Money",
-            list: palettes.toList(growable: false),
+            list: palettes,
             console: _console!),
         Down4Page(
-            onRefresh: () => loadMorePayments(20),
+            onRefresh: widget.loadMorePayments,
             title: "Status",
             list: _payments.values.toList().formatted(),
             console: _console!),

@@ -74,7 +74,7 @@ class _HomeState extends State<Home> {
       case 'home':
         return setPage(homePage(fObjs: f));
       case 'chat':
-        return setPage(chatPage(cv.node as ChatableNode, fObjs: f));
+        return setPage(chatPage(cv.node as ChatableNode, fo: f));
       case 'node':
         return setPage(nodePage(cv.node as BaseNode));
       case 'money':
@@ -154,10 +154,12 @@ class _HomeState extends State<Home> {
 
   BaseNode? homeNode(ID id) => _homePalettes[id]?.node;
   BaseNode? hiddenNode(ID id) => _hiddenPalettes[id]?.node;
+  BaseNode? localNode(ID id) => hiddenNode(id) ?? hiddenNode(id);
 
   Iterable<Palette2> get homePalettes => _homePalettes.values;
   Iterable<Palette2> get hiddenPalettes => _homePalettes.values;
   Iterable<Palette2> get allPalettes => homePalettes.followedBy(hiddenPalettes);
+  Iterable<ID> get allIDs => allPalettes.map((p) => p.id);
   List<Palette2> get formattedHomePalettes =>
       homePalettes.toList().formattedReverse();
 
@@ -171,7 +173,7 @@ class _HomeState extends State<Home> {
 
   // ======================================================= INITIALIZATION ============================================================ //
 
-  void refreshHome() => setPage(homePage());
+  void rfHome() => setPage(homePage());
 
   @override
   void initState() {
@@ -211,20 +213,20 @@ class _HomeState extends State<Home> {
     }
 
     for (final node in nodes.whereType<BaseNode>().followedBy([g.self])) {
-      await writePalette2(node, _homePalettes, bGen, refreshHome, h: true);
+      await writeHomePalette(node, _homePalettes, bGen, rfHome);
     }
 
     if (init) setPage(homePage());
 
     final lHidden = await Future.wait(stayHidden.map((e) => e.getHiddenNode()));
     for (final n in lHidden.whereType<BaseNode>()) {
-      await writePalette2(n, _hiddenPalettes, null, null);
+      await writeHomePalette(n, _hiddenPalettes, null, null);
     }
 
     final fetched = await r.getNodes(hiddenToFetch);
     for (final n in fetched ?? <BaseNode>[]) {
       n.save(hidden: true);
-      await writePalette2(n, _hiddenPalettes, null, null);
+      await writeHomePalette(n, _hiddenPalettes, null, null);
     }
 
     print("HIDDEN = ${_hiddenPalettes.keys.toList()}");
@@ -257,7 +259,7 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<List<ButtonsInfo2>> bGen2(BaseNode node) async {
+  List<ButtonsInfo2> bGen2(BaseNode node) {
     return [
       ButtonsInfo2(
           asset: g.fifty,
@@ -303,7 +305,7 @@ class _HomeState extends State<Home> {
               media: value.first as NodeMedia)
             ..save();
 
-          await writePalette2(hyperchat, _homePalettes, bGen, refreshHome);
+          await writeHomePalette(hyperchat, _homePalettes, bGen, rfHome);
           await localPalettesRoutine();
           setPage(homePage());
         });
@@ -340,14 +342,13 @@ class _HomeState extends State<Home> {
           ..updateActivity()
           ..save();
 
-        await writePalette2(rootNode, _homePalettes, bGen, refreshHome,
-            h: true);
+        await writeHomePalette(rootNode, _homePalettes, bGen, rfHome);
 
         final pg = page;
         if (pg is HomePage) {
           setPage(homePage());
         } else if (pg is ChatPage && pg.node.id == root) {
-          setPage(chatPage(rootNode, isReload: true, fObjs: pg.fObjects));
+          setPage(chatPage(rootNode, isReload: true, fo: pg.fObjects));
         }
       } else if (eventPayload.first == "s") {
         final String mediaID = eventPayload[1];
@@ -382,8 +383,7 @@ class _HomeState extends State<Home> {
           ..updateActivity()
           ..save();
 
-        await writePalette2(nodeRoot, _homePalettes, bGen, refreshHome,
-            h: true);
+        await writeHomePalette(nodeRoot, _homePalettes, bGen, rfHome);
 
         if (cv.id == 'home') setPage(homePage());
       }
@@ -409,8 +409,7 @@ class _HomeState extends State<Home> {
   Future<void> unselectHomeSelection({bool updateActivity = true}) async {
     for (final p in List.of(homePalettes)) {
       if (p.selected) {
-        await writePalette2(p.node, _homePalettes, bGen, refreshHome,
-            h: true, sel: false);
+        await writeHomePalette(p.node, _homePalettes, bGen, rfHome, sel: false);
       }
     }
     return;
@@ -433,7 +432,7 @@ class _HomeState extends State<Home> {
         t.messages.add(m.id);
         t.updateActivity();
         await t.save();
-        await writePalette2(t, _homePalettes, bGen, refreshHome, h: true);
+        await writeHomePalette(t, _homePalettes, bGen, rfHome);
       }
     }
 
@@ -585,7 +584,7 @@ class _HomeState extends State<Home> {
     vm.popUntilHome();
     setPage(chatPage(hyper, isPush: true));
 
-    await writePalette2(hyper, _homePalettes, bGen, refreshHome);
+    await writeHomePalette(hyper, _homePalettes, bGen, rfHome);
 
     final success = await uploadHyperchatMedia(hcMedia);
     if (!success) {
@@ -605,7 +604,7 @@ class _HomeState extends State<Home> {
     final success = await uploadNode(group);
     if (success) {
       await metaSend(p, [group]);
-      await writePalette2(group, _homePalettes, bGen, refreshHome);
+      await writeHomePalette(group, _homePalettes, bGen, rfHome);
       await unselectHomeSelection();
       vm.popUntilHome();
       setPage(chatPage(group, isPush: true));
@@ -696,11 +695,11 @@ class _HomeState extends State<Home> {
   void refreshChat(ChatableNode node) {
     final pg = page;
     if (pg is ChatPage && pg.node.id == node.id) {
-      setPage(chatPage(node, fObjs: pg.fObjects));
+      setPage(chatPage(node, fo: pg.fObjects));
     }
   }
 
-  void reloadChat(ChatableNode node, Map messages, Map members) {
+  void reloadChat(ChatableNode node, Map messages, Map members, bool f) {
     Future(() async {
       // is a reload, load all new messages
       final loaded = messages.cast<ID, ChatMessage>().keys.toSet();
@@ -719,13 +718,14 @@ class _HomeState extends State<Home> {
     }).then((_) => refreshChat(node));
   }
 
-  void initChat(ChatableNode node, Map messages, Map members) {
+  void initChat(ChatableNode node, Map messages, Map members, bool f) {
+    List<ButtonsInfo2> Function(BaseNode)? cbGen = f ? null : bGen2;
+
     Future(() async {
       // if is group, write members
       if (node is GroupNode) {
-        for (final pal in allPalettes.those(node.group)) {
-          await writePalette2(
-              pal.node, members.cast(), bGen2, () => refreshChat(node));
+        for (final n in allPalettes.those(node.group).asNodes()) {
+          writePalette3(n, members.cast(), cbGen, () => refreshChat(node));
         }
       }
       // write the messages
@@ -756,7 +756,8 @@ class _HomeState extends State<Home> {
       palettes: formattedHomePalettes,
       hyperchat: (fo) => setPage(hyperchatPage(fo)),
       group: () => setPage(groupPage()),
-      money: () => setPage(moneyPage(transition: homeTransition())),
+      money: () =>
+          setPage(moneyPage(transition: homeTransition(), isPush: true)),
       ping: (text) {
         // Ping group nodes
         homePalettes.selected().asNodes<GroupNode>().forEach((gn) {
@@ -800,17 +801,29 @@ class _HomeState extends State<Home> {
   }
 
   ru.Down4PageWidget forwardPage(List<Down4Object> fo, {bool isPush = false}) {
+    void rf() => setPage(forwardPage(fo));
+    List<ButtonsInfo2> fbGen(BaseNode node) {
+      return [
+        ButtonsInfo2(
+            asset: g.fifty,
+            rightMost: true,
+            pressFunc: () =>
+                setPage(chatPage(node as ChatableNode, fo: fo, isPush: true)))
+      ];
+    }
+
     if (isPush) {
       vm.popUntilHome();
       vm.push(V(id: "forward", pages: [P()]));
+      for (final p in homePalettes) {
+        writePalette3(p.node, cv.cp.objects, fbGen, rf, pr: p.messagePreview);
+      }
     }
 
     return ForwardingPage(
-        hiddenState: _hiddenPalettes,
-        homePalettes: formattedHomePalettes.reversed.toList(),
         fObjects: fo,
         openNode: (fObjects, node) =>
-            setPage(chatPage(node, fObjs: fObjects, isPush: true)),
+            setPage(chatPage(node, fo: fObjects, isPush: true)),
         hyper: (fObjects, transition) =>
             setPage(hyperchatPage(fObjects, transition)),
         forward: (p, t) async {
@@ -863,20 +876,33 @@ class _HomeState extends State<Home> {
     // payment, it would not be necessary if listeners work on lazy box, but
     // haven't found a way to make the listener work yet...
   }) {
+    Map<ID, Palette2> people() => cv.pages[0].objects.cast();
+    Map<ID, Palette2> payments() => cv.pages[1].objects.cast();
+    void rf() => setPage(moneyPage());
+    void openPay(Down4Payment payment) => setPage(paymentPage(payment));
+    void loadSomePayments(int limit, [int ms = 0]) =>
+        Future.delayed(Duration(milliseconds: ms), () async {
+          await writePayments(payments(), openPay, limit);
+          rf();
+        });
+
     if (isPush) {
       vm.push(V(id: "money", pages: [P(), P()]));
+      final users = transition?.trueTargets ?? (node != null ? [node] : []);
+      for (final u in users) {
+        writePalette3(u, people(), null, null);
+      }
+      loadSomePayments(5, 700);
     }
 
     return MoneyPage(
-        initialOffset: transition?.scroll ?? 0,
-        palettesAfterTransition:
-            transition?.postTransition ?? [Palette2(node: node!)],
-        people: transition?.trueTargets ?? [node!],
-        nHidden: transition?.nHidden ?? 0,
-        openPayment: (payment) => setPage(paymentPage(payment)),
-        palettesBeforeTransition:
-            transition?.preTransition ?? [Palette2(node: node!)],
-        paymentUpdate: paymentUpdate,
+        single: node != null ? Palette2(node: node) : null,
+        transition: transition,
+        loadMorePayments: () async => loadSomePayments(8),
+        onScan: (payment) async {
+          await g.wallet.parsePayment(g.self.id, payment);
+          loadSomePayments(1);
+        },
         makePayment: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
           unselectHomeSelection(updateActivity: true);
@@ -920,21 +946,40 @@ class _HomeState extends State<Home> {
     if (isPush) {
       vm.push(V(id: "search", pages: [P()]));
     }
+
+    void rf() => setPage(searchPage());
+    Map<ID, Palette2> searchs() => cv.cp.objects.cast();
+
     return AddFriendPage(
+        search: (strIDs) async {
+          final ids = strIDs.split(" ").toSet();
+          final toFetch = ids.difference(allIDs.toSet());
+          final inHome = ids.map((id) => localNode(id)).whereType<BaseNode>();
+          final nodes = await r.getNodes(toFetch);
+          for (final node in inHome.followedBy(nodes ?? [])) {
+            writePalette3(node, searchs(), bGen2, rf);
+          }
+          rf();
+        },
+        onScan: (n) {
+          writePalette3(homeNode(n.id) ?? n, searchs(), bGen2, rf);
+          rf();
+        },
         openNode: (node) => setPage(nodePage(node, isPush: true)),
         add: (selectedPals) async {
           for (final p in selectedPals) {
             var node = homeNode(p.id) ?? p.node;
             if (node is User) {
               node.isFriend = true;
-              node.save();
-              await writePalette2(node, _homePalettes, bGen, refreshHome,
-                  h: true);
+              await node.save();
+              writePalette3(node, searchs(), bGen2, rf, sel: false);
+              await writeHomePalette(node, _homePalettes, bGen, rfHome);
             }
           }
-          await localPalettesRoutine();
+          rf();
+          localPalettesRoutine();
         },
-        forwardNodes: (pals) => setPage(forwardPage(pals)),
+        forwardNodes: (pals) => setPage(forwardPage(pals, isPush: true)),
         back: () => back(withPop: true));
   }
 
@@ -1020,7 +1065,7 @@ class _HomeState extends State<Home> {
     ChatableNode node, {
     bool isPush = false,
     bool isReload = false,
-    List<Down4Object>? fObjs,
+    List<Down4Object>? fo,
   }) {
     if (isPush) {
       final id = "chat-${node.id}";
@@ -1031,10 +1076,10 @@ class _HomeState extends State<Home> {
           vm.pop();
           r.removeLast();
         }
-        reloadChat(node, cv.pages[0].objects, cv.pages[1].objects);
+        reloadChat(node, cv.pages[0].objects, cv.pages[1].objects, fo != null);
       } else {
         vm.push(V(id: "chat-${node.id}", pages: [P(), P()], node: node));
-        initChat(node, cv.pages[0].objects, cv.pages[1].objects);
+        initChat(node, cv.pages[0].objects, cv.pages[1].objects, fo != null);
       }
     }
 
@@ -1044,7 +1089,9 @@ class _HomeState extends State<Home> {
     if (isReload) {
       final loaded = messages.keys;
       final last = node.messages.last;
-      if (!loaded.contains(last)) reloadChat(node, messages, members);
+      if (!loaded.contains(last)) {
+        reloadChat(node, messages, members, fo != null);
+      }
     }
 
     return ChatPage(
@@ -1058,23 +1105,23 @@ class _HomeState extends State<Home> {
               ordered: node.messages.toList().reversed.toList(),
               node: node,
               state: messages,
-              refresh: () => setPage(chatPage(node, fObjs: fObjs)),
+              refresh: () => setPage(chatPage(node, fo: fo)),
               openNode: (node_) => setPage(nodePage(node_, isPush: true)));
           refreshChat(node);
         },
         node: node,
-        fObjects: fObjs,
+        fObjects: fo,
         openNode: (node_) => setPage(nodePage(node_, isPush: true)),
         send: (payload) async {
           await metaSend(payload, [node]);
-          reloadChat(node, messages, members);
+          reloadChat(node, messages, members, fo != null);
         }, // TODO, will need future nodes
-        back: () => back(withPop: true, f: fObjs));
+        back: () => back(withPop: true, f: fo));
   }
 
   Future<ru.Down4PageWidget> snipView(ChatableNode node) async {
     if (node.snips.isEmpty) {
-      await writePalette2(node, _homePalettes, bGen, refreshHome, h: true);
+      await writeHomePalette(node, _homePalettes, bGen, rfHome);
       setPage(homePage());
     }
     final snip = node.snips.first;
@@ -1117,7 +1164,7 @@ class _HomeState extends State<Home> {
 
       back_ = () async {
         await ctrl.dispose();
-        await writePalette2(node, _homePalettes, bGen, refreshHome, h: true);
+        await writeHomePalette(node, _homePalettes, bGen, rfHome);
         back(withPop: false);
         media
           ?..references.remove(node.id)
@@ -1139,7 +1186,7 @@ class _HomeState extends State<Home> {
       displayMedia = displayMediaBody(Image.file(media.file!));
 
       back_ = () async {
-        await writePalette2(node, _homePalettes, bGen, refreshHome, h: true);
+        await writeHomePalette(node, _homePalettes, bGen, rfHome);
         back(withPop: false);
         media
           ?..references.remove(node.id)

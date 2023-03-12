@@ -689,12 +689,11 @@ void unselectedSelectedPalettes(Map<ID, Palette2> state) {
   }
 }
 
-Future<void> writePalette2<T>(
+Future<void> writeHomePalette<T>(
   T node,
   Map<ID, Down4Object> state,
   Future<List<ButtonsInfo2>> Function(T)? bGen,
   void Function()? onSel, {
-  bool h = false,
   bool? sel,
 }) async {
   // return right away if not a BaseNode
@@ -712,14 +711,14 @@ Future<void> writePalette2<T>(
 
   // if node is chatable, we want to load previews
   Pair<String, bool>? previewInfo;
-  if (h && node is ChatableNode) {
+  if (node is ChatableNode) {
     previewInfo = await node.previewInfo();
   }
 
   void Function()? onSelect = onSel == null
       ? null
       : () async {
-          await writePalette2(node, state, bGen, onSel, h: h, sel: !isSelected);
+          await writeHomePalette(node, state, bGen, onSel, sel: !isSelected);
           onSel.call();
         };
 
@@ -730,6 +729,40 @@ Future<void> writePalette2<T>(
       imPress: onSelect,
       bodyPress: onSelect,
       buttonsInfo2: await bGen?.call(node) ?? []);
+
+  print("SUCCESS FULLY WROTE ${node.id} TO STATE = $state");
+}
+
+void writePalette3(
+  BaseNode node,
+  Map<ID, Down4Object> state,
+  List<ButtonsInfo2> Function(BaseNode)? bGen,
+  void Function()? onSel, {
+  bool? sel,
+  String? pr,
+}) {
+  // isSelected will check first if it's an argument, else it will check
+  // if the palette is a reload and use it's current status, or else it will
+  // default to false
+  bool? selectionIfReload;
+  final Palette2? pInState = state[node.id] as Palette2?;
+  selectionIfReload = pInState?.selected;
+  bool isSelected = sel ?? selectionIfReload ?? false;
+
+  void Function()? onSelect = onSel == null
+      ? null
+      : () {
+          writePalette3(node, state, bGen, onSel, sel: !isSelected, pr: pr);
+          onSel.call();
+        };
+
+  state[node.id] = Palette2(
+      node: node,
+      selected: isSelected,
+      imPress: onSelect,
+      bodyPress: onSelect,
+      messagePreview: pr,
+      buttonsInfo2: bGen?.call(node) ?? []);
 
   print("SUCCESS FULLY WROTE ${node.id} TO STATE = $state");
 }
@@ -945,5 +978,38 @@ Future<void> writeMessages({
       state[m.id] = m;
       if (m.mediaInfo?.media.isVideo ?? false) msgsWithVideo?.add(m.id);
     }
+  }
+}
+
+Future<void> writePayments(
+  Map<ID, Palette2> state,
+  void Function(Down4Payment)? openPayment, [
+  int limit = 5,
+]) async {
+  final loaded = state.keys;
+  final all = g.boxes.payments.keys;
+
+  List<Down4Payment> payments = [];
+  for (final id in all) {
+    if (payments.length >= 5) break;
+    if (!loaded.contains(id)) {
+      final jsonEncodedPay = await g.boxes.payments.get(id);
+      if (jsonEncodedPay == null) continue;
+      final payment = Down4Payment.fromJson(jsonDecode(jsonEncodedPay));
+      payments.add(payment);
+    }
+  }
+
+  for (final payment in payments) {
+    Palette2(
+      node: Payment(payment: payment, selfID: g.self.id),
+      messagePreview: payment.textNote,
+      buttonsInfo2: [
+        ButtonsInfo2(
+            asset: g.fifty,
+            pressFunc: () => openPayment?.call(payment),
+            rightMost: true)
+      ],
+    );
   }
 }

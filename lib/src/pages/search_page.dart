@@ -30,6 +30,8 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   final void Function(BaseNode) openNode;
   final void Function(List<Palette2>) forwardNodes;
   final void Function(Iterable<Palette2>) add;
+  final void Function(BaseNode) onScan;
+  final Future<void> Function(String) search;
   final void Function() back;
   // final List<ButtonsInfo2> Function(BaseNode) genButtonsForHome;
 
@@ -40,6 +42,8 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
     // required this.putNodeOffline,
     // required this.genButtonsForHome,
     required this.openNode,
+    required this.search,
+    required this.onScan,
     required this.add,
     required this.back,
     required this.forwardNodes,
@@ -66,25 +70,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
   }
 
   Map<ID, Palette2> get searchs => g.vm.cv.cp.objects.cast();
-
-  void reload() => setState(() {});
-
-  Future<void> search() async {
-    if (tec.value.text.isEmpty) return;
-    final ids = tec.value.text.split(" ").toSet();
-    final toFetch = ids.difference(g.boxes.nodes.keys.toSet());
-    final inHome = (await Future.wait(ids
-            .difference(toFetch)
-            .map((homeNodeID) => homeNodeID.getLocalNode())))
-        .whereType<BaseNode>();
-
-    final nodes = await r.getNodes(toFetch);
-    for (final node in inHome.followedBy(nodes ?? [])) {
-      await writePalette2(node, searchs, bGen, reload);
-    }
-    tec.clear();
-    setState(() {});
-  }
 
   @override
   void initState() {
@@ -133,21 +118,19 @@ class _AddFriendPageState extends State<AddFriendPage> {
     );
   }
 
-  scanCallBack(Barcode bc, MobileScannerArguments? args) {
-    if (bc.rawValue != null) {
-      final data = bc.rawValue!.split("~");
-      if (data.length != 4) return;
-      var node = User(
-          id: data[0],
-          firstName: data[1],
-          lastName: data[2],
-          neuter: Down4Keys.fromYouKnow(data[3]),
-          messages: {},
-          snips: {},
-          children: {});
-      writePalette2(node, searchs, bGen, reload);
-    }
-    setState(() {});
+  void scanCallBack(Barcode bc, MobileScannerArguments? args) {
+    if (bc.rawValue == null) return;
+    final data = bc.rawValue!.split("~");
+    if (data.length != 4) return;
+    var node = User(
+        id: data[0],
+        firstName: data[1],
+        lastName: data[2],
+        neuter: Down4Keys.fromYouKnow(data[3]),
+        messages: {},
+        snips: {},
+        children: {});
+    widget.onScan(node);
   }
 
   void defaultConsole([scanning = false]) {
@@ -165,18 +148,14 @@ class _AddFriendPageState extends State<AddFriendPage> {
       topButtons: [
         ConsoleButton(
           name: "Add",
-          onPress: () {
-            final selectedSearchs = searchs.values.selected().toList();
-            for (final s in selectedSearchs) {
-              final n = s.node;
-              if (n is User) n.isFriend = true;
-              writePalette2(n, searchs, bGen, reload, sel: false);
-            }
-            widget.add(selectedSearchs);
-            setState(() {});
-          },
+          onPress: () => widget.add(searchs.values.selected()),
         ),
-        ConsoleButton(name: "Search", onPress: search),
+        ConsoleButton(
+            name: "Search",
+            onPress: () async {
+              await widget.search(tec.value.text);
+              tec.clear();
+            }),
       ],
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
