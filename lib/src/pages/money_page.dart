@@ -219,7 +219,9 @@ class _MoneyPageState extends State<MoneyPage> {
 
   int? _balance;
 
-  Map<ID, Palette2> _payments = {};
+  Map<ID, Palette2> get _users => g.vm.cv.pages[0].objects.cast();
+
+  Map<ID, Palette2> get _payments => g.vm.cv.pages[1].objects.cast();
 
   Future<void> loadMorePayments(int n) async {
     await payments3(n).toList();
