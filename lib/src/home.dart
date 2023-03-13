@@ -154,9 +154,6 @@ class _HomeState extends State<Home> {
 
   // getters for while in a chat, if those are used not in a chat -> rip
   // they are supposed to be used after checking like this (page is ChatPage) {}
-  Map<ID, ChatMessage> get _chatMessages => vm.cv.pages[0].objects.cast();
-  Map<ID, Palette2> get _chatMembers => vm.cv.pages[1].objects.cast();
-  Map<ID, EmptyObject> get _chatVideos => vm.cv.pages[2].objects.cast();
 
   BaseNode? homeNode(ID id) => _homePalettes[id]?.node;
   BaseNode? hiddenNode(ID id) => _hiddenPalettes[id]?.node;
@@ -354,7 +351,7 @@ class _HomeState extends State<Home> {
         if (pg is HomePage) {
           setPage(homePage());
         } else if (pg is ChatPage && pg.node.id == root) {
-          setPage(chatPage(rootNode, isReload: true, fo: pg.fObjects));
+          setPage(chatPage(rootNode, isReload: true, fo: pg.fo));
         }
       } else if (eventPayload.first == "s") {
         final String mediaID = eventPayload[1];
@@ -539,14 +536,14 @@ class _HomeState extends State<Home> {
             final d = key.split("%");
             final nodeID = d[0];
             final msgID = d[1];
-            msgs[msgID]!.sents[nodeID] = await value;
-            await msgs[msgID]!.save();
+            final msg = msgs[msgID]!;
+            msg.sents[nodeID] = await value;
+            await msg.save();
 
             // update chat
             final pRef = page;
             if (pRef is ChatPage && pRef.node.id == nodeID) {
-              print("UPDATING CHAT!");
-              refreshChat(pRef.node, re: msgs[msgID]!);
+              setPage(chatPage(pRef.node, msgRe: msg, fo: pRef.fo));
             }
           }));
     });
@@ -706,71 +703,6 @@ class _HomeState extends State<Home> {
     setPage(homePage(prompt: "Sent ping"));
   }
 
-  // ============================== CHAT UTILS ========================= //
-
-  void refreshChat(ChatableNode node, {bool stopVid = false, Message? re}) {
-    final pg = page;
-    if (pg is ChatPage && pg.node.id == node.id) {
-      if (re != null) {
-        _chatMessages[re.id] = _chatMessages[re.id]!.reloaded(re);
-      }
-      if (stopVid) {
-        for (final v in _chatVideos.keys) {
-          _chatMessages[v] = _chatMessages[v]!.onPageTransition();
-        }
-      }
-      setPage(chatPage(node, fo: pg.fObjects));
-    }
-  }
-
-  void reloadChat(ChatableNode node, bool f) {
-    Future(() async {
-      // is a reload, load all new messages
-      final pg = page;
-      if (pg is! ChatPage || pg.node.id != node.id) return;
-      final loaded = _chatMessages.keys;
-      final ordered = node.messages.toList().reversed.toList();
-      List<ID> toLoad = [];
-      for (final id in ordered) {
-        if (!loaded.contains(id)) toLoad.add(id);
-      }
-      await writeMessages(
-          limit: toLoad.length,
-          node: node,
-          ordered: toLoad,
-          videos: _chatVideos,
-          state: _chatMessages,
-          refresh: () => refreshChat(node),
-          openNode: (node_) => setPage(nodePage(node_, isPush: true)));
-    }).then((_) => refreshChat(node));
-  }
-
-  void initChat(ChatableNode node, bool f) {
-    List<ButtonsInfo2> Function(BaseNode)? cbGen = f ? null : bGen2;
-
-    Future(() async {
-      // if is group, write members
-      if (node is GroupNode) {
-        for (final n in allPalettes.those(node.group).asNodes()) {
-          writePalette3(n, _chatMembers, cbGen, () => refreshChat(node));
-        }
-      }
-      // write the messages
-      await writeMessages(
-          limit: 20,
-          ordered: node.messages.toList().reversed.toList(),
-          node: node,
-          state: _chatMessages,
-          videos: _chatVideos,
-          refresh: () => refreshChat(node),
-          openNode: (node_) => setPage(nodePage(node_, isPush: true)));
-    }).then((_) async {
-      refreshChat(node);
-    });
-  }
-
-  // ============================== MONEY UTILS ========================= //
-
   // ============================== PAGES ============================== //
 
   ru.Down4PageWidget homePage({String? prompt, List<Down4Object>? fObjs}) {
@@ -845,7 +777,7 @@ class _HomeState extends State<Home> {
     if (isPush) {
       vm.popUntilHome();
       vm.push(V(id: "forward", pages: [P()]));
-      for (final p in homePalettes) {
+      for (final p in formattedHomePalettes) {
         writePalette3(p.node, cv.cp.objects, fbGen, rf, pr: p.messagePreview);
       }
     }
@@ -1083,15 +1015,11 @@ class _HomeState extends State<Home> {
 
     return NodePage(
         node: node,
-        openChat: (node_) => setPage(chatPage(
-              node_ as ChatableNode,
-              isPush: true,
-            )),
+        openChat: (node_) =>
+            setPage(chatPage(node_ as ChatableNode, isPush: true)),
         openNode: (node_) => setPage(nodePage(node_, isPush: true)),
-        payNode: (node) => setPage(moneyPage(
-              node: node as Person,
-              isPush: true,
-            )),
+        payNode: (node) =>
+            setPage(moneyPage(node: node as Person, isPush: true)),
         back: () => back(withPop: true));
   }
 
@@ -1099,9 +1027,92 @@ class _HomeState extends State<Home> {
     ChatableNode node, {
     bool isPush = false,
     bool isReload = false,
+    bool rewriteMsgWithNodes = false,
+    Message? msgRe,
     List<Down4Object>? fo,
   }) {
+    bool forwarding() => fo != null;
     ID chatID() => "chat-${node.id}";
+    Map<ID, ChatMessage> messages() => vm.cv.pages[0].objects.cast();
+    Map<ID, Palette2> members() => vm.cv.pages[1].objects.cast();
+    Map<ID, EmptyObject> msgWithVideos() => vm.cv.pages[2].objects.cast();
+    Map<ID, EmptyObject> msgWithNodes() => vm.cv.pages[3].objects.cast();
+    List<ID> orderedMessages() => node.messages.toList().reversed.toList();
+    void opn(BaseNode n) => (n) => setPage(nodePage(n, isPush: true));
+    void Function(BaseNode)? openNode() => forwarding() ? null : opn;
+
+    void refreshChat({bool stopVid = false}) {
+      final pg = page;
+      if (pg is! ChatPage || pg.node.id != node.id) return;
+
+      if (stopVid) {
+        for (final v in msgWithVideos().keys) {
+          messages()[v] = messages()[v]!.onPageTransition();
+        }
+      }
+
+      setPage(chatPage(node, fo: pg.fo));
+    }
+
+    Future<void> loadMore([int i = 20]) async {
+      await writeMessages(
+          limit: i,
+          node: node,
+          ordered: orderedMessages(),
+          state: messages(),
+          withNodes: msgWithNodes(),
+          videos: msgWithVideos(),
+          refresh: refreshChat,
+          openNode: openNode());
+      refreshChat();
+    }
+
+    void reloadChat() {
+      Future(() async {
+        // is a reload, load all new messages
+        final pg = page;
+        if (pg is! ChatPage || pg.node.id != node.id) return;
+        final loaded = messages().keys;
+        final ordered = node.messages.toList().reversed.toList();
+        List<ID> toLoad = [];
+        for (final id in ordered) {
+          if (!loaded.contains(id)) toLoad.add(id);
+        }
+        await writeMessages(
+            limit: toLoad.length,
+            node: node,
+            ordered: toLoad,
+            videos: msgWithVideos(),
+            withNodes: msgWithNodes(),
+            state: messages(),
+            refresh: refreshChat,
+            openNode: openNode());
+      }).then((_) => refreshChat());
+    }
+
+    void initChat() {
+      List<ButtonsInfo2> Function(BaseNode)? cbGen =
+          forwarding() ? null : bGen2;
+
+      Future(() async {
+        // if is group, write members
+        if (node is GroupNode) {
+          for (final n in allPalettes.those(node.group).asNodes()) {
+            writePalette3(n, members(), cbGen, refreshChat);
+          }
+        }
+        // write the messages
+        await writeMessages(
+            limit: 20,
+            ordered: node.messages.toList().reversed.toList(),
+            node: node,
+            state: messages(),
+            videos: msgWithVideos(),
+            withNodes: msgWithNodes(),
+            refresh: () => refreshChat(),
+            openNode: openNode());
+      }).then((_) => refreshChat());
+    }
 
     if (isPush) {
       final id = chatID();
@@ -1112,44 +1123,44 @@ class _HomeState extends State<Home> {
           vm.pop();
           r.removeLast();
         }
-        reloadChat(node, fo != null);
+        reloadChat();
       } else {
-        vm.push(V(id: id, pages: [P(), P(), P()], node: node));
-        initChat(node, fo != null);
+        vm.push(V(id: id, pages: [P(), P(), P(), P()], node: node));
+        initChat();
       }
     }
 
+    if (msgRe != null) {
+      messages()[msgRe.id] = messages()[msgRe.id]!.reloaded(msgRe);
+    }
+
     if (isReload) {
-      final loaded = _chatMessages.keys;
+      final loaded = messages().keys;
       final last = node.messages.last;
-      if (!loaded.contains(last)) {
-        reloadChat(node, fo != null);
+      if (!loaded.contains(last)) reloadChat();
+    }
+
+    if (rewriteMsgWithNodes) {
+      for (final id in msgWithNodes().keys) {
+        messages()[id] = messages()[id]!.withOpenNode(open: openNode());
       }
     }
 
     return ChatPage(
-        onPageChange: (i) => refreshChat(node, stopVid: true),
-        messages: _chatMessages,
+        onPageChange: (_) => refreshChat(stopVid: true),
+        messages: messages(),
         ordered: node.messages.toList().reversed.toList(),
-        members: _chatMembers,
-        loadMore: ({limit}) async {
-          await writeMessages(
-              limit: limit ?? 20,
-              ordered: node.messages.toList().reversed.toList(),
-              node: node,
-              state: _chatMessages,
-              videos: _chatVideos,
-              refresh: () => setPage(chatPage(node, fo: fo)),
-              openNode: (node_) => setPage(nodePage(node_, isPush: true)));
-          refreshChat(node);
-        },
+        members: members(),
+        loadMore: loadMore,
         node: node,
-        fObjects: fo,
-        openNode: (node_) => setPage(nodePage(node_, isPush: true)),
+        fo: fo,
+        openNode: opn,
         send: (payload) async {
           await metaSend(payload, [node]);
-          if (fo != null) vm.popInBetween(); // poping the forwarding page
-          reloadChat(node, fo != null);
+          if (forwarding()) vm.popInBetween(); // poping the forwarding page
+          setPage(chatPage(node,
+              isReload: true,
+              rewriteMsgWithNodes: payload.forwardables.isNotEmpty));
         }, // TODO, will need future nodes
         back: () => back(withPop: true, f: fo));
   }

@@ -26,10 +26,10 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final Map<ID, ChatMessage> messages;
   final Map<ID, Palette2> members;
   final List<ID> ordered;
-  final List<Down4Object>? fObjects;
+  final List<Down4Object>? fo;
   final void Function(int) onPageChange;
   final void Function() back;
-  final Future<void> Function({int? limit}) loadMore;
+  final Future<void> Function([int limit]) loadMore;
   final void Function(BaseNode) openNode;
   final void Function(Payload) send;
 
@@ -44,7 +44,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
     required this.send,
     required this.node,
     required this.openNode,
-    this.fObjects,
+    this.fo,
     Key? key,
   }) : super(key: key);
 
@@ -108,7 +108,7 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     // if (widget.messages.isEmpty) loadSome();
     // if (widget.node is GroupNode && _members.isEmpty) loadMembers();
-    if (widget.fObjects != null) {
+    if (widget.fo != null) {
       loadForwardingConsole();
     } else {
       loadBaseConsole();
@@ -441,7 +441,7 @@ class _ChatPageState extends State<ChatPage> {
     List<Down4Object>? fObjects,
     bool extra = false,
   }) {
-    final f = fObjects ?? widget.fObjects;
+    final f = fObjects ?? widget.fo;
     if (f == null) return loadBaseConsole();
     _console = Console(
       bottomInputs: [_consoleInput],

@@ -876,7 +876,7 @@ Future<ChatMessage?> getChatMessage({
   required ID? prevMsgID,
   required ID? nextMsgID,
   required bool isLast,
-  required void Function(BaseNode) openNode,
+  required void Function(BaseNode)? openNode,
   required void Function() refreshCallback,
 }) async {
   Message? msg = await msgID.getLocalMessage();
@@ -951,8 +951,9 @@ Future<void> writeMessages({
   required List<ID> ordered,
   required Map<ID, ChatMessage> state,
   required Map<ID, EmptyObject> videos,
+  required Map<ID, EmptyObject> withNodes,
   required void Function() refresh,
-  required void Function(BaseNode) openNode,
+  required void Function(BaseNode)? openNode,
   int limit = 20,
 }) async {
   final orderedSet = ordered.toSet();
@@ -980,6 +981,7 @@ Future<void> writeMessages({
     if (m != null) {
       state[m.id] = m;
       if (m.mediaInfo?.media.isVideo ?? false) videos[m.id] = EmptyObject();
+      if ((m.nodes ?? []).isNotEmpty) withNodes[m.id] = EmptyObject();
     }
   }
 }

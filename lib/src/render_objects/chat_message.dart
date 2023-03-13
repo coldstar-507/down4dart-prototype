@@ -82,6 +82,22 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     Key? key,
   }) : super(key: key);
 
+  ChatMessage withOpenNode({required void Function(BaseNode)? open}) {
+    return ChatMessage(
+        message: message,
+        repliesInfo: repliesInfo,
+        nodeRef: nodeRef,
+        mediaInfo: mediaInfo,
+        openNode: open,
+        nodes: nodes,
+        isPost: isPost,
+        myMessage: myMessage,
+        hasGap: hasGap,
+        hasHeader: hasHeader,
+        select: select,
+        selected: selected);
+  }
+
   ChatMessage withHeader({required bool hasHeader}) {
     return ChatMessage(
       message: message,
@@ -411,13 +427,9 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     }
 
     Widget loadedPalette(BaseNode node) {
-      Image nodeImage() => node.media?.data != null
-          ? Image.memory(node.media!.data,
-              cacheHeight: (mpHeight() * 2).toInt(),
-              cacheWidth: (mpHeight() * 2).toInt())
-          : Image.asset("assets/images/hashirama.jpg",
-              cacheHeight: (mpHeight() * 2).toInt(),
-              cacheWidth: (mpHeight() * 2).toInt());
+      Widget nodeImage() {
+        return node.transformedImage;
+      }
 
       return Container(
         height: mpHeight(),
