@@ -12,31 +12,11 @@ import '../globals.dart' show WalletManager;
 
 class Wallet {
   final Down4Keys _keys;
-  // Map<Identifier, Down4TXOUT> _utxos;
-  // Map<Identifier, Down4Payment> _payments;
-  // Map<Identifier, bool> _spent;
   int _ix;
-
-  // final Stream<Down4Payment> payments;
-  // final Future<Down4Payment?> Function(Identifier) _getPayment;
-  // final void Function(Identifier) _removePayment;
-  // final void Function(Down4Payment) _setPayment;
-
-  // final Stream<Down4TXOUT> utxos;
-  // final Future<Down4TXOUT?> Function(Identifier) _getUtxo;
-  // final void Function(Identifier) _removeUtxo;
-  // final void Function(Down4TXOUT) _setUtxo;
-
-  // final Future<bool> Function(Identifier) _isSpent;
-  // final void Function(Identifier, bool) _setSpent;
-
-  // final void Function(int) _setIx;
 
   Down4Keys get neuter => _keys.neutered();
 
   Future<int> get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
-
-  // Future<Set<Down4Payment>> get payments => _payments.toSet();
 
   Future<Set<Down4TX>> get unsettledTxs => payments
       .map((pay) => pay.txs.where((tx) => tx.confirmations == 0))

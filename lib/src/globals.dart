@@ -625,7 +625,9 @@ class Singletons {
 
   List<Down4Object> fo = [];
 
-  late Image fifty, black, red;
+  late Image fifty, black, red, ph;
+  late Uint8List background;
+
   late List<CameraDescription> cameras;
   Self get self => _self ??= SelfSave.load();
   Wallet get wallet => _wallet ??= WalletManager.load();
@@ -916,6 +918,7 @@ Future<ChatMessage?> getChatMessage({
       key: GlobalKey(),
       hasGap: hasGap,
       message: msg,
+      nodeRef: node.id,
       mediaInfo: await ChatMessage.generateMediaInfo(msg),
       nodes: null,
       repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
@@ -947,9 +950,9 @@ Future<void> writeMessages({
   required ChatableNode node,
   required List<ID> ordered,
   required Map<ID, ChatMessage> state,
+  required Map<ID, EmptyObject> videos,
   required void Function() refresh,
   required void Function(BaseNode) openNode,
-  Set<ID>? msgsWithVideo,
   int limit = 20,
 }) async {
   final orderedSet = ordered.toSet();
@@ -976,40 +979,46 @@ Future<void> writeMessages({
         refreshCallback: refresh);
     if (m != null) {
       state[m.id] = m;
-      if (m.mediaInfo?.media.isVideo ?? false) msgsWithVideo?.add(m.id);
+      if (m.mediaInfo?.media.isVideo ?? false) videos[m.id] = EmptyObject();
     }
   }
 }
 
 Future<void> writePayments(
   Map<ID, Palette2> state,
-  void Function(Down4Payment)? openPayment, [
+  void Function(Down4Payment) openPayment, [
   int limit = 5,
 ]) async {
   final loaded = state.keys;
   final all = g.boxes.payments.keys;
 
-  List<Down4Payment> payments = [];
+  List<Down4Payment> paymentsToLoad = [];
   for (final id in all) {
-    if (payments.length >= 5) break;
+    if (paymentsToLoad.length >= 5) break;
     if (!loaded.contains(id)) {
       final jsonEncodedPay = await g.boxes.payments.get(id);
       if (jsonEncodedPay == null) continue;
       final payment = Down4Payment.fromJson(jsonDecode(jsonEncodedPay));
-      payments.add(payment);
+      paymentsToLoad.add(payment);
     }
   }
 
-  for (final payment in payments) {
-    Palette2(
+  for (final payment in paymentsToLoad) {
+    state[payment.id] = Palette2(
       node: Payment(payment: payment, selfID: g.self.id),
       messagePreview: payment.textNote,
-      buttonsInfo2: [
-        ButtonsInfo2(
-            asset: g.fifty,
-            pressFunc: () => openPayment?.call(payment),
-            rightMost: true)
-      ],
+      buttonsInfo2: payment.isSpentBy(id: g.self.id)
+          ? [
+              ButtonsInfo2(
+                  asset: g.fifty,
+                  pressFunc: () => openPayment(payment),
+                  rightMost: true)
+            ]
+          : [],
     );
   }
+}
+
+class EmptyObject extends Down4Object {
+  ID get id => "";
 }

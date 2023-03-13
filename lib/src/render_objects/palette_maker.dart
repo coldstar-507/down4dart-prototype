@@ -140,10 +140,7 @@ class UserMakerPalette extends StatelessWidget {
                   fit: BoxFit.cover,
                   gaplessPlayback: true,
                 )
-              : Image.asset(
-                  'assets/images/picture_place_holder_2.png',
-                  fit: BoxFit.cover,
-                ),
+              : g.ph,
         ),
       );
 
@@ -296,103 +293,37 @@ class PaletteMaker extends StatelessWidget {
   Widget get _defaultImage {
     switch (type) {
       case Nodes.user:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.hyperchat:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.group:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.self:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.root:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.market:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.checkpoint:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.journal:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.item:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.event:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.ticket:
-        return Image.asset(
-          'assets/images/picture_place_holder_2.png',
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          width: Palette.paletteHeight - 4,
-          height: Palette.paletteHeight - 4,
-        );
+        return g.ph;
 
       case Nodes.payment:
         throw 'We are not going to be paletteMaking payments';

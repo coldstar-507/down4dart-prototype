@@ -33,14 +33,8 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   final void Function(BaseNode) onScan;
   final Future<void> Function(String) search;
   final void Function() back;
-  // final List<ButtonsInfo2> Function(BaseNode) genButtonsForHome;
 
   const AddFriendPage({
-    // required this.palettes,
-    // required this.search,
-    // required this.self,
-    // required this.putNodeOffline,
-    // required this.genButtonsForHome,
     required this.openNode,
     required this.search,
     required this.onScan,

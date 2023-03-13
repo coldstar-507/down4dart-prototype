@@ -122,9 +122,13 @@ Future<void> main() async {
     final d1 = await rootBundle.load("assets/images/50.png");
     final d2 = await rootBundle.load("assets/images/filled.png");
     final d3 = await rootBundle.load("assets/images/redArrow.png");
+    final ph = await rootBundle.load("assets/images/place_holder.png");
+    final bg = await rootBundle.load("assets/images/triangles.png");
+    g.ph = Image.memory(ph.buffer.asUint8List(), gaplessPlayback: true);
     g.fifty = Image.memory(d1.buffer.asUint8List(), gaplessPlayback: true);
     g.black = Image.memory(d2.buffer.asUint8List(), gaplessPlayback: true);
     g.red = Image.memory(d3.buffer.asUint8List(), gaplessPlayback: true);
+    g.background = bg.buffer.asUint8List();
   }
 
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

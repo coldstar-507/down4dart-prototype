@@ -173,10 +173,11 @@ class _AndrewState extends State<Andrew> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
           color: PinkTheme.backGroundColor,
           image: DecorationImage(
-              image: AssetImage("assets/images/triangles.png"),
+              image: MemoryImage(
+                  g.background), // AssetImage("assets/images/triangles.png"),
               fit: BoxFit.cover)),
       child: GestureDetector(
         onHorizontalDragUpdate: (DragUpdateDetails details) {

@@ -55,17 +55,19 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   ID get id => message.id;
 
   static const double headerHeight = 18.0;
+  final ID nodeRef;
   final bool myMessage, selected, isPost;
   final void Function(ID id)? select;
   final Message message;
   final bool hasGap, hasHeader;
-  final void Function(BaseNode) openNode;
+  final void Function(BaseNode)? openNode;
 
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
   final List<BaseNode>? nodes;
 
   const ChatMessage({
+    required this.nodeRef,
     required this.nodes,
     required this.hasHeader,
     required this.message,
@@ -73,7 +75,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     required this.hasGap,
     required this.mediaInfo,
     required this.openNode,
-    // required this.textInfo,
     required this.repliesInfo,
     this.isPost = false,
     this.selected = false,
@@ -88,7 +89,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       mediaInfo: mediaInfo,
       openNode: openNode,
       nodes: nodes,
-      // textInfo: textInfo,
+      nodeRef: nodeRef,
       isPost: isPost,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -98,10 +99,28 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
+  ChatMessage reloaded(Message msg) {
+    return ChatMessage(
+      message: msg,
+      isPost: isPost,
+      nodeRef: nodeRef,
+      repliesInfo: repliesInfo,
+      nodes: nodes,
+      mediaInfo: mediaInfo,
+      openNode: openNode,
+      hasHeader: hasHeader,
+      myMessage: myMessage,
+      hasGap: hasGap,
+      select: select,
+      selected: selected,
+    );
+  }
+
   ChatMessage withNodes(List<BaseNode>? pNodes) {
     return ChatMessage(
         message: message,
         repliesInfo: repliesInfo,
+        nodeRef: nodeRef,
         mediaInfo: mediaInfo,
         openNode: openNode,
         nodes: pNodes,
@@ -117,6 +136,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     return ChatMessage(
       message: message,
       isPost: isPost,
+      nodeRef: nodeRef,
       repliesInfo: repliesInfo,
       nodes: nodes,
       mediaInfo: mediaInfo,
@@ -134,6 +154,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       return ChatMessage(
         message: message,
         isPost: isPost,
+        nodeRef: nodeRef,
         repliesInfo: repliesInfo,
         mediaInfo: mediaInfo
           ?..videoController?.pause()
@@ -412,14 +433,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                     padding: const EdgeInsets.only(top: 6.0, left: 6.0),
                     child: Text(node.name, textAlign: TextAlign.start))),
             GestureDetector(
-                onTap: () => openNode(node),
+                onTap: () => openNode?.call(node),
                 child: Center(
                     child: Padding(
-                        padding: const EdgeInsets.all(6.0),
-                        child: Image.asset("assets/images/50.png",
-                            gaplessPlayback: true,
-                            cacheHeight: (mpHeight() * 2).toInt(),
-                            cacheWidth: (mpHeight() * 2).toInt()))))
+                  padding: const EdgeInsets.all(6.0),
+                  child: openNode == null ? const SizedBox.shrink() : g.fifty,
+                )))
           ],
         ),
       );
@@ -571,14 +590,21 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment:
-          myMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        hasGap ? const SizedBox(height: 20) : const SizedBox.shrink(),
-        chatMessage,
-        const SizedBox(height: 4),
-      ],
+    return Opacity(
+      opacity: nodeRef == g.self.id
+          ? 1
+          : message.sent(nodeRef)
+              ? 1
+              : .75,
+      child: Column(
+        crossAxisAlignment:
+            myMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          hasGap ? const SizedBox(height: 20) : const SizedBox.shrink(),
+          chatMessage,
+          const SizedBox(height: 4),
+        ],
+      ),
     );
   }
 }

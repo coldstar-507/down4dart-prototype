@@ -285,25 +285,27 @@ ECPublicKey uncompressPublicKey(Uint8List publicKey) {
 }
 
 void main() {
-  final seed1 = safeSeed(32);
-  final seed2 = safeSeed(32);
+  // final seed1 = safeSeed(32);
+  // final seed2 = safeSeed(32);
 
-  var pair0_ = Down4Keys.fromRandom(seed1, seed2);
+  // var pair0_ = Down4Keys.fromRandom(seed1, seed2);
 
-  io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
+  // io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
 
-  // var pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
-  // var pair1 = pair0.derive(makeUint32(1))!;
-  // var pair2 = pair0.derive(makeUint32(2))!;
-  // var pair3 = pair0.derive(makeUint32(3))!;
-  //
-  // print("TEST0: ${testnetAddress(pair0.rawCompressedPub).toBase58()}");
-  // print("TEST1: ${testnetAddress(pair1.rawCompressedPub).toBase58()}");
-  // print("TEST2: ${testnetAddress(pair2.rawCompressedPub).toBase58()}");
-  // print("TEST3: ${testnetAddress(pair3.rawCompressedPub).toBase58()}");
-  //
-  // print("TEST0PK: ${pair0.privKeyBase58}");
-  // print("TEST1PK: ${pair1.privKeyBase58}");
-  // print("TEST2PK: ${pair2.privKeyBase58}");
-  // print("TEST3PK: ${pair3.privKeyBase58}");
+  final pkHex = io.File("/home/scott/jeff.txt").readAsStringSync();
+
+  var pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
+  var pair1 = pair0.derive(makeUint32(1))!;
+  var pair2 = pair0.derive(makeUint32(2))!;
+  var pair3 = pair0.derive(makeUint32(3))!;
+
+  print("TEST0: ${testnetAddress(pair0.rawCompressedPub).toBase58()}");
+  print("TEST1: ${testnetAddress(pair1.rawCompressedPub).toBase58()}");
+  print("TEST2: ${testnetAddress(pair2.rawCompressedPub).toBase58()}");
+  print("TEST3: ${testnetAddress(pair3.rawCompressedPub).toBase58()}");
+
+  print("TEST0PK: ${pair0.privKeyBase58}");
+  print("TEST1PK: ${pair1.privKeyBase58}");
+  print("TEST2PK: ${pair2.privKeyBase58}");
+  print("TEST3PK: ${pair3.privKeyBase58}");
 }

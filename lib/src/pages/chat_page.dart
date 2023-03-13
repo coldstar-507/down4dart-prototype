@@ -99,21 +99,6 @@ class _ChatPageState extends State<ChatPage> {
     ];
   }
 
-  // Map<ID, ChatMessage> widget.messages = {};
-
-  // Map<ID, ChatMessage> get widget.messages => g.vm.cv.pages[0].objects.cast();
-
-  // Map<ID, Palette2> get _members => g.vm.cv.pages[1].objects.cast();
-
-  // Map<ID, Palette2> _members = {};
-
-  // void reload() => setState(() {});
-
-  // Future<void> loadSome({int limit = 20}) async {
-  //   await messages2(limit: limit).toList();
-  //   setState(() {});
-  // }
-
   var lastOffsetUpdate = 0.0;
 
   String? _idOfLastMessageRead;
@@ -132,9 +117,6 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
-    // for (final msgID in _msgsWithVideos) {
-    //   widget.messages[msgID]?.mediaInfo?.videoController?.dispose();
-    // }
     scroller0.dispose();
     scroller1?.dispose();
     _cameraInput?.delete();
@@ -146,123 +128,6 @@ class _ChatPageState extends State<ChatPage> {
     super.didUpdateWidget(cp);
     // loadSome(limit: 1);
   }
-
-  // Future<void> loadMembers() async {
-  //   final node_ = widget.node;
-  //   if (node_ is GroupNode) {
-  //     writePalette2(g.self, _members, buttonsOfNode, reload);
-  //     for (final groupNode in widget.subNodes!) {
-  //       writePalette2(groupNode, _members, buttonsOfNode, reload);
-  //     }
-  //   }
-  //   setState(() {});
-  // }
-
-  // void selectMessage(ID id) {
-  //   widget.messages[id] = widget.messages[id]!.invertedSelection();
-  //   setState(() {});
-  // }
-
-  // void selectPalette(ID id) {
-  //   _members[id] = _members[id]!.select();
-  //   setState(() {});
-  // }
-
-  // Future<ChatMessage?> getChatMessage(
-  //   ID msgID,
-  //   ID? prevMsgID,
-  //   ID? nextMsgID,
-  //   bool isLast,
-  // ) async {
-  //   Message? msg = await msgID.getLocalMessage();
-  //   if (msg == null) return null;
-  //   Message? prevMsg, nextMsg;
-  //   ChatMessage? prevChatMessage = widget.messages[prevMsgID];
-  //   // If new message while in chat, we might want to remove the header of the
-  //   // previous last message
-  //   if (isLast &&
-  //       prevMsgID != null &&
-  //       prevChatMessage != null &&
-  //       prevChatMessage.hasHeader &&
-  //       msg.senderID == prevChatMessage.message.senderID &&
-  //       msg.senderID != g.self.id) {
-  //     // we need to remove its header
-  //     widget.messages[prevMsgID] = prevChatMessage.withHeader(hasHeader: false);
-  //     // and update it's size
-  //   }
-
-  //   if (widget.messages[msgID] != null) return widget.messages[msgID]!;
-
-  //   prevMsg = await prevMsgID?.getLocalMessage();
-  //   nextMsg = await nextMsgID?.getLocalMessage();
-
-  //   bool hasGap = false;
-  //   if (prevMsg != null) hasGap = ChatMessage.displayGap(msg, prevMsg);
-
-  //   // mark as read
-  //   if (msg.read(widget.node.id)) {
-  //     _idOfLastMessageRead ??= msg.id;
-  //   } else {
-  //     msg.reads[widget.node.id] = true;
-  //     await msg.save();
-  //   }
-
-  //   final bool senderIsSelf = msg.senderID == g.self.id;
-  //   final bool hasHeader = !senderIsSelf &&
-  //       widget.node is GroupNode &&
-  //       nextMsg?.senderID != msg.senderID;
-
-  //   final cm = ChatMessage(
-  //       key: GlobalKey(),
-  //       hasGap: hasGap,
-  //       message: msg,
-  //       mediaInfo: await ChatMessage.generateMediaInfo(msg),
-  //       nodes: null,
-  //       repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
-  //         print("TODO, GO TO REPLY ID = $replyID");
-  //       }),
-  //       hasHeader: hasHeader,
-  //       openNode: widget.openNode,
-  //       myMessage: g.self.id == msg.senderID,
-  //       select: selectMessage);
-
-  //   Future.microtask(() {
-  //     if ((msg.nodes ?? []).isNotEmpty) {
-  //       getNodesFromEverywhere(msg.nodes!.toSet()).then((nodes) {
-  //         if (nodes.isNotEmpty) {
-  //           widget.messages[msg.id] = widget.messages[msg.id]!.withNodes(nodes);
-  //           setState(() {});
-  //         }
-  //       });
-  //     }
-  //   });
-
-  //   return cm;
-  // }
-
-  // Stream<void> messages2({int limit = 20}) async* {
-  //   final allSet = widget.node.messages;
-  //   final orderedSet = allSet.toList().reversed.toSet();
-  //   final loadedSet = widget.messages.keys.toSet();
-  //   final toLoad = orderedSet.difference(loadedSet).toList();
-  //   if (toLoad.isEmpty) return;
-  //   final ordered = orderedSet.toList();
-  //   final allN = ordered.length;
-  //   final nLoad = toLoad.length > limit ? limit : toLoad.length;
-  //   final ixOfFirst = orderedSet.toList().indexOf(toLoad.first);
-  //   for (int i = 0; i < nLoad; i++) {
-  //     final ixInFull = ixOfFirst + i;
-  //     final msgID = toLoad[i];
-  //     final nxt = ixInFull == 0 ? null : ordered[ixInFull - 1];
-  //     final prv = ixInFull < allN - 1 ? ordered[ixInFull + 1] : null;
-  //     final isFirst = msgID == orderedSet.first;
-  //     final msg = await getChatMessage(msgID, prv, nxt, isFirst);
-  //     if (msg != null) {
-  //       widget.messages[msg.id] = msg;
-  //       if (msg.mediaInfo?.media.isVideo ?? false) _msgsWithVideos.add(msg.id);
-  //     }
-  //   }
-  // }
 
   ConsoleInput get consoleInput {
     return ConsoleInput(
@@ -341,6 +206,7 @@ class _ChatPageState extends State<ChatPage> {
     widget.send(p);
 
     unselectSelectedMessage();
+    _cameraInput = null;
     _tec.clear();
     loadBaseConsole();
   }

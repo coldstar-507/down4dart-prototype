@@ -153,6 +153,7 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   // final Iterable<Person> people;
   final Transition? transition;
   final Palette2? single;
+  final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
   // final int? nHidden;
   // final (List<Palette2>, List<Palette2>, int)? transition;
@@ -168,6 +169,7 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
     required this.onScan,
     required this.back,
     required this.makePayment,
+    required this.payments,
     this.transition,
     this.single,
     // required this.refreshMoneyPage,
@@ -201,7 +203,7 @@ class _MoneyPageState extends State<MoneyPage> {
   var importTec = TextEditingController();
   var textNoteTec = TextEditingController();
   MobileScannerController? scanner;
-  Console? _console;
+  late Console _console;
   Map<int, String> scannedData = {};
   int scannedDataLength = -1;
   ConsoleInput? _cachedMainViewInput;
@@ -241,7 +243,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
   List<Person> get people => _users.values.asNodes<Person>().toList();
 
-  Map<ID, Palette2> get _payments => g.vm.cv.pages[1].objects.cast();
+  // Map<ID, Palette2> get _payments => g.vm.cv.pages[1].objects.cast();
 
   // Future<void> loadMorePayments(int n) async {
   //   await payments3(n).toList();
@@ -279,21 +281,20 @@ class _MoneyPageState extends State<MoneyPage> {
   void initState() {
     super.initState();
     if (widget.transition != null) animatedTransition();
-    // loadMorePayments(4);
-    loadInputsAndConsole();
     if (people.isEmpty) {
       loadEmptyViewConsole();
     } else {
       loadMainViewConsole();
     }
+    reloadInputsAndConsole();
   }
 
-  Future<void> loadInputsAndConsole() async {
+  Future<void> reloadInputsAndConsole() async {
     await loadBalance();
     loadMainViewInput();
-    if (people.isEmpty) {
+    if (_console.key == emptyViewConsoleKey) {
       loadEmptyViewConsole();
-    } else {
+    } else if (_console.key == mainViewConsoleKey) {
       loadMainViewConsole();
     }
   }
@@ -321,10 +322,7 @@ class _MoneyPageState extends State<MoneyPage> {
   @override
   void didUpdateWidget(MoneyPage old) {
     super.didUpdateWidget(old);
-    // if (widget.paymentUpdate != null) {
-    //   _payments.putIfAbsent(widget.paymentUpdate!.id,
-    //       () => paymentToPalette(widget.paymentUpdate!));
-    // }
+    reloadInputsAndConsole();
   }
 
   int usdToSatoshis(double usds) =>
@@ -363,10 +361,10 @@ class _MoneyPageState extends State<MoneyPage> {
         (_paymentMethod["l"] as List<String>).length;
   }
 
-  Down4Payment? onScan(Barcode bc, MobileScannerArguments? args) {
+  void onScan(Barcode bc, MobileScannerArguments? args) {
     final raw = bc.rawValue;
     print("Trying to scan some good stuff right here!");
-    if (raw == null) return null;
+    if (raw == null) return;
 
     final isFirst = raw[0] == "_";
     if (!isFirst) {
@@ -398,7 +396,7 @@ class _MoneyPageState extends State<MoneyPage> {
       final base85DecodedData = base85.decode(sortedData);
 
       final payment = Down4Payment.fromCompressed(base85DecodedData);
-      return payment;
+      return widget.onScan(payment);
 
       // print(payment.txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
 
@@ -635,10 +633,8 @@ class _MoneyPageState extends State<MoneyPage> {
           await g.wallet.importMoney(importTec.value.text, g.self.id);
 
       if (payment == null) return;
-      g.wallet.parsePayment(g.self.id, payment);
+      widget.onScan(payment);
       _extra = false;
-      loadBalance();
-      loadMainViewInput();
       if (people.isEmpty) {
         loadEmptyViewConsole();
       } else {
@@ -675,6 +671,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
   @override
   Widget build(BuildContext context) {
+    print("PALLETSN = ${widget.payments.length}");
     return Andrew(
       initialPageIndex: g.vm.cv.ci,
       onPageChange: (idx) => g.vm.cv.ci = idx,
@@ -684,12 +681,12 @@ class _MoneyPageState extends State<MoneyPage> {
             staticList: true,
             title: "Money",
             list: palettes,
-            console: _console!),
+            console: _console),
         Down4Page(
             onRefresh: widget.loadMorePayments,
             title: "Status",
-            list: _payments.values.toList().formatted(),
-            console: _console!),
+            list: widget.payments,
+            console: _console),
       ],
     );
   }
