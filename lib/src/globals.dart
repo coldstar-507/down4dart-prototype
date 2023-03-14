@@ -106,6 +106,21 @@ Future<Message?> downloadMessage(ID msgID) async {
   return Message.fromJson(json);
 }
 
+Future<Down4Payment?> downloadPayment(ID paymentID) async {
+  final payRef = _st.ref(paymentID);
+  try {
+    final compressed = await payRef.getData();
+    if (compressed == null) {
+      print("Error, no data at payment id: $paymentID");
+      return null;
+    }
+    return Down4Payment.fromCompressed(compressed);
+  } catch (e) {
+    print("Error downloading payment id: $paymentID, err: $e");
+    return null;
+  }
+}
+
 Future<MessageMedia?> downloadAndWriteMedia(
   String mediaID, {
   bool isNodeMedia = false,
