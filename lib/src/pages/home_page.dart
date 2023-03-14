@@ -43,8 +43,6 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  GlobalKey groupButtonKey = GlobalKey();
-
   late String placeHolder = widget.promptMessage ?? ":)";
 
   late ScrollController scroller =
@@ -77,7 +75,7 @@ class _HomePageState extends State<HomePage> {
 
   late Console _homeConsole;
 
-  var _tec = TextEditingController();
+  final _tec = TextEditingController();
 
   void ping() {
     if (_tec.value.text.isEmpty) return;
@@ -94,7 +92,6 @@ class _HomePageState extends State<HomePage> {
       ],
       bottomButtons: [
         ConsoleButton(
-            key: groupButtonKey,
             showExtra: extra,
             name: "Group",
             onPress: () =>
@@ -129,6 +126,7 @@ class _HomePageState extends State<HomePage> {
           scrollController: scroller,
           staticList: true,
           title: "Home",
+          trueLen: widget.palettes.length,
           list: widget.palettes,
           console: _homeConsole)
     ]);

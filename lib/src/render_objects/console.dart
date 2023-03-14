@@ -66,10 +66,10 @@ class ConsoleButton extends StatelessWidget {
         isActivated: isActivated,
         key: key,
         border: border,
-        // key: key,
       );
 
-  ConsoleButton withBorder(BorderRadius border) => ConsoleButton(
+  ConsoleButton withBorder(BorderRadius border, {required GlobalKey k}) =>
+      ConsoleButton(
         name: name,
         onPress: onPress,
         onLongPress: onLongPress,
@@ -83,29 +83,8 @@ class ConsoleButton extends StatelessWidget {
         isMode: isMode,
         isSpecial: isSpecial,
         isActivated: isActivated,
-        key: key,
-        // key: key,
+        key: k,
       );
-
-  // ConsoleButton withKey({required Key key}) => ConsoleButton(
-  //       name: name,
-  //       onPress: onPress,
-  //       onLongPress: onLongPress,
-  //       onLongPressUp: onLongPressUp,
-  //       invertColors: false,
-  //       greyedOut: greyedOut,
-  //       leftEpsilon: leftEpsilon,
-  //       bottomEpsilon: bottomEpsilon,
-  //       widthEpsilon: widthEpsilon,
-  //       heightEpsilon: heightEpsilon,
-  //       extraButtons: extraButtons,
-  //       showExtra: showExtra,
-  //       shouldBeDownButIsnt: shouldBeDownButIsnt,
-  //       isMode: isMode,
-  //       isSpecial: isSpecial,
-  //       isActivated: isActivated,
-  //       key: key,
-  //     );
 
   @override
   Widget build(BuildContext context) {
@@ -287,19 +266,6 @@ class ConsoleInput extends StatelessWidget {
   }
 }
 
-// class ConsoleMedias {
-//   final Iterable<MessageMedia> medias;
-//   final void Function(MessageMedia) onSelectMedia;
-//   final int nMedias;
-//   final bool show;
-//   const ConsoleMedias({
-//     required this.show,
-//     required this.medias,
-//     required this.onSelectMedia,
-//     required this.nMedias,
-//   });
-// }
-
 class ConsoleMedias2 {
   final void Function(MessageMedia) onSelect;
   final bool showImages;
@@ -386,9 +352,11 @@ class Console extends StatelessWidget {
   }
 
   List<Widget> get extraBottomButtons {
+    // final firstB = bottomConsoleButtons.first.name;
+    // final lastB = bottomConsoleButtons.last.name;
     return bottomConsoleButtons.map((b) {
       if (b.showExtra) {
-        final nExtraButtons = b.extraButtons!.length;
+        // final nExtraButtons = b.extraButtons!.length;
         final key = b.key as GlobalKey;
         final context = key.currentContext;
         final renderBox = context!.findRenderObject() as RenderBox;
@@ -397,25 +365,24 @@ class Console extends StatelessWidget {
         final buttonWidth = semantics.width;
         final buttonHeight = semantics.height;
 
-        print("""
-        button height: $buttonHeight
-        position:      $position
-        Sizes.w:       ${g.sizes.w}
-        Sizes.h:       ${g.sizes.h}
-        """);
+        // b.extraButtons!.first = b.extraButtons!.first.withBorder(
+        //     BorderRadius.only(
+        //         topLeft: Radius.circular(nExtraButtons >= nConsoleLayers - 1
+        //             ? Console.consoleRad
+        //             : 0),
+        //         topRight: Radius.circular(nExtraButtons >= nConsoleLayers - 1
+        //             ? Console.consoleRad
+        //             : 0)));
 
         b.extraButtons!.first = b.extraButtons!.first.withBorder(
+            k: GlobalKey(),
             BorderRadius.only(
-                topLeft: Radius.circular(nExtraButtons == nConsoleLayers - 1
-                    ? Console.consoleRad
-                    : 0),
-                topRight: Radius.circular(nExtraButtons > nConsoleLayers - 1
-                    ? Console.consoleRad
-                    : 0)));
+                topLeft: Radius.circular(Console.consoleRad),
+                topRight: Radius.circular(Console.consoleRad)));
 
-        final topPosition = buttonHeight * b.extraButtons!.length;
+        // final topPosition = buttonHeight * b.extraButtons!.length;
         final nButton = b.extraButtons!.length;
-        final tp = (buttonHeight + (2 * contourWidth)) * nButton;
+        // final tp = (buttonHeight + (2 * contourWidth)) * nButton;
 
         return Positioned(
           left: position.dx - contourWidth,
@@ -429,19 +396,25 @@ class Console extends StatelessWidget {
               border: Border.all(width: contourWidth, color: contourColor),
               color: contourColor,
               borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(nExtraButtons == nConsoleLayers - 1
-                      ? Console.consoleRad
-                      : 0),
-                  topRight: Radius.circular(nExtraButtons > nConsoleLayers - 1
-                      ? Console.consoleRad
-                      : 0)),
+                topLeft: Radius.circular(Console.consoleRad),
+                topRight: Radius.circular(Console.consoleRad),
+                // topLeft: Radius.circular(nExtraButtons == nConsoleLayers - 1
+                //     ? Console.consoleRad
+                //     : 0),
+                // topRight: Radius.circular(nExtraButtons > nConsoleLayers - 1
+                //     ? Console.consoleRad
+                //     : 0),
+              ),
             ),
-            child: SizedBox(
-              height: buttonHeight * nButton,
-              width: buttonWidth,
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: b.extraButtons!),
+            child: AnimatedSize(
+              duration: Console.animationDuration,
+              child: SizedBox(
+                height: b.showExtra ? buttonHeight * nButton : 0,
+                width: buttonWidth,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: b.extraButtons!),
+              ),
             ),
           ),
         );
@@ -825,34 +798,38 @@ class Console extends StatelessWidget {
             .asMap()
             .map((i, value) => MapEntry(
                 i,
-                value.withBorder(BorderRadius.only(
-                  topLeft: Radius.circular(
-                      !bottomButtonsHasTop && i == 0 ? consoleRad : 0),
-                  topRight: Radius.circular(
-                      !bottomButtonsHasTop && i == _bottomButtons.length - 1
-                          ? 6
-                          : 0),
-                  bottomLeft: Radius.circular(i == 0 ? consoleRad : 0),
-                  bottomRight: Radius.circular(
-                      i == _bottomButtons.length - 1 ? consoleRad : 0),
-                ))))
+                value.withBorder(
+                    k: bottomButtonsKey[i],
+                    BorderRadius.only(
+                      topLeft: Radius.circular(
+                          !bottomButtonsHasTop && i == 0 ? consoleRad : 0),
+                      topRight: Radius.circular(
+                          !bottomButtonsHasTop && i == _bottomButtons.length - 1
+                              ? 6
+                              : 0),
+                      bottomLeft: Radius.circular(i == 0 ? consoleRad : 0),
+                      bottomRight: Radius.circular(
+                          i == _bottomButtons.length - 1 ? consoleRad : 0),
+                    ))))
             .values
             .toList(growable: false)
         : _bottomButtons
             .asMap()
             .map((i, value) => MapEntry(
                 i,
-                value.withBorder(BorderRadius.only(
-                  topLeft: Radius.circular(
-                      !bottomButtonsHasTop && i == 0 ? consoleRad : 0),
-                  topRight: Radius.circular(
-                      !bottomButtonsHasTop && i == _bottomButtons.length - 1
-                          ? 6
-                          : 0),
-                  bottomLeft: Radius.circular(i == 0 ? consoleRad : 0),
-                  bottomRight: Radius.circular(
-                      i == _bottomButtons.length - 1 ? consoleRad : 0),
-                ))))
+                value.withBorder(
+                    k: bottomButtonsKey[i],
+                    BorderRadius.only(
+                      topLeft: Radius.circular(
+                          !bottomButtonsHasTop && i == 0 ? consoleRad : 0),
+                      topRight: Radius.circular(
+                          !bottomButtonsHasTop && i == _bottomButtons.length - 1
+                              ? 6
+                              : 0),
+                      bottomLeft: Radius.circular(i == 0 ? consoleRad : 0),
+                      bottomRight: Radius.circular(
+                          i == _bottomButtons.length - 1 ? consoleRad : 0),
+                    ))))
             .values
             .toList(growable: false);
   }
@@ -864,32 +841,36 @@ class Console extends StatelessWidget {
           .asMap()
           .map((i, value) => MapEntry(
               i,
-              value.withBorder(BorderRadius.only(
-                topLeft: Radius.circular(
-                    !topButtonsHasTop && i == 0 ? consoleRad : 0),
-                topRight: Radius.circular(
-                    !topButtonsHasTop && i == _topButtons!.length - 1
-                        ? consoleRad
-                        : 0),
-                bottomLeft: const Radius.circular(0),
-                bottomRight: const Radius.circular(0),
-              ))))
+              value.withBorder(
+                  k: topButtonsKey[i],
+                  BorderRadius.only(
+                    topLeft: Radius.circular(
+                        !topButtonsHasTop && i == 0 ? consoleRad : 0),
+                    topRight: Radius.circular(
+                        !topButtonsHasTop && i == _topButtons!.length - 1
+                            ? consoleRad
+                            : 0),
+                    bottomLeft: const Radius.circular(0),
+                    bottomRight: const Radius.circular(0),
+                  ))))
           .values
           .toList(growable: false)
       : (_topButtons ?? [])
           .asMap()
           .map((i, value) => MapEntry(
               i,
-              value.withBorder(BorderRadius.only(
-                topLeft: Radius.circular(
-                    !topButtonsHasTop && i == 0 ? consoleRad : 0),
-                topRight: Radius.circular(
-                    !topButtonsHasTop && i == _topButtons!.length - 1
-                        ? consoleRad
-                        : 0),
-                bottomLeft: const Radius.circular(0),
-                bottomRight: const Radius.circular(0),
-              ))))
+              value.withBorder(
+                  k: topButtonsKey[i],
+                  BorderRadius.only(
+                    topLeft: Radius.circular(
+                        !topButtonsHasTop && i == 0 ? consoleRad : 0),
+                    topRight: Radius.circular(
+                        !topButtonsHasTop && i == _topButtons!.length - 1
+                            ? consoleRad
+                            : 0),
+                    bottomLeft: const Radius.circular(0),
+                    bottomRight: const Radius.circular(0),
+                  ))))
           .values
           .toList(growable: false);
 

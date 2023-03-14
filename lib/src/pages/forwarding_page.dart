@@ -14,9 +14,7 @@ import '../globals.dart';
 class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "forward";
-  // final List<Palette2> homePalettes;
   final List<Down4Object> fObjects;
-  // final Map<ID, Palette2> hiddenState;
   final void Function() back;
   final void Function(List<Down4Object>, ChatableNode) openNode;
   final void Function(List<Down4Object>, Transition) hyper;
@@ -44,8 +42,9 @@ class _ForwadingPageState extends State<ForwardingPage> {
   late final fo = widget.fObjects;
 
   late ScrollController scroller =
-      ScrollController(initialScrollOffset: g.vm.home.cp.scroll)
+      ScrollController(initialScrollOffset: g.vm.cv.cp.scroll)
         ..addListener(() {
+          print("listening to scroll = ${scroller.offset}");
           g.vm.cv.cp.scroll = scroller.offset;
         });
 
@@ -61,23 +60,14 @@ class _ForwadingPageState extends State<ForwardingPage> {
 
   Map<ID, Palette2> get hiddenState => g.vm.home.pages[1].objects.cast();
 
-  // Future<List<ButtonsInfo2>> bGen(ChatableNode n, List<Down4Object> f) async {
-  //   return [
-  //     ButtonsInfo2(
-  //         asset: g.fifty,
-  //         pressFunc: () => widget.openNode(f, n),
-  //         rightMost: true)
-  //   ];
-  // }
-
   ConsoleInput get input => ConsoleInput(tec: _tec, placeHolder: ":)");
 
   Transition hyperTransition() {
     return selectionTransition(
-        originalList: _fList,
+        originalList: _fList.reversed.toList(),
         state: _forwardState,
         hiddenState: hiddenState,
-        scrollOffset: scroller.offset);
+        scrollOffset: g.vm.cv.cp.scroll);
   }
 
   ConsoleMedias2 cm(bool showImages) {
@@ -164,6 +154,8 @@ class _ForwadingPageState extends State<ForwardingPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
+        staticList: true,
+        trueLen: _fList.length,
         title: "Forward",
         console: _console,
         list: _fList,

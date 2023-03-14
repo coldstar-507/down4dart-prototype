@@ -19,7 +19,7 @@ class Down4Page {
   final Map<String, Widget>? asMap;
   final List<String>? orderedKeys;
   final Iterable<Widget>? _iterables;
-  final int? iterableLen;
+  final int? iterableLen, trueLen;
   final List<Widget>? stackWidgets;
   final Console? console;
   final bool isChatPage, centerStackItems, reversedList, staticList;
@@ -29,6 +29,7 @@ class Down4Page {
     this.asMap,
     this.stream,
     this.orderedKeys,
+    this.trueLen,
     this.onRefresh,
     this.isChatPage = false,
     this.stackWidgets,
@@ -145,6 +146,7 @@ class _AndrewState extends State<Andrew> {
                           width: curPos == page.key ? g.sizes.w : 0,
                           child: page.value.staticList
                               ? StaticList(
+                                  trueLen: page.value.trueLen,
                                   reversed: page.value.reversedList,
                                   scrollController: page.value.scrollController,
                                   topPadding: page.value.isChatPage ? 4 : null,

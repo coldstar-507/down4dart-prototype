@@ -106,8 +106,6 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    // if (widget.messages.isEmpty) loadSome();
-    // if (widget.node is GroupNode && _members.isEmpty) loadMembers();
     if (widget.fo != null) {
       loadForwardingConsole();
     } else {
@@ -126,7 +124,11 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    // loadSome(limit: 1);
+    if (widget.fo != null) {
+      loadForwardingConsole();
+    } else {
+      loadBaseConsole();
+    }
   }
 
   ConsoleInput get consoleInput {
@@ -532,12 +534,6 @@ class _ChatPageState extends State<ChatPage> {
       pages: pages,
       initialPageIndex: g.vm.cv.ci,
       onPageChange: widget.onPageChange,
-      // onPageChange: (int newPageIndex) {
-      //   g.vm.cv.ci = newPageIndex;
-      //   for (final msgID in _msgsWithVideos) {
-      //     widget.messages[msgID] = widget.messages[msgID]!.onPageTransition();
-      //   }
-      // },
     );
   }
 }

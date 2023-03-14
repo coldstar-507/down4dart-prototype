@@ -367,6 +367,7 @@ class _GroupPageState extends State<GroupPage> {
       Down4Page(
         scrollController: _scrollController,
         staticList: true,
+        trueLen: widget.people.length + 1,
         title: "Group",
         list: _items,
         console: _console!,

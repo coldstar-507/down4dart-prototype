@@ -23,24 +23,22 @@ import '../render_objects/_down4_flutter_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "hyper";
-  final double initialOffset;
-  final List<Palette2> palettesForTransition;
-  final int nHidden;
-  final Iterable<Person> people;
-  final List<Palette2> homePalettes;
+  // final List<Palette2> palettesForTransition;
+  // final int nHidden;
+  final Transition transition;
+  // final Iterable<Person> people;
+  // final List<Palette2> homePalettes;
+  final List<Down4Object>? fo;
   final void Function(String text) ping;
   final void Function() back;
   final void Function(Payload p, Set<ID> group) makeHyperchat;
 
   const HyperchatPage({
-    required this.initialOffset,
-    required this.palettesForTransition,
-    required this.nHidden,
-    required this.people,
-    required this.homePalettes,
+    required this.transition,
     required this.makeHyperchat,
     required this.back,
     required this.ping,
+    required this.fo,
     Key? key,
   }) : super(key: key);
 
@@ -52,24 +50,28 @@ class _HyperchatPageState extends State<HyperchatPage> {
   var _tec = TextEditingController();
   MessageMedia? _cameraInput;
   CameraController? _ctrl;
-  Console? _console;
-  late List<Palette2> _palettes = widget.homePalettes;
-  late final double offset = widget.nHidden * Palette.fullHeight;
-  late var _scrollController =
-      ScrollController(initialScrollOffset: widget.initialOffset);
+  late Console _console;
+  late List<Palette2> _palettes = widget.transition.preTransition;
+  late final double offset = widget.transition.nHidden * Palette.fullHeight;
+  late ScrollController scroller =
+      ScrollController(initialScrollOffset: widget.transition.scroll);
 
   @override
   void initState() {
     super.initState();
-    loadBaseConsole();
+    if (widget.fo != null) {
+      loadForwardingConsole();
+    } else {
+      loadBaseConsole();
+    }
     animatedTransition();
   }
 
   Future<void> animatedTransition() async {
     Future(() => setState(() {
-          _palettes = [...widget.palettesForTransition];
-          _scrollController.jumpTo(widget.initialOffset + offset);
-          _scrollController.animateTo(0,
+          _palettes = widget.transition.postTransition;
+          scroller.jumpTo(widget.transition.scroll + offset);
+          scroller.animateTo(0,
               duration: const Duration(milliseconds: 600),
               curve: Curves.easeInOut);
         }));
@@ -80,8 +82,9 @@ class _HyperchatPageState extends State<HyperchatPage> {
     final text = _tec.value.text;
     if (text.isEmpty && media == null) return;
 
-    final p = Payload(t: text, m: media, f: null, r: null);
-    final group = Set<ID>.from(widget.people.asIds())..add(g.self.id);
+    final p = Payload(t: text, m: media, f: widget.fo, r: null);
+    final group = Set<ID>.from(widget.transition.trueTargets.asIds())
+      ..add(g.self.id);
     widget.makeHyperchat(p, group);
   }
 
@@ -131,7 +134,6 @@ class _HyperchatPageState extends State<HyperchatPage> {
 
   void loadBaseConsole({bool images = true}) {
     _console = Console(
-      // mediasInfo: consoleMedias(images: images, show: false),
       bottomInputs: [consoleInput],
       topButtons: [
         ConsoleButton(name: "Ping", onPress: ping),
@@ -284,6 +286,56 @@ class _HyperchatPageState extends State<HyperchatPage> {
     setState(() {});
   }
 
+  void loadForwardingConsole({bool extra = false}) {
+    _console = Console(
+      bottomInputs: [consoleInput],
+      forwardingObjects: widget.fo,
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: widget.back),
+        ConsoleButton(
+          name: "Forward",
+          onPress: () {
+            if (extra) {
+              loadForwardingConsole(extra: !extra);
+            } else {
+              send();
+            }
+          },
+          onLongPress: () => loadForwardingConsole(extra: !extra),
+          isSpecial: true,
+          showExtra: extra,
+          extraButtons: [
+            ConsoleButton(
+              name: "Medias",
+              onPress: () => loadForwardingMediasConsole(),
+            ),
+          ],
+        )
+      ],
+    );
+    setState(() {});
+  }
+
+  void loadForwardingMediasConsole({bool images = true}) {
+    _console = Console(
+      bottomInputs: [consoleInput],
+      consoleMedias2: ConsoleMedias2(
+          showImages: images, onSelect: (media) => send(mediaInput: media)),
+      forwardingObjects: widget.fo,
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () => loadForwardingConsole(),
+        ),
+        ConsoleButton(
+          name: images ? "Images" : "Videos",
+          onPress: () => loadForwardingMediasConsole(images: !images),
+        )
+      ],
+    );
+    setState(() {});
+  }
+
   @override
   void dispose() {
     _ctrl?.dispose();
@@ -295,10 +347,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
   Widget build(BuildContext context) {
     return Andrew(pages: [
       Down4Page(
-          scrollController: _scrollController,
+          scrollController: scroller,
           staticList: true,
+          trueLen: widget.transition.trueTargets.length,
           title: "Hyperchat",
-          console: _console!,
+          console: _console,
           list: _palettes),
     ]);
   }

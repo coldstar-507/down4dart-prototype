@@ -681,6 +681,7 @@ class _MoneyPageState extends State<MoneyPage> {
             staticList: true,
             title: "Money",
             list: palettes,
+            trueLen: people.length,
             console: _console),
         Down4Page(
             onRefresh: widget.loadMorePayments,

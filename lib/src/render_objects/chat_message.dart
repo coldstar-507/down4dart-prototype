@@ -428,7 +428,10 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
     Widget loadedPalette(BaseNode node) {
       Widget nodeImage() {
-        return node.transformedImage;
+        return SizedBox.square(
+          dimension: mpHeight(),
+          child: node.transformedImage,
+        );
       }
 
       return Container(

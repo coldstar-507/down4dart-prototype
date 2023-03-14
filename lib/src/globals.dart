@@ -1024,3 +1024,19 @@ Future<void> writePayments(
 class EmptyObject extends Down4Object {
   ID get id => "";
 }
+
+final topButtonsKey = [
+  GlobalKey(),
+  GlobalKey(),
+  GlobalKey(),
+  GlobalKey(),
+  GlobalKey(),
+];
+
+final bottomButtonsKey = [
+  GlobalKey(),
+  GlobalKey(),
+  GlobalKey(),
+  GlobalKey(),
+  GlobalKey(),
+];

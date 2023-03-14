@@ -543,7 +543,7 @@ class _HomeState extends State<Home> {
             // update chat
             final pRef = page;
             if (pRef is ChatPage && pRef.node.id == nodeID) {
-              setPage(chatPage(pRef.node, msgRe: msg, fo: pRef.fo));
+              setPage(chatPage(pRef.node, msgRe: msg));
             }
           }));
     });
@@ -881,15 +881,12 @@ class _HomeState extends State<Home> {
   ru.Down4PageWidget hyperchatPage(
       [List<Down4Object>? fObjects, Transition? transition]) {
     final transition_ = transition ?? homeTransition();
-    final hyperchatGroup = Set<ID>.from(transition_.trueTargets.asIds())
-      ..add(g.self.id); // everyone, including self
+    // final hyperchatGroup = Set<ID>.from(transition_.trueTargets.asIds())
+    //   ..add(g.self.id); // everyone, including self
     final pingGroup = transition_.trueTargets.asIds().toList(); // simply
     return HyperchatPage(
-      initialOffset: homeScroll,
-      palettesForTransition: transition_.postTransition,
-      people: transition_.trueTargets,
-      nHidden: transition_.nHidden,
-      homePalettes: transition_.preTransition,
+      transition: transition_,
+      fo: fObjects,
       makeHyperchat: makeHyperchat,
       back: () => back(withPop: false, f: fObjects),
       ping: (text) => ping(text, pingGroup),
@@ -1005,8 +1002,11 @@ class _HomeState extends State<Home> {
       if (r.contains(id)) {
         // we don't allow cycles
         while (route.last != id) {
-          vm.pop();
-          r.removeLast();
+          final v = vm.pop();
+          final l = r.removeLast();
+          print("ROUTE = $route");
+          print("POPPED VIEW ${v.id}");
+          print("POPPED $l");
         }
       } else {
         vm.push(V(id: "node-${node.id}", pages: [P()], node: node));
@@ -1038,8 +1038,10 @@ class _HomeState extends State<Home> {
     Map<ID, EmptyObject> msgWithVideos() => vm.cv.pages[2].objects.cast();
     Map<ID, EmptyObject> msgWithNodes() => vm.cv.pages[3].objects.cast();
     List<ID> orderedMessages() => node.messages.toList().reversed.toList();
-    void opn(BaseNode n) => (n) => setPage(nodePage(n, isPush: true));
+    void opn(BaseNode n) => setPage(nodePage(n, isPush: true));
     void Function(BaseNode)? openNode() => forwarding() ? null : opn;
+
+    List<ButtonsInfo2> Function(BaseNode)? cbGen = forwarding() ? null : bGen2;
 
     void refreshChat({bool stopVid = false}) {
       final pg = page;
@@ -1052,6 +1054,14 @@ class _HomeState extends State<Home> {
       }
 
       setPage(chatPage(node, fo: pg.fo));
+    }
+
+    void writeGroupNodes() {
+      if (node is GroupNode) {
+        for (final n in allPalettes.those(node.group).asNodes()) {
+          writePalette3(n, members(), cbGen, refreshChat);
+        }
+      }
     }
 
     Future<void> loadMore([int i = 20]) async {
@@ -1076,7 +1086,11 @@ class _HomeState extends State<Home> {
         final ordered = node.messages.toList().reversed.toList();
         List<ID> toLoad = [];
         for (final id in ordered) {
-          if (!loaded.contains(id)) toLoad.add(id);
+          if (!loaded.contains(id)) {
+            toLoad.add(id);
+          } else {
+            break;
+          }
         }
         await writeMessages(
             limit: toLoad.length,
@@ -1091,16 +1105,9 @@ class _HomeState extends State<Home> {
     }
 
     void initChat() {
-      List<ButtonsInfo2> Function(BaseNode)? cbGen =
-          forwarding() ? null : bGen2;
-
       Future(() async {
         // if is group, write members
-        if (node is GroupNode) {
-          for (final n in allPalettes.those(node.group).asNodes()) {
-            writePalette3(n, members(), cbGen, refreshChat);
-          }
-        }
+        writeGroupNodes();
         // write the messages
         await writeMessages(
             limit: 20,
@@ -1120,8 +1127,12 @@ class _HomeState extends State<Home> {
       if (r.contains(id)) {
         // we don't allow cycles
         while (route.last != id) {
-          vm.pop();
-          r.removeLast();
+          print("ROUTE BEFORE POP = $route");
+          final v = vm.pop();
+          final l = r.removeLast();
+          print("ROUTE = $route");
+          print("POPPED AFTER POP ${v.id}");
+          print("POPPED $l");
         }
         reloadChat();
       } else {
@@ -1144,6 +1155,8 @@ class _HomeState extends State<Home> {
       for (final id in msgWithNodes().keys) {
         messages()[id] = messages()[id]!.withOpenNode(open: openNode());
       }
+      writeGroupNodes();
+      refreshChat();
     }
 
     return ChatPage(
