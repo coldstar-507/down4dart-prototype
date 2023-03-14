@@ -535,7 +535,7 @@ class Group extends GroupNode {
         "grp": group.toList(),
         if (toLocal) "msg": messages.toList(),
         if (toLocal) "snp": snips.toList(),
-        "a": activity,
+        if (toLocal) "a": activity,
       };
 }
 
@@ -573,11 +573,11 @@ class Hyperchat extends GroupNode {
         "id": id,
         "nm": firstWord,
         "ln": secondWord,
-        "im": media.toJson(),
-        "a": activity,
+        "im": toLocal ? media.toJson() : media.id,
+        if (toLocal) "a": activity,
         "grp": group.toList(),
-        "msg": messages.toList(),
-        "snp": snips.toList(),
+        if (toLocal) "msg": messages.toList(),
+        if (toLocal) "snp": snips.toList(),
       };
 }
 

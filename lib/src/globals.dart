@@ -376,7 +376,8 @@ extension NodeSave on BaseNode {
   Future<void> delete({bool hidden = false}) async {
     var node = this;
     if (node is ChatableNode && node is! Self) {
-      for (var messageID in node.messages) {
+      final msgToDelete = List<ID>.from(node.messages);
+      for (var messageID in msgToDelete) {
         var msg = await messageID.getLocalMessage();
         await msg?.deleteFrom(node);
       }

@@ -149,20 +149,13 @@ class _PaymentPageState extends State<PaymentPage> {
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "money";
-  // final List<Palette2>? palettesBeforeTransition, palettesAfterTransition;
-  // final Iterable<Person> people;
   final Transition? transition;
   final Palette2? single;
   final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
-  // final int? nHidden;
-  // final (List<Palette2>, List<Palette2>, int)? transition;
-  // final void Function(Down4Payment) openPayment;
-  // final Down4Payment? paymentUpdate;
   final Future<void> Function() loadMorePayments;
   final void Function() back;
   final Future<void> Function(Down4Payment) makePayment;
-  // final double initialOffset;
 
   const MoneyPage({
     required this.loadMorePayments,
@@ -172,18 +165,6 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
     required this.payments,
     this.transition,
     this.single,
-    // required this.refreshMoneyPage,
-    // required this.palettesAfterTransition,
-    // required this.openPayment,
-    // required this.people,
-    // required this.nHidden,
-    // required this.palettesBeforeTransition,
-    // required this.onScan,
-    // required this.back,
-    // required this.refreshMoneyPage,
-    // required this.makePayment,
-    // required this.initialOffset,
-    // this.paymentUpdate,
     Key? key,
   }) : super(key: key);
 
@@ -242,40 +223,6 @@ class _MoneyPageState extends State<MoneyPage> {
   Map<ID, Palette2> get _users => g.vm.cv.pages[0].objects.cast();
 
   List<Person> get people => _users.values.asNodes<Person>().toList();
-
-  // Map<ID, Palette2> get _payments => g.vm.cv.pages[1].objects.cast();
-
-  // Future<void> loadMorePayments(int n) async {
-  //   await payments3(n).toList();
-  //   setState(() {});
-  // }
-
-  // Palette2 paymentToPalette(Down4Payment payment) {
-  //   return Palette2(
-  //     node: Payment(payment: payment, selfID: g.self.id),
-  //     messagePreview: payment.textNote,
-  //     buttonsInfo2: [
-  //       ButtonsInfo2(
-  //           asset: g.fifty,
-  //           pressFunc: () => widget.openPayment(payment),
-  //           rightMost: true)
-  //     ],
-  //   );
-  // }
-
-  // Future<void> loadPayment(ID id) async {
-  //   final payment = await g.wallet.getPayment(id);
-  //   if (payment == null) return;
-  //   _payments.putIfAbsent(id, () => paymentToPalette(payment));
-  //   return setState(() {});
-  // }
-
-  // Stream<void> payments3(int n) async* {
-  //   await for (final p in g.wallet.payments.skip(_payments.length).take(n)) {
-  //     final asNode = Payment(payment: p, selfID: g.self.id);
-  //     _payments.putIfAbsent(p.id, () => paymentToPalette(p));
-  //   }
-  // }
 
   @override
   void initState() {
@@ -396,7 +343,13 @@ class _MoneyPageState extends State<MoneyPage> {
       final base85DecodedData = base85.decode(sortedData);
 
       final payment = Down4Payment.fromCompressed(base85DecodedData);
-      return widget.onScan(payment);
+
+      if (people.isEmpty) {
+        loadEmptyViewConsole();
+      } else {
+        loadMainViewConsole();
+      }
+      widget.onScan(payment);
 
       // print(payment.txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
 

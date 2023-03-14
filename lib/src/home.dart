@@ -872,6 +872,7 @@ class _HomeState extends State<Home> {
         onScan: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
           loadSomePayments(1);
+          rf();
         },
         makePayment: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
