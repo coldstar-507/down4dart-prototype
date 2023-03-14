@@ -338,6 +338,7 @@ class _HomeState extends State<Home> {
           final singleNodeList = await r.getNodes([root]);
           if (singleNodeList == null || singleNodeList.length != 1) return;
           rootNode = singleNodeList.first as ChatableNode;
+          rootNode.updateActivity();
           if (rootNode is GroupNode) {
             await rootNode.save();
             await localPalettesRoutine();
@@ -574,26 +575,27 @@ class _HomeState extends State<Home> {
             canSkipCheck: true,
             extension: ".png"));
 
-    final msg = p.message;
-    final msgs = p.forwardables
-        .whereType<ChatMessage>()
-        .map((cm) => cm.message)
-        .followedBy(msg == null ? [] : [msg]);
+    // final msg = p.message;
+    // final msgs = p.forwardables
+    //     .whereType<ChatMessage>()
+    //     .map((cm) => cm.message)
+    //     .followedBy(msg == null ? [] : [msg]);
 
-    for (final m in msgs) {
-      m.reads[hcID] = true;
-      await m.save();
-    }
+    // for (final m in msgs) {
+    //   m.reads[hcID] = true;
+    //   await m.save();
+    // }
 
     final hyper = Hyperchat(
         id: hcID,
         firstWord: hc.second.first,
         secondWord: hc.second.second,
+        activity: timeStamp(),
         group: grp,
-        messages: Set<ID>.from(msgs.map((m) => m.id)),
+        messages: {},
         snips: {},
-        media: hcMedia)
-      ..save();
+        media: hcMedia);
+    // await hyper.save();
 
     final success = await uploadNode(hyper);
     if (!success) {
@@ -603,15 +605,15 @@ class _HomeState extends State<Home> {
       return setPage(homePage(prompt: "Failed to upload Hyperchat"));
     }
 
+    await metaSend(p, [hyper]);
     unselectHomeSelection();
     vm.popUntilHome();
     setPage(chatPage(hyper, isPush: true));
-
-    await writeHomePalette(hyper, _homePalettes, bGen, rfHome);
+    // await writeHomePalette(hyper, _homePalettes, bGen, rfHome);
 
     // final success = await uploadHyperchatMedia(hcMedia);
 
-    await metaSend(p, [hyper]);
+    // await metaSend(p, [hyper]);
     // setPage(chatPage(hyper));
     return;
   }
