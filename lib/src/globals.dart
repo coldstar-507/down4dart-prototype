@@ -114,6 +114,7 @@ Future<Down4Payment?> downloadPayment(ID paymentID) async {
       print("Error, no data at payment id: $paymentID");
       return null;
     }
+    print("Success downloading payment id: $paymentID");
     return Down4Payment.fromCompressed(compressed);
   } catch (e) {
     print("Error downloading payment id: $paymentID, err: $e");

@@ -571,6 +571,7 @@ class _HomeState extends State<Home> {
             owner: g.self.id,
             timestamp: timeStamp(),
             elementAspectRatio: 1.0,
+            canSkipCheck: true,
             extension: ".png"));
 
     final msg = p.message;
@@ -594,13 +595,7 @@ class _HomeState extends State<Home> {
         media: hcMedia)
       ..save();
 
-    unselectHomeSelection();
-    vm.popUntilHome();
-    setPage(chatPage(hyper, isPush: true));
-
-    await writeHomePalette(hyper, _homePalettes, bGen, rfHome);
-
-    final success = await uploadHyperchatMedia(hcMedia);
+    final success = await uploadNode(hyper);
     if (!success) {
       _homePalettes.remove(hyper.id);
       hyper.delete();
@@ -608,8 +603,16 @@ class _HomeState extends State<Home> {
       return setPage(homePage(prompt: "Failed to upload Hyperchat"));
     }
 
+    unselectHomeSelection();
+    vm.popUntilHome();
+    setPage(chatPage(hyper, isPush: true));
+
+    await writeHomePalette(hyper, _homePalettes, bGen, rfHome);
+
+    // final success = await uploadHyperchatMedia(hcMedia);
+
     await metaSend(p, [hyper]);
-    setPage(chatPage(hyper));
+    // setPage(chatPage(hyper));
     return;
   }
 
@@ -816,7 +819,7 @@ class _HomeState extends State<Home> {
             sender: g.self.id,
             targets: targets,
             data: "p%${payment.id}",
-            header: "${g.self.id} payed you",
+            header: "${g.self.name} payed you",
             body: pay.textNote,
           ).process();
           vm.popUntilHome();
