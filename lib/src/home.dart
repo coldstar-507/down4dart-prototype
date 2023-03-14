@@ -321,7 +321,7 @@ class _HomeState extends State<Home> {
       } else if (eventPayload.first == "p") {
         // PAYMENT!
         final paymentID = eventPayload[1];
-        final payment = await r.getPayment(paymentID);
+        final payment = await downloadPayment(paymentID);
         if (payment == null) return;
         await g.wallet.parsePayment(g.self.id, payment);
         if (page is MoneyPage) setPage(moneyPage(paymentUpdate: payment));
