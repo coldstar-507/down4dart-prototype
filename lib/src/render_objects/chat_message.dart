@@ -603,14 +603,27 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
+  double get messageOpacity {
+    if (nodeRef == g.self.id) {
+      // saved message are always sent
+      return 1;
+    } else if (message.senderID != g.self.id) {
+      // if the sender is not us, it's always sent (received)
+      return 1;
+    } else if (message.sent(nodeRef)) {
+      // else we check the sent status
+      return 1;
+    } else {
+      // if it's not sent yet, usually takes less than a sec, message has
+      // some transparancy
+      return .75;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Opacity(
-      opacity: nodeRef == g.self.id
-          ? 1
-          : message.sent(nodeRef)
-              ? 1
-              : .75,
+      opacity: messageOpacity,
       child: Column(
         crossAxisAlignment:
             myMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start,

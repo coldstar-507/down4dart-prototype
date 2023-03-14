@@ -140,26 +140,28 @@ Future<bool> uploadHyperchatMedia(NodeMedia media) async {
   }
 }
 
-Future<bool> uploadOrUpdateMedia(
-  MessageMedia media, {
-  bool skipCheck = false, // usually for camera uploads
-}) async {
-  if (media.file == null) return false;
+Future<bool> uploadMedia(MessageMedia media) async {
+  if (media.file == null) {
+    print("Error, media id: ${media.id} doesn't have a file");
+    return false;
+  }
   final mediaRef = _st.ref(media.id);
-  if (skipCheck) {
+  if (media.metadata.canSkipCheck) {
+    media.metadata.canSkipCheck = false;
+    await media.save();
     try {
       await mediaRef.putFile(
         media.file!,
         SettableMetadata(customMetadata: media.metadata.toJson()),
       );
+      print("Success uploading the media id: ${media.id}");
       return true;
     } on FirebaseException catch (e) {
-      print("Error uploading file $e");
+      print("Error uploading media id: ${media.id}, err: $e");
       return false;
     }
   } else {
     try {
-      print("Checking if media ${media.id} is already on firebase!");
       final metadata = (await mediaRef.getMetadata());
       final down4Metadata = MediaMetadata.fromJson(metadata.customMetadata!);
       if (down4Metadata.timestamp.shouldBeUpdated) {
@@ -169,11 +171,11 @@ Future<bool> uploadOrUpdateMedia(
           await mediaRef.updateMetadata(
             SettableMetadata(customMetadata: down4Metadata.toJson()),
           );
-          print("Updated the metadata");
-          return true;
         }
+        print("Success updating media metadata id: ${media.id}");
+        return true;
       }
-      print("No need to update the metadata right away!");
+      print("Success, no need to update the media id: ${media.id} metadata");
       return true;
     } catch (e) {
       // TODO, find the actual exception we are looking for, docs aren't clear
@@ -183,9 +185,10 @@ Future<bool> uploadOrUpdateMedia(
         media.metadata.timestamp = timeStamp();
         await mediaRef.putFile(media.file!,
             SettableMetadata(customMetadata: media.metadata.toJson()));
+        print("Success uploading media id: ${media.id} after check failed");
         return true;
       } on FirebaseException catch (e) {
-        print("Error uploading file $e");
+        print("Error uploading media id: ${media.id}, err: $e");
         return false;
       }
     }
@@ -193,21 +196,36 @@ Future<bool> uploadOrUpdateMedia(
 }
 
 Future<bool> uploadMessage(Message msg, {required bool skipCheck}) async {
-  if (msg.timestamp.shouldBeUpdated || skipCheck) {
+  final msgRef = db.child("Messages").child(msg.id);
+  if (skipCheck) {
     try {
-      final msgRef = db.child("Messages").child(msg.id);
-      final getTs = await msgRef.child("ts").get();
-      if (!getTs.exists) {
-        msgRef.set(msg.toJson());
-      } else {
-        msgRef.child("ts").set(msg.timestamp);
-      }
+      await msgRef.set(msg.toJson());
+      print("Success uploading message id: ${msg.id}");
       return true;
     } catch (e) {
-      print("Error uploading messageID: ${msg.id}, error: $e");
+      print("Error uploading message id: ${msg.id}, error: $e");
+      return false;
+    }
+  } else if (msg.timestamp.shouldBeUpdated) {
+    try {
+      final tsRef = msgRef.child("ts");
+      final newTs = timeStamp();
+      final currentTs = await tsRef.get();
+      if (!currentTs.exists) {
+        msg.timestamp = newTs;
+        return uploadMessage(msg, skipCheck: true);
+      } else {
+        final ts = currentTs.value as int;
+        if (newTs > ts) await tsRef.set(newTs);
+        print("Success updating the timestamp of message id: ${msg.id}");
+        return true;
+      }
+    } catch (e) {
+      print("Error updating message id: ${msg.id}, error: $e");
       return false;
     }
   } else {
+    print("Success, message id: ${msg.id} doesn't need to be updated");
     return true;
   }
 }

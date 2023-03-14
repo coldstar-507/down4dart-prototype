@@ -66,10 +66,16 @@ class _HomeState extends State<Home> {
     setState(() {});
   }
 
-  void back({required bool withPop, List<Down4Object>? f}) {
-    if (withPop) vm.pop();
+  void back({required bool withPop, List<Down4Object>? f}) async {
+    V? popedView;
+    if (withPop) popedView = vm.pop();
+    final pID = popedView?.id.split('-');
+    final pp0 = pID?.first;
+    if (pID != null && pID.length > 1 && pp0 == "chat") {
+      await writeHomePalette(popedView!.node!, _homePalettes, bGen, rfHome);
+    }
     final id = cv.id.split('-');
-    final p0 = id[0];
+    final p0 = id.first;
     switch (p0) {
       case 'home':
         return setPage(homePage(fObjs: f));
@@ -426,7 +432,8 @@ class _HomeState extends State<Home> {
     Message? msg = p.message;
     await p.media?.save();
     final targetIDs = targets.asIds();
-    final onlySendingToSelf = targetIDs.any((id) => id != g.self.id);
+    print("Target IDs = $targetIDs");
+    final onlySendingToSelf = targetIDs.every((id) => id == g.self.id);
 
     final messagesToForward =
         p.forwardables.whereType<ChatMessage>().map((cm) => cm.message);
@@ -446,14 +453,8 @@ class _HomeState extends State<Home> {
     Future(() async {
       List<Future<bool>> ss = [];
       if (!onlySendingToSelf) {
-        if (msg != null) {
-          ss.add(uploadMessage(msg, skipCheck: true));
-        }
-        if (p.media != null) {
-          ss.add(uploadOrUpdateMedia(p.media!,
-              skipCheck: p.media!.metadata.canSkipCheck));
-        }
-
+        if (msg != null) ss.add(uploadMessage(msg, skipCheck: true));
+        if (p.media != null) ss.add(uploadMedia(p.media!));
         for (final m in messagesToForward) {
           m.refresh();
           await m.save();
@@ -461,15 +462,15 @@ class _HomeState extends State<Home> {
         }
       }
 
-      bool successfulUploads;
+      bool success;
       if (ss.isEmpty) {
-        successfulUploads = true;
+        success = true;
       } else {
-        successfulUploads =
-            await Future.wait(ss).then((s) => s.every((b) => b));
+        success = await Future.wait(ss).then((s) => s.every((b) => b));
       }
 
-      if (!successfulUploads) return;
+      print("nUploads = ${ss.length}, success = $success");
+      if (!success) return;
       Map<ID, Future<bool>> reqs = {};
       Map<ID, Message> msgs = messagesToForward
           .followedBy(msg == null ? [] : [msg])
@@ -657,16 +658,16 @@ class _HomeState extends State<Home> {
         id: randomMediaID(),
         path: path,
         metadata: MediaMetadata(
-          isSquared: false,
-          owner: g.self.id,
-          extension: path.extension(),
-          timestamp: timestamp,
-          isReversed: isReversed,
-          text: text,
-          elementAspectRatio: aspectRatio,
-        ));
+            isSquared: false,
+            owner: g.self.id,
+            extension: path.extension(),
+            timestamp: timestamp,
+            isReversed: isReversed,
+            text: text,
+            canSkipCheck: true,
+            elementAspectRatio: aspectRatio));
 
-    final success = await uploadOrUpdateMedia(media, skipCheck: true);
+    final success = await uploadMedia(media);
     if (!success) return print("Snip media upload unsucessful!");
 
     var personTargets = <ID>[];
@@ -814,7 +815,7 @@ class _HomeState extends State<Home> {
           r.MessageRequest(
             sender: g.self.id,
             targets: targets,
-            data: "p-${payment.id}",
+            data: "p%${payment.id}",
             header: "${g.self.id} payed you",
             body: pay.textNote,
           ).process();

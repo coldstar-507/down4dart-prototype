@@ -618,12 +618,8 @@ class Payment extends BaseNode {
 }
 
 class MediaMetadata {
-  final bool isReversed,
-      isLocked,
-      isPaidToView,
-      isPaidToOwn,
-      isSquared,
-      canSkipCheck;
+  final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
+  bool canSkipCheck;
   final ID owner;
   final String extension;
   final double elementAspectRatio;

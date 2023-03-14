@@ -193,23 +193,21 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  Future<void> send2({
-    MessageMedia? mediaInput,
-    List<Down4Object>? fObjects,
-  }) async {
+  Future<void> send2({MessageMedia? mediaInput, List<Down4Object>? fo}) async {
     final media = mediaInput ?? _cameraInput;
     final text = _tec.value.text;
-    if (text == "" && media != null && fObjects != null) return;
+    if (text == "" && media != null && fo != null) return;
 
     final r = widget.messages.values.selected().asIDs().toList();
 
-    final p = Payload(m: media, t: _tec.value.text, f: fObjects, r: r);
+    final p = Payload(m: media, t: _tec.value.text, f: fo, r: r);
 
     widget.send(p);
 
     unselectSelectedMessage();
     _cameraInput = null;
     _tec.clear();
+
     loadBaseConsole();
   }
 
@@ -483,7 +481,7 @@ class _ChatPageState extends State<ChatPage> {
       bottomInputs: [consoleInput],
       consoleMedias2: ConsoleMedias2(
           showImages: images,
-          onSelect: (media) => send2(mediaInput: media, fObjects: fObjects)),
+          onSelect: (media) => send2(mediaInput: media, fo: fObjects)),
       forwardingObjects: fObjects.toList(),
       bottomButtons: [
         ConsoleButton(
