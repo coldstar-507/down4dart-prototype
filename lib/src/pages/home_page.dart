@@ -19,8 +19,8 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final void Function(String text) ping;
   final void Function(ChatableNode, List<Down4Object>) openNode;
   final void Function(Payload, List<ChatableNode>) send;
-  final void Function(List<Down4Object>) forward;
-  final void Function(List<Down4Object>?) hyperchat;
+  final void Function(List<Palette2>) forward;
+  final void Function() hyperchat;
   final void Function() group, money, search, delete, snip;
   const HomePage({
     required this.palettes,
@@ -87,7 +87,7 @@ class _HomePageState extends State<HomePage> {
     _homeConsole = Console(
       bottomInputs: [input],
       topButtons: [
-        ConsoleButton(name: "Hyperchat", onPress: () => widget.hyperchat(null)),
+        ConsoleButton(name: "Hyperchat", onPress: () => widget.hyperchat()),
         ConsoleButton(name: "Money", onPress: widget.money),
       ],
       bottomButtons: [
