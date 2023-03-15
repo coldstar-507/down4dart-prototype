@@ -23,11 +23,7 @@ import '../render_objects/_down4_flutter_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "hyper";
-  // final List<Palette2> palettesForTransition;
-  // final int nHidden;
   final Transition transition;
-  // final Iterable<Person> people;
-  // final List<Palette2> homePalettes;
   final List<Down4Object>? fo;
   final void Function(String text) ping;
   final void Function() back;

@@ -446,7 +446,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 6.0, left: 6.0),
-                    child: Text(node.name, textAlign: TextAlign.start))),
+                    child: Text(node.name,
+                        maxLines: 1, textAlign: TextAlign.start))),
             GestureDetector(
                 onTap: () => openNode?.call(node),
                 child: Center(

@@ -175,6 +175,11 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
 class _MoneyPageState extends State<MoneyPage> {
   bool _scanning = false;
   bool _extra = false;
+  late FocusNode _focusNode = FocusNode()..addListener(_onFocusChange);
+
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus) reloadInputsAndConsole();
+  }
 
   final emptyViewConsoleKey = GlobalKey();
   final mainViewConsoleKey = GlobalKey();
@@ -239,10 +244,12 @@ class _MoneyPageState extends State<MoneyPage> {
   Future<void> reloadInputsAndConsole() async {
     await loadBalance();
     loadMainViewInput();
-    if (_console.key == emptyViewConsoleKey) {
-      loadEmptyViewConsole();
-    } else if (_console.key == mainViewConsoleKey) {
-      loadMainViewConsole();
+    if (!_focusNode.hasFocus) {
+      if (_console.key == emptyViewConsoleKey) {
+        loadEmptyViewConsole();
+      } else if (_console.key == mainViewConsoleKey) {
+        loadMainViewConsole();
+      }
     }
   }
 
@@ -328,12 +335,6 @@ class _MoneyPageState extends State<MoneyPage> {
       // we have all the data
       print("WE HAVE ALL THE DATA, SENDING!!!!");
 
-      print("RESETTING SCAN");
-      scanner?.stop();
-      scannedData = {};
-      scannedDataLength = -1;
-      _scanning = false;
-
       final sortedKeys = scannedData.keys.toList(growable: false)..sort();
       final sortedData =
           sortedKeys.map((e) => scannedData[e]).toList(growable: false).join();
@@ -351,16 +352,11 @@ class _MoneyPageState extends State<MoneyPage> {
       }
       widget.onScan(payment);
 
-      // print(payment.txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
-
-      // print("the payment = $payment");
-
-      // print("Parsing the payment!");
-
-      // await g.wallet.parsePayment(g.self.id, payment);
-      // await loadPayment(payment.id);
-      // loadInputsAndConsole();
-      // print("Should literally work");
+      print("RESETTING SCAN");
+      scanner?.stop();
+      scannedData = {};
+      scannedDataLength = -1;
+      _scanning = false;
     }
   }
 
@@ -374,6 +370,7 @@ class _MoneyPageState extends State<MoneyPage> {
   void loadMainViewInput() {
     final sats = formattedSats(_balance!);
     _cachedMainViewInput = ConsoleInput(
+      focus: _focusNode,
       maxLines: 1,
       type: TextInputType.number,
       placeHolder: currency == "USD" ? "$usds \$" : "$sats sat",
@@ -382,18 +379,13 @@ class _MoneyPageState extends State<MoneyPage> {
     setState(() {});
   }
 
-  void loadEmptyViewConsole(
-      // {bool scanning = false,
-      // bool extraBack = false,
-      // bool reloadInput = false,}
-      ) {
+  void loadEmptyViewConsole() {
     if (_scanning) {
       scanner = MobileScannerController();
     } else {
       scanner?.dispose();
       scanner = null;
     }
-    // if (reloadInput) loadMainViewInput();
     _console = Console(
       key: emptyViewConsoleKey,
       scanner: !_scanning

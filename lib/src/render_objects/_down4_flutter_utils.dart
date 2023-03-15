@@ -743,19 +743,10 @@ extension ImageOfNodes on BaseNode {
           cacheWidth: Palette.paletteHeight.toInt() * 3);
     } else if (n is Payment) {
       return n.payment.independentGets < 2000000
-          ? Image.asset('assets/images/Dollar_Sign_1.png',
-              fit: BoxFit.cover,
-              cacheHeight: Palette.paletteHeight.toInt(),
-              cacheWidth: Palette.paletteHeight.toInt())
+          ? g.d1
           : n.payment.independentGets < 10000000
-              ? Image.asset('assets/images/Dollar_Sign_2.png',
-                  fit: BoxFit.cover,
-                  cacheHeight: Palette.paletteHeight.toInt(),
-                  cacheWidth: Palette.paletteHeight.toInt())
-              : Image.asset('assets/images/Dollar_Sign_3.png',
-                  fit: BoxFit.cover,
-                  cacheHeight: Palette.paletteHeight.toInt(),
-                  cacheWidth: Palette.paletteHeight.toInt());
+              ? g.d2
+              : g.d3;
     } else if (n is Self) {
       return Image.memory(
         n.media.data,

@@ -660,7 +660,7 @@ class Singletons {
 
   List<Down4Object> fo = [];
 
-  late Image fifty, black, red, ph;
+  late Image fifty, black, red, ph, d1, d2, d3;
   late Uint8List background;
 
   late List<CameraDescription> cameras;

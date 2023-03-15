@@ -172,9 +172,10 @@ class Message implements Down4Object {
   @override
   final ID id;
   final ID senderID;
-  final ID? forwarderID, mediaID;
+  final ID? mediaID;
   final String? text;
   final List<ID>? replies, nodes;
+  ID? forwarderID;
   int timestamp;
   Map<ID, bool> sents, reads;
 
@@ -337,6 +338,11 @@ abstract class BaseNode implements Down4Object {
   }
 }
 
+abstract class BranchableNode implements BaseNode {
+  Set<ID> get children;
+  set children(Set<ID> chld);
+}
+
 abstract class ChatableNode extends BaseNode {
   Set<ID> messages, snips;
   ChatableNode({
@@ -368,12 +374,7 @@ abstract class GroupNode extends ChatableNode {
   }) : super(id: id, activity: activity, messages: messages, snips: snips);
 }
 
-mixin Branchable {
-  Set<ID> get children; // can we remove that if we have set
-  set children(Set<ID> c);
-}
-
-abstract class Person extends ChatableNode with Branchable {
+abstract class Person extends ChatableNode implements BranchableNode {
   String firstName;
   String? lastName, description;
   final Down4Keys neuter;
@@ -396,10 +397,11 @@ abstract class Person extends ChatableNode with Branchable {
 }
 
 class User extends Person {
-  NodeMedia? media;
   bool isFriend;
   @override
   Set<ID> children;
+  @override
+  NodeMedia? media;
 
   User({
     this.isFriend = false,
@@ -446,6 +448,7 @@ class User extends Person {
 
 class Self extends Person {
   Set<ID> images, videos, nfts;
+  @override
   NodeMedia media;
 
   @override

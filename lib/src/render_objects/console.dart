@@ -128,6 +128,7 @@ class ConsoleButton extends StatelessWidget {
 
 // Could refactor to use Down4Input
 class ConsoleInput extends StatelessWidget {
+  final FocusNode? focus;
   final TextInputType type;
   final bool activated;
   final String placeHolder;
@@ -135,11 +136,14 @@ class ConsoleInput extends StatelessWidget {
   final String prefix, suffix;
   final int maxLines;
   final void Function(String)? inputCallBack;
+  final void Function()? onEditingComplete;
   final TextEditingController tec;
   final bool show;
   final BorderRadius? borderRadius;
   const ConsoleInput({
+    this.focus,
     this.borderRadius,
+    this.onEditingComplete,
     this.show = true,
     this.type = TextInputType.text,
     this.inputCallBack,
@@ -158,6 +162,7 @@ class ConsoleInput extends StatelessWidget {
   ConsoleInput withRadius(BorderRadius radius) {
     return ConsoleInput(
       borderRadius: radius,
+      focus: focus,
       type: type,
       placeHolder: placeHolder,
       tec: tec,
@@ -166,6 +171,7 @@ class ConsoleInput extends StatelessWidget {
       maxLines: maxLines,
       prefix: prefix,
       suffix: suffix,
+      onEditingComplete: onEditingComplete,
       inputCallBack: inputCallBack,
       show: show,
     );
@@ -173,8 +179,10 @@ class ConsoleInput extends StatelessWidget {
 
   ConsoleInput animated({required bool show}) {
     return ConsoleInput(
+      focus: focus,
       borderRadius: borderRadius,
       type: type,
+      onEditingComplete: onEditingComplete,
       placeHolder: placeHolder,
       tec: tec,
       activated: activated,
@@ -190,10 +198,12 @@ class ConsoleInput extends StatelessWidget {
   Widget get activatedField {
     return TextField(
       controller: tec,
+      focusNode: focus,
       cursorColor: PinkTheme.black,
       key: GlobalKey(),
       maxLines: maxLines,
       minLines: 1,
+      onEditingComplete: onEditingComplete,
       keyboardType: type,
       textAlign: TextAlign.center,
       decoration: InputDecoration(
@@ -248,21 +258,6 @@ class ConsoleInput extends StatelessWidget {
         ),
       ),
     );
-
-    // return Expanded(
-    //   child: AnimatedContainer(
-    //     duration: Console.animationDuration,
-    //     decoration: BoxDecoration(
-    //         color: activated ? Colors.white : Colors.grey,
-    //         border: Border.all(
-    //             width: Console.contourWidth, color: Console.contourColor)),
-    //     constraints: BoxConstraints(
-    //         // this is higher than maxfields in the textInput allows
-    //         maxHeight: show ? 8 * Console.buttonHeight : 0,
-    //         minHeight: show ? Console.buttonHeight : 0),
-    //     child: activated ? activatedField : unactivatedField,
-    //   ),
-    // );
   }
 }
 
@@ -352,11 +347,8 @@ class Console extends StatelessWidget {
   }
 
   List<Widget> get extraBottomButtons {
-    // final firstB = bottomConsoleButtons.first.name;
-    // final lastB = bottomConsoleButtons.last.name;
     return bottomConsoleButtons.map((b) {
       if (b.showExtra) {
-        // final nExtraButtons = b.extraButtons!.length;
         final key = b.key as GlobalKey;
         final context = key.currentContext;
         final renderBox = context!.findRenderObject() as RenderBox;
@@ -365,24 +357,13 @@ class Console extends StatelessWidget {
         final buttonWidth = semantics.width;
         final buttonHeight = semantics.height;
 
-        // b.extraButtons!.first = b.extraButtons!.first.withBorder(
-        //     BorderRadius.only(
-        //         topLeft: Radius.circular(nExtraButtons >= nConsoleLayers - 1
-        //             ? Console.consoleRad
-        //             : 0),
-        //         topRight: Radius.circular(nExtraButtons >= nConsoleLayers - 1
-        //             ? Console.consoleRad
-        //             : 0)));
-
         b.extraButtons!.first = b.extraButtons!.first.withBorder(
             k: GlobalKey(),
             BorderRadius.only(
                 topLeft: Radius.circular(Console.consoleRad),
                 topRight: Radius.circular(Console.consoleRad)));
 
-        // final topPosition = buttonHeight * b.extraButtons!.length;
         final nButton = b.extraButtons!.length;
-        // final tp = (buttonHeight + (2 * contourWidth)) * nButton;
 
         return Positioned(
           left: position.dx - contourWidth,

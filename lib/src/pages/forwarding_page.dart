@@ -64,7 +64,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
 
   Transition hyperTransition() {
     return selectionTransition(
-        originalList: _fList.reversed.toList(),
+        originalList: _fList.toList(),
         state: _forwardState,
         hiddenState: hiddenState,
         scrollOffset: g.vm.cv.cp.scroll);
@@ -80,15 +80,6 @@ class _ForwadingPageState extends State<ForwardingPage> {
   }
 
   void reload() => setState(() {});
-
-  // Future<void> loadPalettes() async {
-  //   final nodes = widget.homePalettes.map((e) => e.node);
-  //   _f = await Future.value({});
-  //   for (final node in nodes.whereType<ChatableNode>()) {
-  //     await writeHomePalette(node, _f!, (node) => bGen(node, fo), reload);
-  //   }
-  //   setState(() {});
-  // }
 
   @override
   void initState() {

@@ -78,7 +78,7 @@ class _HomeState extends State<Home> {
     final p0 = id.first;
     switch (p0) {
       case 'home':
-        return setPage(homePage(fObjs: f));
+        return setPage(homePage());
       case 'chat':
         return setPage(chatPage(cv.node as ChatableNode, fo: f));
       case 'node':
@@ -91,60 +91,6 @@ class _HomeState extends State<Home> {
         return setPage(forwardPage(f ?? []));
     }
   }
-  // void push(ru.Down4PageWidget p) {
-  //   if (p is NodePage || p is ChatPage) {
-  //     // is this place on stack? we don't allow cycles
-  //     var route = vm.views.map((e) => e.id).toList();
-  //     if (route.contains(p.id)) {
-  //       // is on stack, we pop all until we reach it
-  //       while (route.last != p.id) {
-  //         vm.pop();
-  //         route.removeLast();
-  //       }
-  //       if (p is NodePage) {
-  //         return refresh(nodePage(p.node));
-  //       } else if (p is ChatPage) {
-  //         return refresh(chatPage(p.node, p.messages, p.messages, p.fObjects));
-  //       }
-  //     }
-  //   }
-  //   if (p is HomePage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P(), P()]));
-  //   } else if (p is LoadingPage2) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()]));
-  //   } else if (p is MoneyPage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P(), P()]));
-  //   } else if (p is ChatPage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P(), P()], node: p.node));
-  //     initChat(p);
-  //   } else if (p is NodePage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()], node: p.node));
-  //   } else if (p is HyperchatPage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()]));
-  //   } else if (p is GroupPage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()]));
-  //   } else if (p is ForwardingPage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()]));
-  //   } else if (p is SnipViewPage) {
-  //     page = p;
-  //     g.vm.push(V(id: p.id, pages: [P()]));
-  //   } else if (p is AddFriendPage) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()]));
-  //   } else if (p is SnipCamera) {
-  //     page = p;
-  //     vm.push(V(id: p.id, pages: [P()]));
-  //   }
-  //   setState(() {});
-  // }
 
   Transition homeTransition() {
     return selectionTransition(
@@ -157,9 +103,7 @@ class _HomeState extends State<Home> {
 
   Map<ID, Palette2> get _homePalettes => vm.home.pages[0].objects.cast();
   Map<ID, Palette2> get _hiddenPalettes => vm.home.pages[1].objects.cast();
-
-  // getters for while in a chat, if those are used not in a chat -> rip
-  // they are supposed to be used after checking like this (page is ChatPage) {}
+  Map<ID, Palette2> get _all => {..._homePalettes, ..._hiddenPalettes};
 
   BaseNode? homeNode(ID id) => _homePalettes[id]?.node;
   BaseNode? hiddenNode(ID id) => _hiddenPalettes[id]?.node;
@@ -281,6 +225,36 @@ class _HomeState extends State<Home> {
     var msgQueue = db.child("Users").child(g.self.id).child("M");
     var messagesRef = db.child("Messages");
 
+    Future<void> handleMessage(Message msg, ID root) async {
+      ChatableNode? rootNode = homeNode(root) as ChatableNode?;
+      if (rootNode == null) {
+        // need to download it
+        final singleNodeList = await r.getNodes([root]);
+        if (singleNodeList == null || singleNodeList.length != 1) return;
+        rootNode = singleNodeList.first as ChatableNode;
+        rootNode.updateActivity();
+        if (rootNode is GroupNode) {
+          await rootNode.save();
+          await localPalettesRoutine();
+        }
+      }
+
+      await msg.onReceipt(root: root);
+
+      rootNode.messages.add(msg.id);
+      rootNode.updateActivity();
+      await rootNode.save();
+
+      await writeHomePalette(rootNode, _homePalettes, bGen, rfHome);
+
+      final pg = page;
+      if (pg is HomePage) {
+        setPage(homePage());
+      } else if (pg is ChatPage && pg.node.id == root) {
+        setPage(chatPage(rootNode, isReload: true, fo: pg.fo));
+      }
+    }
+
     _messageListener = msgQueue.onChildAdded.listen((event) async {
       print("New message!");
       final eventKey = event.snapshot.key;
@@ -332,34 +306,7 @@ class _HomeState extends State<Home> {
         final root = eventPayload[2];
         final msg = await downloadMessage(msgID);
         if (msg == null) return;
-        ChatableNode? rootNode = homeNode(root) as ChatableNode?;
-        if (rootNode == null) {
-          // need to download it
-          final singleNodeList = await r.getNodes([root]);
-          if (singleNodeList == null || singleNodeList.length != 1) return;
-          rootNode = singleNodeList.first as ChatableNode;
-          rootNode.updateActivity();
-          if (rootNode is GroupNode) {
-            await rootNode.save();
-            await localPalettesRoutine();
-          }
-        }
-
-        await msg.onReceipt(root: root);
-
-        rootNode
-          ..messages.add(msg.id)
-          ..updateActivity()
-          ..save();
-
-        await writeHomePalette(rootNode, _homePalettes, bGen, rfHome);
-
-        final pg = page;
-        if (pg is HomePage) {
-          setPage(homePage());
-        } else if (pg is ChatPage && pg.node.id == root) {
-          setPage(chatPage(rootNode, isReload: true, fo: pg.fo));
-        }
+        return await handleMessage(msg, root);
       } else if (eventPayload.first == "s") {
         final String mediaID = eventPayload[1];
         final String root = eventPayload[2];
@@ -397,7 +344,14 @@ class _HomeState extends State<Home> {
 
         if (cv.id == 'home') setPage(homePage());
       } else if (eventPayload.first == "f") {
-        // TODO, forwarded message!
+        // FORWARDED MESSAGE
+        final msgID = eventPayload[1];
+        final root = eventPayload[2];
+        final forwardedFrom = eventPayload[3];
+        final msg = await downloadMessage(msgID);
+        if (msg == null) return;
+        msg.forwarderID = forwardedFrom;
+        return handleMessage(msg, root);
       }
     });
   }
@@ -425,6 +379,20 @@ class _HomeState extends State<Home> {
       }
     }
     return;
+  }
+
+  List<Palette2> forwardables(List<Palette2> ps) {
+    final idsInGroups = ps
+        .asNodes<GroupNode>()
+        .map((e) => e.group)
+        .expand((element) => element)
+        .toSet();
+
+    final forwardables = ps.whereNodeIs<BranchableNode>().asIds();
+
+    final all = forwardables.followedBy(idsInGroups).toSet();
+
+    return all.map((id) => _all[id]).whereType<Palette2>().toList();
   }
 
   // =========================== PAGES FUNCTIONS ======================== //
@@ -575,17 +543,6 @@ class _HomeState extends State<Home> {
             canSkipCheck: true,
             extension: ".png"));
 
-    // final msg = p.message;
-    // final msgs = p.forwardables
-    //     .whereType<ChatMessage>()
-    //     .map((cm) => cm.message)
-    //     .followedBy(msg == null ? [] : [msg]);
-
-    // for (final m in msgs) {
-    //   m.reads[hcID] = true;
-    //   await m.save();
-    // }
-
     final hyper = Hyperchat(
         id: hcID,
         firstWord: hc.second.first,
@@ -595,7 +552,6 @@ class _HomeState extends State<Home> {
         messages: {},
         snips: {},
         media: hcMedia);
-    // await hyper.save();
 
     final success = await uploadNode(hyper);
     if (!success) {
@@ -609,12 +565,6 @@ class _HomeState extends State<Home> {
     unselectHomeSelection();
     vm.popUntilHome();
     setPage(chatPage(hyper, isPush: true));
-    // await writeHomePalette(hyper, _homePalettes, bGen, rfHome);
-
-    // final success = await uploadHyperchatMedia(hcMedia);
-
-    // await metaSend(p, [hyper]);
-    // setPage(chatPage(hyper));
     return;
   }
 
@@ -711,9 +661,9 @@ class _HomeState extends State<Home> {
 
   // ============================== PAGES ============================== //
 
-  ru.Down4PageWidget homePage({String? prompt, List<Down4Object>? fObjs}) {
+  ru.Down4PageWidget homePage({String? prompt}) {
     return HomePage(
-      forward: (f) => setPage(forwardPage(f, isPush: true)),
+      forward: (sel) => setPage(forwardPage(forwardables(sel), isPush: true)),
       openNode: (n, f) => setPage(chatPage(n, isPush: true)),
       send: (p, t) async {
         await metaSend(p, t);
@@ -722,7 +672,7 @@ class _HomeState extends State<Home> {
         setPage(homePage(prompt: "Sent messages!"));
       },
       palettes: formattedHomePalettes,
-      hyperchat: (fo) => setPage(hyperchatPage(fo)),
+      hyperchat: () => setPage(hyperchatPage()),
       group: () => setPage(groupPage()),
       money: () =>
           setPage(moneyPage(transition: homeTransition(), isPush: true)),
@@ -874,7 +824,6 @@ class _HomeState extends State<Home> {
         onScan: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
           loadSomePayments(1);
-          rf();
         },
         makePayment: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);

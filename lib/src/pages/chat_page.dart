@@ -75,21 +75,6 @@ class _ChatPageState extends State<ChatPage> {
         }))
       : null;
 
-  // late List<ID> mIds;
-  // late List<ID> ordered;
-
-  // Future<void> _loadSome({int? limit}) async {
-  //   final all = widget.node.messages;
-  //   final reversed = all.toList().reversed.toSet();
-  //   final loaded = widget.messages.keys.toSet();
-  //   final toLoad = reversed.difference(loaded);
-  //   final loadN = toLoad.isNotEmpty
-  //       ? limit ?? (toLoad.length > 20 ? 20 : toLoad.length)
-  //       : 0;
-  //   await messages2(toLoad.toList().sublist(0, loadN)).toList();
-  //   if (mounted) setState(() {});
-  // }
-
   Future<List<ButtonsInfo2>> buttonsOfNode(BaseNode node) async {
     return [
       ButtonsInfo2(
@@ -124,11 +109,6 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    if (widget.fo != null) {
-      loadForwardingConsole();
-    } else {
-      loadBaseConsole();
-    }
   }
 
   ConsoleInput get consoleInput {
