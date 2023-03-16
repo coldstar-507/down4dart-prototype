@@ -45,7 +45,8 @@ dependencies:
   http: ^0.13.4
   file_picker: ^5.2.2
   english_words: ^4.0.0
-  # image_picker: ^0.8.6
+  better_player: ^0.0.69
+  realm: ^1.0.2
   video_compress: ^3.1.2
   hive: ^2.1.0
   camera: ^0.10.0+4

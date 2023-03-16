@@ -6,13 +6,31 @@ import 'dart:convert';
 
 import 'dart:math' as math;
 
-void main() async {
-  final g = Iterable.generate(100, (i) => i).toList();
+abstract class Jeff {
+  void lol();
+}
 
-  while (g.isNotEmpty) {
-    final i = g.removeLast();
-    print(i);
-  }
+abstract class Scott {
+  void fuckyou();
+}
+
+abstract class Helene {
+  void jeff();
+}
+
+class Andrew implements Scott, Jeff {
+  Andrew();
+  @override
+  void fuckyou() => print("FUCK YOU");
+  void lol() => print("LOL");
+}
+
+void main() async {
+  var andrew = Andrew();
+
+  print(andrew is Scott);
+  print(andrew is Jeff);
+  print(andrew is Helene);
 
   return;
 }
