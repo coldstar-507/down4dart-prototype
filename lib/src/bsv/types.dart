@@ -52,26 +52,6 @@ class Down4Payment {
     return outSats > 0 ? "+$outSats sat" : "$outSats sat";
   }
 
-  // String get formattedName {
-  //   final tx = txs.last;
-  //   final spender = txs.last.txsIn.first.spender ?? "";
-  //   String receivers = "";
-  //   int singularGets = tx.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
-  //   int count = 0;
-  //   for (final txOut in txs.last.txsOut) {
-  //     if (txOut.isGets) {
-  //       receivers += "${txOut.receiver!} ";
-  //       count += 1;
-  //     }
-  //   }
-
-  //   if (count > 1) {
-  //     return "$spender --($count x $singularGets)--> $receivers";
-  //   } else {
-  //     return "$spender  --($singularGets)--> $receivers";
-  //   }
-  // }
-
   String get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
     final dataPart = sha1(idFold.toUint8List()).toBase58();

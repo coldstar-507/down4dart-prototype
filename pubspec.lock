@@ -97,14 +97,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.1"
-  build_cli_annotations:
-    dependency: transitive
-    description:
-      name: build_cli_annotations
-      sha256: b59d2769769efd6c9ff6d4c4cede0be115a566afc591705c2040b707534b1172
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.0"
   build_config:
     dependency: transitive
     description:
@@ -201,14 +193,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.1+1"
-  cancellation_token:
-    dependency: transitive
+  cbl:
+    dependency: "direct main"
     description:
-      name: cancellation_token
-      sha256: "44891ef71d605bc59ef7974c403630d8e8506fcd897a29c3e38466ef69e5c4eb"
+      name: cbl
+      sha256: a050486b653e4d220f4a1f9441501d2568d6609f4fdc59b9f86e9810e7b2dad1
       url: "https://pub.dev"
     source: hosted
-    version: "1.6.1"
+    version: "2.1.6"
+  cbl_ffi:
+    dependency: transitive
+    description:
+      name: cbl_ffi
+      sha256: d0f03ba7cf6424e033b652f2b584db146ca6f6053d24ebb45c806a4e189a19e6
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.8.1+1"
+  cbl_libcblite_api:
+    dependency: transitive
+    description:
+      name: cbl_libcblite_api
+      sha256: "2561ac2c4d028236efba5387b583556977a7b9c251a8adc888997b2f6f880fae"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
+  cbl_libcblitedart_api:
+    dependency: transitive
+    description:
+      name: cbl_libcblitedart_api
+      sha256: "7f7e3441e3347b70536db7c703f217fda5bda41e1630261b2d23f89f332d6bf6"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.0"
   characters:
     dependency: transitive
     description:
@@ -784,14 +800,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
-  objectid:
-    dependency: transitive
-    description:
-      name: objectid
-      sha256: "22fa972000d3256f10d06323a9dcbf4b564fb03fdb9024399e3a6c1d9902f914"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.0"
   package_config:
     dependency: transitive
     description:
@@ -936,38 +944,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.1"
-  realm:
-    dependency: "direct main"
-    description:
-      name: realm
-      sha256: ba8e23b1577450c20c9b11fd1fd7a4f94eb35ca1bbd6c154f731bf43bc3f5dbc
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.2"
-  realm_common:
-    dependency: transitive
-    description:
-      name: realm_common
-      sha256: "5e6bc3771fe16151f175ab7ae5134715488056a6ab81638074f856d6bb28cc02"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.2"
-  realm_generator:
-    dependency: transitive
-    description:
-      name: realm_generator
-      sha256: "9e11fc2736a8af9c4da9f7e2ff1409e7772d1a928d1e3d4aa3ab8e0df15ed75e"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.2"
-  sane_uuid:
-    dependency: transitive
-    description:
-      name: sane_uuid
-      sha256: "615f6d25e6d7e0c59ea0fb5ce0cdf043ce110af15b19b3c35ca1441e5bb06972"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0-alpha.4"
   shelf:
     dependency: transitive
     description:
@@ -1037,14 +1013,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.0"
-  tar:
+  synchronized:
     dependency: transitive
     description:
-      name: tar
-      sha256: "85ffd53e277f2bac8afa2885e6b195e26937e9c402424c3d88d92fd920b56de9"
+      name: synchronized
+      sha256: "33b31b6beb98100bf9add464a36a8dd03eb10c7a8cf15aeec535e9b054aaf04b"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.6"
+    version: "3.0.1"
   term_glyph:
     dependency: transitive
     description:
