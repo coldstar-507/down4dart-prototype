@@ -43,7 +43,7 @@ final listEqual = const ListEquality().equals;
 class Pair<E, F> {
   final E first;
   final F second;
-  Pair(this.first, this.second);
+  const Pair(this.first, this.second);
 }
 
 class Triple<E, F, G> {

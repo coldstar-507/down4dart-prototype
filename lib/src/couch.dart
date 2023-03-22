@@ -1,17 +1,10 @@
-import 'dart:html';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:down4/src/globals.dart';
-import 'package:down4/src/render_objects/chat_message.dart';
-import 'package:down4/src/render_objects/palette.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-
 import '_down4_dart_utils.dart' as u;
 import 'dart:typed_data' show Uint8List;
 import 'bsv/types.dart';
-
 import 'package:cbl/cbl.dart' as cbl;
 
 final _realtime = FirebaseDatabase.instance.ref();
@@ -20,6 +13,19 @@ final _node_storage =
     FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _message_storage =
     FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+
+extension ISetMaker on Iterable {
+  ISet<T> toISet<T>() => ISet<T>(toSet().cast<T>());
+}
+
+class ISet<T> {
+  final Set<T> _set;
+  final int size;
+  Iterable<T> get values => _set;
+  ISet(Set<T> set)
+      : _set = Set<T>.unmodifiable(set),
+        size = set.length;
+}
 
 late cbl.AsyncDatabase _nodesDB,
     _mediasDB,
@@ -66,7 +72,7 @@ Future<T?> fetch<T extends FireObject>(
       final maybeFutureData = withData ? ref.getData() : null;
       // will throw if no metadata, so we can use !
       final mediaJson = (await futureFullMetadata).customMetadata!;
-      final media = FireMedia.fromJson(mediaJson)!;
+      final media = FireMedia.fromJson(mediaJson);
       Uint8List? videoThumbnail;
       final bool isVideo = media.isVideo;
       if (isVideo && withData) {
@@ -117,58 +123,22 @@ cbl.Database db<T extends FireObject>() {
 }
 
 Future<T?> local<T extends FireObject>(Id id) async {
-  final doc = db<T>().document(id);
+  final doc = await db<T>().document(id);
+  if (doc == null) return null;
+  return _fromJson<T>(doc.toPlainMap().cast());
 }
 
-// Stream<Palette2> loadHomePalettes({bool isHidden = false}) async* {
-//   final raw = '''
-//       SELECT * FROM nodes
-//       LEFT JOIN ON medias.id = nodes.media
-//       WHERE nodes.isHidden = ${isHidden.toString()}
-//         AND nodes.type IN ('group', 'hyperchat', 'user', 'self')
-//       ''';
-
-//   final query = await cbl.Query.fromN1qlAsync(_nodesDB, raw);
-//   final results = await query.execute();
-//   await for (final result in results.asStream()) {
-//     Map<String, String?> nodeJson = result.toPlainMap().cast();
-//     Map<String, String?> mediaJson = result.toPlainMap().cast();
-//     final node = FireNode.fromJson(nodeJson)!;
-//     final media = FireMedia.fromJson(mediaJson);
-//     yield Palette2(node: node, media: media);
-//   }
-// }
-
-// Future<List<ChatMessage>> loadMessages(FireObject root,
-//     {required int take, required int skip}) async {
-//   final raw = '''
-//         SELECT * FROM messages
-//         LEFT JOIN ON medias.id = messages.media
-//         WHERE messages.root = ${root.id}
-//         LIMIT $take OFFSET $skip
-//         ORDER BY messages.timestamp DESC
-//     ''';
-//   final query = await Query.fromN1qlAsync(_messagesDB, raw);
-//   final results = await query.execute();
-//   final all = await results.allResults();
-//   return all.map((result) {
-//     Map<String, String?> nodeJson = result.toPlainMap().cast();
-//     Map<String, String?> mediaJson = result.toPlainMap().cast();
-//     final message = FireNode.fromJson(nodeJson)!;
-//     final media = FireMedia.fromJson(mediaJson);
-//     return ChatMessage(
-//         nodeRef: nodeRef,
-//         nodes: nodes,
-//         hasHeader: hasHeader,
-//         message: message,
-//         myMessage: myMessage,
-//         hasGap: hasGap,
-//         mediaInfo: mediaInfo,
-//         openNode: openNode,
-//         repliesInfo: repliesInfo,
-//         select: select);
-//   }).toList();
-// }
+T _fromJson<T extends FireObject>(Map<String, String?> json) {
+  switch (T) {
+    case FireNode:
+      return FireNode.fromJson(json) as T;
+    case FireMessage:
+      return FireMessage.fromJson(json) as T;
+    case FireMedia:
+      return FireMedia.fromJson(json) as T;
+  }
+  throw 'Cannot create fireobject from json for this type: $T';
+}
 
 abstract class FireObject {
   final String id;
@@ -274,14 +244,26 @@ abstract class FireObject {
 
     await db.saveDocument(document);
   }
+
+  static T fromJson<T extends FireObject>(Map<String, String?> json) {
+    switch (T) {
+      case FireMessage:
+        return FireMessage.fromJson(json) as T;
+      case FireNode:
+        return FireNode.fromJson(json) as T;
+      case FireMedia:
+        return FireMedia.fromJson(json) as T;
+    }
+    throw '$T is not a supported type for the fromJson function';
+  }
 }
 
 class FireMessage extends FireObject {
-  final FireObject root;
-  final FireObject sender;
-  final FireObject? media;
+  final Id root;
+  final Id sender;
+  final Id? media;
   final String? text;
-  final List<FireObject>? replies, nodes;
+  final ISet<Id>? replies, nodes;
   final String? forwarderID;
   final int timestamp;
   final bool isRead, isSent;
@@ -301,23 +283,18 @@ class FireMessage extends FireObject {
   });
 
   static FireMessage? fromJson(Map<String, String?> decodedJson) {
-    final id = decodedJson["id"];
-    if (id == null) return null;
-    final mediaID = decodedJson["media"];
-    final nodes = decodedJson["nodes"];
-    final replies = decodedJson["replies"];
     return FireMessage(
-      id,
-      root: FireObject(decodedJson["root"] as String),
-      sender: FireObject(decodedJson["sender"] as String),
+      decodedJson["id"] as Id,
+      root: decodedJson["root"] as Id,
+      sender: decodedJson["sender"] as Id,
       forwarderID: decodedJson["forwarderID"],
       text: decodedJson["text"],
-      media: mediaID != null ? FireObject(mediaID) : null,
+      media: decodedJson["media"],
       timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
       isRead: decodedJson["isRead"] == "true",
       isSent: decodedJson["isSent"] == "true",
-      replies: replies?.split(" ").map((e) => FireObject(e)).toList(),
-      nodes: nodes?.split(" ").map((e) => FireObject(e)).toList(),
+      nodes: decodedJson["nodes"]?.split(" ").toISet(),
+      replies: decodedJson["replies"]?.split(" ").toISet(),
     );
   }
 
@@ -325,15 +302,15 @@ class FireMessage extends FireObject {
   Map<String, String> toJson({bool withLocalValues = false}) => {
         'id': id,
         if (text != null) 'text': text!,
-        'root': root.id,
-        'sender': sender.id,
+        'root': root,
+        'sender': sender,
         'timestamp': timestamp.toString(),
-        if (media != null) 'media': media!.id,
+        if (media != null) 'media': media!,
         if (withLocalValues) 'isRead': isRead.toString(),
         if (withLocalValues) 'isSent': isSent.toString(),
         if (forwarderID != null) 'forwarderID': forwarderID!,
-        if (replies != null) 'replies': replies!.map((e) => e.id).join(" "),
-        if (nodes != null) 'nodes': nodes!.map((e) => e.id).join(" "),
+        if (replies != null) 'replies': replies!.values.join(" "),
+        if (nodes != null) 'nodes': nodes!.values.join(" "),
       };
 
   @override
@@ -406,17 +383,20 @@ abstract class FireNode extends FireObject {
   final String _name;
   final String? _lastName, _description;
   final Down4Keys? _neuter;
-  final FireObject? _media;
+  final Id? _media;
   final bool? _isFriend, _isHidden;
-  final Set<FireObject>? _messages,
-      _snips,
-      _group,
-      _nfts,
-      _images,
-      _videos,
-      _children;
+  final ISet<Id>? _messages;
+  final ISet<Id>? _snips;
+  final ISet<Id>? _group;
+  final ISet<Id>? _nfts;
+  final ISet<Id>? _images;
+  final ISet<Id>? _videos;
+  final ISet<Id>? _children;
 
-  FireObject? get media;
+  @override
+  cbl.Database _db() => _nodesDB;
+
+  Id? get media;
   NodesColor get colorCode;
   Nodes get type;
   String get displayID;
@@ -433,22 +413,19 @@ abstract class FireNode extends FireObject {
         if (withLocalValues && _isHidden != null)
           "isHidden": _isHidden.toString(),
         if (_lastName != null) "lastName": _lastName!,
-        if (_media != null) "media": _media!.id,
-        if (_children != null)
-          "children": _children!.map((e) => e.id).toList().join(" "),
+        if (_media != null) "media": _media!,
+        if (_children != null) "children": _children!.values.join(" "),
         if (_neuter != null) "neuter": _neuter!.toYouKnow(),
-        if (_group != null)
-          "group": _group!.map((e) => e.id).toList().join(" "),
+        if (_group != null) "group": _group!.values.join(" "),
         if (withLocalValues && _images != null)
-          "images": _images!.map((e) => e.id).toList().join(" "),
+          "images": _images!.values.join(" "),
         if (withLocalValues && _videos != null)
-          "videos": _videos!.map((e) => e.id).toList().join(" "),
-        if (withLocalValues && _nfts != null)
-          "nfts": _nfts!.map((e) => e.id).toList().join(" "),
+          "videos": _videos!.values.join(" "),
+        if (withLocalValues && _nfts != null) "nfts": _nfts!.values.join(" "),
         if (withLocalValues && _messages != null)
-          "messages": _messages!.map((e) => e.id).toList().join(" "),
+          "messages": _messages!.values.join(" "),
         if (withLocalValues && _snips != null)
-          "snips": _snips!.map((e) => e.id).toList().join(" "),
+          "snips": _snips!.values.join(" "),
         if (withLocalValues) "activity": _activity.toString(),
       };
 
@@ -461,14 +438,14 @@ abstract class FireNode extends FireObject {
     bool? isHidden,
     String? description,
     Down4Keys? neuter,
-    FireObject? media,
-    Set<FireObject>? messages,
-    Set<FireObject>? snips,
-    Set<FireObject>? group,
-    Set<FireObject>? nfts,
-    Set<FireObject>? images,
-    Set<FireObject>? videos,
-    Set<FireObject>? children,
+    Id? media,
+    ISet<Id>? messages,
+    ISet<Id>? snips,
+    ISet<Id>? group,
+    ISet<Id>? nfts,
+    ISet<Id>? images,
+    ISet<Id>? videos,
+    ISet<Id>? children,
   })  : _activity = activity,
         _name = name,
         _lastName = lastName,
@@ -493,25 +470,23 @@ abstract class FireNode extends FireObject {
     if (id == null) return null;
     final activity = int.parse(json["activity"] ?? "0");
     final type = Nodes.values.byName(json["type"] as String);
-    final media =
-        json["media"] != null ? FireObject(json["media"] as String) : null;
+    final media = json["media"];
+
     final name = json["name"] as String;
     final isFriend = json["isFriend"] == "true";
     final isHidden = json["isHidden"] == "true";
     final lastName = json["lastName"];
     final description = json["description"];
-    final children =
-        json["children"]?.split(" ").map((e) => FireObject(e)).toSet();
+    final children = json["children"]?.split(" ").toISet<Id>();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
-    final group = json["group"]?.split(" ").map((e) => FireObject(e)).toSet();
-    final images = json["images"]?.split(" ").map((e) => FireObject(e)).toSet();
-    final videos = json["videos"]?.split(" ").map((e) => FireObject(e)).toSet();
-    final nfts = json["nfts"]?.split(" ").map((e) => FireObject(e)).toSet();
-    final messages =
-        json["messages"]?.split(" ").map((e) => FireObject(e)).toSet();
-    final snips = json["snips"]?.split(" ").map((e) => FireObject(e)).toSet();
+    final group = json["group"]?.split(" ").toISet<Id>();
+    final images = json["images"]?.split(" ").toISet<Id>();
+    final videos = json["videos"]?.split(" ").toISet<Id>();
+    final nfts = json["nfts"]?.split(" ").toISet<Id>();
+    final messages = json["messages"]?.split(" ").toISet<Id>();
+    final snips = json["snips"]?.split(" ").toISet<Id>();
 
     switch (type) {
       case Nodes.user:
@@ -520,6 +495,7 @@ abstract class FireNode extends FireObject {
             name: name,
             lastName: lastName,
             media: media,
+            isHidden: isHidden,
             isFriend: isFriend,
             children: children!,
             messages: messages!,
@@ -587,21 +563,44 @@ abstract class FireNode extends FireObject {
 }
 
 mixin Branchable on FireNode {
-  Set<FireObject> get children;
+  ISet<Id> get children;
+
+  Future<void> addChildren(FireNode child) async {}
 }
 
 mixin Chatable on FireNode {
-  Set<FireObject> get messages;
-  Set<FireObject> get snips;
+  ISet<Id> get messages;
+  ISet<Id> get snips;
+
+  Future<void> addMessage(FireMessage msg) async {
+    await msg._merge();
+    await _merge({
+      "messages": messages.values.followedBy([msg.id]).join(" ")
+    });
+  }
+
+  Future<void> removeMessage(Id msgID) async {
+    await db<FireMessage>().purgeDocumentById(msgID);
+    final ref = Set<Id>.from(messages.values);
+    final deletion = ref.remove(msgID);
+    if (!deletion) return;
+    await _merge({"messages": ref.join(" ")});
+  }
+
   Future<u.Pair<bool, String>> messagingPreview() async {
-    return Future.value(u.Pair(true, ""));
+    final def = Future.value(const u.Pair(true, ""));
+    if (messages.values.isEmpty) def;
+    final lastMsgID = messages.values.last;
+    final msg = await local<FireMessage>(lastMsgID);
+    if (msg == null) return def;
+    return u.Pair(msg.isRead, msg.text ?? "&attachment");
   }
 }
 
 mixin Groupable on FireNode {
-  Set<FireObject> get group;
+  ISet<Id> get group;
   @override
-  String get displayID => group.map((id) => "@$id").join(" ");
+  String get displayID => group.values.map((id) => "@$id").join(" ");
 }
 
 mixin Personable on FireNode {
@@ -634,15 +633,17 @@ class User extends FireNode with Branchable, Personable, Chatable {
     super.id, {
     required super.activity,
     required super.name,
+    required bool isHidden,
     required bool isFriend,
-    required Set<FireObject> children,
-    required Set<FireObject> messages,
-    required Set<FireObject> snips,
+    required ISet<Id> children,
+    required ISet<Id> messages,
+    required ISet<Id> snips,
     required super.description,
     required super.lastName,
     required super.media,
     required Down4Keys neuter,
   }) : super(
+            isHidden: isHidden,
             isFriend: isFriend,
             children: children,
             messages: messages,
@@ -651,7 +652,7 @@ class User extends FireNode with Branchable, Personable, Chatable {
   bool get isFriend => _isFriend!;
 
   @override
-  Set<FireObject> get children => _children!;
+  ISet<Id> get children => _children!;
 
   @override
   NodesColor get colorCode =>
@@ -664,10 +665,10 @@ class User extends FireNode with Branchable, Personable, Chatable {
   String? get lastName => _lastName;
 
   @override
-  FireObject? get media => _media;
+  Id? get media => _media;
 
   @override
-  Set<FireObject> get messages => _messages!;
+  ISet<Id> get messages => _messages!;
 
   @override
   String get name => _name;
@@ -676,7 +677,7 @@ class User extends FireNode with Branchable, Personable, Chatable {
   Down4Keys get neuter => _neuter!;
 
   @override
-  Set<FireObject> get snips => _snips!;
+  ISet<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.user;
@@ -689,10 +690,10 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
     required super.name,
     required super.description,
     required super.lastName,
-    required FireObject media,
-    required Set<FireObject> children,
-    required Set<FireObject> messages,
-    required Set<FireObject> snips,
+    required Id media,
+    required ISet<Id> children,
+    required ISet<Id> messages,
+    required ISet<Id> snips,
   }) : super(
           media: media,
           children: children,
@@ -704,7 +705,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   NodesColor get colorCode => NodesColor.self;
 
   @override
-  Set<FireObject> get children => _children!;
+  ISet<Id> get children => _children!;
 
   @override
   String? get description => _description;
@@ -713,10 +714,10 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   String? get lastName => _lastName;
 
   @override
-  FireObject get media => _media!;
+  Id get media => _media!;
 
   @override
-  Set<FireObject> get messages => _messages!;
+  ISet<Id> get messages => _messages!;
 
   @override
   String get name => _name;
@@ -725,7 +726,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   Down4Keys get neuter => _neuter!;
 
   @override
-  Set<FireObject> get snips => _snips!;
+  ISet<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.self;
@@ -737,9 +738,9 @@ class Group extends FireNode with Groupable, Editable, Chatable {
     required super.activity,
     required super.name,
     required super.media,
-    required Set<FireObject> messages,
-    required Set<FireObject> snips,
-    required Set<FireObject> group,
+    required ISet<Id> messages,
+    required ISet<Id> snips,
+    required ISet<Id> group,
   }) : super(messages: messages, snips: snips, group: group);
 
   @override
@@ -749,16 +750,16 @@ class Group extends FireNode with Groupable, Editable, Chatable {
   String get displayName => _name;
 
   @override
-  Set<FireObject> get group => _group!;
+  ISet<Id> get group => _group!;
 
   @override
-  FireObject? get media => _media;
+  Id? get media => _media;
 
   @override
-  Set<FireObject> get messages => _messages!;
+  ISet<Id> get messages => _messages!;
 
   @override
-  Set<FireObject> get snips => _snips!;
+  ISet<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.group;
@@ -771,9 +772,9 @@ class Hyperchat extends FireNode with Groupable, Chatable {
     required String firstWord,
     required String secondWord,
     required super.media,
-    required Set<FireObject> messages,
-    required Set<FireObject> snips,
-    required Set<FireObject> group,
+    required ISet<Id> messages,
+    required ISet<Id> snips,
+    required ISet<Id> group,
   }) : super(
             messages: messages,
             snips: snips,
@@ -788,16 +789,16 @@ class Hyperchat extends FireNode with Groupable, Chatable {
   String get displayName => "$_name $_lastName";
 
   @override
-  Set<FireObject> get group => _group!;
+  ISet<Id> get group => _group!;
 
   @override
-  FireObject? get media => _media;
+  Id? get media => _media;
 
   @override
-  Set<FireObject> get messages => _messages!;
+  ISet<Id> get messages => _messages!;
 
   @override
-  Set<FireObject> get snips => _snips!;
+  ISet<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.hyperchat;
@@ -808,7 +809,7 @@ class Payment extends FireNode {
   int get activity => _payment.tsSeconds;
 
   @override
-  FireObject? get media => null;
+  Id? get media => null;
 
   final Down4Payment _payment;
   final FireObject selfID;
@@ -843,6 +844,8 @@ class FireMedia extends FireObject {
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
   final Id owner;
   final Id? onlineRef;
+  final String imageDigest;
+  final String? videoDigest;
   final String extension;
   final String mimetype;
   final double aspectRatio;
@@ -850,6 +853,17 @@ class FireMedia extends FireObject {
   final int timestamp;
 
   bool get isVideo => extension.isVideoExtension();
+
+  Future<Uint8List?> get imageData async {
+    final blob = await _db().getBlob({"digest": imageDigest});
+    return blob?.content();
+  }
+
+  Future<Uint8List?> get videoData async {
+    if (videoDigest == null) return null;
+    final blob = await _db().getBlob({"digest": videoDigest!});
+    return blob?.content();
+  }
 
   @override
   cbl.Database _db() => _mediasDB;
@@ -861,6 +875,8 @@ class FireMedia extends FireObject {
     required this.aspectRatio,
     required this.extension,
     required this.mimetype,
+    required this.imageDigest,
+    this.videoDigest,
     this.onlineRef,
     this.isLocked = false,
     this.isPaidToView = false,
@@ -873,14 +889,10 @@ class FireMedia extends FireObject {
   Future<void> _write({Uint8List? videoData, Uint8List? imageData}) async {
     if (videoData == null && imageData == null) return;
     if (isVideo) {
-      
-      final vid = cbl.Blob.fromData(mimetype, videoData!);
-      _db().getBlob(properties)
+      await _db().saveBlob(cbl.Blob.fromData(mimetype, videoData!));
     }
-    cbl.MutableDocument.withId("image-$id").setBlob(
-      cbl.Blob.fromData(isVideo ? "image/png" : mimetype, imageData!),
-      key: "image-$id",
-    );
+    final imageMime = isVideo ? "image/png" : mimetype;
+    await _db().saveBlob(cbl.Blob.fromData(imageMime, imageData!));
     return;
   }
 
@@ -891,6 +903,8 @@ class FireMedia extends FireObject {
       timestamp: int.parse(decodedJson["timestamp"] as String),
       extension: decodedJson["extension"] as String,
       mimetype: decodedJson["mimetype"] as String,
+      imageDigest: decodedJson["imageDigest"] as String,
+      videoDigest: decodedJson["videoDigest"],
       onlineRef: decodedJson["onlineRef"],
       isReversed: decodedJson["isReversed"] == "true",
       isSquared: decodedJson["isSquared"] == "true",
@@ -908,6 +922,8 @@ class FireMedia extends FireObject {
         "timestamp": timestamp.toString(),
         "extension": extension,
         "mimetype": mimetype,
+        "imageDigest": imageDigest,
+        if (videoDigest != null) "videoDigest": videoDigest!,
         if (onlineRef != null) "onlineRef": onlineRef!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
@@ -958,3 +974,54 @@ class ExchangeRate {
         "lastUpdate": lastUpdate,
       };
 }
+
+
+// Stream<Palette2> loadHomePalettes({bool isHidden = false}) async* {
+//   final raw = '''
+//       SELECT * FROM nodes
+//       LEFT JOIN ON medias.id = nodes.media
+//       WHERE nodes.isHidden = ${isHidden.toString()}
+//         AND nodes.type IN ('group', 'hyperchat', 'user', 'self')
+//       ''';
+
+//   final query = await cbl.Query.fromN1qlAsync(_nodesDB, raw);
+//   final results = await query.execute();
+//   await for (final result in results.asStream()) {
+//     Map<String, String?> nodeJson = result.toPlainMap().cast();
+//     Map<String, String?> mediaJson = result.toPlainMap().cast();
+//     final node = FireNode.fromJson(nodeJson)!;
+//     final media = FireMedia.fromJson(mediaJson);
+//     yield Palette2(node: node, media: media);
+//   }
+// }
+
+// Future<List<ChatMessage>> loadMessages(FireObject root,
+//     {required int take, required int skip}) async {
+//   final raw = '''
+//         SELECT * FROM messages
+//         LEFT JOIN ON medias.id = messages.media
+//         WHERE messages.root = ${root.id}
+//         LIMIT $take OFFSET $skip
+//         ORDER BY messages.timestamp DESC
+//     ''';
+//   final query = await Query.fromN1qlAsync(_messagesDB, raw);
+//   final results = await query.execute();
+//   final all = await results.allResults();
+//   return all.map((result) {
+//     Map<String, String?> nodeJson = result.toPlainMap().cast();
+//     Map<String, String?> mediaJson = result.toPlainMap().cast();
+//     final message = FireNode.fromJson(nodeJson)!;
+//     final media = FireMedia.fromJson(mediaJson);
+//     return ChatMessage(
+//         nodeRef: nodeRef,
+//         nodes: nodes,
+//         hasHeader: hasHeader,
+//         message: message,
+//         myMessage: myMessage,
+//         hasGap: hasGap,
+//         mediaInfo: mediaInfo,
+//         openNode: openNode,
+//         repliesInfo: repliesInfo,
+//         select: select);
+//   }).toList();
+// }
