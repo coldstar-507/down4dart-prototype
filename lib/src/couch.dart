@@ -28,6 +28,98 @@ late cbl.AsyncDatabase _nodesDB,
     _paymentsDB,
     _billsDB;
 
+typedef Id = String;
+
+Future<T?> fetch<T extends FireObject>(
+  Id id, {
+  bool merge = false,
+  bool withData = false,
+  bool fromNodes = false,
+}) async {
+  Future<FireNode?> fetchNode(Id id, {bool merge = false}) async {
+    final snapshot = await _firestore
+        .collection("Nodes")
+        .doc(id)
+        .get(const GetOptions(source: Source.server));
+    if (!snapshot.exists) return null;
+    final node = FireNode.fromJson(snapshot.data()!.cast())!;
+    if (merge) await node._merge();
+    return node;
+  }
+
+  Future<FireMessage?> fetchMessage(Id id, {bool merge = false}) async {
+    final snapshot = await _realtime.child("Message").child(id).get();
+    if (!snapshot.exists) return null;
+    final json = Map<String, String?>.from(snapshot.value as Map);
+    final message = FireMessage.fromJson(json)!;
+    if (merge) message._merge();
+    return message;
+  }
+
+  Future<FireMedia?> fetchMedia(Id id,
+      {bool merge = false,
+      bool withData = false,
+      bool fromNodes = false}) async {
+    final ref = fromNodes ? _node_storage.ref(id) : _message_storage.ref(id);
+    try {
+      final futureFullMetadata = ref.getMetadata();
+      final maybeFutureData = withData ? ref.getData() : null;
+      // will throw if no metadata, so we can use !
+      final mediaJson = (await futureFullMetadata).customMetadata!;
+      final media = FireMedia.fromJson(mediaJson)!;
+      Uint8List? videoThumbnail;
+      final bool isVideo = media.isVideo;
+      if (isVideo && withData) {
+        final url = await ref.getDownloadURL();
+        videoThumbnail = await VideoThumbnail.thumbnailData(
+          video: url,
+          quality: 50,
+        );
+      }
+      if (merge) {
+        media._merge();
+        if (withData) {
+          await media._write(
+            videoData: isVideo ? await maybeFutureData : null,
+            imageData: isVideo ? videoThumbnail : await maybeFutureData,
+          );
+        }
+      }
+      return media;
+    } catch (e) {
+      print("Error downloading media id: $id from storage, err: $e");
+      return null;
+    }
+  }
+
+  switch (T) {
+    case FireNode:
+      return fetchNode(id, merge: merge) as T;
+    case FireMessage:
+      return fetchMessage(id, merge: merge) as T;
+    case FireMedia:
+      return fetchMedia(id,
+          merge: merge, withData: withData, fromNodes: fromNodes) as T;
+  }
+  throw 'Unsupported type for fetching $T';
+}
+
+cbl.Database db<T extends FireObject>() {
+  switch (T) {
+    case FireNode:
+      return _nodesDB;
+    case FireMessage:
+      return _messagesDB;
+    case FireMedia:
+      return _mediasDB;
+  }
+  throw 'No db exists for type: $T';
+}
+
+Future<T?> local<T extends FireObject>(Id id) async {
+  final doc = db<T>().document(id);
+}
+
 // Stream<Palette2> loadHomePalettes({bool isHidden = false}) async* {
 //   final raw = '''
 //       SELECT * FROM nodes
@@ -84,10 +176,6 @@ abstract class FireObject {
 
   cbl.Database _db();
 
-  Future<bool> _isLocal();
-
-  Future<FireObject?> _local();
-
   //  async {
   //   final doc = await _db<T>().document(id);
   //   if (doc == null) return null;
@@ -102,13 +190,9 @@ abstract class FireObject {
   //   throw "TODO: Implement this type $T";
   // }
 
-  Future<FireObject?> get({bool mergeIfOnline = false});
-
   //  async {
   //   return (await _local<T>()) ?? (await _fetch<T>(withMerge: mergeIfOnline));
   // }
-
-  Future<FireObject?> _fetch({required bool withMerge});
 
   //  async {
   //   if (T is FireNode) {
@@ -144,7 +228,6 @@ abstract class FireObject {
   //           quality: 50,
   //         );
   //       }
-
   //       if (withMerge) {
   //         media._merge<T>();
   //         if (mediaWithData) {
@@ -154,7 +237,6 @@ abstract class FireObject {
   //           );
   //         }
   //       }
-
   //       return media as T;
   //     } catch (e) {
   //       print("Error downloading media id: $id from storage, err: $e");
@@ -257,15 +339,15 @@ class FireMessage extends FireObject {
   @override
   cbl.Database _db() => _messagesDB;
 
-  @override
-  Future<FireObject?> _fetch({required bool withMerge}) {
-        final snapshot = await _realtime.child("Message").child(id).get();
-        if (!snapshot.exists) return null;
-        final json = Map<String, String?>.from(snapshot.value as Map);
-        final message = FireMessage.fromJson(json) as T;
-        if (withMerge) message._merge<T>();
-        return message;
-  }
+  // @override
+  // Future<FireObject?> _fetch({required bool withMerge}) {
+  //       final snapshot = await _realtime.child("Message").child(id).get();
+  //       if (!snapshot.exists) return null;
+  //       final json = Map<String, String?>.from(snapshot.value as Map);
+  //       final message = FireMessage.fromJson(json) as T;
+  //       if (withMerge) message._merge<T>();
+  //       return message;
+  // }
 
   @override
   Future<bool> _isLocal() {
@@ -759,8 +841,8 @@ class Payment extends FireNode {
 
 class FireMedia extends FireObject {
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
-  final FireObject owner;
-  final FireObject? onlineRef;
+  final Id owner;
+  final Id? onlineRef;
   final String extension;
   final String mimetype;
   final double aspectRatio;
@@ -768,6 +850,9 @@ class FireMedia extends FireObject {
   final int timestamp;
 
   bool get isVideo => extension.isVideoExtension();
+
+  @override
+  cbl.Database _db() => _mediasDB;
 
   const FireMedia(
     super.id, {
@@ -787,23 +872,26 @@ class FireMedia extends FireObject {
 
   Future<void> _write({Uint8List? videoData, Uint8List? imageData}) async {
     if (videoData == null && imageData == null) return;
-
-    cbl.MutableDocument.withId("video-$id").setBlob(
-      cbl.Blob.fromData(mimetype, imageData!),
+    if (isVideo) {
+      
+      final vid = cbl.Blob.fromData(mimetype, videoData!);
+      _db().getBlob(properties)
+    }
+    cbl.MutableDocument.withId("image-$id").setBlob(
+      cbl.Blob.fromData(isVideo ? "image/png" : mimetype, imageData!),
       key: "image-$id",
     );
     return;
   }
 
-  static FireMedia? fromJson(Map<String, String?> decodedJson) {
-    final id = decodedJson["id"];
-    if (id == null) return null;
+  factory FireMedia.fromJson(Map<String, String?> decodedJson) {
     return FireMedia(
-      id,
-      owner: FireObject(decodedJson["owner"] as String),
+      decodedJson["id"] as String,
+      owner: decodedJson["owner"] as String,
       timestamp: int.parse(decodedJson["timestamp"] as String),
       extension: decodedJson["extension"] as String,
       mimetype: decodedJson["mimetype"] as String,
+      onlineRef: decodedJson["onlineRef"],
       isReversed: decodedJson["isReversed"] == "true",
       isSquared: decodedJson["isSquared"] == "true",
       isLocked: decodedJson["isLocked"] == "true",
@@ -814,11 +902,13 @@ class FireMedia extends FireObject {
     );
   }
 
+  @override
   Map<String, String> toJson({bool withLocalValues = true}) => {
-        "owner": owner.id,
+        "owner": owner,
         "timestamp": timestamp.toString(),
         "extension": extension,
         "mimetype": mimetype,
+        if (onlineRef != null) "onlineRef": onlineRef!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
         "isLocked": isLocked.toString(),
