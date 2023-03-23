@@ -37,6 +37,15 @@ final lastUseMediaIndexConfig = cbl.ValueIndexConfiguration(["lastUse"]);
 final isSavedMediaIndexConfig = cbl.ValueIndexConfiguration(["isSaved"]);
 final isVideoMediaIndexConfig = cbl.ValueIndexConfiguration(["isVideo"]);
 
+Stream<Down4TXOUT> allUtxos() async* {
+  const raw = 'SELECT * FROM _';
+  final query = await cbl.AsyncQuery.fromN1ql(_utxosDB, raw);
+  final resultSet = await query.execute();
+  await for (final r in resultSet.asStream()) {
+    yield Down4TXOUT.fromJson(r.toPlainMap());
+  }
+}
+
 typedef Id = String;
 
 Future<T?> fetch<T extends FireObject>(
@@ -143,6 +152,20 @@ T _fromJson<T extends FireObject>(Map<String, String?> json) {
       return FireMedia.fromJson(json) as T;
   }
   throw 'Cannot create fireobject from json for this type: $T';
+}
+
+abstract class StaticObject {
+  cbl.Database get db;
+  Id get id;
+  Map<String, Object> toJson();
+  Future<void> delete() async {
+    await db.purgeDocumentById(id);
+  }
+
+  Future<bool> save() async {
+    final doc = cbl.MutableDocument.withId(id)..setData(toJson());
+    return await db.saveDocument(doc);
+  }
 }
 
 abstract class FireObject {
