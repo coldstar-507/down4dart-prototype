@@ -9,23 +9,21 @@ import 'package:cbl/cbl.dart' as cbl;
 
 final _realtime = FirebaseDatabase.instance.ref();
 final _firestore = FirebaseFirestore.instance;
-final _node_storage =
-    FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
-final _message_storage =
-    FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+final _nodeStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
+final _messageStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-extension ISetMaker on Iterable {
-  ISet<T> toISet<T>() => ISet<T>(toSet().cast<T>());
-}
+// extension on Iterable {
+//   ISet<T> toISet<T>() => ISet<T>(toSet().cast<T>());
+// }
 
-class ISet<T> {
-  final Set<T> _set;
-  final int size;
-  Iterable<T> get values => _set;
-  ISet(Set<T> set)
-      : _set = Set<T>.unmodifiable(set),
-        size = set.length;
-}
+// class ISet<T> {
+//   final Set<T> _set;
+//   final int size;
+//   Iterable<T> get values => _set;
+//   ISet(Set<T> set)
+//       : _set = Set<T>.unmodifiable(set),
+//         size = set.length;
+// }
 
 late cbl.AsyncDatabase _nodesDB,
     _mediasDB,
@@ -62,11 +60,13 @@ Future<T?> fetch<T extends FireObject>(
     return message;
   }
 
-  Future<FireMedia?> fetchMedia(Id id,
-      {bool merge = false,
-      bool withData = false,
-      bool fromNodes = false}) async {
-    final ref = fromNodes ? _node_storage.ref(id) : _message_storage.ref(id);
+  Future<FireMedia?> fetchMedia(
+    Id id, {
+    bool merge = false,
+    bool withData = false,
+    bool fromNodes = false,
+  }) async {
+    final ref = fromNodes ? _nodeStore.ref(id) : _messageStore.ref(id);
     try {
       final futureFullMetadata = ref.getMetadata();
       final maybeFutureData = withData ? ref.getData() : null;
@@ -110,7 +110,7 @@ Future<T?> fetch<T extends FireObject>(
   throw 'Unsupported type for fetching $T';
 }
 
-cbl.Database db<T extends FireObject>() {
+cbl.Database db_<T extends FireObject>() {
   switch (T) {
     case FireNode:
       return _nodesDB;
@@ -123,7 +123,7 @@ cbl.Database db<T extends FireObject>() {
 }
 
 Future<T?> local<T extends FireObject>(Id id) async {
-  final doc = await db<T>().document(id);
+  final doc = await db_<T>().document(id);
   if (doc == null) return null;
   return _fromJson<T>(doc.toPlainMap().cast());
 }
@@ -146,77 +146,7 @@ abstract class FireObject {
 
   cbl.Database _db();
 
-  //  async {
-  //   final doc = await _db<T>().document(id);
-  //   if (doc == null) return null;
-  //   final Map<String, String?> docJson = doc.toPlainMap().cast();
-  //   if (T is FireMessage) {
-  //     return FireMessage.fromJson(docJson) as T;
-  //   } else if (T is FireNode) {
-  //     return FireNode.fromJson(docJson) as T;
-  //   } else if (T is FireMedia) {
-  //     return FireMedia.fromJson(docJson) as T;
-  //   }
-  //   throw "TODO: Implement this type $T";
-  // }
-
-  //  async {
-  //   return (await _local<T>()) ?? (await _fetch<T>(withMerge: mergeIfOnline));
-  // }
-
-  //  async {
-  //   if (T is FireNode) {
-  //     final snapshot = await _firestore
-  //         .collection("Nodes")
-  //         .doc(id)
-  //         .get(const GetOptions(source: Source.server));
-  //     if (!snapshot.exists) return null;
-  //     final node = FireNode.fromJson(snapshot.data()!.cast()) as T;
-  //     if (withMerge) await node._merge<T>();
-  //     return node;
-  //   } else if (T is FireMessage) {
-  //     final snapshot = await _realtime.child("Message").child(id).get();
-  //     if (!snapshot.exists) return null;
-  //     final json = Map<String, String?>.from(snapshot.value as Map);
-  //     final message = FireMessage.fromJson(json) as T;
-  //     if (withMerge) message._merge<T>();
-  //     return message;
-  //   } else if (T is FireMedia) {
-  //     final ref = fromNodes ? _node_storage.ref(id) : _message_storage.ref(id);
-  //     try {
-  //       final futureFullMetadata = ref.getMetadata();
-  //       final maybeFutureData = mediaWithData ? ref.getData() : null;
-  //       // will throw if no metadata, so we can use !
-  //       final mediaJson = (await futureFullMetadata).customMetadata!;
-  //       final media = FireMedia.fromJson(mediaJson)!;
-  //       Uint8List? videoThumbnail;
-  //       final bool isVideo = media.isVideo;
-  //       if (isVideo && mediaWithData) {
-  //         final url = await ref.getDownloadURL();
-  //         videoThumbnail = await VideoThumbnail.thumbnailData(
-  //           video: url,
-  //           quality: 50,
-  //         );
-  //       }
-  //       if (withMerge) {
-  //         media._merge<T>();
-  //         if (mediaWithData) {
-  //           await media._write(
-  //             videoData: isVideo ? await maybeFutureData : null,
-  //             imageData: isVideo ? videoThumbnail : await maybeFutureData,
-  //           );
-  //         }
-  //       }
-  //       return media as T;
-  //     } catch (e) {
-  //       print("Error downloading media id: $id from storage, err: $e");
-  //       return null;
-  //     }
-  //   }
-  //   return null;
-  // }
-
-  // if we know what we want to merge, we can specify values to be more efficient
+  Future<void> _delete() async => await _db().purgeDocumentById(id);
 
   Map<String, String> toJson({bool withLocalValues = false});
 
@@ -263,7 +193,7 @@ class FireMessage extends FireObject {
   final Id sender;
   final Id? media;
   final String? text;
-  final ISet<Id>? replies, nodes;
+  final Set<Id>? replies, nodes;
   final String? forwarderID;
   final int timestamp;
   final bool isRead, isSent;
@@ -293,8 +223,8 @@ class FireMessage extends FireObject {
       timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
       isRead: decodedJson["isRead"] == "true",
       isSent: decodedJson["isSent"] == "true",
-      nodes: decodedJson["nodes"]?.split(" ").toISet(),
-      replies: decodedJson["replies"]?.split(" ").toISet(),
+      nodes: decodedJson["nodes"]?.split(" ").toSet(),
+      replies: decodedJson["replies"]?.split(" ").toSet(),
     );
   }
 
@@ -309,8 +239,8 @@ class FireMessage extends FireObject {
         if (withLocalValues) 'isRead': isRead.toString(),
         if (withLocalValues) 'isSent': isSent.toString(),
         if (forwarderID != null) 'forwarderID': forwarderID!,
-        if (replies != null) 'replies': replies!.values.join(" "),
-        if (nodes != null) 'nodes': nodes!.values.join(" "),
+        if (replies != null) 'replies': replies!.join(" "),
+        if (nodes != null) 'nodes': nodes!.join(" "),
       };
 
   @override
@@ -379,19 +309,19 @@ enum NodesColor {
 }
 
 abstract class FireNode extends FireObject {
-  final int _activity;
-  final String _name;
-  final String? _lastName, _description;
+  int _activity;
+  String _name;
+  String? _lastName, _description;
   final Down4Keys? _neuter;
-  final Id? _media;
-  final bool? _isFriend, _isHidden;
-  final ISet<Id>? _messages;
-  final ISet<Id>? _snips;
-  final ISet<Id>? _group;
-  final ISet<Id>? _nfts;
-  final ISet<Id>? _images;
-  final ISet<Id>? _videos;
-  final ISet<Id>? _children;
+  Id? _media;
+  bool? _isFriend, _isHidden;
+  final Set<Id>? _messages;
+  final Set<Id>? _snips;
+  final Set<Id>? _group;
+  final Set<Id>? _nfts;
+  final Set<Id>? _images;
+  final Set<Id>? _videos;
+  final Set<Id>? _children;
 
   @override
   cbl.Database _db() => _nodesDB;
@@ -414,22 +344,19 @@ abstract class FireNode extends FireObject {
           "isHidden": _isHidden.toString(),
         if (_lastName != null) "lastName": _lastName!,
         if (_media != null) "media": _media!,
-        if (_children != null) "children": _children!.values.join(" "),
+        if (_children != null) "children": _children!.join(" "),
         if (_neuter != null) "neuter": _neuter!.toYouKnow(),
-        if (_group != null) "group": _group!.values.join(" "),
-        if (withLocalValues && _images != null)
-          "images": _images!.values.join(" "),
-        if (withLocalValues && _videos != null)
-          "videos": _videos!.values.join(" "),
-        if (withLocalValues && _nfts != null) "nfts": _nfts!.values.join(" "),
+        if (_group != null) "group": _group!.join(" "),
+        if (withLocalValues && _images != null) "images": _images!.join(" "),
+        if (withLocalValues && _videos != null) "videos": _videos!.join(" "),
+        if (withLocalValues && _nfts != null) "nfts": _nfts!.join(" "),
         if (withLocalValues && _messages != null)
-          "messages": _messages!.values.join(" "),
-        if (withLocalValues && _snips != null)
-          "snips": _snips!.values.join(" "),
+          "messages": _messages!.join(" "),
+        if (withLocalValues && _snips != null) "snips": _snips!.join(" "),
         if (withLocalValues) "activity": _activity.toString(),
       };
 
-  const FireNode(
+  FireNode(
     super.id, {
     required int activity,
     required String name,
@@ -439,13 +366,13 @@ abstract class FireNode extends FireObject {
     String? description,
     Down4Keys? neuter,
     Id? media,
-    ISet<Id>? messages,
-    ISet<Id>? snips,
-    ISet<Id>? group,
-    ISet<Id>? nfts,
-    ISet<Id>? images,
-    ISet<Id>? videos,
-    ISet<Id>? children,
+    Set<Id>? messages,
+    Set<Id>? snips,
+    Set<Id>? group,
+    Set<Id>? nfts,
+    Set<Id>? images,
+    Set<Id>? videos,
+    Set<Id>? children,
   })  : _activity = activity,
         _name = name,
         _lastName = lastName,
@@ -462,8 +389,10 @@ abstract class FireNode extends FireObject {
         _videos = videos,
         _children = children;
 
-  void updateActivity([int? newActivity]) =>
-      super._merge({"activity": (newActivity ?? u.timeStamp()).toString()});
+  void updateActivity([int? newActivity]) {
+    _activity = newActivity ?? u.timeStamp();
+    _merge({"activity": _activity.toString()});
+  }
 
   static FireNode? fromJson(Map<String, String?> json) {
     final id = json["id"];
@@ -477,16 +406,16 @@ abstract class FireNode extends FireObject {
     final isHidden = json["isHidden"] == "true";
     final lastName = json["lastName"];
     final description = json["description"];
-    final children = json["children"]?.split(" ").toISet<Id>();
+    final children = json["children"]?.split(" ").toSet();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
-    final group = json["group"]?.split(" ").toISet<Id>();
-    final images = json["images"]?.split(" ").toISet<Id>();
-    final videos = json["videos"]?.split(" ").toISet<Id>();
-    final nfts = json["nfts"]?.split(" ").toISet<Id>();
-    final messages = json["messages"]?.split(" ").toISet<Id>();
-    final snips = json["snips"]?.split(" ").toISet<Id>();
+    final group = json["group"]?.split(" ").toSet();
+    final images = json["images"]?.split(" ").toSet();
+    final videos = json["videos"]?.split(" ").toSet();
+    final nfts = json["nfts"]?.split(" ").toSet();
+    final messages = json["messages"]?.split(" ").toSet();
+    final snips = json["snips"]?.split(" ").toSet();
 
     switch (type) {
       case Nodes.user:
@@ -563,34 +492,52 @@ abstract class FireNode extends FireObject {
 }
 
 mixin Branchable on FireNode {
-  ISet<Id> get children;
-
-  Future<void> addChildren(FireNode child) async {}
+  Iterable<Id> get children;
 }
 
 mixin Chatable on FireNode {
-  ISet<Id> get messages;
-  ISet<Id> get snips;
+  Iterable<Id> get messages;
+  Iterable<Id> get snips;
 
   Future<void> addMessage(FireMessage msg) async {
-    await msg._merge();
-    await _merge({
-      "messages": messages.values.followedBy([msg.id]).join(" ")
-    });
+    // message will be merged on fetch
+    _messages!.add(msg.id);
+    Map<String, String> merges = {};
+    merges["messages"] = _messages!.join(" ");
+    if (this is User) merges["isHidden"] = false.toString();
+    await _merge(merges);
   }
 
-  Future<void> removeMessage(Id msgID) async {
-    await db<FireMessage>().purgeDocumentById(msgID);
-    final ref = Set<Id>.from(messages.values);
-    final deletion = ref.remove(msgID);
-    if (!deletion) return;
-    await _merge({"messages": ref.join(" ")});
+  Future<void> removeMessage(FireMessage msg) async {
+    final n = this;
+    if (msg.media != null) {
+      final media = await local<FireMedia>(msg.media!);
+      await media?.removeReference(msg.id);
+    }
+    _messages!.remove(msg.id);
+    if (messages.isEmpty &&
+        snips.isEmpty &&
+        (n is Hyperchat || (n is User && !n.isFriend))) {
+      _delete();
+    } else {
+      await _merge({"messages": messages.join(" ")});
+    }
+
+    await msg._delete();
+  }
+
+  Future<void> addSnip(FireMedia snip) async {
+    _snips!.add(snip.id);
+    Map<String, String> merges = {};
+    merges["snips"] = snips.join(" ");
+    if (this is User) merges["isHidden"] = false.toString();
+    await _merge(merges);
   }
 
   Future<u.Pair<bool, String>> messagingPreview() async {
     final def = Future.value(const u.Pair(true, ""));
-    if (messages.values.isEmpty) def;
-    final lastMsgID = messages.values.last;
+    if (messages.isEmpty) def;
+    final lastMsgID = messages.last;
     final msg = await local<FireMessage>(lastMsgID);
     if (msg == null) return def;
     return u.Pair(msg.isRead, msg.text ?? "&attachment");
@@ -598,13 +545,13 @@ mixin Chatable on FireNode {
 }
 
 mixin Groupable on FireNode {
-  ISet<Id> get group;
+  Iterable<Id> get group;
   @override
-  String get displayID => group.values.map((id) => "@$id").join(" ");
+  String get displayID => group.map((id) => "@$id").join(" ");
 }
 
 mixin Personable on FireNode {
-  String get name;
+  String get firstName;
   String? get description;
   String? get lastName;
   Down4Keys get neuter;
@@ -613,31 +560,46 @@ mixin Personable on FireNode {
   String get displayID => "@$id";
 
   @override
-  String get displayName => name + ((lastName != null) ? " $lastName" : "");
+  String get displayName =>
+      firstName + ((lastName != null) ? " $lastName" : "");
 }
 
 mixin Editable on FireNode {
-  void editName(String newName) {
-    // TODO
+  Future<void> editName(String newName) async {
+    _name = newName;
+    await _merge({"name": _name});
   }
-  void editLastName(String? newLastName) {
-    // TODO
+
+  Future<void> editLastName(String? newLastName) async {
+    _lastName = newLastName;
+    await _merge({"lastName": _lastName ?? ""});
   }
-  void editImage(FireMedia newImage) {
-    // TODO
+
+  Future<void> editImage(FireMedia newImage) async {
+    await newImage.addReference(id);
+    if (media != null) {
+      await (await local<FireMedia>(media!))?.removeReference(id);
+    }
+    _media = newImage.id;
+    await _merge({"media": _media!});
+  }
+
+  Future<void> editDescription(String newDescription) async {
+    _description = newDescription;
+    await _merge({"description": _description!});
   }
 }
 
 class User extends FireNode with Branchable, Personable, Chatable {
-  const User(
+  User(
     super.id, {
     required super.activity,
     required super.name,
     required bool isHidden,
     required bool isFriend,
-    required ISet<Id> children,
-    required ISet<Id> messages,
-    required ISet<Id> snips,
+    required Set<Id> children,
+    required Set<Id> messages,
+    required Set<Id> snips,
     required super.description,
     required super.lastName,
     required super.media,
@@ -649,10 +611,22 @@ class User extends FireNode with Branchable, Personable, Chatable {
             messages: messages,
             snips: snips);
 
+  Future<void> updateFriendStatus(bool newFriendStatus) async {
+    _isFriend = newFriendStatus;
+    await _merge({"isFriend": _isFriend.toString()});
+  }
+
+  Future<void> updateHiddenStatus(bool newHiddenStatus) async {
+    _isHidden = newHiddenStatus;
+    await _merge({"isHidden": _isHidden.toString()});
+  }
+
+  bool get isHidden => _isHidden!;
+
   bool get isFriend => _isFriend!;
 
   @override
-  ISet<Id> get children => _children!;
+  Iterable<Id> get children => _children!;
 
   @override
   NodesColor get colorCode =>
@@ -668,32 +642,32 @@ class User extends FireNode with Branchable, Personable, Chatable {
   Id? get media => _media;
 
   @override
-  ISet<Id> get messages => _messages!;
+  Iterable<Id> get messages => _messages!;
 
   @override
-  String get name => _name;
+  String get firstName => _name;
 
   @override
   Down4Keys get neuter => _neuter!;
 
   @override
-  ISet<Id> get snips => _snips!;
+  Iterable<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.user;
 }
 
 class Self extends FireNode with Branchable, Personable, Chatable, Editable {
-  const Self(
+  Self(
     super.id, {
     required super.activity,
     required super.name,
     required super.description,
     required super.lastName,
     required Id media,
-    required ISet<Id> children,
-    required ISet<Id> messages,
-    required ISet<Id> snips,
+    required Set<Id> children,
+    required Set<Id> messages,
+    required Set<Id> snips,
   }) : super(
           media: media,
           children: children,
@@ -705,7 +679,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   NodesColor get colorCode => NodesColor.self;
 
   @override
-  ISet<Id> get children => _children!;
+  Iterable<Id> get children => _children!;
 
   @override
   String? get description => _description;
@@ -717,31 +691,39 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   Id get media => _media!;
 
   @override
-  ISet<Id> get messages => _messages!;
+  Iterable<Id> get messages => _messages!;
 
   @override
-  String get name => _name;
+  String get firstName => _name;
 
   @override
   Down4Keys get neuter => _neuter!;
 
   @override
-  ISet<Id> get snips => _snips!;
+  Iterable<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.self;
 }
 
 class Group extends FireNode with Groupable, Editable, Chatable {
-  const Group(
+  Group(
     super.id, {
     required super.activity,
     required super.name,
     required super.media,
-    required ISet<Id> messages,
-    required ISet<Id> snips,
-    required ISet<Id> group,
+    required Set<Id> messages,
+    required Set<Id> snips,
+    required Set<Id> group,
   }) : super(messages: messages, snips: snips, group: group);
+
+  Future<void> addMembers(Iterable<Personable> members) async {
+    final membersID = members.map((e) => e.id);
+    _group!.addAll(membersID);
+    final merges = members.map((e) => e._merge());
+    await Future.wait(merges);
+    await _merge({"group": group.join(" ")});
+  }
 
   @override
   NodesColor get colorCode => NodesColor.group;
@@ -750,31 +732,31 @@ class Group extends FireNode with Groupable, Editable, Chatable {
   String get displayName => _name;
 
   @override
-  ISet<Id> get group => _group!;
+  Iterable<Id> get group => _group!;
 
   @override
   Id? get media => _media;
 
   @override
-  ISet<Id> get messages => _messages!;
+  Iterable<Id> get messages => _messages!;
 
   @override
-  ISet<Id> get snips => _snips!;
+  Iterable<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.group;
 }
 
 class Hyperchat extends FireNode with Groupable, Chatable {
-  const Hyperchat(
+  Hyperchat(
     super.id, {
     required super.activity,
     required String firstWord,
     required String secondWord,
     required super.media,
-    required ISet<Id> messages,
-    required ISet<Id> snips,
-    required ISet<Id> group,
+    required Set<Id> messages,
+    required Set<Id> snips,
+    required Set<Id> group,
   }) : super(
             messages: messages,
             snips: snips,
@@ -789,16 +771,16 @@ class Hyperchat extends FireNode with Groupable, Chatable {
   String get displayName => "$_name $_lastName";
 
   @override
-  ISet<Id> get group => _group!;
+  Iterable<Id> get group => _group!;
 
   @override
   Id? get media => _media;
 
   @override
-  ISet<Id> get messages => _messages!;
+  Iterable<Id> get messages => _messages!;
 
   @override
-  ISet<Id> get snips => _snips!;
+  Iterable<Id> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.hyperchat;
@@ -842,76 +824,98 @@ class Payment extends FireNode {
 
 class FireMedia extends FireObject {
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
+  bool _isSaved;
   final Id owner;
-  final Id? onlineRef;
-  final String imageDigest;
-  final String? videoDigest;
+  final Id? onlineId;
   final String extension;
   final String mimetype;
   final double aspectRatio;
   final String? text;
   final int timestamp;
+  final Set<Id> _references;
 
   bool get isVideo => extension.isVideoExtension();
 
   Future<Uint8List?> get imageData async {
-    final blob = await _db().getBlob({"digest": imageDigest});
+    final blob = (await _db().document(id))?.blob("image");
     return blob?.content();
   }
 
   Future<Uint8List?> get videoData async {
-    if (videoDigest == null) return null;
-    final blob = await _db().getBlob({"digest": videoDigest!});
+    final blob = (await _db().document(id))?.blob("video");
     return blob?.content();
   }
 
   @override
   cbl.Database _db() => _mediasDB;
 
-  const FireMedia(
+  FireMedia(
     super.id, {
     required this.owner,
     required this.timestamp,
     required this.aspectRatio,
     required this.extension,
     required this.mimetype,
-    required this.imageDigest,
-    this.videoDigest,
-    this.onlineRef,
+    required Set<Id> references,
+    this.onlineId,
+    bool isSaved = false,
     this.isLocked = false,
     this.isPaidToView = false,
     this.isReversed = false,
     this.isPaidToOwn = false,
     this.isSquared = false,
     this.text,
-  });
+  })  : _references = references,
+        _isSaved = isSaved;
+
+  Future<void> updateSaveStatus(bool newSaveStatus) async {
+    _isSaved = newSaveStatus;
+    await _merge({"isSaved": _isSaved.toString()});
+  }
+
+  Future<void> addReference(Id reference) async {
+    _references.add(reference);
+    await _merge({"references": _references.join(" ")});
+  }
+
+  Future<void> removeReference(Id reference) async {
+    _references.remove(reference);
+    if (_references.isEmpty && !_isSaved) {
+      await _delete();
+    } else {
+      await _merge({"references": _references.join(" ")});
+    }
+  }
 
   Future<void> _write({Uint8List? videoData, Uint8List? imageData}) async {
     if (videoData == null && imageData == null) return;
+    final doc = (await _db().document(id))?.toMutable();
     if (isVideo) {
-      await _db().saveBlob(cbl.Blob.fromData(mimetype, videoData!));
+      final videoBlob = cbl.Blob.fromData(mimetype, videoData!);
+      doc?.setBlob(videoBlob, key: "video");
     }
     final imageMime = isVideo ? "image/png" : mimetype;
-    await _db().saveBlob(cbl.Blob.fromData(imageMime, imageData!));
+    final imageBlob = cbl.Blob.fromData(imageMime, imageData!);
+    doc?.setBlob(imageBlob, key: "image");
     return;
   }
 
   factory FireMedia.fromJson(Map<String, String?> decodedJson) {
     return FireMedia(
-      decodedJson["id"] as String,
-      owner: decodedJson["owner"] as String,
-      timestamp: int.parse(decodedJson["timestamp"] as String),
-      extension: decodedJson["extension"] as String,
-      mimetype: decodedJson["mimetype"] as String,
-      imageDigest: decodedJson["imageDigest"] as String,
-      videoDigest: decodedJson["videoDigest"],
-      onlineRef: decodedJson["onlineRef"],
+      decodedJson["id"]!,
+      owner: decodedJson["owner"]!,
+      timestamp: int.parse(decodedJson["timestamp"]!),
+      extension: decodedJson["extension"]!,
+      mimetype: decodedJson["mimetype"]!,
+      onlineId: decodedJson["onlineRef"]!,
+      references: decodedJson["references"]!.split(" ").toSet(),
+      isSaved: decodedJson["isSaved"] == "true",
       isReversed: decodedJson["isReversed"] == "true",
       isSquared: decodedJson["isSquared"] == "true",
       isLocked: decodedJson["isLocked"] == "true",
       isPaidToOwn: decodedJson["isPaidToView"] == "true",
       isPaidToView: decodedJson["isPaidToOwn"] == "true",
-      aspectRatio: double.tryParse(decodedJson["aspectRatio"] as String) ?? 1.0,
+      aspectRatio: double.tryParse(decodedJson["aspectRatio"]!) ?? 1.0,
       text: decodedJson["text"],
     );
   }
@@ -922,16 +926,16 @@ class FireMedia extends FireObject {
         "timestamp": timestamp.toString(),
         "extension": extension,
         "mimetype": mimetype,
-        "imageDigest": imageDigest,
-        if (videoDigest != null) "videoDigest": videoDigest!,
-        if (onlineRef != null) "onlineRef": onlineRef!,
+        if (onlineId != null) "onlineRef": onlineId!,
+        if (text != null) "text": text!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
         "isLocked": isLocked.toString(),
         "isPaidToView": isPaidToView.toString(),
         "isPaidToOwn": isPaidToOwn.toString(),
         "aspectRatio": aspectRatio.toString(),
-        if (text != null) "text": text!,
+        if (withLocalValues) "references": _references.join(" "),
+        if (withLocalValues) "isSaved": _isSaved.toString(),
       };
 }
 
