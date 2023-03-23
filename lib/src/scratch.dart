@@ -5,12 +5,19 @@ import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:math' as math;
 
+class Jeff {
+  int i = 0;
+}
+
+Future<void> modifyJeff(Jeff jeff) async {
+  jeff.i = 1;
+  await Future(() {
+    jeff.i = 2;
+  });
+}
+
 void main() async {
-  final jeff = Iterable.generate(10, (i) => Future.value(i));
-
-  final caca = await Future.wait(jeff);
-
-  print(caca);
-
-  return;
+  var jeff = Jeff();
+  modifyJeff(jeff);
+  print(jeff.i);
 }

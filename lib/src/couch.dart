@@ -32,6 +32,11 @@ late cbl.AsyncDatabase _nodesDB,
     _paymentsDB,
     _billsDB;
 
+final isHiddenNodeIndexConfig = cbl.ValueIndexConfiguration(["isHidden"]);
+final lastUseMediaIndexConfig = cbl.ValueIndexConfiguration(["lastUse"]);
+final isSavedMediaIndexConfig = cbl.ValueIndexConfiguration(["isSaved"]);
+final isVideoMediaIndexConfig = cbl.ValueIndexConfiguration(["isVideo"]);
+
 typedef Id = String;
 
 Future<T?> fetch<T extends FireObject>(
@@ -55,7 +60,7 @@ Future<T?> fetch<T extends FireObject>(
     final snapshot = await _realtime.child("Message").child(id).get();
     if (!snapshot.exists) return null;
     final json = Map<String, String?>.from(snapshot.value as Map);
-    final message = FireMessage.fromJson(json)!;
+    final message = FireMessage.fromJson(json);
     if (merge) message._merge();
     return message;
   }
@@ -189,9 +194,8 @@ abstract class FireObject {
 }
 
 class FireMessage extends FireObject {
-  final Id root;
   final Id sender;
-  final Id? media;
+  final Id? media, onlineMedia;
   final String? text;
   final Set<Id>? replies, nodes;
   final String? forwarderID;
@@ -200,10 +204,10 @@ class FireMessage extends FireObject {
 
   const FireMessage(
     super.id, {
-    required this.root,
     required this.sender,
     required this.timestamp,
     this.media,
+    this.onlineMedia,
     this.forwarderID,
     this.text,
     this.nodes,
@@ -212,14 +216,14 @@ class FireMessage extends FireObject {
     this.isSent = false,
   });
 
-  static FireMessage? fromJson(Map<String, String?> decodedJson) {
+  factory FireMessage.fromJson(Map<String, String?> decodedJson) {
     return FireMessage(
       decodedJson["id"] as Id,
-      root: decodedJson["root"] as Id,
       sender: decodedJson["sender"] as Id,
       forwarderID: decodedJson["forwarderID"],
       text: decodedJson["text"],
       media: decodedJson["media"],
+      onlineMedia: decodedJson["onlineMedia"],
       timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
       isRead: decodedJson["isRead"] == "true",
       isSent: decodedJson["isSent"] == "true",
@@ -232,10 +236,10 @@ class FireMessage extends FireObject {
   Map<String, String> toJson({bool withLocalValues = false}) => {
         'id': id,
         if (text != null) 'text': text!,
-        'root': root,
         'sender': sender,
         'timestamp': timestamp.toString(),
         if (media != null) 'media': media!,
+        if (onlineMedia != null) 'onlineMedia': onlineMedia!,
         if (withLocalValues) 'isRead': isRead.toString(),
         if (withLocalValues) 'isSent': isSent.toString(),
         if (forwarderID != null) 'forwarderID': forwarderID!,
@@ -245,34 +249,6 @@ class FireMessage extends FireObject {
 
   @override
   cbl.Database _db() => _messagesDB;
-
-  // @override
-  // Future<FireObject?> _fetch({required bool withMerge}) {
-  //       final snapshot = await _realtime.child("Message").child(id).get();
-  //       if (!snapshot.exists) return null;
-  //       final json = Map<String, String?>.from(snapshot.value as Map);
-  //       final message = FireMessage.fromJson(json) as T;
-  //       if (withMerge) message._merge<T>();
-  //       return message;
-  // }
-
-  @override
-  Future<bool> _isLocal() {
-    // TODO: implement _isLocal
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<FireObject?> _local() {
-    // TODO: implement _local
-    throw UnimplementedError();
-  }
-
-  @override
-  Future<FireObject?> get({bool mergeIfOnline = false}) {
-    // TODO: implement get
-    throw UnimplementedError();
-  }
 }
 
 enum Nodes {
@@ -318,9 +294,9 @@ abstract class FireNode extends FireObject {
   final Set<Id>? _messages;
   final Set<Id>? _snips;
   final Set<Id>? _group;
-  final Set<Id>? _nfts;
-  final Set<Id>? _images;
-  final Set<Id>? _videos;
+  // final Set<Id>? _nfts;
+  // final Set<Id>? _images;
+  // final Set<Id>? _videos;
   final Set<Id>? _children;
 
   @override
@@ -347,9 +323,9 @@ abstract class FireNode extends FireObject {
         if (_children != null) "children": _children!.join(" "),
         if (_neuter != null) "neuter": _neuter!.toYouKnow(),
         if (_group != null) "group": _group!.join(" "),
-        if (withLocalValues && _images != null) "images": _images!.join(" "),
-        if (withLocalValues && _videos != null) "videos": _videos!.join(" "),
-        if (withLocalValues && _nfts != null) "nfts": _nfts!.join(" "),
+        // if (withLocalValues && _images != null) "images": _images!.join(" "),
+        // if (withLocalValues && _videos != null) "videos": _videos!.join(" "),
+        // if (withLocalValues && _nfts != null) "nfts": _nfts!.join(" "),
         if (withLocalValues && _messages != null)
           "messages": _messages!.join(" "),
         if (withLocalValues && _snips != null) "snips": _snips!.join(" "),
@@ -384,9 +360,9 @@ abstract class FireNode extends FireObject {
         _messages = messages,
         _snips = snips,
         _group = group,
-        _nfts = nfts,
-        _images = images,
-        _videos = videos,
+        // _nfts = nfts,
+        // _images = images,
+        // _videos = videos,
         _children = children;
 
   void updateActivity([int? newActivity]) {
@@ -411,9 +387,9 @@ abstract class FireNode extends FireObject {
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
     final group = json["group"]?.split(" ").toSet();
-    final images = json["images"]?.split(" ").toSet();
-    final videos = json["videos"]?.split(" ").toSet();
-    final nfts = json["nfts"]?.split(" ").toSet();
+    // final images = json["images"]?.split(" ").toSet();
+    // final videos = json["videos"]?.split(" ").toSet();
+    // final nfts = json["nfts"]?.split(" ").toSet();
     final messages = json["messages"]?.split(" ").toSet();
     final snips = json["snips"]?.split(" ").toSet();
 
@@ -826,7 +802,9 @@ class FireMedia extends FireObject {
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
   bool _isSaved;
   final Id owner;
-  final Id? onlineId;
+  Id? _onlineId;
+  int _onlineTimestamp;
+  int _lastUse;
   final String extension;
   final String mimetype;
   final double aspectRatio;
@@ -849,6 +827,10 @@ class FireMedia extends FireObject {
   @override
   cbl.Database _db() => _mediasDB;
 
+  int get onlineTimestamp => _onlineTimestamp;
+
+  String? get onlineId => _onlineId;
+
   FireMedia(
     super.id, {
     required this.owner,
@@ -857,7 +839,9 @@ class FireMedia extends FireObject {
     required this.extension,
     required this.mimetype,
     required Set<Id> references,
-    this.onlineId,
+    int onlineTimestamp = 0,
+    int lastUse = 0,
+    Id? onlineId,
     bool isSaved = false,
     this.isLocked = false,
     this.isPaidToView = false,
@@ -866,11 +850,29 @@ class FireMedia extends FireObject {
     this.isSquared = false,
     this.text,
   })  : _references = references,
-        _isSaved = isSaved;
+        _lastUse = lastUse,
+        _isSaved = isSaved,
+        _onlineId = onlineId,
+        _onlineTimestamp = onlineTimestamp;
+
+  Future<void> use() async {
+    _lastUse = u.timeStamp();
+    await _merge({"lastUse": _lastUse.toString()});
+  }
 
   Future<void> updateSaveStatus(bool newSaveStatus) async {
     _isSaved = newSaveStatus;
     await _merge({"isSaved": _isSaved.toString()});
+  }
+
+  Future<void> updateOnlineReference(Id newOnlineId, int newStamp) async {
+    if (newStamp < onlineTimestamp) return;
+    _onlineId = newOnlineId;
+    _onlineTimestamp = newStamp;
+    await _merge({
+      "onlineTimestamp": _onlineTimestamp.toString(),
+      "onlineId": newOnlineId,
+    });
   }
 
   Future<void> addReference(Id reference) async {
@@ -908,6 +910,8 @@ class FireMedia extends FireObject {
       extension: decodedJson["extension"]!,
       mimetype: decodedJson["mimetype"]!,
       onlineId: decodedJson["onlineRef"]!,
+      lastUse: int.parse(decodedJson["lastUse"]!),
+      onlineTimestamp: int.parse(decodedJson["onlineTimestamp"]!),
       references: decodedJson["references"]!.split(" ").toSet(),
       isSaved: decodedJson["isSaved"] == "true",
       isReversed: decodedJson["isReversed"] == "true",
@@ -927,6 +931,7 @@ class FireMedia extends FireObject {
         "extension": extension,
         "mimetype": mimetype,
         if (onlineId != null) "onlineRef": onlineId!,
+        "onlineTimestamp": onlineTimestamp.toString(),
         if (text != null) "text": text!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
@@ -934,6 +939,7 @@ class FireMedia extends FireObject {
         "isPaidToView": isPaidToView.toString(),
         "isPaidToOwn": isPaidToOwn.toString(),
         "aspectRatio": aspectRatio.toString(),
+        if (withLocalValues) "isVideo": isVideo.toString(), // for index
         if (withLocalValues) "references": _references.join(" "),
         if (withLocalValues) "isSaved": _isSaved.toString(),
       };
