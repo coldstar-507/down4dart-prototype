@@ -261,7 +261,9 @@ class _ChatPageState extends State<ChatPage> {
               tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
             }
             vpc?.dispose();
+            final tiny = resizeImage(isVideo ? tn! : data, 20, 20);
             final newMedia = FireMedia(mediaID,
+                tinyThumbnail: base64Encode(tiny),
                 mimetype: mimetype!,
                 owner: g.self.id,
                 timestamp: u.timeStamp(),

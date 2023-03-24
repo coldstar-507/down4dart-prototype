@@ -220,8 +220,10 @@ class _HyperchatPageState extends State<HyperchatPage> {
               tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
             }
             vpc?.dispose();
+            final tiny = resizeImage(isVideo ? tn! : data, 20, 20);
             final newMedia = FireMedia(mediaID,
                 mimetype: mimetype!,
+                tinyThumbnail: base64Encode(tiny),
                 owner: g.self.id,
                 timestamp: u.timeStamp(),
                 aspectRatio: ctrl!.value.aspectRatio,
