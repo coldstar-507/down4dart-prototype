@@ -27,7 +27,7 @@ class ChatReplyInfo {
 }
 
 class ChatMediaInfo {
-  final MessageMedia media;
+  final FireMedia media;
   final Size precalculatedMediaSize;
   final VideoPlayerController? videoController;
   const ChatMediaInfo({
@@ -58,13 +58,13 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   final ID nodeRef;
   final bool myMessage, selected, isPost;
   final void Function(ID id)? select;
-  final Message message;
+  final FireMessage message;
   final bool hasGap, hasHeader;
-  final void Function(BaseNode)? openNode;
+  final void Function(FireNode)? openNode;
 
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
-  final List<BaseNode>? nodes;
+  final List<FireNode>? nodes;
 
   const ChatMessage({
     required this.nodeRef,
@@ -82,7 +82,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     Key? key,
   }) : super(key: key);
 
-  ChatMessage withOpenNode({required void Function(BaseNode)? open}) {
+  ChatMessage withOpenNode({required void Function(FireNode)? open}) {
     return ChatMessage(
         message: message,
         repliesInfo: repliesInfo,
@@ -115,7 +115,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage reloaded(Message msg) {
+  ChatMessage reloaded(FireMessage msg) {
     return ChatMessage(
       message: msg,
       isPost: isPost,
@@ -132,7 +132,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage withNodes(List<BaseNode>? pNodes) {
+  ChatMessage withNodes(List<FireNode>? pNodes) {
     return ChatMessage(
         message: message,
         repliesInfo: repliesInfo,
@@ -221,7 +221,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   bool get hasPalettes => (nodes ?? []).isNotEmpty;
 
-  static String timeString(Message message) {
+  static String timeString(FireMessage message) {
     final ts = DateTime.fromMillisecondsSinceEpoch(message.timestamp).toLocal();
     final now = DateTime.now().toLocal();
     String timeStr;
@@ -250,16 +250,15 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     }
   }
 
-  static Future<ChatMediaInfo?> generateMediaInfo(Message message) async {
-    if (message.mediaID == null) return null;
+  static Future<ChatMediaInfo?> generateMediaInfo(FireMessage message) async {
+    if (message.media == null) return null;
     // print("GENERATING MEDIA INFO");
     double mediaHeight = 0;
     double mediaWidth = 0;
-    MessageMedia? media = await message.mediaID!.getLocalMessageMedia();
+    FireMedia? media = await local<FireMedia>(message.media!);
     if (media == null) return null;
     mediaWidth = ChatMessage.maxMessageWidth - ChatMessage.messageBorder;
-    mediaHeight = mediaWidth *
-        (media.metadata.isSquared ? 1.0 : media.metadata.elementAspectRatio);
+    mediaHeight = mediaWidth * (media.isSquared ? 1.0 : media.aspectRatio);
 
     VideoPlayerController? vpc;
     if (media.isVideo) {
@@ -273,18 +272,18 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   static Future<List<ChatReplyInfo>?> generateRepliesInfo(
-      Message message, void Function(String) goToReply) async {
+      FireMessage message, void Function(String) goToReply) async {
     if (message.replies == null) return null;
     List<ChatReplyInfo> chatReplies = [];
     for (final replyID in message.replies!) {
-      final reply = await replyID.getLocalMessage();
+      final reply = await local<FireMessage>(replyID);
       if (reply == null) continue;
       final String replyBody =
           reply.text?.isNotEmpty ?? false ? reply.text! : "&attachment";
 
       final info = ChatReplyInfo(
           onPressReply: () => goToReply.call(replyID),
-          senderID: reply.senderID,
+          senderID: reply.sender,
           messageRefID: reply.id,
           body: replyBody);
 
@@ -311,7 +310,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     //     .toList(growable: false);
   }
 
-  static bool displayGap(Message msg, Message prevMsg) {
+  static bool displayGap(FireMessage msg, FireMessage prevMsg) {
     final prevMsgTS = DateTime.fromMillisecondsSinceEpoch(prevMsg.timestamp);
     final curMsgTS = DateTime.fromMillisecondsSinceEpoch(msg.timestamp);
     if (curMsgTS.difference(prevMsgTS).inMinutes > 20) {
@@ -387,7 +386,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         child: Row(children: [
           const Spacer(),
           Text(
-            "-${message.senderID}   ",
+            "-${message.sender}   ",
             style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
           ),
         ]));
@@ -406,7 +405,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   Widget? get messagePalettes {
-    if (!hasPalettes && (message.nodes ?? []).isEmpty) return null;
+    if (!hasPalettes && (message.nodes ?? {}).isEmpty) return null;
     double mpHeight() => Palette.paletteHeight / golden;
     Widget unloadedPalette(ID id) {
       return Container(
@@ -426,7 +425,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       );
     }
 
-    Widget loadedPalette(BaseNode node) {
+    Widget loadedPalette(FireNode node) {
       Widget nodeImage() {
         return SizedBox.square(
           dimension: mpHeight(),
@@ -446,7 +445,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 6.0, left: 6.0),
-                    child: Text(node.name,
+                    child: Text(node.displayName,
                         maxLines: 1, textAlign: TextAlign.start))),
             GestureDetector(
                 onTap: () => openNode?.call(node),
@@ -608,10 +607,10 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     if (nodeRef == g.self.id) {
       // saved message are always sent
       return 1;
-    } else if (message.senderID != g.self.id) {
+    } else if (message.sender != g.self.id) {
       // if the sender is not us, it's always sent (received)
       return 1;
-    } else if (message.sent(nodeRef)) {
+    } else if (message.isSent) {
       // else we check the sent status
       return 1;
     } else {

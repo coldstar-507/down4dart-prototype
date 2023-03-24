@@ -80,7 +80,7 @@ class Wallet {
   }
 
   Future<Down4Payment?> payPeople({
-    required List<Person> people,
+    required List<Personable> people,
     required ID selfID,
     required Sats amount,
     String textNote = "",

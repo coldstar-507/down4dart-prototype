@@ -16,9 +16,9 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "forward";
   final List<Down4Object> fObjects;
   final void Function() back;
-  final void Function(List<Down4Object>, ChatableNode) openNode;
+  final void Function(List<Down4Object>, Chatable) openNode;
   final void Function(List<Down4Object>, Transition) hyper;
-  final Future<void> Function(Payload, List<ChatableNode>) forward;
+  final Future<void> Function(Payload, List<Chatable>) forward;
 
   const ForwardingPage({
     // required this.homePalettes,
@@ -75,7 +75,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
       showImages: showImages,
       onSelect: (media) => widget.forward(
           Payload(f: widget.fObjects, t: _tec.value.text, m: media, r: null),
-          _fList.selected().asNodes<ChatableNode>().toList()),
+          _fList.selected().asNodes<Chatable>().toList()),
     );
   }
 
@@ -95,7 +95,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
         showImages: images,
         onSelect: (media) => widget.forward(
           Payload(f: fo, t: _tec.value.text, m: media, r: null),
-          _fList.selected().asNodes<ChatableNode>().toList(),
+          _fList.selected().asNodes<Chatable>().toList(),
         ),
       ),
       forwardingObjects: fo,
@@ -124,7 +124,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
               ? loadForwardingConsole(extra: !extra)
               : widget.forward(
                   Payload(r: null, f: fo, t: _tec.value.text, m: null),
-                  _fList.selected().asNodes<ChatableNode>().toList()),
+                  _fList.selected().asNodes<Chatable>().toList()),
           isSpecial: true,
           showExtra: extra,
           extraButtons: [

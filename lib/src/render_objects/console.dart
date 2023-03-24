@@ -262,7 +262,7 @@ class ConsoleInput extends StatelessWidget {
 }
 
 class ConsoleMedias2 {
-  final void Function(MessageMedia) onSelect;
+  final void Function(FireMedia) onSelect;
   final bool showImages;
   ConsoleMedias2({required this.showImages, required this.onSelect});
 }
@@ -431,7 +431,7 @@ class Console extends StatelessWidget {
   static int nMedias(bool images) =>
       images ? g.self.images.length : g.self.videos.length;
 
-  static Stream<MessageMedia> medias(bool images) async* {
+  static Stream<FireMedia> medias(bool images) async* {
     final ids = List<ID>.from(images ? g.self.images : g.self.videos);
     for (final mediaID in ids) {
       if (g.cachedConsoleMedias[mediaID] != null) {

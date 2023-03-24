@@ -227,7 +227,7 @@ class _MoneyPageState extends State<MoneyPage> {
 
   Map<ID, Palette2> get _users => g.vm.cv.pages[0].objects.cast();
 
-  List<Person> get people => _users.values.asNodes<Person>().toList();
+  List<Personable> get people => _users.values.asNodes<Personable>().toList();
 
   @override
   void initState() {

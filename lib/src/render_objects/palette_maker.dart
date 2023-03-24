@@ -228,7 +228,7 @@ class PaletteMaker extends StatelessWidget {
   final void Function() imagePress;
   final String name, id;
   final String hintText;
-  final NodeMedia? image;
+  final FireMedia? image;
   final void Function(ID)? go;
   final NodesColor colorCode;
   final Nodes type;

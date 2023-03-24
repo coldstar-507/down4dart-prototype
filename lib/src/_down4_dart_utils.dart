@@ -157,19 +157,19 @@ String randomMediaID() {
 
 int timeStamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
-extension IterableNodes on Iterable<BaseNode> {
-  List<BaseNode> formatted() =>
+extension IterableNodes on Iterable<FireNode> {
+  List<FireNode> formatted() =>
       toList(growable: false)..sort((a, b) => b.activity.compareTo(a.activity));
   Iterable<String> asIds() => map((node) => node.id);
-  Iterable<BaseNode> those(List<ID> ids) =>
+  Iterable<FireNode> those(List<ID> ids) =>
       where((node) => ids.contains(node.id));
-  Iterable<GroupNode> groups() => whereType<GroupNode>();
+  Iterable<Groupable> groups() => whereType<Groupable>();
   Iterable<User> users() => whereType<User>();
 }
 
-extension IsTypes on BaseNode {
-  bool get isFriendOrGroup => isFriendUser || this is GroupNode;
-  bool get isUserOrGroup => this is User || this is GroupNode;
+extension IsTypes on FireNode {
+  bool get isFriendOrGroup => isFriendUser || this is Groupable;
+  bool get isUserOrGroup => this is User || this is Groupable;
   bool get isFriendUser => this is User ? (this as User).isFriend : false;
   bool get isPublicGroup => this is Group ? !(this as Group).isPrivate : false;
 }

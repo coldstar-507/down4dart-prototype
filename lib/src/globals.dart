@@ -38,238 +38,239 @@ Future<bool> uploadPayment(Down4Payment pay) async {
   }
 }
 
-Future<bool> uploadNode(BaseNode node) async {
-  Future<bool> uploadImage() async {
-    final media = node.media;
-    if (media == null) return true;
-    try {
-      await _st_node.ref(media.id).putData(media.data,
-          SettableMetadata(customMetadata: media.metadata.toJson()));
-      return true;
-    } catch (e) {
-      print("Error uploading node image: $e");
-      return false;
-    }
-  }
+// Future<bool> uploadNode(FireNode node) async {
+//   Future<bool> uploadImage() async {
+//     final media = node.media;
+//     if (media == null) return true;
+//     try {
+//       await _st_node.ref(media.id).putData(media.data,
+//           SettableMetadata(customMetadata: media.metadata.toJson()));
+//       return true;
+//     } catch (e) {
+//       print("Error uploading node image: $e");
+//       return false;
+//     }
+//   }
 
-  Future<bool> uploadNode() async {
-    final body = node.toJson(toLocal: false);
-    try {
-      await _fs.collection("Nodes").doc(node.id).set(body);
-      return true;
-    } catch (e) {
-      print("Failure uploading node: $e");
-      return false;
-    }
-  }
+//   Future<bool> uploadNode() async {
+//     final body = node.toJson(toLocal: false);
+//     try {
+//       await _fs.collection("Nodes").doc(node.id).set(body);
+//       return true;
+//     } catch (e) {
+//       print("Failure uploading node: $e");
+//       return false;
+//     }
+//   }
 
-  List<Future<bool>> successes = [uploadImage(), uploadNode()];
+//   List<Future<bool>> successes = [uploadImage(), uploadNode()];
 
-  final success = Future.wait(successes).then((s) => s.every((e) => e));
-  return success;
-}
+//   final success = Future.wait(successes).then((s) => s.every((e) => e));
+//   return success;
+// }
 
-String _mediaPath(String mediaID, {bool isThumbnail = false}) =>
-    "${g.boxes.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
+// String _mediaPath(String mediaID, {bool isThumbnail = false}) =>
+//     "${g.boxes.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
 
-Future<void> _deleteMediaFile(String path) async {
-  try {
-    await File(path).delete();
-  } on PathNotFoundException catch (e) {
-    print("Cannot delete, this file is external: $e");
-  } catch (e) {
-    print("Cannot delete this file for this reason: $e");
-  }
-}
+// Future<void> _deleteMediaFile(String path) async {
+//   try {
+//     await File(path).delete();
+//   } on PathNotFoundException catch (e) {
+//     print("Cannot delete, this file is external: $e");
+//   } catch (e) {
+//     print("Cannot delete this file for this reason: $e");
+//   }
+// }
 
 String messagePushId() => db.child("Messages").push().key!;
 
-Future<NodeMedia?> downloadMessageMediaAsNodeMedia(ID mediaID) async {
-  final ref = _st.ref(mediaID);
-  try {
-    final md = await ref.getMetadata();
-    final data = await ref.getData();
-    if (data == null) return null;
-    final d4md = MediaMetadata.fromJson(md.customMetadata!);
-    return NodeMedia(data: data, id: mediaID, metadata: d4md);
-  } catch (e) {
-    print("Error downloading media: $e");
-    return null;
-  }
-}
+// Future<FireMedia?> downloadMessageMediaAsNodeMedia(ID mediaID) async {
+//   final ref = _st.ref(mediaID);
+//   try {
+//     final md = await ref.getMetadata();
+//     final data = await ref.getData();
+//     if (data == null) return null;
+//     final d4md = MediaMetadata.fromJson(md.customMetadata!);
+//     return FireMedia(data: data, id: mediaID, metadata: d4md);
+//   } catch (e) {
+//     print("Error downloading media: $e");
+//     return null;
+//   }
+// }
 
-Future<Message?> downloadMessage(ID msgID) async {
-  final s = await db.child("Messages").child(msgID).get();
-  if (!s.exists) return null;
-  print("MESSAGE VALUE = ${s.value}");
-  final json = Map<String, dynamic>.from(s.value as Map);
-  return Message.fromJson(json);
-}
+// Future<FireMessage?> downloadMessage(ID msgID) async {
+//   final s = await db.child("Messages").child(msgID).get();
+//   if (!s.exists) return null;
+//   print("MESSAGE VALUE = ${s.value}");
+//   final json = Map<String, dynamic>.from(s.value as Map);
+//   return FireMessage.fromJson(json);
+// }
 
-Future<Down4Payment?> downloadPayment(ID paymentID) async {
-  final payRef = _st.ref(paymentID);
-  try {
-    final compressed = await payRef.getData();
-    if (compressed == null) {
-      print("Error, no data at payment id: $paymentID");
-      return null;
-    }
-    print("Success downloading payment id: $paymentID");
-    return Down4Payment.fromCompressed(compressed);
-  } catch (e) {
-    print("Error downloading payment id: $paymentID, err: $e");
-    return null;
-  }
-}
+// Future<Down4Payment?> downloadPayment(ID paymentID) async {
+//   final payRef = _st.ref(paymentID);
+//   try {
+//     final compressed = await payRef.getData();
+//     if (compressed == null) {
+//       print("Error, no data at payment id: $paymentID");
+//       return null;
+//     }
+//     print("Success downloading payment id: $paymentID");
+//     return Down4Payment.fromCompressed(compressed);
+//   } catch (e) {
+//     print("Error downloading payment id: $paymentID, err: $e");
+//     return null;
+//   }
+// }
 
-Future<MessageMedia?> downloadAndWriteMedia(
-  String mediaID, {
-  bool isNodeMedia = false,
-}) async {
-  final mediaRef = isNodeMedia ? _st_node.ref(mediaID) : _st.ref(mediaID);
-  try {
-    final futureMediaData = mediaRef.getData(31457280); // 30mib
-    final fullMetadata = await mediaRef.getMetadata();
-    final customMetadata = fullMetadata.customMetadata as Map<String, String>;
-    final mediaMetadata = MediaMetadata.fromJson(customMetadata);
-    final path = "${g.boxes.docPath}/$mediaID";
-    final mediaData = await futureMediaData;
-    if (mediaData != null) {
-      await File(path).writeAsBytes(mediaData);
-    }
-    return MessageMedia(id: mediaID, path: path, metadata: mediaMetadata);
-  } catch (e) {
-    print("Error downloading mediaID: $mediaID, isNode: $isNodeMedia\n$e");
-    return null;
-  }
-}
+// Future<FireMedia?> downloadAndWriteMedia(
+//   String mediaID, {
+//   bool isNodeMedia = false,
+// }) async {
+//   final mediaRef = isNodeMedia ? _st_node.ref(mediaID) : _st.ref(mediaID);
+//   try {
+//     final futureMediaData = mediaRef.getData(31457280); // 30mib
+//     final fullMetadata = await mediaRef.getMetadata();
+//     final customMetadata = fullMetadata.customMetadata as Map<String, String>;
+//     final mediaMetadata = MediaMetadata.fromJson(customMetadata);
+//     final path = "${g.boxes.docPath}/$mediaID";
+//     final mediaData = await futureMediaData;
+//     if (mediaData != null) {
+//       await File(path).writeAsBytes(mediaData);
+//     }
+//     return FireMedia(id: mediaID, path: path, metadata: mediaMetadata);
+//   } catch (e) {
+//     print("Error downloading mediaID: $mediaID, isNode: $isNodeMedia\n$e");
+//     return null;
+//   }
+// }
 
-Future<bool> uploadHyperchatMedia(NodeMedia media) async {
-  var mediaRef = _st.ref(media.id);
-  try {
-    await mediaRef.putData(
-        media.data, SettableMetadata(customMetadata: media.metadata.toJson()));
-    return true;
-  } catch (e) {
-    print("Error uploading temporary node media: $e");
-    return false;
-  }
-}
+// Future<bool> uploadHyperchatMedia(FireMedia media) async {
+//   if (!media.onlineTimestamp.shouldBeUpdated) return true;
+//   var mediaRef = _st.ref(media.id);
+//   try {
+//     await mediaRef.putData(
+//         media.data, SettableMetadata(customMetadata: media.metadata.toJson()));
+//     return true;
+//   } catch (e) {
+//     print("Error uploading temporary node media: $e");
+//     return false;
+//   }
+// }
 
-Future<bool> uploadMedia(MessageMedia media) async {
-  if (media.file == null) {
-    print("Error, media id: ${media.id} doesn't have a file");
-    return false;
-  }
-  final mediaRef = _st.ref(media.id);
-  if (media.metadata.canSkipCheck) {
-    media.metadata.canSkipCheck = false;
-    await media.save();
-    try {
-      await mediaRef.putFile(
-        media.file!,
-        SettableMetadata(customMetadata: media.metadata.toJson()),
-      );
-      print("Success uploading the media id: ${media.id}");
-      return true;
-    } on FirebaseException catch (e) {
-      print("Error uploading media id: ${media.id}, err: $e");
-      return false;
-    }
-  } else {
-    try {
-      final metadata = (await mediaRef.getMetadata());
-      final down4Metadata = MediaMetadata.fromJson(metadata.customMetadata!);
-      if (down4Metadata.timestamp.shouldBeUpdated) {
-        final newTimeStamp = timeStamp();
-        if (newTimeStamp > down4Metadata.timestamp) {
-          down4Metadata.timestamp = newTimeStamp;
-          await mediaRef.updateMetadata(
-            SettableMetadata(customMetadata: down4Metadata.toJson()),
-          );
-        }
-        print("Success updating media metadata id: ${media.id}");
-        return true;
-      }
-      print("Success, no need to update the media id: ${media.id} metadata");
-      return true;
-    } catch (e) {
-      // TODO, find the actual exception we are looking for, docs aren't clear
-      // If there's an exception, it should mean that there is no media, so we
-      // do the full upload
-      try {
-        media.metadata.timestamp = timeStamp();
-        await mediaRef.putFile(media.file!,
-            SettableMetadata(customMetadata: media.metadata.toJson()));
-        print("Success uploading media id: ${media.id} after check failed");
-        return true;
-      } on FirebaseException catch (e) {
-        print("Error uploading media id: ${media.id}, err: $e");
-        return false;
-      }
-    }
-  }
-}
+// Future<bool> uploadMedia(FireMedia media) async {
+//   if (media.file == null) {
+//     print("Error, media id: ${media.id} doesn't have a file");
+//     return false;
+//   }
+//   final mediaRef = _st.ref(media.id);
+//   if (media.metadata.canSkipCheck) {
+//     media.metadata.canSkipCheck = false;
+//     await media.save();
+//     try {
+//       await mediaRef.putFile(
+//         media.file!,
+//         SettableMetadata(customMetadata: media.metadata.toJson()),
+//       );
+//       print("Success uploading the media id: ${media.id}");
+//       return true;
+//     } on FirebaseException catch (e) {
+//       print("Error uploading media id: ${media.id}, err: $e");
+//       return false;
+//     }
+//   } else {
+//     try {
+//       final metadata = (await mediaRef.getMetadata());
+//       final down4Metadata = MediaMetadata.fromJson(metadata.customMetadata!);
+//       if (down4Metadata.timestamp.shouldBeUpdated) {
+//         final newTimeStamp = timeStamp();
+//         if (newTimeStamp > down4Metadata.timestamp) {
+//           down4Metadata.timestamp = newTimeStamp;
+//           await mediaRef.updateMetadata(
+//             SettableMetadata(customMetadata: down4Metadata.toJson()),
+//           );
+//         }
+//         print("Success updating media metadata id: ${media.id}");
+//         return true;
+//       }
+//       print("Success, no need to update the media id: ${media.id} metadata");
+//       return true;
+//     } catch (e) {
+//       // TODO, find the actual exception we are looking for, docs aren't clear
+//       // If there's an exception, it should mean that there is no media, so we
+//       // do the full upload
+//       try {
+//         media.metadata.timestamp = timeStamp();
+//         await mediaRef.putFile(media.file!,
+//             SettableMetadata(customMetadata: media.metadata.toJson()));
+//         print("Success uploading media id: ${media.id} after check failed");
+//         return true;
+//       } on FirebaseException catch (e) {
+//         print("Error uploading media id: ${media.id}, err: $e");
+//         return false;
+//       }
+//     }
+//   }
+// }
 
-Future<bool> uploadMessage(Message msg, {required bool skipCheck}) async {
-  final msgRef = db.child("Messages").child(msg.id);
-  if (skipCheck) {
-    try {
-      await msgRef.set(msg.toJson());
-      print("Success uploading message id: ${msg.id}");
-      return true;
-    } catch (e) {
-      print("Error uploading message id: ${msg.id}, error: $e");
-      return false;
-    }
-  } else if (msg.timestamp.shouldBeUpdated) {
-    try {
-      final tsRef = msgRef.child("ts");
-      final newTs = timeStamp();
-      final currentTs = await tsRef.get();
-      if (!currentTs.exists) {
-        msg.timestamp = newTs;
-        return uploadMessage(msg, skipCheck: true);
-      } else {
-        final ts = currentTs.value as int;
-        if (newTs > ts) await tsRef.set(newTs);
-        print("Success updating the timestamp of message id: ${msg.id}");
-        return true;
-      }
-    } catch (e) {
-      print("Error updating message id: ${msg.id}, error: $e");
-      return false;
-    }
-  } else {
-    print("Success, message id: ${msg.id} doesn't need to be updated");
-    return true;
-  }
-}
+// Future<bool> uploadMessage(FireMessage msg, {required bool skipCheck}) async {
+//   final msgRef = db.child("Messages").child(msg.id);
+//   if (skipCheck) {
+//     try {
+//       await msgRef.set(msg.toJson());
+//       print("Success uploading message id: ${msg.id}");
+//       return true;
+//     } catch (e) {
+//       print("Error uploading message id: ${msg.id}, error: $e");
+//       return false;
+//     }
+//   } else if (msg.timestamp.shouldBeUpdated) {
+//     try {
+//       final tsRef = msgRef.child("ts");
+//       final newTs = timeStamp();
+//       final currentTs = await tsRef.get();
+//       if (!currentTs.exists) {
+//         msg.timestamp = newTs;
+//         return uploadMessage(msg, skipCheck: true);
+//       } else {
+//         final ts = currentTs.value as int;
+//         if (newTs > ts) await tsRef.set(newTs);
+//         print("Success updating the timestamp of message id: ${msg.id}");
+//         return true;
+//       }
+//     } catch (e) {
+//       print("Error updating message id: ${msg.id}, error: $e");
+//       return false;
+//     }
+//   } else {
+//     print("Success, message id: ${msg.id} doesn't need to be updated");
+//     return true;
+//   }
+// }
 
-Future<File> writeMedia({
-  required Uint8List mediaData,
-  required String mediaID,
-  bool isThumbnail = false,
-}) async =>
-    File(_mediaPath(mediaID, isThumbnail: isThumbnail)).writeAsBytes(mediaData);
+// Future<File> writeMedia({
+//   required Uint8List mediaData,
+//   required String mediaID,
+//   bool isThumbnail = false,
+// }) async =>
+//     File(_mediaPath(mediaID, isThumbnail: isThumbnail)).writeAsBytes(mediaData);
 
-Future<File> copyMedia({
-  required String fromPath,
-  required String mediaID,
-  bool isThumbnail = false,
-}) async =>
-    File(fromPath).copy(_mediaPath(mediaID, isThumbnail: isThumbnail));
+// Future<File> copyMedia({
+//   required String fromPath,
+//   required String mediaID,
+//   bool isThumbnail = false,
+// }) async =>
+//     File(fromPath).copy(_mediaPath(mediaID, isThumbnail: isThumbnail));
 
-Future<File?> makeThumbnail({
-  required String videoPath,
-  required String mediaID,
-}) async {
-  final tn = await VideoThumbnail.thumbnailData(video: videoPath, quality: 90);
-  if (tn != null) {
-    return writeMedia(mediaData: tn, mediaID: mediaID, isThumbnail: true);
-  }
-  return null;
-}
+// Future<File?> makeThumbnail({
+//   required String videoPath,
+//   required String mediaID,
+// }) async {
+//   final tn = await VideoThumbnail.thumbnailData(video: videoPath, quality: 90);
+//   if (tn != null) {
+//     return writeMedia(mediaData: tn, mediaID: mediaID, isThumbnail: true);
+//   }
+//   return null;
+// }
 
 extension ExchangeRateSave on ExchangeRate {
   void save() {
@@ -283,249 +284,249 @@ extension ExchangeRateSave on ExchangeRate {
   }
 }
 
-extension Getters on ID {
-  Future<MessageMedia?> getLocalMessageMedia() async {
-    final String? jsonEncoded = await g.boxes.medias.get(this);
-    if (jsonEncoded == null) return null;
-    return MessageMedia.fromJson(jsonDecode(jsonEncoded));
-  }
+// extension Getters on ID {
+//   Future<FireMedia?> getLocalMessageMedia() async {
+//     final String? jsonEncoded = await g.boxes.medias.get(this);
+//     if (jsonEncoded == null) return null;
+//     return FireMedia.fromJson(jsonDecode(jsonEncoded));
+//   }
 
-  Future<Message?> getLocalMessage() async {
-    final String? jsonEncoded = await g.boxes.messages.get(this);
-    if (jsonEncoded == null) return null;
-    return Message.fromJson(jsonDecode(jsonEncoded));
-  }
+//   Future<FireMessage?> getLocalMessage() async {
+//     final String? jsonEncoded = await g.boxes.messages.get(this);
+//     if (jsonEncoded == null) return null;
+//     return FireMessage.fromJson(jsonDecode(jsonEncoded));
+//   }
 
-  Future<BaseNode?> getLocalNode() async {
-    final String? jsonEncoded = await g.boxes.nodes.get(this);
-    if (jsonEncoded == null) return null;
-    return BaseNode.fromJson(jsonDecode(jsonEncoded));
-  }
+//   Future<FireNode?> getLocalNode() async {
+//     final String? jsonEncoded = await g.boxes.nodes.get(this);
+//     if (jsonEncoded == null) return null;
+//     return FireNode.fromJson(jsonDecode(jsonEncoded));
+//   }
 
-  Future<BaseNode?> getHiddenNode() async {
-    final String? jsonEncoded = await g.boxes.hidden.get(this);
-    if (jsonEncoded == null) return null;
-    return BaseNode.fromJson(jsonDecode(jsonEncoded));
-  }
+//   Future<FireNode?> getHiddenNode() async {
+//     final String? jsonEncoded = await g.boxes.hidden.get(this);
+//     if (jsonEncoded == null) return null;
+//     return FireNode.fromJson(jsonDecode(jsonEncoded));
+//   }
 
-  Future<void> deleteLocalNode() async {
-    return await g.boxes.nodes.delete(this);
-  }
-}
+//   Future<void> deleteLocalNode() async {
+//     return await g.boxes.nodes.delete(this);
+//   }
+// }
 
-extension MessageSave on Message {
-  Future<void> onReceipt({required ID root}) async {
-    reads[root] = false;
-    await save();
-    if (mediaID != null) {
-      MessageMedia? media = await mediaID?.getLocalMessageMedia();
-      media ??= await downloadAndWriteMedia(mediaID!);
-      if (media != null && media.extension.isVideoExtension()) {
-        // we generate a thumbnail
-        final tn = await VideoThumbnail.thumbnailData(
-          video: media.path,
-          quality: 90,
-        );
-        if (tn != null) {
-          final f = await writeMedia(
-              mediaData: tn, mediaID: mediaID!, isThumbnail: true);
-          media.thumbnail = f.path;
-        }
-      }
-      media?.references.add(id);
-      await media?.save();
-    }
-    return;
-  }
+// extension MessageSave on FireMessage {
+//   Future<void> onReceipt({required ID root}) async {
+//     reads[root] = false;
+//     await save();
+//     if (mediaID != null) {
+//       FireMedia? media = await mediaID?.getLocalMessageMedia();
+//       media ??= await downloadAndWriteMedia(mediaID!);
+//       if (media != null && media.extension.isVideoExtension()) {
+//         // we generate a thumbnail
+//         final tn = await VideoThumbnail.thumbnailData(
+//           video: media.path,
+//           quality: 90,
+//         );
+//         if (tn != null) {
+//           final f = await writeMedia(
+//               mediaData: tn, mediaID: mediaID!, isThumbnail: true);
+//           media.thumbnail = f.path;
+//         }
+//       }
+//       media?.references.add(id);
+//       await media?.save();
+//     }
+//     return;
+//   }
 
-  Future<void> save() async {
-    return g.boxes.messages.put(id, jsonEncode(toJson(toLocal: true)));
-  }
+//   Future<void> save() async {
+//     return g.boxes.messages.put(id, jsonEncode(toJson(toLocal: true)));
+//   }
 
-  Future<void> deleteFrom(ChatableNode node) async {
-    reads.remove(node.id);
-    node.messages.remove(id);
-    if (reads.isEmpty) return delete();
-    return;
-  }
+//   Future<void> deleteFrom(Chatable node) async {
+//     reads.remove(node.id);
+//     node.messages.remove(id);
+//     if (reads.isEmpty) return delete();
+//     return;
+//   }
 
-  Future<void> delete() async {
-    final MessageMedia? media = await mediaID?.getLocalMessageMedia();
-    if (media != null) {
-      media.references.remove(id);
-      media.delete();
-    }
-    await g.boxes.messages.delete(id);
-    return;
-  }
-}
+//   Future<void> delete() async {
+//     final FireMedia? media = await mediaID?.getLocalMessageMedia();
+//     if (media != null) {
+//       media.references.remove(id);
+//       media.delete();
+//     }
+//     await g.boxes.messages.delete(id);
+//     return;
+//   }
+// }
 
-extension NodeSave on BaseNode {
-  Future<void> save({bool hidden = false}) async {
-    if (hidden) {
-      await g.boxes.hidden.put(id, jsonEncode(toJson(toLocal: true)));
-    } else {
-      if (this is Self) {
-        await g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
-      } else {
-        await g.boxes.nodes.put(id, jsonEncode(toJson(toLocal: true)));
-      }
-    }
-  }
+// extension NodeSave on FireNode {
+//   Future<void> save({bool hidden = false}) async {
+//     if (hidden) {
+//       await g.boxes.hidden.put(id, jsonEncode(toJson(toLocal: true)));
+//     } else {
+//       if (this is Self) {
+//         await g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
+//       } else {
+//         await g.boxes.nodes.put(id, jsonEncode(toJson(toLocal: true)));
+//       }
+//     }
+//   }
 
-  Future<void> delete({bool hidden = false}) async {
-    var node = this;
-    if (node is ChatableNode && node is! Self) {
-      final msgToDelete = List<ID>.from(node.messages);
-      for (var messageID in msgToDelete) {
-        var msg = await messageID.getLocalMessage();
-        await msg?.deleteFrom(node);
-      }
-      await g.boxes.nodes.delete(id);
-    }
-  }
-}
+//   Future<void> delete({bool hidden = false}) async {
+//     var node = this;
+//     if (node is Chatable && node is! Self) {
+//       final msgToDelete = List<ID>.from(node.messages);
+//       for (var messageID in msgToDelete) {
+//         var msg = await messageID.getLocalMessage();
+//         await msg?.deleteFrom(node);
+//       }
+//       await g.boxes.nodes.delete(id);
+//     }
+//   }
+// }
 
-extension ChatableNodeExtensions on ChatableNode {
-  Future<Pair<String, bool>> previewInfo() async {
-    String? lastMessagePreview;
-    bool? lastMessageWasRead;
-    if (messages.isNotEmpty) {
-      final lastMessage = await messages.last.getLocalMessage();
-      lastMessageWasRead = lastMessage?.reads[id] ??= false;
-      if ((lastMessage?.text ?? "").isEmpty) {
-        lastMessagePreview = "&attachment";
-      } else {
-        lastMessagePreview = lastMessage!.text!;
-      }
-    }
-    return Pair(lastMessagePreview ?? "", lastMessageWasRead ?? true);
-  }
-}
+// extension ChatableNodeExtensions on Chatable {
+//   Future<Pair<String, bool>> previewInfo() async {
+//     String? lastMessagePreview;
+//     bool? lastMessageWasRead;
+//     if (messages.isNotEmpty) {
+//       final lastMessage = await messages.last.getLocalMessage();
+//       lastMessageWasRead = lastMessage?.reads[id] ??= false;
+//       if ((lastMessage?.text ?? "").isEmpty) {
+//         lastMessagePreview = "&attachment";
+//       } else {
+//         lastMessagePreview = lastMessage!.text!;
+//       }
+//     }
+//     return Pair(lastMessagePreview ?? "", lastMessageWasRead ?? true);
+//   }
+// }
 
-extension MediaSave on MessageMedia {
-  Future<void> save() async {
-    return g.boxes.medias.put(id, jsonEncode(toJson(toLocal: true)));
-  }
+// extension MediaSave on FireMedia {
+//   Future<void> save() async {
+//     return g.boxes.medias.put(id, jsonEncode(toJson(toLocal: true)));
+//   }
 
-  Future<void> delete() async {
-    if (references.isEmpty && !isSaved) {
-      print("References are empty, deleting the file!");
-      g.boxes.medias.delete(id);
-      _deleteMediaFile(path);
-      if (thumbnail != null) {
-        _deleteMediaFile(thumbnail!);
-      }
-    }
-    return;
-  }
-}
+//   Future<void> delete() async {
+//     if (references.isEmpty && !isSaved) {
+//       print("References are empty, deleting the file!");
+//       g.boxes.medias.delete(id);
+//       _deleteMediaFile(path);
+//       if (thumbnail != null) {
+//         _deleteMediaFile(thumbnail!);
+//       }
+//     }
+//     return;
+//   }
+// }
 
-extension PaymentSave on Down4Payment {
-  Future<void> save() => g.boxes.payments.put(id, jsonEncode(this));
-}
+// extension PaymentSave on Down4Payment {
+//   Future<void> save() => g.boxes.payments.put(id, jsonEncode(this));
+// }
 
-extension WalletManager on Wallet {
-  void setIx(int ix) => g.boxes.personal.put("ix", ix);
+// extension WalletManager on Wallet {
+//   void setIx(int ix) => g.boxes.personal.put("ix", ix);
 
-  static int get ix => g.boxes.personal.get("ix");
+//   static int get ix => g.boxes.personal.get("ix");
 
-  static Down4Keys get keys =>
-      Down4Keys.fromJson(jsonDecode(g.boxes.personal.get("keys")));
+//   static Down4Keys get keys =>
+//       Down4Keys.fromJson(jsonDecode(g.boxes.personal.get("keys")));
 
-  Stream<Down4Payment> get payments async* {
-    for (final paymentID in g.boxes.payments.keys) {
-      final json = await g.boxes.payments.get(paymentID);
-      if (json != null) {
-        yield Down4Payment.fromJson(jsonDecode(json));
-      }
-    }
-  }
+//   Stream<Down4Payment> get payments async* {
+//     for (final paymentID in g.boxes.payments.keys) {
+//       final json = await g.boxes.payments.get(paymentID);
+//       if (json != null) {
+//         yield Down4Payment.fromJson(jsonDecode(json));
+//       }
+//     }
+//   }
 
-  Stream<Down4TXOUT> get utxos async* {
-    for (final utxoID in g.boxes.utxos.keys) {
-      final json = await g.boxes.utxos.get(utxoID);
-      if (json != null) {
-        yield Down4TXOUT.fromJson(jsonDecode(json));
-      }
-    }
-  }
+//   Stream<Down4TXOUT> get utxos async* {
+//     for (final utxoID in g.boxes.utxos.keys) {
+//       final json = await g.boxes.utxos.get(utxoID);
+//       if (json != null) {
+//         yield Down4TXOUT.fromJson(jsonDecode(json));
+//       }
+//     }
+//   }
 
-  Future<Down4TXOUT?> getUtxo(ID id) async {
-    final json = await g.boxes.utxos.get(id);
-    if (json == null) return null;
-    return Down4TXOUT.fromJson(jsonDecode(json));
-  }
+//   Future<Down4TXOUT?> getUtxo(ID id) async {
+//     final json = await g.boxes.utxos.get(id);
+//     if (json == null) return null;
+//     return Down4TXOUT.fromJson(jsonDecode(json));
+//   }
 
-  Future<void> removeUtxo(ID id) async {
-    await g.boxes.utxos.delete(id);
-    return;
-  }
+//   Future<void> removeUtxo(ID id) async {
+//     await g.boxes.utxos.delete(id);
+//     return;
+//   }
 
-  Future<Down4Payment?> getPayment(ID id) async {
-    final json = await g.boxes.payments.get(id);
-    if (json == null) return null;
-    return Down4Payment.fromJson(jsonDecode(json));
-  }
+//   Future<Down4Payment?> getPayment(ID id) async {
+//     final json = await g.boxes.payments.get(id);
+//     if (json == null) return null;
+//     return Down4Payment.fromJson(jsonDecode(json));
+//   }
 
-  void removePayment(ID id) {
-    g.boxes.payments.delete(id);
-  }
+//   void removePayment(ID id) {
+//     g.boxes.payments.delete(id);
+//   }
 
-  Future<void> setPayment(Down4Payment payment) async {
-    await g.boxes.payments.put(payment.id, jsonEncode(payment));
-    return;
-  }
+//   Future<void> setPayment(Down4Payment payment) async {
+//     await g.boxes.payments.put(payment.id, jsonEncode(payment));
+//     return;
+//   }
 
-  Future<void> setUtxo(Down4TXOUT utxo) async {
-    await g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
-    return;
-  }
+//   Future<void> setUtxo(Down4TXOUT utxo) async {
+//     await g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
+//     return;
+//   }
 
-  Future<bool> isSpent(ID utxoID) async {
-    final bool? spent = await g.boxes.spents.get(utxoID);
-    return spent ?? false;
-  }
+//   Future<bool> isSpent(ID utxoID) async {
+//     final bool? spent = await g.boxes.spents.get(utxoID);
+//     return spent ?? false;
+//   }
 
-  Future<void> setSpent(ID id, bool spent) async {
-    await g.boxes.spents.put(id, spent);
-    return;
-  }
+//   Future<void> setSpent(ID id, bool spent) async {
+//     await g.boxes.spents.put(id, spent);
+//     return;
+//   }
 
-  static Wallet load() {
-    return Wallet(
-        keys: keys,
-        // payments: payments,
-        // utxos: utxos,
-        // getUtxo: getUtxo,
-        // getPayment: getPayment,
-        // removeUtxo: removeUtxo,
-        // removePayment: removePayment,
-        // setIx: setIx,
-        // setSpent: setSpent,
-        // isSpent: isSpent,
-        // setPayment: setPayment,
-        // setUtxo: setUtxo,
-        ix: ix);
-  }
-}
+//   static Wallet load() {
+//     return Wallet(
+//         keys: keys,
+//         // payments: payments,
+//         // utxos: utxos,
+//         // getUtxo: getUtxo,
+//         // getPayment: getPayment,
+//         // removeUtxo: removeUtxo,
+//         // removePayment: removePayment,
+//         // setIx: setIx,
+//         // setSpent: setSpent,
+//         // isSpent: isSpent,
+//         // setPayment: setPayment,
+//         // setUtxo: setUtxo,
+//         ix: ix);
+//   }
+// }
 
-extension SelfSave on Self {
-  void save() {
-    // this will be split so we don't save the whole thing everytime
-    g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
-  }
+// extension SelfSave on Self {
+//   void save() {
+//     // this will be split so we don't save the whole thing everytime
+//     g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
+//   }
 
-  static Self load() {
-    // this will be remade so we load many different parts to make the self
-    final asJson = jsonDecode(g.boxes.personal.get("self"));
-    return BaseNode.fromJson(asJson) as Self;
-  }
+//   static Self load() {
+//     // this will be remade so we load many different parts to make the self
+//     final asJson = jsonDecode(g.boxes.personal.get("self"));
+//     return FireNode.fromJson(asJson) as Self;
+//   }
 
-  static bool notYetInitialized() {
-    return g.boxes.personal.get("self") == null;
-  }
-}
+//   static bool notYetInitialized() {
+//     return g.boxes.personal.get("self") == null;
+//   }
+// }
 
 class P {
   double scroll;
@@ -536,7 +537,7 @@ class P {
 }
 
 class V {
-  final BaseNode? node;
+  final FireNode? node;
   final ID id;
   final List<P> pages;
   int ci;
@@ -585,13 +586,13 @@ class Payload {
   final List<Down4Object> forwardables;
   final List<ID> replies;
   final String text;
-  final MessageMedia? media;
-  final Message? message;
+  final FireMedia? media;
+  final FireMessage? message;
   Payload({
     required List<ID>? r,
     required List<Down4Object>? f,
     required String? t,
-    required MessageMedia? m,
+    required FireMedia? m,
   })  : forwardables = f ?? const <Down4Object>[],
         replies = r ?? const <ID>[],
         media = m,
@@ -599,7 +600,7 @@ class Payload {
         message = (t ?? "").isNotEmpty ||
                 m != null ||
                 (f ?? const []).whereType<Palette2>().isNotEmpty
-            ? Message(
+            ? FireMessage(
                 senderID: g.self.id,
                 timestamp: timeStamp(),
                 id: messagePushId(),
@@ -670,7 +671,7 @@ class Singletons {
   Sizes get sizes => _sizes ??= Sizes._();
   ExchangeRate get exchangeRate => _exchangeRate ??= ExchangeRateSave.load();
 
-  Map<ID, MessageMedia> cachedConsoleMedias = {};
+  Map<ID, FireMedia> cachedConsoleMedias = {};
 
   bool get notYetInitialized => SelfSave.notYetInitialized();
 
@@ -682,7 +683,7 @@ class Singletons {
   }
 
   void initSelf(
-      ID id, NodeMedia media, Down4Keys neuter, String name, String? lastName) {
+      ID id, FireMedia media, Down4Keys neuter, String name, String? lastName) {
     _self = Self(
       id: id,
       media: media,
@@ -699,7 +700,7 @@ class Singletons {
   }
 }
 
-Future<List<BaseNode>> getNodesFromEverywhere(Set<ID> ids) async {
+Future<List<FireNode>> getNodesFromEverywhere(Set<ID> ids) async {
   bool hasSelf;
   if (hasSelf = ids.contains(g.self.id)) {
     ids.remove(g.self.id);
@@ -714,7 +715,7 @@ Future<List<BaseNode>> getNodesFromEverywhere(Set<ID> ids) async {
   final locals = await Future.wait(localFetch);
   final onlines = await onlineFetch;
   return locals
-      .whereType<BaseNode>()
+      .whereType<FireNode>()
       .followedBy(onlines ?? [])
       .followedBy(hasSelf ? [g.self] : [])
       .toList();
@@ -734,7 +735,7 @@ Future<void> writeHomePalette<T>(
   bool? sel,
 }) async {
   // return right away if not a BaseNode
-  if (node is! BaseNode) {
+  if (node is! FireNode) {
     return print("SORRY BRO, BUT ISN'T BASE NODE LOL");
   }
 
@@ -748,7 +749,7 @@ Future<void> writeHomePalette<T>(
 
   // if node is chatable, we want to load previews
   Pair<String, bool>? previewInfo;
-  if (node is ChatableNode) {
+  if (node is Chatable) {
     previewInfo = await node.previewInfo();
   }
 
@@ -771,9 +772,9 @@ Future<void> writeHomePalette<T>(
 }
 
 void writePalette3(
-  BaseNode node,
+  FireNode node,
   Map<ID, Down4Object> state,
-  List<ButtonsInfo2> Function(BaseNode)? bGen,
+  List<ButtonsInfo2> Function(FireNode)? bGen,
   void Function()? onSel, {
   bool? sel,
   String? pr,
@@ -805,7 +806,7 @@ void writePalette3(
 }
 
 class Transition {
-  final Iterable<Person> trueTargets;
+  final Iterable<Personable> trueTargets;
   final List<Palette2> preTransition, postTransition;
   final Map<ID, Palette2> state;
   final int nHidden;
@@ -833,14 +834,14 @@ Transition selectionTransition({
   final unselected = originalList.notSelected();
   final idsInGroups = selected
       .asNodes()
-      .whereType<GroupNode>()
+      .whereType<Groupable>()
       .map((g) => g.group)
       .expand((id) => id)
       .toSet();
-  final selectedUsers = selected.whereNodeIs<Person>();
-  final selectedGroups = selected.whereNodeIs<GroupNode>();
-  final unselectedGroups = unselected.whereNodeIs<GroupNode>();
-  final unselectedUsers = unselected.whereNodeIs<Person>();
+  final selectedUsers = selected.whereNodeIs<Personable>();
+  final selectedGroups = selected.whereNodeIs<Groupable>();
+  final unselectedGroups = unselected.whereNodeIs<Groupable>();
+  final unselectedUsers = unselected.whereNodeIs<Personable>();
   final unHide = hidden.those(idsInGroups);
   final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
   final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
@@ -866,7 +867,7 @@ Transition selectionTransition({
 
   print("pals=${pals.map((e) => e.node.name).toList()}");
   return Transition(
-      trueTargets: pals.where((p) => !p.fold).asNodes<Person>(),
+      trueTargets: pals.where((p) => !p.fold).asNodes<Personable>(),
       preTransition: originalList,
       postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIds())),
       state: state,
@@ -879,7 +880,7 @@ Transition typeTransition<T>({
   required Map<ID, Palette2> hiddenState,
   required double scrollOffset,
 }) {
-  if (T is! BaseNode) throw 'T needs to be a BaseNode type';
+  if (T is! FireNode) throw 'T needs to be a BaseNode type';
   final all = state.values;
   final ogOrder = all.asIds();
   final hidden = hiddenState.values;
@@ -895,7 +896,7 @@ Transition typeTransition<T>({
 
   print("pals=${pals.map((e) => e.node.name).toList()}");
   return Transition(
-      trueTargets: pals.where((p) => !p.fold).asNodes<Person>(),
+      trueTargets: pals.where((p) => !p.fold).asNodes<Personable>(),
       preTransition: all.toList(),
       postTransition:
           pals.inThatOrder(ogOrder.followedBy(properTypeHidden.asIds())),
@@ -906,17 +907,17 @@ Transition typeTransition<T>({
 
 Future<ChatMessage?> getChatMessage({
   required Map<ID, ChatMessage> state,
-  required ChatableNode node,
+  required Chatable node,
   required ID msgID,
   required ID? prevMsgID,
   required ID? nextMsgID,
   required bool isLast,
-  required void Function(BaseNode)? openNode,
+  required void Function(FireNode)? openNode,
   required void Function() refreshCallback,
 }) async {
-  Message? msg = await msgID.getLocalMessage();
+  FireMessage? msg = await msgID.getLocalMessage();
   if (msg == null) return null;
-  Message? prevMsg, nextMsg;
+  FireMessage? prevMsg, nextMsg;
   ChatMessage? prevChatMessage = state[prevMsgID];
   // If new message while in chat, we might want to remove the header of the
   // previous last message
@@ -947,7 +948,7 @@ Future<ChatMessage?> getChatMessage({
 
   final bool senderIsSelf = msg.senderID == g.self.id;
   final bool hasHeader =
-      !senderIsSelf && node is GroupNode && nextMsg?.senderID != msg.senderID;
+      !senderIsSelf && node is Groupable && nextMsg?.senderID != msg.senderID;
 
   final cm = ChatMessage(
       key: GlobalKey(),
@@ -982,13 +983,13 @@ Future<ChatMessage?> getChatMessage({
 }
 
 Future<void> writeMessages({
-  required ChatableNode node,
+  required Chatable node,
   required List<ID> ordered,
   required Map<ID, ChatMessage> state,
   required Map<ID, EmptyObject> videos,
   required Map<ID, EmptyObject> withNodes,
   required void Function() refresh,
-  required void Function(BaseNode)? openNode,
+  required void Function(FireNode)? openNode,
   int limit = 20,
 }) async {
   final orderedSet = ordered.toSet();
@@ -1057,7 +1058,7 @@ Future<void> writePayments(
 }
 
 class EmptyObject extends Down4Object {
-  ID get id => "";
+  EmptyObject(super.id);
 }
 
 final topButtonsKey = [

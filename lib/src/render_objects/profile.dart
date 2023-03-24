@@ -17,14 +17,14 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
   @override
   ID get id => node is Group ? node.id : sha1(utf8.encode(node.id)).toBase58();
 
-  final BaseNode node;
+  final FireNode node;
   const ProfileWidget({required this.node, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final node_ = node;
-    NodeMedia? media;
-    if (node_ is GroupNode) {
+    FireMedia? media;
+    if (node_ is Groupable) {
       media = node_.media;
     } else if (node_ is User) {
       media = node_.media;
@@ -84,7 +84,7 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           //     textAlign: TextAlign.center,
           //     maxLines: 1),
           const SizedBox(height: 8.0),
-          (node_ is Person && (node_.description ?? "").isNotEmpty)
+          (node_ is Personable && (node_.description ?? "").isNotEmpty)
               ? Container(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(node_.description!, textAlign: TextAlign.justify))

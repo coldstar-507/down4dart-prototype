@@ -263,7 +263,7 @@ class Down4VideoPlayer extends StatefulWidget {
   final VideoPlayerController videoController;
   // final AnimationController animationController;
   // final Widget Function(double) rotatingLogo;
-  final MessageMedia media;
+  final FireMedia media;
   // final String? thumbnail;
   final Color backgroundColor;
   final Size displaySize;
@@ -555,7 +555,7 @@ class Down4ImageTransform extends StatelessWidget {
 }
 
 class Down4ImageViewer extends StatelessWidget {
-  final MessageMedia media;
+  final FireMedia media;
   final Size displaySize;
   final bool forceSquareAnyways;
   const Down4ImageViewer({
@@ -641,10 +641,10 @@ extension PaletteExtensions on Iterable<Palette> {
   Iterable<Palette> selected() => where((p) => p.selected);
   Iterable<Palette> notSelected() => where((p) => !p.selected);
   Iterable<ID> asIds() => map((e) => e.node.id);
-  Iterable<Palette> chatables() => where((p) => p.node is ChatableNode);
+  Iterable<Palette> chatables() => where((p) => p.node is Chatable);
   Iterable<Palette> users() => where((p) => p.node is User);
-  Iterable<Palette> people() => where((p) => p.node is Person);
-  Iterable<Palette> groups() => where((p) => p.node is GroupNode);
+  Iterable<Palette> people() => where((p) => p.node is Personable);
+  Iterable<Palette> groups() => where((p) => p.node is Groupable);
   Iterable<Palette> those(Iterable<ID> ids) =>
       where((p) => ids.contains(p.node.id));
   Iterable<Palette> notThose(Iterable<ID> ids) =>
@@ -698,9 +698,9 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   Set<ID> allPeopleIds() {
     Set<ID> ids = {};
     for (final node in asNodes()) {
-      if (node is GroupNode) {
+      if (node is Groupable) {
         ids.addAll(node.group);
-      } else if (node is Person) {
+      } else if (node is Personable) {
         ids.add(node.id);
       }
     }
@@ -708,7 +708,7 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   }
 }
 
-extension ImageOfNodes on BaseNode {
+extension ImageOfNodes on FireNode {
   Widget get transformedImage {
     if (media != null) {
       return Down4ImageTransform(
@@ -735,7 +735,7 @@ extension ImageOfNodes on BaseNode {
               fit: BoxFit.cover,
               cacheHeight: Palette.paletteHeight.toInt(),
               cacheWidth: Palette.paletteHeight.toInt());
-    } else if (n is GroupNode) {
+    } else if (n is Groupable) {
       return Image.memory(n.media.data,
           fit: BoxFit.cover,
           gaplessPlayback: true,
@@ -890,7 +890,7 @@ Future<void> clearAppCache() async {
   Directory(tempDir.path).delete(recursive: true);
 }
 
-Future<NodeMedia?> importNodeMedia() async {
+Future<FireMedia?> importNodeMedia() async {
   final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: imageExtensions.withoutDots(),
@@ -902,7 +902,7 @@ Future<NodeMedia?> importNodeMedia() async {
   final bytes = result.files.single.bytes;
   final mediaID = deterministicMediaID(bytes!, g.self.id);
   final size = await decodeImageSize(bytes);
-  return NodeMedia(
+  return FireMedia(
       data: bytes,
       id: mediaID,
       metadata: MediaMetadata(
@@ -927,7 +927,7 @@ Future<void> importConsoleMedias({required bool images}) async {
       final mediaID = deterministicMediaID(file.bytes!, g.self.id);
       final size = await decodeImageSize(file.bytes!);
       final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-      MessageMedia(
+      FireMedia(
           id: mediaID,
           isSaved: true,
           path: f.path,
@@ -965,7 +965,7 @@ Future<void> importConsoleMedias({required bool images}) async {
         thumbnailPath = f.path;
       }
 
-      MessageMedia(
+      FireMedia(
           id: mediaID,
           path: f.path,
           thumbnail: thumbnailPath,

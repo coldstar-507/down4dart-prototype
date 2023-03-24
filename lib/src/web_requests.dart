@@ -36,14 +36,14 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<BaseNode>?> getNodes(Iterable<String> ids) async {
+Future<List<FireNode>?> getNodes(Iterable<String> ids) async {
   if (ids.isEmpty) return [];
   final url =
       Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes");
   final res = await http.post(url, body: ids.join(" "));
   final jsonLists = List<Map<String, dynamic>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
-    return jsonLists.map((e) => BaseNode.fromJson(e)).toList();
+    return jsonLists.map((e) => FireNode.fromJson(e)).toList();
   }
   return null;
 }
@@ -65,7 +65,7 @@ Future<Media?> getMessageMedia(String id) async {
   );
   final res = await http.post(url, body: id);
   if (res.statusCode != 200) return null;
-  return MessageMedia.fromJson(jsonDecode(res.body));
+  return FireMedia.fromJson(jsonDecode(res.body));
 }
 
 Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
@@ -161,7 +161,7 @@ Future<int> refreshTokenRequest(String newToken) async {
   return res.statusCode;
 }
 
-Future<List<Message>?> getPosts(List<String> ids) async {
+Future<List<FireMessage>?> getPosts(List<String> ids) async {
   // TODO: getPosts
   return null;
 }

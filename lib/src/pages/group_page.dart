@@ -26,7 +26,7 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "group";
   final List<Palette2> homePalettes, palettesForTransition;
-  final Iterable<Person> people;
+  final Iterable<Personable> people;
   final int nHidden;
   final void Function() back;
   final void Function(Group group, Payload p) makeGroup;
@@ -59,10 +59,10 @@ class _GroupPageState extends State<GroupPage> {
     initialScrollOffset: widget.initialOffset,
   );
 
-  NodeMedia? _groupImage;
+  FireMedia? _groupImage;
   String _groupName = "";
 
-  MessageMedia? _cameraInput;
+  FireMedia? _cameraInput;
 
   ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: _tec);
 
@@ -76,7 +76,7 @@ class _GroupPageState extends State<GroupPage> {
   Future<void> animatedTransition() async {
     Future(() => setState(() {
           print(
-            "PALETTES FOR TRANSITION = ${widget.palettesForTransition.map((e) => e.node.name).toList()}",
+            "PALETTES FOR TRANSITION = ${widget.palettesForTransition.map((e) => e.node.displayName).toList()}",
           );
           _items = [...widget.palettesForTransition, groupMaker(fold: false)];
           _scrollController.jumpTo(widget.initialOffset + offset);
@@ -101,7 +101,7 @@ class _GroupPageState extends State<GroupPage> {
     );
   }
 
-  Future<void> send({MessageMedia? mediaInput}) async {
+  Future<void> send({FireMedia? mediaInput}) async {
     final media = mediaInput ?? _cameraInput;
     final text = _tec.value.text;
     if (_groupImage == null || _groupName.isEmpty) return;
@@ -116,11 +116,11 @@ class _GroupPageState extends State<GroupPage> {
 
     final members = Set<ID>.from(widget.people.asIds())..add(g.self.id);
 
-    final Group group = Group(
+    final Group group = Group(groupID,
+        activity: ts,
         isPrivate: _private,
         name: _groupName,
-        id: groupID,
-        media: _groupImage!,
+        media: _groupImage!.id,
         group: members,
         messages: {},
         snips: {});
@@ -138,9 +138,9 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   void loadMediaConsole({bool images = true, bool forGroupImage = false}) {
-    void selectMedia(MessageMedia media) {
+    void selectMedia(FireMedia media) {
       if (forGroupImage) {
-        _groupImage = media.asNodeMedia();
+        _groupImage = media;
         loadBaseConsole();
         reloadItems();
       } else {
@@ -223,6 +223,7 @@ class _GroupPageState extends State<GroupPage> {
     CameraController? ctrl,
     int cam = 0,
     String? path,
+    String? mimetype,
   }) async {
     if (ctrl == null) {
       try {
@@ -249,7 +250,8 @@ class _GroupPageState extends State<GroupPage> {
             shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
             onPress: () async {
               final XFile f = await ctrl!.takePicture();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
+              loadSquaredCameraConsole(
+                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
             },
             onLongPress: () async {
               await ctrl!.startVideoRecording();
@@ -257,7 +259,8 @@ class _GroupPageState extends State<GroupPage> {
             },
             onLongPressUp: () async {
               final XFile f = await ctrl!.stopVideoRecording();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
+              loadSquaredCameraConsole(
+                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
             },
           ),
         ],
@@ -281,29 +284,26 @@ class _GroupPageState extends State<GroupPage> {
         ConsoleButton(
           name: "Accept",
           onPress: () async {
-            String? thumbnailPath;
-            final mediaID = u.randomMediaID();
-            if (path.extension().isVideoExtension()) {
-              final tn =
-                  await VideoThumbnail.thumbnailData(video: path, quality: 90);
-              if (tn != null) {
-                final f = await writeMedia(
-                    mediaData: tn, mediaID: mediaID, isThumbnail: true);
-                thumbnailPath = f.path;
-              }
+            Uint8List? tn;
+            final Uint8List data = File(path).readAsBytesSync();
+            final mediaID = u.deterministicMediaID(data, g.self.id);
+            final bool isVideo = path.extension().isVideoExtension();
+            if (isVideo) {
+              tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
             }
             vpc?.dispose();
-            _cameraInput = MessageMedia(
-                path: path,
-                thumbnail: thumbnailPath,
-                id: mediaID,
-                metadata: MediaMetadata(
-                    owner: g.self.id,
-                    timestamp: u.timeStamp(),
-                    elementAspectRatio: ctrl!.value.aspectRatio,
-                    extension: path.extension(),
-                    isReversed: cam == 1,
-                    isSquared: true));
+            _cameraInput = FireMedia(mediaID,
+                owner: g.self.id,
+                timestamp: u.timeStamp(),
+                aspectRatio: ctrl!.value.aspectRatio,
+                extension: path.extension(),
+                isReversed: cam == 1,
+                isSquared: true,
+                mimetype: mimetype!,
+                references: {});
+            await _cameraInput!.write(
+                imageData: isVideo ? tn : data,
+                videoData: isVideo ? data : null);
             loadBaseConsole();
           },
         ),

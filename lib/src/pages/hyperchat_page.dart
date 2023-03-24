@@ -44,7 +44,7 @@ class HyperchatPage extends StatefulWidget implements Down4PageWidget {
 
 class _HyperchatPageState extends State<HyperchatPage> {
   var _tec = TextEditingController();
-  MessageMedia? _cameraInput;
+  FireMedia? _cameraInput;
   CameraController? _ctrl;
   late Console _console;
   late List<Palette2> _palettes = widget.transition.preTransition;
@@ -73,7 +73,7 @@ class _HyperchatPageState extends State<HyperchatPage> {
         }));
   }
 
-  Future<void> send({MessageMedia? mediaInput}) async {
+  Future<void> send({FireMedia? mediaInput}) async {
     final media = mediaInput ?? _cameraInput;
     final text = _tec.value.text;
     if (text.isEmpty && media == null) return;
@@ -150,10 +150,11 @@ class _HyperchatPageState extends State<HyperchatPage> {
     CameraController? ctrl,
     int cam = 0,
     String? path,
+    String? mimetype,
   }) async {
     if (ctrl == null) {
       try {
-        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
+        ctrl = CameraController(g.cameras[cam], ResolutionPreset.medium);
         await ctrl.initialize();
       } catch (err) {
         loadBaseConsole();
@@ -176,7 +177,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
             shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
             onPress: () async {
               final XFile f = await ctrl!.takePicture();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
+              loadSquaredCameraConsole(
+                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
             },
             onLongPress: () async {
               await ctrl!.startVideoRecording();
@@ -184,7 +186,8 @@ class _HyperchatPageState extends State<HyperchatPage> {
             },
             onLongPressUp: () async {
               final XFile f = await ctrl!.stopVideoRecording();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
+              loadSquaredCameraConsole(
+                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
             },
           ),
         ],
@@ -208,29 +211,27 @@ class _HyperchatPageState extends State<HyperchatPage> {
         ConsoleButton(
           name: "Accept",
           onPress: () async {
-            String? thumbnailPath;
-            final mediaID = u.randomMediaID();
-            if (path.extension().isVideoExtension()) {
-              final tn =
-                  await VideoThumbnail.thumbnailData(video: path, quality: 90);
-              if (tn != null) {
-                final f = await writeMedia(
-                    mediaData: tn, mediaID: mediaID, isThumbnail: true);
-                thumbnailPath = f.path;
-              }
+            Uint8List? tn;
+            final Uint8List data = File(path).readAsBytesSync();
+            final mediaID = u.deterministicMediaID(data, g.self.id);
+            bool isVideo = path.extension().isVideoExtension();
+            if (isVideo) {
+              tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
             }
             vpc?.dispose();
-            _cameraInput = MessageMedia(
-                path: path,
-                thumbnail: thumbnailPath,
-                id: u.randomMediaID(),
-                metadata: MediaMetadata(
-                    owner: g.self.id,
-                    timestamp: u.timeStamp(),
-                    elementAspectRatio: ctrl!.value.aspectRatio,
-                    extension: path.extension(),
-                    isReversed: cam == 1,
-                    isSquared: true));
+            final newMedia = FireMedia(mediaID,
+                mimetype: mimetype!,
+                owner: g.self.id,
+                timestamp: u.timeStamp(),
+                aspectRatio: ctrl!.value.aspectRatio,
+                extension: path.extension(),
+                isReversed: cam == 1,
+                references: {},
+                isSquared: true);
+            await newMedia.write(
+                videoData: isVideo ? data : null,
+                imageData: isVideo ? tn : data);
+            _cameraInput = newMedia;
             loadBaseConsole();
           },
         ),

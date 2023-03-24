@@ -17,7 +17,5 @@ Future<void> modifyJeff(Jeff jeff) async {
 }
 
 void main() async {
-  var jeff = Jeff();
-  modifyJeff(jeff);
-  print(jeff.i);
+  print(null.runtimeType);
 }

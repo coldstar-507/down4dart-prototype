@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:video_player/video_player.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../globals.dart';
 import '../_down4_dart_utils.dart' as u;
@@ -21,7 +23,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "chat-${node.id}";
 
-  final ChatableNode node;
+  final Chatable node;
   // final List<BaseNode>? subNodes;
   final Map<ID, ChatMessage> messages;
   final Map<ID, Palette2> members;
@@ -30,7 +32,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function(int) onPageChange;
   final void Function() back;
   final Future<void> Function([int limit]) loadMore;
-  final void Function(BaseNode) openNode;
+  final void Function(FireNode) openNode;
   final void Function(Payload) send;
 
   const ChatPage({
@@ -58,7 +60,7 @@ class _ChatPageState extends State<ChatPage> {
   late Console _console;
   late ConsoleInput _consoleInput = consoleInput;
   var _tec = TextEditingController();
-  MessageMedia? _cameraInput;
+  FireMedia? _cameraInput;
   List<ID> _msgsWithVideos = [];
   // List<ID> loaded = [];
 
@@ -68,14 +70,14 @@ class _ChatPageState extends State<ChatPage> {
           g.vm.cv.pages[0].scroll = scroller0.offset;
         });
 
-  late ScrollController? scroller1 = widget.node is GroupNode
+  late ScrollController? scroller1 = widget.node is Groupable
       ? (ScrollController(initialScrollOffset: g.vm.cv.pages[1].scroll)
         ..addListener(() {
           g.vm.cv.pages[1].scroll = scroller1!.offset;
         }))
       : null;
 
-  Future<List<ButtonsInfo2>> buttonsOfNode(BaseNode node) async {
+  Future<List<ButtonsInfo2>> buttonsOfNode(FireNode node) async {
     return [
       ButtonsInfo2(
           asset: g.fifty,
@@ -126,12 +128,8 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(
             name: "To Saved Messages",
             onPress: () async {
-              for (var msg in widget.messages.values) {
-                if (msg.selected) {
-                  g.self.messages.add(msg.message.id);
-                  msg.message.reads[g.self.id] = true;
-                  await msg.message.save();
-                }
+              for (var chat in widget.messages.values.selected()) {
+                chat.message.updateSavedStatus(true);
               }
               g.self.save();
               unselectSelectedMessage();
@@ -143,17 +141,12 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(
             name: "To Medias",
             onPress: () {
-              for (var msg in widget.messages.values) {
-                if (msg.selected && msg.hasMedia) {
-                  if (msg.mediaInfo!.media.isVideo) {
-                    g.self.videos.add(msg.mediaInfo!.media.id);
-                  } else {
-                    g.self.images.add(msg.mediaInfo!.media.id);
-                  }
-                  msg.mediaInfo!.media
-                    ..isSaved = true
-                    ..save();
-                }
+              final selectedMedias = widget.messages.values
+                  .selected()
+                  .where((chat) => chat.hasMedia)
+                  .map((chat) => chat.mediaInfo!.media);
+              for (final media in selectedMedias) {
+                media.updateSaveStatus(true);
               }
               g.self.save();
               unselectSelectedMessage();
@@ -173,7 +166,7 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  Future<void> send2({MessageMedia? mediaInput, List<Down4Object>? fo}) async {
+  Future<void> send2({FireMedia? mediaInput, List<Down4Object>? fo}) async {
     final media = mediaInput ?? _cameraInput;
     final text = _tec.value.text;
     if (text == "" && media != null && fo != null) return;
@@ -199,6 +192,7 @@ class _ChatPageState extends State<ChatPage> {
     CameraController? ctrl,
     int cam = 0,
     String? path,
+    String? mimetype,
   }) async {
     if (ctrl == null) {
       try {
@@ -225,7 +219,8 @@ class _ChatPageState extends State<ChatPage> {
             shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
             onPress: () async {
               final XFile f = await ctrl!.takePicture();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
+              loadSquaredCameraConsole(
+                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
             },
             onLongPress: () async {
               await ctrl!.startVideoRecording();
@@ -233,7 +228,8 @@ class _ChatPageState extends State<ChatPage> {
             },
             onLongPressUp: () async {
               final XFile f = await ctrl!.stopVideoRecording();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
+              loadSquaredCameraConsole(
+                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
             },
           ),
         ],
@@ -257,25 +253,27 @@ class _ChatPageState extends State<ChatPage> {
         ConsoleButton(
           name: "Accept",
           onPress: () async {
-            String? thumbnailPath;
-            final mediaID = u.randomMediaID();
-            final media = await copyMedia(fromPath: path, mediaID: mediaID);
-            if (path.extension().isVideoExtension()) {
-              final tn = await makeThumbnail(videoPath: path, mediaID: mediaID);
-              thumbnailPath = tn?.path;
+            Uint8List? tn;
+            final Uint8List data = File(path).readAsBytesSync();
+            final mediaID = u.deterministicMediaID(data, g.self.id);
+            bool isVideo = path.extension().isVideoExtension();
+            if (isVideo) {
+              tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
             }
             vpc?.dispose();
-            _cameraInput = MessageMedia(
-                path: media.path,
-                thumbnail: thumbnailPath,
-                id: mediaID,
-                metadata: MediaMetadata(
-                    owner: g.self.id,
-                    timestamp: u.timeStamp(),
-                    elementAspectRatio: ctrl!.value.aspectRatio,
-                    extension: path.extension(),
-                    isReversed: cam == 1,
-                    isSquared: true));
+            final newMedia = FireMedia(mediaID,
+                mimetype: mimetype!,
+                owner: g.self.id,
+                timestamp: u.timeStamp(),
+                aspectRatio: ctrl!.value.aspectRatio,
+                extension: path.extension(),
+                isReversed: cam == 1,
+                references: {},
+                isSquared: true);
+            await newMedia.write(
+                videoData: isVideo ? data : null,
+                imageData: isVideo ? tn : data);
+            _cameraInput = newMedia;
             loadBaseConsole();
           },
         ),
@@ -333,22 +331,23 @@ class _ChatPageState extends State<ChatPage> {
     bool extra = false,
   }) {
     void switchMode() => mode == "Send"
-        ? loadMediasConsole(images: images, mode: "Delete", extra: true)
+        ? loadMediasConsole(images: images, mode: "Remove", extra: true)
         : loadMediasConsole(images: images, mode: "Send", extra: true);
 
-    void selectMedia(MessageMedia media) {
+    void selectMedia(FireMedia media) {
       if (mode == "Send") {
         send2(mediaInput: media);
         return;
+      } else if (mode == "Remove") {
+        media.updateSaveStatus(false);
       }
-      if (!media.isVideo) {
-        g.self.images.remove(media.id);
-      } else {
-        g.self.videos.remove(media.id);
-      }
-      media
-        ..isSaved = false
-        ..delete();
+      // if (!media.isVideo) {
+      //   g.self.images.remove(media.id);
+      // } else {
+      //   g.self.videos.remove(media.id);
+      // }
+      // media
+      //   ..isSaved = false
       loadMediasConsole(images: images, mode: mode, extra: extra);
     }
 
@@ -480,12 +479,12 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = widget.node is GroupNode
+    final pages = widget.node is Groupable
         ? [
             Down4Page(
                 scrollController: scroller0,
                 isChatPage: true,
-                title: widget.node.name,
+                title: widget.node.displayName,
                 console: _console,
                 asMap: widget.messages,
                 orderedKeys: widget.ordered,
@@ -501,7 +500,7 @@ class _ChatPageState extends State<ChatPage> {
             Down4Page(
                 scrollController: scroller0,
                 isChatPage: true,
-                title: widget.node.name,
+                title: widget.node.displayName,
                 console: _console,
                 asMap: widget.messages,
                 orderedKeys: widget.ordered,

@@ -14,8 +14,8 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "node-${node.id}";
 
-  final BaseNode node;
-  final void Function(BaseNode) openNode, openChat, payNode;
+  final FireNode node;
+  final void Function(FireNode) openNode, openChat, payNode;
   final void Function() back;
 
   const NodePage({
@@ -49,12 +49,12 @@ class _NodePageState extends State<NodePage> {
   @override
   void initState() {
     super.initState();
-    if (widget.node is Person) {
+    if (widget.node is Personable) {
       _view = Andrew(pages: [
         Down4Page(
           scrollController: scroller,
           reversedList: false,
-          title: widget.node.name,
+          title: widget.node.displayName,
           console: userPaletteConsole,
           list: [ProfileWidget(node: widget.node)],
         ),

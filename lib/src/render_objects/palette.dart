@@ -115,7 +115,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
   @override
   ID get id => node.id;
 
-  final BaseNode node;
+  final FireNode node;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish;
   final List<ButtonsInfo2> buttonsInfo2;
@@ -375,7 +375,7 @@ class Palette extends StatelessWidget {
   static double get fullHeight => paletteHeight + gapSize;
   static Offset get shadowOffset => const Offset(6.0, 6.0);
   static Color get shadowColor => Colors.black.withOpacity(0.66);
-  final BaseNode node;
+  final FireNode node;
   final String at;
   final void Function(String, String)? imPress,
       bodyPress,
@@ -388,13 +388,13 @@ class Palette extends StatelessWidget {
   final int containerMS, fadeMS, fadeButtonMS;
 
   Image get nodeImage {
-    BaseNode n = node;
+    FireNode n = node;
     if (n is User) {
       return n.media != null
           ? Image.memory(n.media!.data,
               fit: BoxFit.cover, gaplessPlayback: true)
           : Image.asset('assets/images/hashirama.jpg', fit: BoxFit.cover);
-    } else if (n is GroupNode) {
+    } else if (n is Groupable) {
       return Image.memory(n.media.data,
           fit: BoxFit.cover, gaplessPlayback: true);
     } else if (n is Payment) {

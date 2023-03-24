@@ -27,10 +27,10 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   // final List<Palette> palettes;
   // final Future<bool> Function(List<String>) search;
   // final void Function(User node) putNodeOffline;
-  final void Function(BaseNode) openNode;
+  final void Function(FireNode) openNode;
   final void Function(List<Palette2>) forwardNodes;
   final void Function(Iterable<Palette2>) add;
-  final void Function(BaseNode) onScan;
+  final void Function(FireNode) onScan;
   final Future<void> Function(String) search;
   final void Function() back;
 
@@ -54,7 +54,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
   CameraController? _cameraController;
   MobileScannerController? scanner;
 
-  Future<List<ButtonsInfo2>> bGen(BaseNode node) async {
+  Future<List<ButtonsInfo2>> bGen(FireNode node) async {
     return [
       ButtonsInfo2(
           asset: g.fifty,
@@ -88,7 +88,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   String get qrData => [
         g.self.id,
-        g.self.name,
+        g.self.firstName,
         g.self.lastName,
         g.self.neuter.toYouKnow(),
       ].join("~");
@@ -112,18 +112,24 @@ class _AddFriendPageState extends State<AddFriendPage> {
     );
   }
 
-  void scanCallBack(Barcode bc, MobileScannerArguments? args) {
+  void scanCallBack(Barcode bc, MobileScannerArguments? args) async {
     if (bc.rawValue == null) return;
     final data = bc.rawValue!.split("~");
     if (data.length != 4) return;
-    var node = User(
-        id: data[0],
-        firstName: data[1],
-        lastName: data[2],
-        neuter: Down4Keys.fromYouKnow(data[3]),
-        messages: {},
-        snips: {},
-        children: {});
+    final localUser = await global<User>(data[0]);
+    final node = localUser ??
+        User(data[0],
+            name: data[1],
+            lastName: data[2],
+            neuter: Down4Keys.fromYouKnow(data[3]),
+            messages: {},
+            snips: {},
+            children: {},
+            activity: timeStamp(),
+            isFriend: false,
+            isHidden: false,
+            description: "",
+            media: null);
     widget.onScan(node);
   }
 

@@ -86,18 +86,20 @@ class _Down4State extends State<Down4> {
     g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
-    NodeMedia image = NodeMedia(
-      id: d4utils.randomMediaID(),
-      data: File(imPath).readAsBytesSync(),
-      metadata: MediaMetadata(
+    final imageData = File(imPath).readAsBytesSync();
+    final mediaID = d4utils.deterministicMediaID(imageData, id);
+
+    FireMedia image = FireMedia(mediaID,
         owner: id,
         timestamp: d4utils.timeStamp(),
-        elementAspectRatio: 1 / imAspectRatio,
+        aspectRatio: 1 / imAspectRatio,
         extension: imExtension,
         isReversed: isReversed,
-        isSquared: true, // all node images are squared
-      ),
-    );
+        isSquared: true, // all nodes images are squared
+        mimetype: '',
+        references: {id});
+
+    await image.write(imageData: imageData);
 
     final userInfo = {
       'id': id,
