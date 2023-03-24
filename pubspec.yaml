@@ -47,6 +47,7 @@ dependencies:
   english_words: ^4.0.0
   better_player: ^0.0.69
   video_compress: ^3.1.2
+  mime: ^1.0.4
   hive: ^2.1.0
   cbl: ^2.1.6
   camera: ^0.10.0+4

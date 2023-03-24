@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert' show utf8;
+import 'dart:convert' show base64Encode, utf8;
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -292,7 +292,9 @@ class _GroupPageState extends State<GroupPage> {
               tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
             }
             vpc?.dispose();
+            final tiny = resizeImage(isVideo ? tn! : data, 20, 20);
             _cameraInput = FireMedia(mediaID,
+                tinyThumbnail: base64Encode(tiny),
                 owner: g.self.id,
                 timestamp: u.timeStamp(),
                 aspectRatio: ctrl!.value.aspectRatio,

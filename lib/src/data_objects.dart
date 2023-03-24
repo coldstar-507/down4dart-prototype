@@ -51,6 +51,19 @@ Stream<Down4TXOUT> allUtxos() async* {
   }
 }
 
+Stream<FireMedia> savedMedia(bool images) async* {
+  final isVideo = images ? "'false'" : "'true'";
+  final raw = """
+        SELECT * FROM _ 
+        WHERE isSaved = 'true' AND isVideo = $isVideo
+        ORDER BY lastUse DESC""";
+  final query = await cbl.AsyncQuery.fromN1ql(_mediasDB, raw);
+  final results = await query.execute();
+  await for (final r in results.asStream()) {
+    yield FireMedia.fromJson(r.toPlainMap().cast());
+  }
+}
+
 typedef ID = String;
 
 Future<T?> _fetch<T extends FireObject>(
@@ -871,6 +884,7 @@ class Payment extends FireNode {
 
 class FireMedia extends FireObject {
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
+  final String tinyThumbnail;
   bool _isSaved;
   final ID owner;
   ID? _onlineId;
@@ -882,12 +896,13 @@ class FireMedia extends FireObject {
   final String? text;
   final int timestamp;
   final Set<ID> _references;
+  Uint8List? cachedImage;
 
   bool get isVideo => extension.isVideoExtension();
 
   Future<Uint8List?> get imageData async {
     final blob = (await _db().document(id))?.blob("image");
-    return blob?.content();
+    return cachedImage = await blob?.content();
   }
 
   Future<Uint8List?> get videoData async {
@@ -910,6 +925,7 @@ class FireMedia extends FireObject {
     required this.extension,
     required this.mimetype,
     required Set<ID> references,
+    required this.tinyThumbnail,
     int onlineTimestamp = 0,
     int lastUse = 0,
     ID? onlineId,
@@ -965,14 +981,16 @@ class FireMedia extends FireObject {
 
   Future<void> write({Uint8List? videoData, Uint8List? imageData}) async {
     if (videoData == null && imageData == null) return;
-    final doc = (await _db().document(id))?.toMutable();
+    final doc = cbl.MutableDocument.withId(id);
     if (isVideo) {
       final videoBlob = cbl.Blob.fromData(mimetype, videoData!);
-      doc?.setBlob(videoBlob, key: "video");
+      doc.setBlob(videoBlob, key: "video");
     }
     final imageMime = isVideo ? "image/png" : mimetype;
     final imageBlob = cbl.Blob.fromData(imageMime, imageData!);
-    doc?.setBlob(imageBlob, key: "image");
+    doc.setBlob(imageBlob, key: "image");
+    doc.setData(toJson(withLocalValues: true));
+    await _db().saveDocument(doc);
     return;
   }
 
@@ -985,6 +1003,7 @@ class FireMedia extends FireObject {
       mimetype: decodedJson["mimetype"]!,
       onlineId: decodedJson["onlineRef"]!,
       lastUse: int.parse(decodedJson["lastUse"]!),
+      tinyThumbnail: decodedJson["tinyThumbnail"]!,
       onlineTimestamp: int.parse(decodedJson["onlineTimestamp"]!),
       references: decodedJson["references"]!.split(" ").toSet(),
       isSaved: decodedJson["isSaved"] == "true",
@@ -1005,6 +1024,7 @@ class FireMedia extends FireObject {
         "extension": extension,
         "mimetype": mimetype,
         if (onlineId != null) "onlineRef": onlineId!,
+        "tinyThumbnail": tinyThumbnail,
         "onlineTimestamp": onlineTimestamp.toString(),
         if (text != null) "text": text!,
         "isReversed": isReversed.toString(),

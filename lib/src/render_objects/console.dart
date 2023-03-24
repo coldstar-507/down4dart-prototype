@@ -427,24 +427,22 @@ class Console extends StatelessWidget {
 
   // contour width is actually applied 2 times horizontally, (4 times)
   // (it is also applied 2 times vertically)
-
-  static int nMedias(bool images) =>
-      images ? g.self.images.length : g.self.videos.length;
-
-  static Stream<FireMedia> medias(bool images) async* {
-    final ids = List<ID>.from(images ? g.self.images : g.self.videos);
-    for (final mediaID in ids) {
-      if (g.cachedConsoleMedias[mediaID] != null) {
-        yield g.cachedConsoleMedias[mediaID]!;
-      } else {
-        final media = await mediaID.getLocalMessageMedia();
-        if (media != null) {
-          g.cachedConsoleMedias[media.id] = media;
-          yield media;
-        }
-      }
-    }
-  }
+  // static int nMedias(bool images) =>
+  //     images ? g.self.images.length : g.self.videos.length;
+  // static Stream<FireMedia> medias(bool images) async* {
+  //   // final ids = List<ID>.from(images ? g.self.images : g.self.videos);
+  //   for (final mediaID in ids) {
+  //     if (g.cachedConsoleMedias[mediaID] != null) {
+  //       yield g.cachedConsoleMedias[mediaID]!;
+  //     } else {
+  //       final media = await mediaID.getLocalMessageMedia();
+  //       if (media != null) {
+  //         g.cachedConsoleMedias[media.id] = media;
+  //         yield media;
+  //       }
+  //     }
+  //   }
+  // }
 
   bool get bottomInputsHasTop => _topInputs != null;
 
@@ -545,13 +543,13 @@ class Console extends StatelessWidget {
   Widget consoleMedias() {
     if (consoleMedias2 == null) return const SizedBox.shrink();
 
-    final nMedia = nMedias(consoleMedias2?.showImages ?? true);
-    final theoreticalRows = (nMedia / mediaPerRow).ceil();
-    final trueRows = theoreticalRows > 0
-        ? theoreticalRows < 4
-            ? theoreticalRows
-            : 3
-        : 1;
+    // final nMedia = nMedias(consoleMedias2?.showImages ?? true);
+    // final theoreticalRows = (nMedia / mediaPerRow).ceil();
+    // final trueRows = theoreticalRows > 0
+    //     ? theoreticalRows < 4
+    //         ? theoreticalRows
+    //         : 3
+    //     : 1;
 
     final showingImages = consoleMedias2?.showImages ?? true;
     return Container(
@@ -562,54 +560,54 @@ class Console extends StatelessWidget {
           border: Border.all(color: contourColor, width: contourWidth)),
       child: ConstrainedBox(
           constraints: BoxConstraints(
-              maxHeight: trueRows * mediaCelSize, maxWidth: trueWidth),
+              maxHeight: maximumMediaRows * mediaCelSize, maxWidth: trueWidth),
           child: ListView.builder(
-              itemCount: theoreticalRows,
+              // itemCount: theoreticalRows,
               itemBuilder: ((context, index) {
-                Widget f(int i) {
-                  return FutureBuilder(
-                    future: medias(showingImages).elementAt(i),
-                    builder: ((context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.done &&
-                          snapshot.hasData) {
-                        return GestureDetector(
-                          onTap: () => consoleMedias2?.onSelect
-                              .call(snapshot.requireData),
-                          child: Down4ImageViewer(
-                              media: snapshot.requireData,
-                              displaySize: Size.square(mediaCelSize),
-                              forceSquareAnyways: true),
-                        );
-                      } else {
-                        return SizedBox.square(dimension: mediaCelSize);
-                      }
-                    }),
-                  );
-                  // if (i < nMedia) {
-                  //   final theMedia = await medias(showingImages).elementAt(i);
-                  //   return GestureDetector(
-                  //     onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
-                  //     child: Down4ImageViewer(
-                  //       media: theMedia,
-                  //       displaySize: Size.square(mediaCelSize),
-                  //       forceSquareAnyways: true,
-                  //     ),
-                  //   );
-                  // } else {
-                  //   return const SizedBox.shrink();
-                  // }
-                }
+            Widget f(int i) {
+              return FutureBuilder(
+                future: savedMedia(showingImages).elementAt(i),
+                builder: ((context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.done &&
+                      snapshot.hasData) {
+                    return GestureDetector(
+                      onTap: () =>
+                          consoleMedias2?.onSelect.call(snapshot.requireData),
+                      child: Down4ImageViewer(
+                          media: snapshot.requireData,
+                          displaySize: Size.square(mediaCelSize),
+                          forceSquareAnyways: true),
+                    );
+                  } else {
+                    return SizedBox.square(dimension: mediaCelSize);
+                  }
+                }),
+              );
+              // if (i < nMedia) {
+              //   final theMedia = await medias(showingImages).elementAt(i);
+              //   return GestureDetector(
+              //     onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
+              //     child: Down4ImageViewer(
+              //       media: theMedia,
+              //       displaySize: Size.square(mediaCelSize),
+              //       forceSquareAnyways: true,
+              //     ),
+              //   );
+              // } else {
+              //   return const SizedBox.shrink();
+              // }
+            }
 
-                return Row(
-                  children: [
-                    f((index * 5)),
-                    f((index * 5) + 1),
-                    f((index * 5) + 2),
-                    f((index * 5) + 3),
-                    f((index * 5) + 4)
-                  ],
-                );
-              }))),
+            return Row(
+              children: [
+                f((index * 5)),
+                f((index * 5) + 1),
+                f((index * 5) + 2),
+                f((index * 5) + 3),
+                f((index * 5) + 4)
+              ],
+            );
+          }))),
     );
   }
 
@@ -639,7 +637,7 @@ class Console extends StatelessWidget {
                       padding: const EdgeInsets.all(4.0),
                       color: PinkTheme.nodeColors[obj.node.colorCode],
                       child: Text(
-                        obj.node.name,
+                        obj.node.displayName,
                         overflow: TextOverflow.clip,
                         maxLines: 1,
                       )))

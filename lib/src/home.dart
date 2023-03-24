@@ -971,7 +971,7 @@ class _HomeState extends State<Home> {
     }
 
     return NodePage(
-        node: node,
+        palette: node,
         openChat: (node_) => setPage(chatPage(node_ as Chatable, isPush: true)),
         openNode: (node_) => setPage(nodePage(node_, isPush: true)),
         payNode: (node) =>

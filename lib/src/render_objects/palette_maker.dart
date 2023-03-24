@@ -334,13 +334,12 @@ class PaletteMaker extends StatelessWidget {
         onTap: imagePress,
         child: SizedBox(
           width: Palette.paletteHeight - 4.0, // borderWidth x2
-          child: image == null
-              ? _defaultImage
-              : Image.memory(
-                  image!.data,
-                  gaplessPlayback: true,
-                  fit: BoxFit.cover,
-                ),
+          child: image != null
+              ? Down4ImageViewer(
+                  media: image!,
+                  displaySize: Size.square(Palette.paletteHeight),
+                  forceSquareAnyways: true)
+              : _defaultImage,
         ),
       );
 

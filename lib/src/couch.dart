@@ -823,6 +823,7 @@ class Payment extends FireNode {
 
 class FireMedia extends FireObject {
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
+  final String tinyThumbnail;
   bool _isSaved;
   final Id owner;
   Id? _onlineId;
@@ -861,6 +862,7 @@ class FireMedia extends FireObject {
     required this.aspectRatio,
     required this.extension,
     required this.mimetype,
+    required this.tinyThumbnail,
     required Set<Id> references,
     int onlineTimestamp = 0,
     int lastUse = 0,
@@ -934,6 +936,7 @@ class FireMedia extends FireObject {
       mimetype: decodedJson["mimetype"]!,
       onlineId: decodedJson["onlineRef"]!,
       lastUse: int.parse(decodedJson["lastUse"]!),
+      tinyThumbnail: decodedJson["tinyThumbnail"]!,
       onlineTimestamp: int.parse(decodedJson["onlineTimestamp"]!),
       references: decodedJson["references"]!.split(" ").toSet(),
       isSaved: decodedJson["isSaved"] == "true",
@@ -953,6 +956,7 @@ class FireMedia extends FireObject {
         "timestamp": timestamp.toString(),
         "extension": extension,
         "mimetype": mimetype,
+        "tinyThumbnail": tinyThumbnail,
         if (onlineId != null) "onlineRef": onlineId!,
         "onlineTimestamp": onlineTimestamp.toString(),
         if (text != null) "text": text!,

@@ -12,14 +12,14 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "node-${node.id}";
+  ID get id => "node-${palette.node.id}";
 
-  final FireNode node;
-  final void Function(FireNode) openNode, openChat, payNode;
+  final Palette2 palette;
+  final void Function(Palette2) openNode, openChat, payNode;
   final void Function() back;
 
   const NodePage({
-    required this.node,
+    required this.palette,
     required this.payNode,
     required this.openNode,
     required this.openChat,
@@ -49,14 +49,14 @@ class _NodePageState extends State<NodePage> {
   @override
   void initState() {
     super.initState();
-    if (widget.node is Personable) {
+    if (widget.palette.node is Personable) {
       _view = Andrew(pages: [
         Down4Page(
           scrollController: scroller,
           reversedList: false,
-          title: widget.node.displayName,
+          title: widget.palette.node.displayName,
           console: userPaletteConsole,
-          list: [ProfileWidget(node: widget.node)],
+          list: [ProfileWidget(palette: widget.palette)],
         ),
       ]);
     } // TODO other node types
@@ -79,14 +79,14 @@ class _NodePageState extends State<NodePage> {
         topButtons: [
           ConsoleButton(
             name: "Message",
-            onPress: () => widget.openChat(widget.node),
+            onPress: () => widget.openChat(widget.palette),
           ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.back),
           ConsoleButton(
             name: "Pay",
-            onPress: () => widget.payNode(widget.node),
+            onPress: () => widget.payNode(widget.palette),
           ),
         ],
       );

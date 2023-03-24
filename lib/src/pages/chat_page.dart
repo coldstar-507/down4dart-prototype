@@ -131,7 +131,7 @@ class _ChatPageState extends State<ChatPage> {
               for (var chat in widget.messages.values.selected()) {
                 chat.message.updateSavedStatus(true);
               }
-              g.self.save();
+              // g.self.save();
               unselectSelectedMessage();
               loadBaseConsole();
             })
@@ -148,7 +148,7 @@ class _ChatPageState extends State<ChatPage> {
               for (final media in selectedMedias) {
                 media.updateSaveStatus(true);
               }
-              g.self.save();
+              // g.self.save();
               unselectSelectedMessage();
               loadBaseConsole();
             }),

@@ -255,7 +255,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     // print("GENERATING MEDIA INFO");
     double mediaHeight = 0;
     double mediaWidth = 0;
-    FireMedia? media = await local<FireMedia>(message.media!);
+    FireMedia? media = await global<FireMedia>(message.media!);
     if (media == null) return null;
     mediaWidth = ChatMessage.maxMessageWidth - ChatMessage.messageBorder;
     mediaHeight = mediaWidth * (media.isSquared ? 1.0 : media.aspectRatio);
@@ -276,7 +276,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     if (message.replies == null) return null;
     List<ChatReplyInfo> chatReplies = [];
     for (final replyID in message.replies!) {
-      final reply = await local<FireMessage>(replyID);
+      final reply = await global<FireMessage>(replyID);
       if (reply == null) continue;
       final String replyBody =
           reply.text?.isNotEmpty ?? false ? reply.text! : "&attachment";

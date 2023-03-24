@@ -1,12 +1,16 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:down4/src/_down4_dart_utils.dart';
-import 'package:video_player/video_player.dart';
+// import 'package:video_player/video_player.dart';
+import 'package:better_player/better_player.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:mime/mime.dart';
+import 'package:image/image.dart' as IMG;
 
 import 'palette.dart';
 
@@ -16,6 +20,42 @@ import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../globals.dart';
+
+class Down4ImageViewer extends StatelessWidget {
+  final FireMedia media;
+  final Size displaySize;
+  final bool forceSquareAnyways;
+
+  const Down4ImageViewer({
+    required this.media,
+    required this.displaySize,
+    required this.forceSquareAnyways,
+    Key? key,
+  }) : super(key: key);
+
+  Widget transform(Image image) => Down4ImageTransform(
+      image: image,
+      imageAspectRatio: media.aspectRatio,
+      displaySize: displaySize,
+      isSquared: media.isSquared,
+      isReversed: media.isReversed);
+
+  @override
+  Widget build(BuildContext context) {
+    if (media.cachedImage != null) {
+      return transform(Image.memory(media.cachedImage!));
+    }
+    return FutureBuilder(
+      future: media.imageData,
+      builder: (ctx, asn) {
+        if (!asn.hasData) {
+          transform(Image.memory(base64Decode(media.tinyThumbnail)));
+        }
+        return transform(Image.memory(asn.requireData!));
+      },
+    );
+  }
+}
 
 Image down4Logo(double dimension) {
   return Image.asset(
@@ -259,260 +299,260 @@ class _Down4InputState extends State<Down4Input> {
   }
 }
 
-class Down4VideoPlayer extends StatefulWidget {
-  final VideoPlayerController videoController;
-  // final AnimationController animationController;
-  // final Widget Function(double) rotatingLogo;
-  final FireMedia media;
-  // final String? thumbnail;
-  final Color backgroundColor;
-  final Size displaySize;
-  final bool forceSquareAnyways;
-  final bool autoPlay;
-  const Down4VideoPlayer({
-    // this.thumbnail,
-    // required this.rotatingLogo,
-    // required this.animationController,
-    required this.videoController,
-    required this.backgroundColor,
-    required this.media,
-    required this.autoPlay,
-    required this.displaySize,
-    this.forceSquareAnyways = false,
-    Key? key,
-  }) : super(key: key);
+// class Down4VideoPlayer extends StatefulWidget {
+//   final VideoPlayerController videoController;
+//   // final AnimationController animationController;
+//   // final Widget Function(double) rotatingLogo;
+//   final FireMedia media;
+//   // final String? thumbnail;
+//   final Color backgroundColor;
+//   final Size displaySize;
+//   final bool forceSquareAnyways;
+//   final bool autoPlay;
+//   const Down4VideoPlayer({
+//     // this.thumbnail,
+//     // required this.rotatingLogo,
+//     // required this.animationController,
+//     required this.videoController,
+//     required this.backgroundColor,
+//     required this.media,
+//     required this.autoPlay,
+//     required this.displaySize,
+//     this.forceSquareAnyways = false,
+//     Key? key,
+//   }) : super(key: key);
 
-  @override
-  State<Down4VideoPlayer> createState() => _Down4VideoPlayerState();
-}
+//   @override
+//   State<Down4VideoPlayer> createState() => _Down4VideoPlayerState();
+// }
 
-class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
-  double turns = 0.0;
-  Timer? timer;
-  @override
-  void initState() {
-    super.initState();
-    if (widget.videoController.value.isInitialized) {
-      widget.videoController.addListener(_listenOnEnd);
-      print("LISTENING ON END OF VIDEO ID ${widget.media.id}");
-    }
-  }
+// class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
+//   double turns = 0.0;
+//   Timer? timer;
+//   @override
+//   void initState() {
+//     super.initState();
+//     if (widget.videoController.value.isInitialized) {
+//       widget.videoController.addListener(_listenOnEnd);
+//       print("LISTENING ON END OF VIDEO ID ${widget.media.id}");
+//     }
+//   }
 
-  @override
-  void didUpdateWidget(Down4VideoPlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    print("DID UPDATE WIDGET OF VIDEO ID ${widget.media.id}");
-  }
+//   @override
+//   void didUpdateWidget(Down4VideoPlayer oldWidget) {
+//     super.didUpdateWidget(oldWidget);
+//     print("DID UPDATE WIDGET OF VIDEO ID ${widget.media.id}");
+//   }
 
-  @override
-  void dispose() {
-    print("DISPOSING STATE OF VIDEO ID ${widget.media.id}");
-    if (widget.videoController.value.isInitialized) {
-      print("REMOVING LISTEN ON END OF VIDEO ID ${widget.media.id}");
-      widget.videoController.removeListener(_listenOnEnd);
-    }
-    if (mounted) super.dispose();
-  }
+//   @override
+//   void dispose() {
+//     print("DISPOSING STATE OF VIDEO ID ${widget.media.id}");
+//     if (widget.videoController.value.isInitialized) {
+//       print("REMOVING LISTEN ON END OF VIDEO ID ${widget.media.id}");
+//       widget.videoController.removeListener(_listenOnEnd);
+//     }
+//     if (mounted) super.dispose();
+//   }
 
-  bool loading = false;
+//   bool loading = false;
 
-  void startTurning() {
-    timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      setState(() {
-        turns += 2 * math.pi / 10;
-        turns = turns % (2 * math.pi);
-      });
-    });
-  }
+//   void startTurning() {
+//     timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+//       setState(() {
+//         turns += 2 * math.pi / 10;
+//         turns = turns % (2 * math.pi);
+//       });
+//     });
+//   }
 
-  Future<void> _initController() async {
-    setState(() {
-      loading = true;
-    });
-    await widget.videoController.initialize();
-    widget.videoController.addListener(_listenOnEnd);
-    if (widget.autoPlay) {
-      widget.videoController
-        ..setLooping(true)
-        ..play();
-    }
-    setState(() {
-      loading = false;
-      timer?.cancel();
-    });
-  }
+//   Future<void> _initController() async {
+//     setState(() {
+//       loading = true;
+//     });
+//     await widget.videoController.initialize();
+//     widget.videoController.addListener(_listenOnEnd);
+//     if (widget.autoPlay) {
+//       widget.videoController
+//         ..setLooping(true)
+//         ..play();
+//     }
+//     setState(() {
+//       loading = false;
+//       timer?.cancel();
+//     });
+//   }
 
-  Future<void> _pauseOrPlay() async {
-    if (!widget.autoPlay) {
-      if (widget.videoController.value.isPlaying == true) {
-        await widget.videoController.pause();
-        await widget.videoController.seekTo(Duration.zero);
-      } else {
-        await widget.videoController.play();
-      }
-    }
-    setState(() {});
-  }
+//   Future<void> _pauseOrPlay() async {
+//     if (!widget.autoPlay) {
+//       if (widget.videoController.value.isPlaying == true) {
+//         await widget.videoController.pause();
+//         await widget.videoController.seekTo(Duration.zero);
+//       } else {
+//         await widget.videoController.play();
+//       }
+//     }
+//     setState(() {});
+//   }
 
-  Future<void> onTap() async {
-    if (!widget.videoController.value.isInitialized) {
-      startTurning();
-      await _initController();
-    }
-    await _pauseOrPlay();
-  }
+//   Future<void> onTap() async {
+//     if (!widget.videoController.value.isInitialized) {
+//       startTurning();
+//       await _initController();
+//     }
+//     await _pauseOrPlay();
+//   }
 
-  void _listenOnEnd() async {
-    if (widget.videoController.value.duration ==
-            widget.videoController.value.position &&
-        !widget.videoController.value.isPlaying) {
-      await widget.videoController.seekTo(Duration.zero);
-      print("CLOSING VIDEO!");
-      setState(() {});
-    }
-  }
+//   void _listenOnEnd() async {
+//     if (widget.videoController.value.duration ==
+//             widget.videoController.value.position &&
+//         !widget.videoController.value.isPlaying) {
+//       await widget.videoController.seekTo(Duration.zero);
+//       print("CLOSING VIDEO!");
+//       setState(() {});
+//     }
+//   }
 
-  // Widget rotatingLogo(double dimension) {
-  //   return AnimatedRotation(
-  //       turns: math.pi * 2,
-  //       duration: const Duration(seconds: 2),
-  //       child: down4Logo(dimension));
-  // }
+//   // Widget rotatingLogo(double dimension) {
+//   //   return AnimatedRotation(
+//   //       turns: math.pi * 2,
+//   //       duration: const Duration(seconds: 2),
+//   //       child: down4Logo(dimension));
+//   // }
 
-  Widget rotatingLogo(double dimension) {
-    return AnimatedRotation(
-      duration: const Duration(seconds: 1),
-      turns: turns,
-      child: down4Logo(dimension),
-    );
-  }
+//   Widget rotatingLogo(double dimension) {
+//     return AnimatedRotation(
+//       duration: const Duration(seconds: 1),
+//       turns: turns,
+//       child: down4Logo(dimension),
+//     );
+//   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.videoController.value.isInitialized && !loading) {
-      print("THUMBNAIL PATH = ${widget.media.thumbnail}");
-      return Stack(children: [
-        Down4ImageTransform(
-            image: Image.file(widget.media.thumbnailFile!,
-                fit: BoxFit.cover,
-                cacheHeight: widget.displaySize.height.toInt(),
-                cacheWidth: widget.displaySize.width.toInt()),
-            imageAspectRatio: widget.media.metadata.elementAspectRatio,
-            displaySize: widget.displaySize,
-            isSquared:
-                widget.media.metadata.isSquared || widget.forceSquareAnyways,
-            isReversed: widget.media.metadata.isReversed),
-        Center(
-            child: SizedBox.square(
-                dimension: widget.displaySize.aspectRatio > 1
-                    ? widget.displaySize.height / 4
-                    : widget.displaySize.width / 4,
-                child: GestureDetector(
-                    onTap: onTap,
-                    child: Image.asset("assets/images/filled.png",
-                        fit: BoxFit.cover))))
-      ]);
-      // return FutureBuilder(
-      //   future: _initController(),
-      //   builder: (context, snapshot) {
-      //     if (snapshot.connectionState == ConnectionState.done) {
-      //       if (widget.videoController.value.isPlaying) {
-      //         return GestureDetector(
-      //           onTap: _pauseOrPlay,
-      //           child: Down4VideoTransform(
-      //               displaySize: widget.displaySize,
-      //               isReversed: widget.media.metadata.isReversed,
-      //               isSquared: widget.media.metadata.isSquared ||
-      //                   widget.forceSquareAnyways,
-      //               video: VideoPlayer(widget.videoController),
-      //               videoAspectRatio: widget.media.metadata.elementAspectRatio),
-      //         );
-      //       } else {
-      //         return Stack(
-      //           children: [
-      //             Down4ImageTransform(
-      //                 image: Image.memory(widget.thumbnail!,
-      //                     fit: BoxFit.cover,
-      //                     cacheHeight: widget.displaySize.height.toInt(),
-      //                     cacheWidth: widget.displaySize.width.toInt()),
-      //                 imageAspectRatio:
-      //                     widget.media.metadata.elementAspectRatio,
-      //                 displaySize: widget.displaySize,
-      //                 isSquared: widget.media.metadata.isSquared ||
-      //                     widget.forceSquareAnyways,
-      //                 isReversed: widget.media.metadata.isReversed),
-      //             Center(
-      //                 child: SizedBox.square(
-      //                     dimension: widget.displaySize.aspectRatio > 1
-      //                         ? widget.displaySize.height / 4
-      //                         : widget.displaySize.width / 4,
-      //                     child: GestureDetector(
-      //                         onTap: _pauseOrPlay,
-      //                         child: Image.asset(
-      //                             "assets/images/filled.png",
-      //                             fit: BoxFit.cover))))
-      //           ],
-      //         );
-      //       }
-      //     } else {
-      //       return S
-      //     }
-      //   },
-      // );
-    } else if (!widget.videoController.value.isInitialized && loading) {
-      return Stack(children: [
-        Down4ImageTransform(
-            image: Image.file(widget.media.thumbnailFile!,
-                fit: BoxFit.cover,
-                cacheHeight: widget.displaySize.height.toInt(),
-                cacheWidth: widget.displaySize.width.toInt()),
-            imageAspectRatio: widget.media.metadata.elementAspectRatio,
-            displaySize: widget.displaySize,
-            isSquared:
-                widget.media.metadata.isSquared || widget.forceSquareAnyways,
-            isReversed: widget.media.metadata.isReversed),
-        Center(
-            child: GestureDetector(
-                onTap: onTap,
-                child: rotatingLogo(widget.displaySize.aspectRatio > 1
-                    ? widget.displaySize.height / 4
-                    : widget.displaySize.width / 4)))
-      ]);
-    } else {
-      return widget.videoController.value.isPlaying
-          ? GestureDetector(
-              onTap: _pauseOrPlay,
-              child: Down4VideoTransform(
-                  displaySize: widget.displaySize,
-                  isReversed: widget.media.metadata.isReversed,
-                  isSquared: widget.media.metadata.isSquared ||
-                      widget.forceSquareAnyways,
-                  video: VideoPlayer(widget.videoController),
-                  videoAspectRatio: widget.media.metadata.elementAspectRatio))
-          : Stack(children: [
-              Down4ImageTransform(
-                  image: Image.file(widget.media.thumbnailFile!,
-                      fit: BoxFit.cover,
-                      cacheHeight: widget.displaySize.height.toInt(),
-                      cacheWidth: widget.displaySize.width.toInt()),
-                  imageAspectRatio: widget.media.metadata.elementAspectRatio,
-                  displaySize: widget.displaySize,
-                  isSquared: widget.media.metadata.isSquared ||
-                      widget.forceSquareAnyways,
-                  isReversed: widget.media.metadata.isReversed),
-              Center(
-                  child: SizedBox.square(
-                      dimension: widget.displaySize.aspectRatio > 1
-                          ? widget.displaySize.height / 4
-                          : widget.displaySize.width / 4,
-                      child: GestureDetector(
-                          onTap: _pauseOrPlay,
-                          child: Image.asset("assets/images/filled.png",
-                              fit: BoxFit.cover))))
-            ]);
-    }
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     if (!widget.videoController.value.isInitialized && !loading) {
+//       print("THUMBNAIL PATH = ${widget.media.thumbnail}");
+//       return Stack(children: [
+//         Down4ImageTransform(
+//             image: Image.file(widget.media.thumbnailFile!,
+//                 fit: BoxFit.cover,
+//                 cacheHeight: widget.displaySize.height.toInt(),
+//                 cacheWidth: widget.displaySize.width.toInt()),
+//             imageAspectRatio: widget.media.metadata.elementAspectRatio,
+//             displaySize: widget.displaySize,
+//             isSquared:
+//                 widget.media.metadata.isSquared || widget.forceSquareAnyways,
+//             isReversed: widget.media.metadata.isReversed),
+//         Center(
+//             child: SizedBox.square(
+//                 dimension: widget.displaySize.aspectRatio > 1
+//                     ? widget.displaySize.height / 4
+//                     : widget.displaySize.width / 4,
+//                 child: GestureDetector(
+//                     onTap: onTap,
+//                     child: Image.asset("assets/images/filled.png",
+//                         fit: BoxFit.cover))))
+//       ]);
+//       // return FutureBuilder(
+//       //   future: _initController(),
+//       //   builder: (context, snapshot) {
+//       //     if (snapshot.connectionState == ConnectionState.done) {
+//       //       if (widget.videoController.value.isPlaying) {
+//       //         return GestureDetector(
+//       //           onTap: _pauseOrPlay,
+//       //           child: Down4VideoTransform(
+//       //               displaySize: widget.displaySize,
+//       //               isReversed: widget.media.metadata.isReversed,
+//       //               isSquared: widget.media.metadata.isSquared ||
+//       //                   widget.forceSquareAnyways,
+//       //               video: VideoPlayer(widget.videoController),
+//       //               videoAspectRatio: widget.media.metadata.elementAspectRatio),
+//       //         );
+//       //       } else {
+//       //         return Stack(
+//       //           children: [
+//       //             Down4ImageTransform(
+//       //                 image: Image.memory(widget.thumbnail!,
+//       //                     fit: BoxFit.cover,
+//       //                     cacheHeight: widget.displaySize.height.toInt(),
+//       //                     cacheWidth: widget.displaySize.width.toInt()),
+//       //                 imageAspectRatio:
+//       //                     widget.media.metadata.elementAspectRatio,
+//       //                 displaySize: widget.displaySize,
+//       //                 isSquared: widget.media.metadata.isSquared ||
+//       //                     widget.forceSquareAnyways,
+//       //                 isReversed: widget.media.metadata.isReversed),
+//       //             Center(
+//       //                 child: SizedBox.square(
+//       //                     dimension: widget.displaySize.aspectRatio > 1
+//       //                         ? widget.displaySize.height / 4
+//       //                         : widget.displaySize.width / 4,
+//       //                     child: GestureDetector(
+//       //                         onTap: _pauseOrPlay,
+//       //                         child: Image.asset(
+//       //                             "assets/images/filled.png",
+//       //                             fit: BoxFit.cover))))
+//       //           ],
+//       //         );
+//       //       }
+//       //     } else {
+//       //       return S
+//       //     }
+//       //   },
+//       // );
+//     } else if (!widget.videoController.value.isInitialized && loading) {
+//       return Stack(children: [
+//         Down4ImageTransform(
+//             image: Image.file(widget.media.thumbnailFile!,
+//                 fit: BoxFit.cover,
+//                 cacheHeight: widget.displaySize.height.toInt(),
+//                 cacheWidth: widget.displaySize.width.toInt()),
+//             imageAspectRatio: widget.media.metadata.elementAspectRatio,
+//             displaySize: widget.displaySize,
+//             isSquared:
+//                 widget.media.metadata.isSquared || widget.forceSquareAnyways,
+//             isReversed: widget.media.metadata.isReversed),
+//         Center(
+//             child: GestureDetector(
+//                 onTap: onTap,
+//                 child: rotatingLogo(widget.displaySize.aspectRatio > 1
+//                     ? widget.displaySize.height / 4
+//                     : widget.displaySize.width / 4)))
+//       ]);
+//     } else {
+//       return widget.videoController.value.isPlaying
+//           ? GestureDetector(
+//               onTap: _pauseOrPlay,
+//               child: Down4VideoTransform(
+//                   displaySize: widget.displaySize,
+//                   isReversed: widget.media.metadata.isReversed,
+//                   isSquared: widget.media.metadata.isSquared ||
+//                       widget.forceSquareAnyways,
+//                   video: VideoPlayer(widget.videoController),
+//                   videoAspectRatio: widget.media.metadata.elementAspectRatio))
+//           : Stack(children: [
+//               Down4ImageTransform(
+//                   image: Image.file(widget.media.thumbnailFile!,
+//                       fit: BoxFit.cover,
+//                       cacheHeight: widget.displaySize.height.toInt(),
+//                       cacheWidth: widget.displaySize.width.toInt()),
+//                   imageAspectRatio: widget.media.metadata.elementAspectRatio,
+//                   displaySize: widget.displaySize,
+//                   isSquared: widget.media.metadata.isSquared ||
+//                       widget.forceSquareAnyways,
+//                   isReversed: widget.media.metadata.isReversed),
+//               Center(
+//                   child: SizedBox.square(
+//                       dimension: widget.displaySize.aspectRatio > 1
+//                           ? widget.displaySize.height / 4
+//                           : widget.displaySize.width / 4,
+//                       child: GestureDetector(
+//                           onTap: _pauseOrPlay,
+//                           child: Image.asset("assets/images/filled.png",
+//                               fit: BoxFit.cover))))
+//             ]);
+//     }
+//   }
+// }
 
 class Down4ImageTransform extends StatelessWidget {
   final double imageAspectRatio;
@@ -554,104 +594,104 @@ class Down4ImageTransform extends StatelessWidget {
   }
 }
 
-class Down4ImageViewer extends StatelessWidget {
-  final FireMedia media;
-  final Size displaySize;
-  final bool forceSquareAnyways;
-  const Down4ImageViewer({
-    required this.media,
-    required this.displaySize,
-    this.forceSquareAnyways = false,
-    Key? key,
-  }) : super(key: key);
+// class Down4ImageViewer extends StatelessWidget {
+//   final FireMedia media;
+//   final Size displaySize;
+//   final bool forceSquareAnyways;
+//   const Down4ImageViewer({
+//     required this.media,
+//     required this.displaySize,
+//     this.forceSquareAnyways = false,
+//     Key? key,
+//   }) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    final isSquared = media.metadata.isSquared || forceSquareAnyways;
-    final isReversed = media.metadata.isReversed;
-    final aspectRatio = media.metadata.elementAspectRatio;
-    final theImage = media.file != null
-        ? Image.file(media.file!,
-            gaplessPlayback: true,
-            cacheHeight: displaySize.height.toInt() * (isSquared ? 1 : 2),
-            cacheWidth: displaySize.width.toInt() * (isSquared ? 1 : 2),
-            fit: BoxFit.cover)
-        : Image.network(media.url,
-            gaplessPlayback: true,
-            cacheHeight: displaySize.height.toInt() * (isSquared ? 1 : 2),
-            cacheWidth: displaySize.width.toInt() * (isSquared ? 1 : 2),
-            fit: BoxFit.cover);
-    return Down4ImageTransform(
-      displaySize: displaySize,
-      isSquared: isSquared,
-      imageAspectRatio: aspectRatio,
-      isReversed: isReversed,
-      image: theImage,
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     final isSquared = media.metadata.isSquared || forceSquareAnyways;
+//     final isReversed = media.metadata.isReversed;
+//     final aspectRatio = media.metadata.elementAspectRatio;
+//     final theImage = media.file != null
+//         ? Image.file(media.file!,
+//             gaplessPlayback: true,
+//             cacheHeight: displaySize.height.toInt() * (isSquared ? 1 : 2),
+//             cacheWidth: displaySize.width.toInt() * (isSquared ? 1 : 2),
+//             fit: BoxFit.cover)
+//         : Image.network(media.url,
+//             gaplessPlayback: true,
+//             cacheHeight: displaySize.height.toInt() * (isSquared ? 1 : 2),
+//             cacheWidth: displaySize.width.toInt() * (isSquared ? 1 : 2),
+//             fit: BoxFit.cover);
+//     return Down4ImageTransform(
+//       displaySize: displaySize,
+//       isSquared: isSquared,
+//       imageAspectRatio: aspectRatio,
+//       isReversed: isReversed,
+//       image: theImage,
+//     );
+//   }
+// }
 
 extension ChatMessageExtension on Iterable<ChatMessage> {
   Iterable<ChatMessage> selected() => where((e) => e.selected);
   Iterable<ID> asIDs() => map((e) => e.id);
 }
 
-extension PaletteExtensionsMap on Map<ID, Palette> {
-  Map<ID, Palette> those(List<ID> ids) {
-    var map = <ID, Palette>{};
-    for (final id in ids) {
-      map[id] = this[id]!;
-    }
-    return map;
-  }
-}
+// extension PaletteExtensionsMap on Map<ID, Palette> {
+//   Map<ID, Palette> those(List<ID> ids) {
+//     var map = <ID, Palette>{};
+//     for (final id in ids) {
+//       map[id] = this[id]!;
+//     }
+//     return map;
+//   }
+// }
 
-extension PaletteExtensions on Iterable<Palette> {
-  List<Palette> inThatOrder(Iterable<ID> ids) {
-    var theList = <Palette>[];
-    var palIds = asIds();
-    for (final id in ids) {
-      if (palIds.contains(id)) {
-        theList.add(firstWhere((p) => p.node.id == id));
-      }
-    }
-    return theList;
-  }
+// extension PaletteExtensions on Iterable<Palette> {
+//   List<Palette> inThatOrder(Iterable<ID> ids) {
+//     var theList = <Palette>[];
+//     var palIds = asIds();
+//     for (final id in ids) {
+//       if (palIds.contains(id)) {
+//         theList.add(firstWhere((p) => p.node.id == id));
+//       }
+//     }
+//     return theList;
+//   }
 
-  List<Palette> inReversedOrder(Iterable<ID> ids) {
-    var theList = <Palette>[];
-    var palIds = asIds();
-    for (final id in ids.toList(growable: false).reversed) {
-      if (palIds.contains(id)) {
-        theList.add(firstWhere((p) => p.node.id == id));
-      }
-    }
-    return theList;
-  }
+//   List<Palette> inReversedOrder(Iterable<ID> ids) {
+//     var theList = <Palette>[];
+//     var palIds = asIds();
+//     for (final id in ids.toList(growable: false).reversed) {
+//       if (palIds.contains(id)) {
+//         theList.add(firstWhere((p) => p.node.id == id));
+//       }
+//     }
+//     return theList;
+//   }
 
-  List<Palette> formatted() => toList(growable: false)
-    ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
-  List<Palette> formattedReverse() => toList(growable: false)
-    ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
-  Iterable<Palette> unfolded() => where((p) => !p.fold);
-  Iterable<Palette> folded() => where((p) => p.fold);
-  Iterable<Palette> deactivated() => map((p) => p.deactivated());
-  Iterable<BaseNode> asNodes<BaseNode>() =>
-      map((p) => p.node).whereType<BaseNode>();
-  Iterable<Palette> selected() => where((p) => p.selected);
-  Iterable<Palette> notSelected() => where((p) => !p.selected);
-  Iterable<ID> asIds() => map((e) => e.node.id);
-  Iterable<Palette> chatables() => where((p) => p.node is Chatable);
-  Iterable<Palette> users() => where((p) => p.node is User);
-  Iterable<Palette> people() => where((p) => p.node is Personable);
-  Iterable<Palette> groups() => where((p) => p.node is Groupable);
-  Iterable<Palette> those(Iterable<ID> ids) =>
-      where((p) => ids.contains(p.node.id));
-  Iterable<Palette> notThose(Iterable<ID> ids) =>
-      where((p) => !ids.contains(p.node.id));
-  Iterable<Palette> forwardables() =>
-      where((p) => p.node.isPublicGroup || p.node is User);
-}
+//   List<Palette> formatted() => toList(growable: false)
+//     ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+//   List<Palette> formattedReverse() => toList(growable: false)
+//     ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
+//   Iterable<Palette> unfolded() => where((p) => !p.fold);
+//   Iterable<Palette> folded() => where((p) => p.fold);
+//   Iterable<Palette> deactivated() => map((p) => p.deactivated());
+//   Iterable<BaseNode> asNodes<BaseNode>() =>
+//       map((p) => p.node).whereType<BaseNode>();
+//   Iterable<Palette> selected() => where((p) => p.selected);
+//   Iterable<Palette> notSelected() => where((p) => !p.selected);
+//   Iterable<ID> asIds() => map((e) => e.node.id);
+//   Iterable<Palette> chatables() => where((p) => p.node is Chatable);
+//   Iterable<Palette> users() => where((p) => p.node is User);
+//   Iterable<Palette> people() => where((p) => p.node is Personable);
+//   Iterable<Palette> groups() => where((p) => p.node is Groupable);
+//   Iterable<Palette> those(Iterable<ID> ids) =>
+//       where((p) => ids.contains(p.node.id));
+//   Iterable<Palette> notThose(Iterable<ID> ids) =>
+//       where((p) => !ids.contains(p.node.id));
+//   Iterable<Palette> forwardables() =>
+//       where((p) => p.node.isPublicGroup || p.node is User);
+// }
 
 extension Palette2Extensions on List<Palette2> {
   List<Palette2> formatted() => toList(growable: false)
@@ -708,57 +748,57 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   }
 }
 
-extension ImageOfNodes on FireNode {
-  Widget get transformedImage {
-    if (media != null) {
-      return Down4ImageTransform(
-          image: nodeImage,
-          imageAspectRatio: media!.metadata.elementAspectRatio,
-          displaySize: Size.square(Palette.paletteHeight),
-          isSquared: true,
-          isReversed: media!.metadata.isReversed);
-    } else {
-      return nodeImage;
-    }
-  }
+// extension ImageOfNodes on FireNode {
+//   Widget get transformedImage {
+//     if (media != null) {
+//       return Down4ImageTransform(
+//           image: nodeImage,
+//           imageAspectRatio: media!.metadata.elementAspectRatio,
+//           displaySize: Size.square(Palette.paletteHeight),
+//           isSquared: true,
+//           isReversed: media!.metadata.isReversed);
+//     } else {
+//       return nodeImage;
+//     }
+//   }
 
-  Image get nodeImage {
-    final n = this;
-    if (n is User) {
-      return n.media != null
-          ? Image.memory(n.media!.data,
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              cacheHeight: (Palette.paletteHeight * 3).toInt(),
-              cacheWidth: (Palette.paletteHeight * 3).toInt())
-          : Image.asset('assets/images/hashirama.jpg',
-              fit: BoxFit.cover,
-              cacheHeight: Palette.paletteHeight.toInt(),
-              cacheWidth: Palette.paletteHeight.toInt());
-    } else if (n is Groupable) {
-      return Image.memory(n.media.data,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          cacheHeight: Palette.paletteHeight.toInt() * 3,
-          cacheWidth: Palette.paletteHeight.toInt() * 3);
-    } else if (n is Payment) {
-      return n.payment.independentGets < 2000000
-          ? g.d1
-          : n.payment.independentGets < 10000000
-              ? g.d2
-              : g.d3;
-    } else if (n is Self) {
-      return Image.memory(
-        n.media.data,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        cacheHeight: Palette.paletteHeight.toInt() * 3,
-        cacheWidth: Palette.paletteHeight.toInt() * 3,
-      );
-    }
-    throw 'stop breaking my app';
-  }
-}
+//   Image get nodeImage {
+//     final n = this;
+//     if (n is User) {
+//       return n.media != null
+//           ? Image.memory(n.media!.data,
+//               fit: BoxFit.cover,
+//               gaplessPlayback: true,
+//               cacheHeight: (Palette.paletteHeight * 3).toInt(),
+//               cacheWidth: (Palette.paletteHeight * 3).toInt())
+//           : Image.asset('assets/images/hashirama.jpg',
+//               fit: BoxFit.cover,
+//               cacheHeight: Palette.paletteHeight.toInt(),
+//               cacheWidth: Palette.paletteHeight.toInt());
+//     } else if (n is Groupable) {
+//       return Image.memory(n.media.data,
+//           fit: BoxFit.cover,
+//           gaplessPlayback: true,
+//           cacheHeight: Palette.paletteHeight.toInt() * 3,
+//           cacheWidth: Palette.paletteHeight.toInt() * 3);
+//     } else if (n is Payment) {
+//       return n.payment.independentGets < 2000000
+//           ? g.d1
+//           : n.payment.independentGets < 10000000
+//               ? g.d2
+//               : g.d3;
+//     } else if (n is Self) {
+//       return Image.memory(
+//         n.media.data,
+//         fit: BoxFit.cover,
+//         gaplessPlayback: true,
+//         cacheHeight: Palette.paletteHeight.toInt() * 3,
+//         cacheWidth: Palette.paletteHeight.toInt() * 3,
+//       );
+//     }
+//     throw 'stop breaking my app';
+//   }
+// }
 
 class NoGlow extends ScrollBehavior {
   @override
@@ -827,39 +867,39 @@ class MediaSizeClipper extends CustomClipper<Rect> {
   }
 }
 
-class Down4VideoTransform extends StatelessWidget {
-  final Size displaySize;
-  final double videoAspectRatio;
-  final VideoPlayer video;
-  final bool isReversed, isSquared;
+// class Down4VideoTransform extends StatelessWidget {
+//   final Size displaySize;
+//   final double videoAspectRatio;
+//   final VideoPlayer video;
+//   final bool isReversed, isSquared;
 
-  const Down4VideoTransform({
-    required this.displaySize,
-    required this.videoAspectRatio,
-    required this.video,
-    required this.isReversed,
-    required this.isSquared,
-    Key? key,
-  }) : super(key: key);
+//   const Down4VideoTransform({
+//     required this.displaySize,
+//     required this.videoAspectRatio,
+//     required this.video,
+//     required this.isReversed,
+//     required this.isSquared,
+//     Key? key,
+//   }) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return ClipRect(
-      clipper: MediaSizeClipper(displaySize),
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.rotationY(isReversed ? math.pi : 0),
-        child: Transform.scale(
-            scaleY: isSquared && videoAspectRatio > 1 ? videoAspectRatio : null,
-            scaleX: isSquared && videoAspectRatio <= 1
-                ? 1 / videoAspectRatio
-                : null,
-            scale: !isSquared ? 1.0 : null,
-            child: SizedBox.fromSize(size: displaySize, child: video)),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return ClipRect(
+//       clipper: MediaSizeClipper(displaySize),
+//       child: Transform(
+//         alignment: Alignment.center,
+//         transform: Matrix4.rotationY(isReversed ? math.pi : 0),
+//         child: Transform.scale(
+//             scaleY: isSquared && videoAspectRatio > 1 ? videoAspectRatio : null,
+//             scaleX: isSquared && videoAspectRatio <= 1
+//                 ? 1 / videoAspectRatio
+//                 : null,
+//             scale: !isSquared ? 1.0 : null,
+//             child: SizedBox.fromSize(size: displaySize, child: video)),
+//       ),
+//     );
+//   }
+// }
 
 Future<Size> decodeImageSize(Uint8List d) async {
   final decodedImage = await decodeImageFromList(d);
@@ -897,20 +937,27 @@ Future<FireMedia?> importNodeMedia() async {
       allowMultiple: false,
       allowCompression: true,
       withData: true);
-
   if (result == null) return null;
   final bytes = result.files.single.bytes;
   final mediaID = deterministicMediaID(bytes!, g.self.id);
   final size = await decodeImageSize(bytes);
-  return FireMedia(
-      data: bytes,
-      id: mediaID,
-      metadata: MediaMetadata(
-          isSquared: true,
-          owner: g.self.id,
-          timestamp: timeStamp(),
-          elementAspectRatio: 1.0 / size.aspectRatio,
-          extension: result.files.single.path!.extension()));
+  final mime = lookupMimeType(result.files.single.path!)!;
+  final tiny = resizeImage(bytes, 20, 20);
+  return FireMedia(mediaID,
+      mimetype: mime,
+      references: {},
+      tinyThumbnail: base64Encode(tiny),
+      isSquared: true,
+      owner: g.self.id,
+      timestamp: timeStamp(),
+      aspectRatio: 1.0 / size.aspectRatio,
+      extension: result.files.single.path!.extension());
+}
+
+Uint8List resizeImage(Uint8List bytes, int width, int height) {
+  IMG.Image? img = IMG.decodeImage(bytes);
+  IMG.Image resized = IMG.copyResize(img!, width: 20, height: 20);
+  return Uint8List.fromList(IMG.encodePng(resized));
 }
 
 Future<void> importConsoleMedias({required bool images}) async {
@@ -922,26 +969,25 @@ Future<void> importConsoleMedias({required bool images}) async {
         allowCompression: true,
         withData: true);
     if (results == null) return;
-    for (final file in results.files) {
-      if (file.path == null && file.bytes != null) continue;
-      final mediaID = deterministicMediaID(file.bytes!, g.self.id);
-      final size = await decodeImageSize(file.bytes!);
-      final f = await writeMedia(mediaData: file.bytes!, mediaID: mediaID);
-      FireMedia(
-          id: mediaID,
+    for (final image in results.files) {
+      if (image.path == null || image.bytes == null) continue;
+      final mediaID = deterministicMediaID(image.bytes!, g.self.id);
+      final size = await decodeImageSize(image.bytes!);
+      final mime = lookupMimeType(image.path!)!;
+      final tiny = resizeImage(image.bytes!, 20, 20);
+      final media = FireMedia(mediaID,
           isSaved: true,
-          path: f.path,
-          metadata: MediaMetadata(
-              isSquared: false,
-              isReversed: false,
-              extension: file.path!.extension(),
-              timestamp: timeStamp(),
-              owner: g.self.id,
-              elementAspectRatio: 1.0 / size.aspectRatio))
-        ..isSaved = true
-        ..save();
-
-      g.self.images.add(mediaID);
+          isSquared: false,
+          isReversed: false,
+          mimetype: mime,
+          references: {},
+          tinyThumbnail: base64Encode(tiny),
+          extension: image.path!.extension(),
+          timestamp: timeStamp(),
+          owner: g.self.id,
+          aspectRatio: 1.0 / size.aspectRatio);
+      await media.write(imageData: image.bytes!);
+      // g.self.images.add(mediaID);
     }
   } else {
     final videos = await FilePicker.platform.pickFiles(
@@ -956,32 +1002,25 @@ Future<void> importConsoleMedias({required bool images}) async {
       final videoInfoGetter = FlutterVideoInfo();
       final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
       final mediaID = deterministicMediaID(video.bytes!, g.self.id);
-      final f = await writeMedia(mediaData: video.bytes!, mediaID: mediaID);
-      final tn = await VideoThumbnail.thumbnailData(video: f.path, quality: 90);
-      String? thumbnailPath;
-      if (tn != null) {
-        final f = await writeMedia(
-            mediaData: tn, mediaID: mediaID, isThumbnail: true);
-        thumbnailPath = f.path;
-      }
-
-      FireMedia(
-          id: mediaID,
-          path: f.path,
-          thumbnail: thumbnailPath,
-          metadata: MediaMetadata(
-              isReversed: false,
-              isSquared: false,
-              extension: video.path!.extension(),
-              timestamp: timeStamp(),
-              owner: g.self.id,
-              elementAspectRatio:
-                  (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0)))
-        ..isSaved = true
-        ..save();
-
-      g.self.videos.add(mediaID);
+      final mime = lookupMimeType(video.path!)!;
+      final tn = await VideoThumbnail.thumbnailData(
+        video: video.path!,
+        quality: 90,
+      );
+      final tiny = resizeImage(tn!, 20, 20);
+      final media = FireMedia(mediaID,
+          mimetype: mime,
+          tinyThumbnail: base64Encode(tiny),
+          isReversed: false,
+          isSquared: false,
+          references: {},
+          isSaved: true,
+          extension: video.path!.extension(),
+          timestamp: timeStamp(),
+          owner: g.self.id,
+          aspectRatio: (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0));
+      await media.write(videoData: video.bytes!, imageData: tn);
     }
   }
-  g.self.save();
+  // g.self.save();
 }
