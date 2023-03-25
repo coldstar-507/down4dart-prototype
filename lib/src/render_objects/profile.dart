@@ -63,7 +63,7 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           // displaySize: Size.square(squareImageSize),
           // isSquared: media?.isSquared ?? false,
           // isReversed: media?.isReversed ?? false),
-          palette.image,
+          palette.paletteMedia,
           const SizedBox(height: 8.0),
           Down4Text(
               text: palette.node.displayName,

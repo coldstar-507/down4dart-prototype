@@ -748,7 +748,7 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   }
 }
 
-// extension ImageOfNodes on FireNode {
+extension ImageOfNodes on FireNode {
 //   Widget get transformedImage {
 //     if (media != null) {
 //       return Down4ImageTransform(
@@ -762,43 +762,40 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
 //     }
 //   }
 
-//   Image get nodeImage {
-//     final n = this;
-//     if (n is User) {
-//       return n.media != null
-//           ? Image.memory(n.media!.data,
-//               fit: BoxFit.cover,
-//               gaplessPlayback: true,
-//               cacheHeight: (Palette.paletteHeight * 3).toInt(),
-//               cacheWidth: (Palette.paletteHeight * 3).toInt())
-//           : Image.asset('assets/images/hashirama.jpg',
-//               fit: BoxFit.cover,
-//               cacheHeight: Palette.paletteHeight.toInt(),
-//               cacheWidth: Palette.paletteHeight.toInt());
-//     } else if (n is Groupable) {
-//       return Image.memory(n.media.data,
-//           fit: BoxFit.cover,
-//           gaplessPlayback: true,
-//           cacheHeight: Palette.paletteHeight.toInt() * 3,
-//           cacheWidth: Palette.paletteHeight.toInt() * 3);
-//     } else if (n is Payment) {
-//       return n.payment.independentGets < 2000000
-//           ? g.d1
-//           : n.payment.independentGets < 10000000
-//               ? g.d2
-//               : g.d3;
-//     } else if (n is Self) {
-//       return Image.memory(
-//         n.media.data,
-//         fit: BoxFit.cover,
-//         gaplessPlayback: true,
-//         cacheHeight: Palette.paletteHeight.toInt() * 3,
-//         cacheWidth: Palette.paletteHeight.toInt() * 3,
-//       );
-//     }
-//     throw 'stop breaking my app';
-//   }
-// }
+  Image get defaultNodeImage {
+    final n = this;
+    if (n is User) {
+      return Image.asset('assets/images/hashirama.jpg',
+          fit: BoxFit.cover,
+          cacheHeight: Palette.paletteHeight.toInt(),
+          cacheWidth: Palette.paletteHeight.toInt());
+      // n.media != null
+      // ? Image.memory(n.media!.data,
+      //     fit: BoxFit.cover,
+      //     gaplessPlayback: true,
+      //     cacheHeight: (Palette.paletteHeight * 3).toInt(),
+      //     cacheWidth: (Palette.paletteHeight * 3).toInt())
+      // :
+    } else if (n is Groupable) {
+      return Image.asset('assets/images/hashirama.jpg',
+          fit: BoxFit.cover,
+          cacheHeight: Palette.paletteHeight.toInt(),
+          cacheWidth: Palette.paletteHeight.toInt());
+    } else if (n is Payment) {
+      return n.payment.independentGets < 2000000
+          ? g.d1
+          : n.payment.independentGets < 10000000
+              ? g.d2
+              : g.d3;
+    } else if (n is Self) {
+      return Image.asset('assets/images/hashirama.jpg',
+          fit: BoxFit.cover,
+          cacheHeight: Palette.paletteHeight.toInt(),
+          cacheWidth: Palette.paletteHeight.toInt());
+    }
+    throw 'stop breaking my app';
+  }
+}
 
 class NoGlow extends ScrollBehavior {
   @override

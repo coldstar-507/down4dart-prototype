@@ -116,7 +116,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     if (bc.rawValue == null) return;
     final data = bc.rawValue!.split("~");
     if (data.length != 4) return;
-    final localUser = await global<User>(data[0]);
+    final (localUser, gt) = await global<User>(data[0]);
     final node = localUser ??
         User(data[0],
             name: data[1],

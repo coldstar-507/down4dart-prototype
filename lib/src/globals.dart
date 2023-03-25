@@ -426,107 +426,107 @@ extension ExchangeRateSave on ExchangeRate {
 //   Future<void> save() => g.boxes.payments.put(id, jsonEncode(this));
 // }
 
-// extension WalletManager on Wallet {
-//   void setIx(int ix) => g.boxes.personal.put("ix", ix);
+extension WalletManager on Wallet {
+  void setIx(int ix) => g.boxes.personal.put("ix", ix);
 
-//   static int get ix => g.boxes.personal.get("ix");
+  static int get ix => g.boxes.personal.get("ix");
 
-//   static Down4Keys get keys =>
-//       Down4Keys.fromJson(jsonDecode(g.boxes.personal.get("keys")));
+  static Down4Keys get keys =>
+      Down4Keys.fromJson(jsonDecode(g.boxes.personal.get("keys")));
 
-//   Stream<Down4Payment> get payments async* {
-//     for (final paymentID in g.boxes.payments.keys) {
-//       final json = await g.boxes.payments.get(paymentID);
-//       if (json != null) {
-//         yield Down4Payment.fromJson(jsonDecode(json));
-//       }
-//     }
-//   }
+  Stream<Down4Payment> get payments async* {
+    for (final paymentID in g.boxes.payments.keys) {
+      final json = await g.boxes.payments.get(paymentID);
+      if (json != null) {
+        yield Down4Payment.fromJson(jsonDecode(json));
+      }
+    }
+  }
 
-//   Stream<Down4TXOUT> get utxos async* {
-//     for (final utxoID in g.boxes.utxos.keys) {
-//       final json = await g.boxes.utxos.get(utxoID);
-//       if (json != null) {
-//         yield Down4TXOUT.fromJson(jsonDecode(json));
-//       }
-//     }
-//   }
+  Stream<Down4TXOUT> get utxos async* {
+    for (final utxoID in g.boxes.utxos.keys) {
+      final json = await g.boxes.utxos.get(utxoID);
+      if (json != null) {
+        yield Down4TXOUT.fromJson(jsonDecode(json));
+      }
+    }
+  }
 
-//   Future<Down4TXOUT?> getUtxo(ID id) async {
-//     final json = await g.boxes.utxos.get(id);
-//     if (json == null) return null;
-//     return Down4TXOUT.fromJson(jsonDecode(json));
-//   }
+  Future<Down4TXOUT?> getUtxo(ID id) async {
+    final json = await g.boxes.utxos.get(id);
+    if (json == null) return null;
+    return Down4TXOUT.fromJson(jsonDecode(json));
+  }
 
-//   Future<void> removeUtxo(ID id) async {
-//     await g.boxes.utxos.delete(id);
-//     return;
-//   }
+  Future<void> removeUtxo(ID id) async {
+    await g.boxes.utxos.delete(id);
+    return;
+  }
 
-//   Future<Down4Payment?> getPayment(ID id) async {
-//     final json = await g.boxes.payments.get(id);
-//     if (json == null) return null;
-//     return Down4Payment.fromJson(jsonDecode(json));
-//   }
+  Future<Down4Payment?> getPayment(ID id) async {
+    final json = await g.boxes.payments.get(id);
+    if (json == null) return null;
+    return Down4Payment.fromJson(jsonDecode(json));
+  }
 
-//   void removePayment(ID id) {
-//     g.boxes.payments.delete(id);
-//   }
+  void removePayment(ID id) {
+    g.boxes.payments.delete(id);
+  }
 
-//   Future<void> setPayment(Down4Payment payment) async {
-//     await g.boxes.payments.put(payment.id, jsonEncode(payment));
-//     return;
-//   }
+  Future<void> setPayment(Down4Payment payment) async {
+    await g.boxes.payments.put(payment.id, jsonEncode(payment));
+    return;
+  }
 
-//   Future<void> setUtxo(Down4TXOUT utxo) async {
-//     await g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
-//     return;
-//   }
+  Future<void> setUtxo(Down4TXOUT utxo) async {
+    await g.boxes.utxos.put(utxo.id, jsonEncode(utxo));
+    return;
+  }
 
-//   Future<bool> isSpent(ID utxoID) async {
-//     final bool? spent = await g.boxes.spents.get(utxoID);
-//     return spent ?? false;
-//   }
+  Future<bool> isSpent(ID utxoID) async {
+    final bool? spent = await g.boxes.spents.get(utxoID);
+    return spent ?? false;
+  }
 
-//   Future<void> setSpent(ID id, bool spent) async {
-//     await g.boxes.spents.put(id, spent);
-//     return;
-//   }
+  Future<void> setSpent(ID id, bool spent) async {
+    await g.boxes.spents.put(id, spent);
+    return;
+  }
 
-//   static Wallet load() {
-//     return Wallet(
-//         keys: keys,
-//         // payments: payments,
-//         // utxos: utxos,
-//         // getUtxo: getUtxo,
-//         // getPayment: getPayment,
-//         // removeUtxo: removeUtxo,
-//         // removePayment: removePayment,
-//         // setIx: setIx,
-//         // setSpent: setSpent,
-//         // isSpent: isSpent,
-//         // setPayment: setPayment,
-//         // setUtxo: setUtxo,
-//         ix: ix);
-//   }
-// }
+  static Wallet load() {
+    return Wallet(
+        keys: keys,
+        // payments: payments,
+        // utxos: utxos,
+        // getUtxo: getUtxo,
+        // getPayment: getPayment,
+        // removeUtxo: removeUtxo,
+        // removePayment: removePayment,
+        // setIx: setIx,
+        // setSpent: setSpent,
+        // isSpent: isSpent,
+        // setPayment: setPayment,
+        // setUtxo: setUtxo,
+        ix: ix);
+  }
+}
 
-// extension SelfSave on Self {
-//   void save() {
-//     // this will be split so we don't save the whole thing everytime
-//     g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
-//   }
+extension SelfSave on Self {
+  void save() {
+    // this will be split so we don't save the whole thing everytime
+    g.boxes.personal.put("self", jsonEncode(toJson(toLocal: true)));
+  }
 
-//   static Self load() {
-//     // this will be remade so we load many different parts to make the self
-//     final asJson = jsonDecode(g.boxes.personal.get("self"));
-//     return FireNode.fromJson(asJson) as Self;
-//   }
+  static Self load() {
+    // this will be remade so we load many different parts to make the self
+    final asJson = jsonDecode(g.boxes.personal.get("self"));
+    return FireNode.fromJson(asJson) as Self;
+  }
 
-//   static bool notYetInitialized() {
-//     return g.boxes.personal.get("self") == null;
-//   }
-// }
+  static bool notYetInitialized() {
+    return g.boxes.personal.get("self") == null;
+  }
+}
 
 class P {
   double scroll;
@@ -727,43 +727,41 @@ void unselectedSelectedPalettes(Map<ID, Palette2> state) {
   }
 }
 
-Future<void> writeHomePalette<T>(
-  T node,
+Future<void> writeHomePalette<T extends FireNode>(
+  Palette2<T> p,
   Map<ID, Down4Object> state,
   Future<List<ButtonsInfo2>> Function(T)? bGen,
   void Function()? onSel, {
   bool? sel,
 }) async {
-  // return right away if not a BaseNode
-  if (node is! FireNode) {
-    return print("SORRY BRO, BUT ISN'T BASE NODE LOL");
-  }
 
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false
   bool? selectionIfReload;
-  final Palette2? pInState = state[node.id] as Palette2?;
+  final Palette2? pInState = state[p.node.id] as Palette2?;
   selectionIfReload = pInState?.selected;
   bool isSelected = sel ?? selectionIfReload ?? false;
 
   // if node is chatable, we want to load previews
-  Pair<String, bool>? previewInfo;
+  Pair<bool, String>? previewInfo;
+  final node = p.node;
   if (node is Chatable) {
-    previewInfo = await node.previewInfo();
+    previewInfo = await node.messagingPreview();
   }
 
   void Function()? onSelect = onSel == null
       ? null
       : () async {
-          await writeHomePalette(node, state, bGen, onSel, sel: !isSelected);
+          await writeHomePalette(p, state, bGen, onSel, sel: !isSelected);
           onSel.call();
         };
 
   state[node.id] = Palette2(
-      node: node,
+      node: p.node,
+      image: p.image,
       selected: isSelected,
-      messagePreview: previewInfo?.first,
+      messagePreview: previewInfo?.second,
       imPress: onSelect,
       bodyPress: onSelect,
       buttonsInfo2: await bGen?.call(node) ?? []);
@@ -772,7 +770,7 @@ Future<void> writeHomePalette<T>(
 }
 
 void writePalette3(
-  FireNode node,
+  Palette2 p,
   Map<ID, Down4Object> state,
   List<ButtonsInfo2> Function(FireNode)? bGen,
   void Function()? onSel, {
@@ -783,26 +781,27 @@ void writePalette3(
   // if the palette is a reload and use it's current status, or else it will
   // default to false
   bool? selectionIfReload;
-  final Palette2? pInState = state[node.id] as Palette2?;
+  final Palette2? pInState = state[p.node.id] as Palette2?;
   selectionIfReload = pInState?.selected;
   bool isSelected = sel ?? selectionIfReload ?? false;
 
   void Function()? onSelect = onSel == null
       ? null
       : () {
-          writePalette3(node, state, bGen, onSel, sel: !isSelected, pr: pr);
+          writePalette3(p, state, bGen, onSel, sel: !isSelected, pr: pr);
           onSel.call();
         };
 
-  state[node.id] = Palette2(
-      node: node,
+  state[p.node.id] = Palette2(
+      node: p.node,
+      image: p.image,
       selected: isSelected,
       imPress: onSelect,
       bodyPress: onSelect,
       messagePreview: pr,
-      buttonsInfo2: bGen?.call(node) ?? []);
+      buttonsInfo2: bGen?.call(p.node) ?? []);
 
-  print("SUCCESS FULLY WROTE ${node.id} TO STATE = $state");
+  print("SUCCESS FULLY WROTE ${p.node.id} TO STATE = $state");
 }
 
 class Transition {

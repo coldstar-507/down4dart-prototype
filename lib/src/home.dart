@@ -122,8 +122,6 @@ class _HomeState extends State<Home> {
 
   void homeScrollToZero() => vm.home.pages[0].scroll = 0;
 
-  var _tec = TextEditingController();
-
   // ======================================================= INITIALIZATION ============================================================ //
 
   void rfHome() => setPage(homePage());
@@ -146,41 +144,46 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> localPalettesRoutine({bool init = false}) async {
-    final homes = Set<ID>.from(g.boxes.nodes.keys.followedBy([g.self.id]));
-    final hiddens = Set<ID>.from(g.boxes.hidden.keys);
-    final shouldDump = hiddens.intersection(homes);
-    final allLocal = homes.followedBy(hiddens).toSet();
+    final homePalettes = await loadHomePalettes(isHidden: false);
+    final hiddenHomePalettes = await loadHomePalettes(isHidden: true);
 
-    final nodes = await Future.wait(homes.map((e) => e.getLocalNode()));
-    final groupNodes = nodes.whereType<Groupable>();
+
+    final homeIDs = homePalettes.asIds().toSet();
+    final hiddenIDs = hiddenHomePalettes.asIds().toSet();
+    // final homes = Set<ID>.from(g.boxes.nodes.keys.followedBy([g.self.id]));
+    // final hiddens = Set<ID>.from(g.boxes.hidden.keys);
+    final shouldDump = hiddenIDs.intersection(homeIDs);
+    final allLocal = homeIDs.followedBy(hiddenIDs).toSet();
+
+
+    final groupNodes = homePalettes.asNodes<Groupable>();
     final groupIds = groupNodes.map((e) => e.group).expand((id) => id).toSet();
-    final calcHidden = groupIds.difference(homes);
+    final calcHidden = groupIds.difference(homeIDs);
 
-    final stayHidden = hiddens.intersection(calcHidden);
+    final stayHidden = hiddenIDs.intersection(calcHidden);
 
-    final hiddenToDump = hiddens.difference(stayHidden);
+    final hiddenToDump = hiddenIDs.difference(stayHidden);
     final hiddenToFetch = calcHidden.difference(allLocal);
 
     for (final dump in hiddenToDump.followedBy(shouldDump)) {
-      g.boxes.hidden.delete(dump);
+      db_<FireNode>().purgeDocumentById(dump);
     }
 
-    for (final node in nodes.whereType<FireNode>().followedBy([g.self])) {
-      await writeHomePalette(node, _homePalettes, bGen, rfHome);
+    for (final p in homePalettes) {
+      await writeHomePalette(p, _homePalettes, bGen, rfHome);
     }
 
     if (init) setPage(homePage());
 
-    final lHidden = await Future.wait(stayHidden.map((e) => e.getHiddenNode()));
-    for (final n in lHidden.whereType<FireNode>()) {
-      await writeHomePalette(n, _hiddenPalettes, null, null);
+    for (final p in hiddenHomePalettes) {
+      await writeHomePalette(p, _hiddenPalettes, null, null);
     }
 
     final fetched = await r.getNodes(hiddenToFetch);
     for (final n in fetched ?? <FireNode>[]) {
-      n.save(hidden: true);
       await writeHomePalette(n, _hiddenPalettes, null, null);
     }
+
 
     print("HIDDEN = ${_hiddenPalettes.keys.toList()}");
     print("HOMES = ${_homePalettes.keys.toList()}");
@@ -198,12 +201,11 @@ class _HomeState extends State<Home> {
             rightMost: true)
       ];
     } else {
-      FireMessage? lastMsg = node.messages.isEmpty
-          ? null
-          : await node.messages.last.getLocalMessage();
+      final FireMessage? lastMsg =
+          node.messages.isEmpty ? null : await global(node.messages.last);
       return [
         ButtonsInfo2(
-            asset: lastMsg?.reads[node.id] ?? true ? g.fifty : g.black,
+            asset: lastMsg?.isRead ?? true ? g.fifty : g.black,
             pressFunc: () => setPage(chatPage(node, isPush: true)),
             longPressFunc: () => node is Personable
                 ? setPage(nodePage(node, isPush: true))
@@ -227,32 +229,28 @@ class _HomeState extends State<Home> {
     var messagesRef = db.child("Messages");
 
     Future<void> handleMessage(FireMessage msg, ID root) async {
-      Chatable? rootNode = homeNode(root) as Chatable?;
-      if (rootNode == null) {
-        // need to download it
-        final singleNodeList = await r.getNodes([root]);
-        if (singleNodeList == null || singleNodeList.length != 1) return;
-        rootNode = singleNodeList.first as Chatable;
-        rootNode.updateActivity();
-        if (rootNode is Groupable) {
-          await rootNode.save();
-          await localPalettesRoutine();
-        }
+      final (n, gt) = await global<Chatable>(root, fetch: true, merge: true);
+      if (n == null) return;
+      if (gt == GetType.fetch && n.media != null) {
+        await global<FireMedia>(n.media!,
+            fetch: true, merge: true, mediaData: true, nodesMedia: true);
       }
 
-      await msg.onReceipt(root: root);
+      if (msg.media != null) {
+        await global<FireMedia>(msg.media!,
+            fetch: true, merge: true, mediaData: true);
+      }
 
-      rootNode.messages.add(msg.id);
-      rootNode.updateActivity();
-      await rootNode.save();
+      await n.addMessage(msg);
+      n.updateActivity();
 
-      await writeHomePalette(rootNode, _homePalettes, bGen, rfHome);
+      await writeHomePalette<Chatable>(n, _homePalettes, bGen, rfHome);
 
       final pg = page;
       if (pg is HomePage) {
         setPage(homePage());
       } else if (pg is ChatPage && pg.node.id == root) {
-        setPage(chatPage(rootNode, isReload: true, fo: pg.fo));
+        setPage(chatPage(n, isReload: true, fo: pg.fo));
       }
     }
 

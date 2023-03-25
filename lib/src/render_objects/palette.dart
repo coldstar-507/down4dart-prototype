@@ -117,7 +117,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
   ID get id => node.id;
 
   final T node;
-  final Image image;
+  final FireMedia? image;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish;
   final List<ButtonsInfo2> buttonsInfo2;
@@ -289,14 +289,6 @@ class Palette2<T extends FireNode> extends StatelessWidget
         ),
       );
 
-  // Widget get image => GestureDetector(
-  //     onTap: imPress,
-  //     onLongPress: imLongPress,
-  //     child: SizedBox(
-  //         width: Palette.paletteHeight - 4.0,
-  //         height: Palette.paletteHeight - 4.0, // borderWidth x2
-  //         child: node.transformedImage));
-
   Widget get body => Expanded(
         child: GestureDetector(
           onTap: bodyPress,
@@ -350,6 +342,13 @@ class Palette2<T extends FireNode> extends StatelessWidget
         ),
       );
 
+  Widget get paletteMedia => image == null
+      ? node.defaultNodeImage
+      : Down4ImageViewer(
+          media: image!,
+          displaySize: Size.square(Palette.paletteHeight),
+          forceSquareAnyways: true);
+
   @override
   Widget build(BuildContext context) {
     return AnimatedOpacity(
@@ -358,7 +357,9 @@ class Palette2<T extends FireNode> extends StatelessWidget
       duration: Duration(milliseconds: fadeMS),
       child: Column(children: [
         animatedContainer2(
-          child: mainContainer(child: row(children: [image, body, buttons])),
+          child: mainContainer(
+            child: row(children: [paletteMedia, body, buttons]),
+          ),
         ),
         AnimatedContainer(
             duration: Duration(milliseconds: containerMS),

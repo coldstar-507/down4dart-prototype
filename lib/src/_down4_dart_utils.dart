@@ -167,12 +167,12 @@ extension IterableNodes on Iterable<FireNode> {
   Iterable<User> users() => whereType<User>();
 }
 
-extension IsTypes on FireNode {
-  bool get isFriendOrGroup => isFriendUser || this is Groupable;
-  bool get isUserOrGroup => this is User || this is Groupable;
-  bool get isFriendUser => this is User ? (this as User).isFriend : false;
-  bool get isPublicGroup => this is Group ? !(this as Group).isPrivate : false;
-}
+// extension IsTypes on FireNode {
+//   bool get isFriendOrGroup => isFriendUser || this is Groupable;
+//   bool get isUserOrGroup => this is User || this is Groupable;
+//   bool get isFriendUser => this is User ? (this as User).isFriend : false;
+//   bool get isPublicGroup => this is Group ? !(this as Group).isPrivate : false;
+// }
 
 extension AsUint8List on List<int> {
   Uint8List toUint8List() => Uint8List.fromList(this);

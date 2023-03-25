@@ -49,7 +49,8 @@ Future<void> main() async {
     await Firebase.initializeApp();
     channel = const AndroidNotificationChannel(
       'Down4AndroidNotificationChannel', // id
-      'High Importance Notifications for Down4AndroidNotificationChannel', // title // description
+      'High Importance Notifications for Down4AndroidNotificationChannel',
+      // title // description
       importance: Importance.high,
     );
 
