@@ -585,35 +585,36 @@ class ViewManager {
   }
 }
 
-
-
 class Payload {
-  final List<Down4Object> forwardables;
-  final List<ID> replies;
-  final String text;
+  final List<Down4Object>? forwardables;
+  final List<ID>? replies;
+  final String? text;
   final FireMedia? media;
-  final FireMessage? message;
+
+  Set<ID>? get nodesRef => forwardables?.whereType<Palette2>().asIds().toSet();
+
+  FireMessage? generateMessage() {
+    if (text == null && media == null && (nodesRef ?? {}).isEmpty) return null;
+    return FireMessage(
+      messagePushId(),
+      sender: g.self.id,
+      timestamp: timeStamp(),
+      media: media?.id,
+      text: text,
+      replies: replies?.toSet(),
+      nodes: forwardables?.whereType<Palette2>().asIds().toSet(),
+    );
+  }
+
   Payload({
     required List<ID>? r,
     required List<Down4Object>? f,
     required String? t,
     required FireMedia? m,
-  })  : forwardables = f ?? const <Down4Object>[],
-        replies = r ?? const <ID>[],
-        media = m,
-        text = t ?? "",
-        message = (t ?? "").isNotEmpty ||
-                m != null ||
-                (f ?? const []).whereType<Palette2>().isNotEmpty
-            ? FireMessage(
-                senderID: g.self.id,
-                timestamp: timeStamp(),
-                id: messagePushId(),
-                mediaID: m?.id,
-                text: t,
-                replies: r,
-                nodes: (f ?? []).whereType<Palette2>().asIds().toList())
-            : null;
+  })  : forwardables = f,
+        replies = r,
+        text = t,
+        media = m;
 }
 
 class Boxes {
@@ -698,7 +699,7 @@ class Singletons {
       images: {},
       videos: {},
       nfts: {},
-      children: {},
+      publics: {},
       messages: {},
       snips: {},
     )..save();

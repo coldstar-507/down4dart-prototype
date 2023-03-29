@@ -43,6 +43,22 @@ final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
 final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
 final isVideoMediaIndexConfig = ValueIndexConfiguration(["isVideo"]);
 
+Future<Set<ID>> allGroupIDs() async {
+  final q = await const AsyncQueryBuilder()
+      .select(SelectResult.property("group"))
+      .from(DataSource.database(_nodesDB))
+      .where(Expression.property("type").in_([
+        Expression.string("hyperchat"),
+        Expression.string("group"),
+      ]))
+      .execute();
+
+  return (await q.allResults()).fold(<ID>{}, (value, element) async {
+    final sGroup = element.toPlainMap()["group"] as String;
+    return (await value)..addAll(sGroup.split(" "));
+  });
+}
+
 Future<List<Palette2<Chatable>>> loadHomePalettes(
     {required bool isHidden}) async {
   final isHiddenProp = isHidden.toString();
@@ -308,9 +324,6 @@ class FireMessage extends FireObject {
   final String? forwarderID;
   final int timestamp;
   bool _isRead, _isSent;
-  final Set<ID> _references;
-
-  Iterable<ID> get references => _references;
 
   FireMessage(
     super.id, {
@@ -323,11 +336,9 @@ class FireMessage extends FireObject {
     this.text,
     this.nodes,
     this.replies,
-    Set<ID>? references,
     bool isRead = false,
     bool isSent = false,
-  })  : _references = references ?? Set<ID>.identity(),
-        _isRead = isRead,
+  })  : _isRead = isRead,
         _isSent = isSent;
 
   bool get isRead => _isRead;
@@ -350,7 +361,6 @@ class FireMessage extends FireObject {
     return FireMessage(decodedJson["id"] as ID,
         sender: decodedJson["sender"] as ID,
         forwarderID: decodedJson["forwarderID"],
-        references: decodedJson["references"]?.split(" ").toSet(),
         text: decodedJson["text"],
         isSaved: decodedJson["isSaved"] == "true",
         media: decodedJson["media"],
@@ -362,16 +372,16 @@ class FireMessage extends FireObject {
         replies: decodedJson["replies"]?.split(" ").toSet());
   }
 
-  Future<void> addReference(ID ref) async {
-    _references.add(ref);
-    await _merge({"references": references.join(" ")});
-  }
+  // Future<void> addReference(ID ref) async {
+  //   _references.add(ref);
+  //   await _merge({"references": references.join(" ")});
+  // }
 
-  Future<void> removeReference(ID ref) async {
-    _references.remove(ref);
-    if (references.isEmpty) return _delete();
-    await _merge({"references": references.join(" ")});
-  }
+  // Future<void> removeReference(ID ref) async {
+  //   _references.remove(ref);
+  //   if (references.isEmpty) return _delete();
+  //   await _merge({"references": references.join(" ")});
+  // }
 
   Future<void> markRead() async {
     if (isRead) return;
@@ -393,7 +403,7 @@ class FireMessage extends FireObject {
         'timestamp': timestamp.toString(),
         if (media != null) 'media': media!,
         if (onlineMedia != null) 'onlineMedia': onlineMedia!,
-        if (withLocalValues) 'references': _references.join(" "),
+        // if (withLocalValues) 'references': _references.join(" "),
         // if (withLocalValues) 'isSaved': _isSaved.toString(),
         if (withLocalValues) 'isRead': isRead.toString(),
         if (withLocalValues) 'isSent': isSent.toString(),
@@ -446,8 +456,7 @@ abstract class FireNode extends FireObject {
   final Down4Keys? _neuter;
   ID? _media;
   bool? _isFriend, _isHidden, _isPrivate;
-  // final Set<ID>? _messages;
-  // final Set<ID>? _snips;
+  final Set<ID>? _snips, _messages;
   final Set<ID>? _group, _publics, _privates, _posts, _admins;
   final String? _owner;
   // final Set<Id>? _nfts;
@@ -499,14 +508,14 @@ abstract class FireNode extends FireObject {
     String? description,
     Down4Keys? neuter,
     ID? media,
-
-    // Set<ID>? messages,
-    // Set<ID>? snips,
-    // Set<ID>? group,
-    // Set<ID>? nfts,
-    // Set<ID>? images,
-    // Set<ID>? videos,
-    Set<ID>? children,
+    ID? owner,
+    Set<ID>? publics,
+    Set<ID>? privates,
+    Set<ID>? posts,
+    Set<ID>? admins,
+    Set<ID>? messages,
+    Set<ID>? snips,
+    Set<ID>? group,
   })  : _activity = activity,
         _name = name,
         _lastName = lastName,
@@ -516,13 +525,14 @@ abstract class FireNode extends FireObject {
         _description = description,
         _neuter = neuter,
         _media = media,
-        // _messages = messages,
-        // _snips = snips,
+        _owner = owner,
+        _messages = messages,
+        _privates = privates,
+        _snips = snips,
         _group = group,
-        // _nfts = nfts,
-        // _images = images,
-        // _videos = videos,
-        _publics = children;
+        _admins = admins,
+        _posts = posts,
+        _publics = publics;
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? u.timeStamp();
@@ -541,14 +551,13 @@ abstract class FireNode extends FireObject {
     final isPrivate = json["isPrivate"] == "true";
     final lastName = json["lastName"];
     final description = json["description"];
-    final children = json["children"]?.split(" ").toSet();
+    final publics = json["publics"]?.split(" ").toSet();
+    final privates = json["privates"]?.split(" ").toSet();
+    final admins = json["admins"]?.split(" ").toSet();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
     final group = json["group"]?.split(" ").toSet();
-    // final images = json["images"]?.split(" ").toSet();
-    // final videos = json["videos"]?.split(" ").toSet();
-    // final nfts = json["nfts"]?.split(" ").toSet();
     final messages = json["messages"]?.split(" ").toSet();
     final snips = json["snips"]?.split(" ").toSet();
 
@@ -561,7 +570,7 @@ abstract class FireNode extends FireObject {
             media: media,
             isHidden: isHidden,
             isFriend: isFriend,
-            children: children!,
+            publics: publics!,
             messages: messages!,
             snips: snips!,
             neuter: neuter!,
@@ -594,7 +603,7 @@ abstract class FireNode extends FireObject {
             description: description,
             lastName: lastName,
             media: media!,
-            children: children!,
+            publics: publics!,
             messages: messages!,
             snips: snips!);
 
@@ -634,40 +643,61 @@ abstract mixin class Branchable implements FireNode {
 abstract mixin class Chatable implements FireNode {
   Iterable<ID> get messages;
   Iterable<ID> get snips;
-  bool get noMessagesNorSnips => messages.isEmpty && snips.isEmpty;
+  bool get _noMessagesNorSnips => messages.isEmpty && snips.isEmpty;
 
-  Future<void> addMessage(FireMessage msg) async {
-
+  Future<void> addMessageRef(ID msgID) async {
+    _messages!.add(msgID);
+    _activity = u.timeStamp();
+    _isHidden = false;
+    await _merge({
+      "messages": messages.join(" "),
+      "isHidden": _isHidden.toString(),
+      "activity": activity.toString(),
+    });
   }
 
-  Future<void> removeMessage(FireMessage msg) async {
-    await msg.removeReference(id);
+  Future<void> _onMessageOrSnipRemoval() async {
     final n = this;
-    if (msg.media != null) {
-      final (media, _) = await global<FireMedia>(msg.media!);
-      await media?.removeReference(msg.id);
-    }
-    _messages!.remove(msg.id);
-    if (noMessagesNorSnips && (n is Hyperchat || (n is User && !n.isFriend))) {
-      _delete();
+    final nodeIsDeletable = (n is Hyperchat || (n is User && !n.isFriend));
+    if (nodeIsDeletable && _noMessagesNorSnips) {
+      // need to check if this node is part of a group before deleting it
+      // if it's part of a group, we hide it
+      final groupIDs = await allGroupIDs();
+      if (!groupIDs.contains(id)) {
+        await _delete();
+      } else {
+        await _merge({
+          "messages": messages.join(" "),
+          "isHidden": true.toString(),
+        });
+      }
     } else {
-      await _merge({"messages": messages.join(" ")});
+      await _merge({
+        "messages": messages.join(" "),
+        "snips": snips.join(" "),
+      });
     }
   }
 
-  Future<void> addSnip(FireMedia snip) async {
-    await snip.addReference(id);
-    _snips!.add(snip.id);
-    Map<String, String> merges = {};
-    merges["snips"] = snips.join(" ");
-    if (this is User) merges["isHidden"] = false.toString();
-    await _merge(merges);
+  Future<void> removeMessageRef(ID msgID) async {
+    _messages!.remove(msgID);
+    await _onMessageOrSnipRemoval();
+  }
+
+  Future<void> addSnipRef(ID snipID) async {
+    _snips!.add(snipID);
+    _activity = u.timeStamp();
+    _isHidden = false;
+    await _merge({
+      "snips": snips.join(" "),
+      "isHidden": false.toString(),
+      "activity": u.timeStamp().toString(),
+    });
   }
 
   Future<void> removeSnip(FireMedia snip) async {
-    await snip.removeReference(id);
     _snips!.remove(snip.id);
-    await _merge({"snips": snips.join(" ")});
+    await _onMessageOrSnipRemoval();
   }
 
   Future<(bool isRead, String preview)> messagingPreview() async {
@@ -686,7 +716,7 @@ abstract mixin class Chatable implements FireNode {
     if (r.isEmpty) return const (true, "");
     final json = r.single.toPlainMap()["messages"] as Map<String, String?>;
     final msg = FireMessage.fromJson(json);
-    final preview = (msg.text ?? "").isEmpty ? "&attachment": msg.text!;
+    final preview = (msg.text ?? "").isEmpty ? "&attachment" : msg.text!;
     return (msg.isRead, preview);
 
     // final q = await AsyncQuery.fromN1ql(_messagesDB, raw);
@@ -755,7 +785,7 @@ class User extends FireNode with Branchable, Personable, Chatable {
     required super.name,
     required bool isHidden,
     required bool isFriend,
-    required Set<ID> children,
+    required Set<ID> publics,
     required Set<ID> messages,
     required Set<ID> snips,
     required super.description,
@@ -765,7 +795,7 @@ class User extends FireNode with Branchable, Personable, Chatable {
   }) : super(
             isHidden: isHidden,
             isFriend: isFriend,
-            children: children,
+            publics: publics,
             messages: messages,
             snips: snips);
 
@@ -799,20 +829,20 @@ class User extends FireNode with Branchable, Personable, Chatable {
   @override
   ID? get media => _media;
 
-  // @override
-  // Iterable<ID> get messages => _messages!;
-
   @override
   String get firstName => _name;
 
   @override
   Down4Keys get neuter => _neuter!;
 
-  // @override
-  // Iterable<ID> get snips => _snips!;
-
   @override
   Nodes get type => Nodes.user;
+
+  @override
+  Iterable<ID> get messages => _messages!;
+
+  @override
+  Iterable<ID> get snips => _snips!;
 }
 
 class Self extends FireNode with Branchable, Personable, Chatable, Editable {
@@ -823,12 +853,12 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
     required super.description,
     required super.lastName,
     required ID media,
-    required Set<ID> children,
+    required Set<ID> publics,
     required Set<ID> messages,
     required Set<ID> snips,
   }) : super(
           media: media,
-          children: children,
+          publics: publics,
           messages: messages,
           snips: snips,
         );
@@ -849,7 +879,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   ID get media => _media!;
 
   @override
-  // Iterable<ID> get messages => _messages!;
+  Iterable<ID> get messages => _messages!;
 
   @override
   String get firstName => _name;
@@ -858,7 +888,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   Down4Keys get neuter => _neuter!;
 
   @override
-  // Iterable<ID> get snips => _snips!;
+  Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.self;
@@ -880,11 +910,8 @@ class Group extends FireNode with Groupable, Editable, Chatable {
             group: group,
             isPrivate: isPrivate);
 
-  Future<void> addMembers(Iterable<Personable> members) async {
-    final membersID = members.map((e) => e.id);
-    _group!.addAll(membersID);
-    final merges = members.map((e) => e._merge());
-    await Future.wait(merges);
+  Future<void> addMembersRef(Iterable<ID> memberIDs) async {
+    _group!.addAll(memberIDs);
     await _merge({"group": group.join(" ")});
   }
 
@@ -902,11 +929,11 @@ class Group extends FireNode with Groupable, Editable, Chatable {
   @override
   ID? get media => _media;
 
-  // @override
-  // Iterable<ID> get messages => _messages!;
-  //
-  // @override
-  // Iterable<ID> get snips => _snips!;
+  @override
+  Iterable<ID> get messages => _messages!;
+
+  @override
+  Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.group;
@@ -941,11 +968,11 @@ class Hyperchat extends FireNode with Groupable, Chatable {
   @override
   ID? get media => _media;
 
-  // @override
-  // Iterable<ID> get messages => _messages!;
-  //
-  // @override
-  // Iterable<ID> get snips => _snips!;
+  @override
+  Iterable<ID> get messages => _messages!;
+
+  @override
+  Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.hyperchat;

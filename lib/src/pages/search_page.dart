@@ -124,7 +124,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
             neuter: Down4Keys.fromYouKnow(data[3]),
             messages: {},
             snips: {},
-            children: {},
+            publics: {},
             activity: timeStamp(),
             isFriend: false,
             isHidden: false,

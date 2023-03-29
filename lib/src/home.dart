@@ -243,12 +243,12 @@ class _HomeState extends State<Home> {
       }
 
       if (msg.media != null) {
-        await global<FireMedia>(msg.media!,
+        final (media, _) = await global<FireMedia>(msg.media!,
             fetch: true, merge: true, mediaData: true);
+        media?.addReference(msg.id);
       }
 
-      await n.addMessage(msg);
-      n.updateActivity();
+      n.addMessageRef(msg.id);
 
       final p = Palette2<Chatable>(node: n, image: nodeMedia);
       await writeHomePalette<Chatable>(p, _homePalettes, bGen, rfHome);
@@ -322,49 +322,20 @@ class _HomeState extends State<Home> {
             fetch: true, merge: true, mediaData: true);
         if (snip == null) return;
 
-        // Chatable? nodeRoot;
-        // nodeRoot = homeNode(root) as Chatable?;
-        // if (nodeRoot == null) {
-        //   // nodeRoot is not in home, need to download it
-        //   final newRootNodes = await r.fetchPalettes([root]);
-        //   if (newRootNodes == null || newRootNodes.length != 1) return;
-        //   nodeRoot = newRootNodes.first as Chatable;
-        // }
         final (nodeRoot, gt) =
             await global<Chatable>(root, fetch: true, merge: true);
         if (nodeRoot == null) return;
-        nodeRoot.addSnip(snip);
-        nodeRoot.updateActivity();
+        nodeRoot.addSnipRef(snip.id);
+        snip.addReference(nodeRoot.id);
 
         FireMedia? nodeMedia;
         if (gt == GetType.fetch) {
           (nodeMedia, _) = await global<FireMedia>(nodeRoot.media,
               fetch: true, merge: true, mediaData: true, nodesMedia: true);
+          nodeMedia?.addReference(nodeRoot.id);
         }
         final p = Palette2<Chatable>(node: nodeRoot, image: nodeMedia);
         await writeHomePalette(p, _homePalettes, bGen, rfHome);
-
-        // if (snip != null) nodeRoot.addSnip(snip);
-        // Future<void> getOrUpdateMedia(String refID) async {
-        //   final (media, _) = await global<FireMedia>(mediaID,
-        //       merge: true, fetch: true, mediaData: true);
-        //   media?.addReference(refID);
-        // }
-        //
-        // if (nodeRoot is User && nodeRoot.isFriend) {
-        //   await getOrUpdateMedia(nodeRoot.id);
-        // } else if (nodeRoot is Self) {
-        //   await getOrUpdateMedia(nodeRoot.id);
-        // } else if (nodeRoot is Groupable) {
-        //   await getOrUpdateMedia(nodeRoot.id);
-        // }
-
-        // nodeRoot.addSnip(snip)
-        //
-        // nodeRoot
-        //   ..snips.add(mediaID)
-        //   ..updateActivity()
-        //   ..save();
 
         if (cv.id == 'home') setPage(homePage());
       }
@@ -423,22 +394,19 @@ class _HomeState extends State<Home> {
   // =========================== PAGES FUNCTIONS ======================== //
 
   Future<void> metaSend(Payload p, List<Chatable> targets) async {
-    FireMessage? msg = p.message;
-    await p.media?.save();
     final targetIDs = targets.asIds();
     print("Target IDs = $targetIDs");
     final onlySendingToSelf = targetIDs.every((id) => id == g.self.id);
 
     final messagesToForward =
-        p.forwardables.whereType<ChatMessage>().map((cm) => cm.message);
+        p.forwardables?.whereType<ChatMessage>().map((cm) => cm.message) ?? [];
 
+    List<FireMessage> messages = [];
     for (final t in targets) {
-      for (final m in messagesToForward.followedBy(msg == null ? [] : [msg])) {
-        m.reads[t.id] = true;
-        await m.save();
-        t.messages.add(m.id);
-        t.updateActivity();
-        await t.save();
+      for (final m in messagesToForward) {
+        final msg = m.forwarded(g.self.id)..markRead();
+        messages.add(msg);
+        t.addMessageRef(msg.id);
         await writeHomePalette(t, _homePalettes, bGen, rfHome);
       }
     }
