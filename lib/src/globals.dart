@@ -20,7 +20,7 @@ import 'render_objects/chat_message.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
-import 'web_requests.dart' show getNodes;
+import 'web_requests.dart' show fetchPalettes;
 
 final g = Singletons.instance;
 final db = FirebaseDatabase.instance.ref();
@@ -38,36 +38,39 @@ Future<bool> uploadPayment(Down4Payment pay) async {
   }
 }
 
-// Future<bool> uploadNode(FireNode node) async {
-//   Future<bool> uploadImage() async {
-//     final media = node.media;
-//     if (media == null) return true;
-//     try {
-//       await _st_node.ref(media.id).putData(media.data,
-//           SettableMetadata(customMetadata: media.metadata.toJson()));
-//       return true;
-//     } catch (e) {
-//       print("Error uploading node image: $e");
-//       return false;
-//     }
-//   }
+Future<bool> uploadPalette(Palette2 p) async {
+  Future<bool> uploadImage() async {
+    final media = p.image;
+    if (media == null) return true;
+    final data = await (media.isVideo ? media.videoData : media.imageData);
+    if (data == null) return true;
+    try {
+      final metadata = media.toJson(withLocalValues: true);
+      final settableMetadata = SettableMetadata(customMetadata: metadata);
+      await _st_node.ref(media.id).putData(data, settableMetadata);
+      return true;
+    } catch (e) {
+      print("Error uploading node image: $e");
+      return false;
+    }
+  }
 
-//   Future<bool> uploadNode() async {
-//     final body = node.toJson(toLocal: false);
-//     try {
-//       await _fs.collection("Nodes").doc(node.id).set(body);
-//       return true;
-//     } catch (e) {
-//       print("Failure uploading node: $e");
-//       return false;
-//     }
-//   }
+  Future<bool> uploadNode() async {
+    final body = p.node.toJson(withLocalValues: false);
+    try {
+      await _fs.collection("Nodes").doc(p.id).set(body);
+      return true;
+    } catch (e) {
+      print("Failure uploading node: $e");
+      return false;
+    }
+  }
 
-//   List<Future<bool>> successes = [uploadImage(), uploadNode()];
+  List<Future<bool>> successes = [uploadImage(), uploadNode()];
 
-//   final success = Future.wait(successes).then((s) => s.every((e) => e));
-//   return success;
-// }
+  final success = Future.wait(successes).then((s) => s.every((e) => e));
+  return success;
+}
 
 // String _mediaPath(String mediaID, {bool isThumbnail = false}) =>
 //     "${g.boxes.docPath}/$mediaID${isThumbnail ? "-TN" : ""}";
@@ -106,21 +109,21 @@ String messagePushId() => db.child("Messages").push().key!;
 //   return FireMessage.fromJson(json);
 // }
 
-// Future<Down4Payment?> downloadPayment(ID paymentID) async {
-//   final payRef = _st.ref(paymentID);
-//   try {
-//     final compressed = await payRef.getData();
-//     if (compressed == null) {
-//       print("Error, no data at payment id: $paymentID");
-//       return null;
-//     }
-//     print("Success downloading payment id: $paymentID");
-//     return Down4Payment.fromCompressed(compressed);
-//   } catch (e) {
-//     print("Error downloading payment id: $paymentID, err: $e");
-//     return null;
-//   }
-// }
+Future<Down4Payment?> downloadPayment(ID paymentID) async {
+  final payRef = _st.ref(paymentID);
+  try {
+    final compressed = await payRef.getData();
+    if (compressed == null) {
+      print("Error, no data at payment id: $paymentID");
+      return null;
+    }
+    print("Success downloading payment id: $paymentID");
+    return Down4Payment.fromCompressed(compressed);
+  } catch (e) {
+    print("Error downloading payment id: $paymentID, err: $e");
+    return null;
+  }
+}
 
 // Future<FireMedia?> downloadAndWriteMedia(
 //   String mediaID, {
@@ -537,12 +540,12 @@ class P {
 }
 
 class V {
-  final FireNode? node;
+  final Palette2? p;
   final ID id;
   final List<P> pages;
   int ci;
 
-  V({required this.id, required this.pages, int? ix, this.node}) : ci = ix ?? 0;
+  V({required this.id, required this.pages, int? ix, this.p}) : ci = ix ?? 0;
 
   P get cp => pages[ci];
 }
@@ -581,6 +584,8 @@ class ViewManager {
     push(last);
   }
 }
+
+
 
 class Payload {
   final List<Down4Object> forwardables;
@@ -699,27 +704,27 @@ class Singletons {
     )..save();
   }
 }
-
-Future<List<FireNode>> getNodesFromEverywhere(Set<ID> ids) async {
-  bool hasSelf;
-  if (hasSelf = ids.contains(g.self.id)) {
-    ids.remove(g.self.id);
-  }
-
-  final toFetch = ids.difference(g.boxes.nodes.keys.toSet());
-  final local = ids.difference(toFetch);
-
-  final onlineFetch = getNodes(toFetch);
-  final localFetch = local.map((e) => e.getLocalNode()).toList();
-
-  final locals = await Future.wait(localFetch);
-  final onlines = await onlineFetch;
-  return locals
-      .whereType<FireNode>()
-      .followedBy(onlines ?? [])
-      .followedBy(hasSelf ? [g.self] : [])
-      .toList();
-}
+//
+// Future<List<FireNode>> getNodesFromEverywhere(Set<ID> ids) async {
+//   bool hasSelf;
+//   if (hasSelf = ids.contains(g.self.id)) {
+//     ids.remove(g.self.id);
+//   }
+//
+//   final toFetch = ids.difference(g.boxes.nodes.keys.toSet());
+//   final local = ids.difference(toFetch);
+//
+//   final onlineFetch = fetchPalettes(toFetch);
+//   final localFetch = local.map((e) => e.getLocalNode()).toList();
+//
+//   final locals = await Future.wait(localFetch);
+//   final onlines = await onlineFetch;
+//   return locals
+//       .whereType<FireNode>()
+//       .followedBy(onlines ?? [])
+//       .followedBy(hasSelf ? [g.self] : [])
+//       .toList();
+// }
 
 void unselectedSelectedPalettes(Map<ID, Palette2> state) {
   for (final p in state.values) {
@@ -727,14 +732,13 @@ void unselectedSelectedPalettes(Map<ID, Palette2> state) {
   }
 }
 
-Future<void> writeHomePalette<T extends FireNode>(
+Future<void> writeHomePalette<T extends Chatable>(
   Palette2<T> p,
   Map<ID, Down4Object> state,
-  Future<List<ButtonsInfo2>> Function(T)? bGen,
+  Future<List<ButtonsInfo2>> Function(Palette2<T>)? bGen,
   void Function()? onSel, {
   bool? sel,
 }) async {
-
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false
@@ -743,12 +747,7 @@ Future<void> writeHomePalette<T extends FireNode>(
   selectionIfReload = pInState?.selected;
   bool isSelected = sel ?? selectionIfReload ?? false;
 
-  // if node is chatable, we want to load previews
-  Pair<bool, String>? previewInfo;
-  final node = p.node;
-  if (node is Chatable) {
-    previewInfo = await node.messagingPreview();
-  }
+  final previewInfo = await p.node.messagingPreview();
 
   void Function()? onSelect = onSel == null
       ? null
@@ -757,16 +756,16 @@ Future<void> writeHomePalette<T extends FireNode>(
           onSel.call();
         };
 
-  state[node.id] = Palette2(
+  state[p.node.id] = Palette2(
       node: p.node,
       image: p.image,
       selected: isSelected,
-      messagePreview: previewInfo?.second,
+      messagePreview: previewInfo.second,
       imPress: onSelect,
       bodyPress: onSelect,
-      buttonsInfo2: await bGen?.call(node) ?? []);
+      buttonsInfo2: await bGen?.call(p) ?? []);
 
-  print("SUCCESS FULLY WROTE ${node.id} TO STATE = $state");
+  print("SUCCESS FULLY WROTE ${p.node.id} TO STATE = $state");
 }
 
 void writePalette3(
@@ -864,7 +863,7 @@ Transition selectionTransition({
         .map((e) => e.animated(fold: true, fadeButton: true, fade: true)),
   };
 
-  print("pals=${pals.map((e) => e.node.name).toList()}");
+  print("pals=${pals.map((e) => e.node.displayName).toList()}");
   return Transition(
       trueTargets: pals.where((p) => !p.fold).asNodes<Personable>(),
       preTransition: originalList,
@@ -893,7 +892,7 @@ Transition typeTransition<T>({
     ...properTypeHidden,
   };
 
-  print("pals=${pals.map((e) => e.node.name).toList()}");
+  print("pals=${pals.map((e) => e.node.displayName).toList()}");
   return Transition(
       trueTargets: pals.where((p) => !p.fold).asNodes<Personable>(),
       preTransition: all.toList(),
@@ -906,7 +905,7 @@ Transition typeTransition<T>({
 
 Future<ChatMessage?> getChatMessage({
   required Map<ID, ChatMessage> state,
-  required Chatable node,
+  required Palette2<Chatable> palette,
   required ID msgID,
   required ID? prevMsgID,
   required ID? nextMsgID,
@@ -914,7 +913,7 @@ Future<ChatMessage?> getChatMessage({
   required void Function(FireNode)? openNode,
   required void Function() refreshCallback,
 }) async {
-  FireMessage? msg = await msgID.getLocalMessage();
+  final (msg, _) = await global<FireMessage>(msgID);
   if (msg == null) return null;
   FireMessage? prevMsg, nextMsg;
   ChatMessage? prevChatMessage = state[prevMsgID];
@@ -924,8 +923,8 @@ Future<ChatMessage?> getChatMessage({
       prevMsgID != null &&
       prevChatMessage != null &&
       prevChatMessage.hasHeader &&
-      msg.senderID == prevChatMessage.message.senderID &&
-      msg.senderID != g.self.id) {
+      msg.sender == prevChatMessage.message.sender &&
+      msg.sender != g.self.id) {
     // we need to remove its header
     state[prevMsgID] = prevChatMessage.withHeader(hasHeader: false);
     // and update it's size
@@ -933,27 +932,24 @@ Future<ChatMessage?> getChatMessage({
 
   if (state[msgID] != null) return state[msgID]!;
 
-  prevMsg = await prevMsgID?.getLocalMessage();
-  nextMsg = await nextMsgID?.getLocalMessage();
+  (prevMsg, _) = await global<FireMessage>(prevMsgID);
+  (nextMsg, _) = await global<FireMessage>(nextMsgID);
 
   bool hasGap = false;
   if (prevMsg != null) hasGap = ChatMessage.displayGap(msg, prevMsg);
 
   // mark as read
-  if (!msg.read(node.id)) {
-    msg.reads[node.id] = true;
-    await msg.save();
-  }
+  msg.markRead();
 
-  final bool senderIsSelf = msg.senderID == g.self.id;
+  final bool senderIsSelf = msg.sender == g.self.id;
   final bool hasHeader =
-      !senderIsSelf && node is Groupable && nextMsg?.senderID != msg.senderID;
+      !senderIsSelf && palette is Groupable && nextMsg?.sender != msg.sender;
 
   final cm = ChatMessage(
       key: GlobalKey(),
       hasGap: hasGap,
       message: msg,
-      nodeRef: node.id,
+      nodeRef: palette.id,
       mediaInfo: await ChatMessage.generateMediaInfo(msg),
       nodes: null,
       repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
@@ -961,14 +957,14 @@ Future<ChatMessage?> getChatMessage({
       }),
       hasHeader: hasHeader,
       openNode: openNode,
-      myMessage: g.self.id == msg.senderID,
+      myMessage: g.self.id == msg.sender,
       select: (_) {
         state[msgID] = state[msgID]!.invertedSelection();
         refreshCallback();
       });
 
   Future.microtask(() {
-    if ((msg.nodes ?? []).isNotEmpty) {
+    if ((msg.nodes ?? {}).isNotEmpty) {
       getNodesFromEverywhere(msg.nodes!.toSet()).then((nodes) {
         if (nodes.isNotEmpty) {
           state[msg.id] = state[msg.id]!.withNodes(nodes);
@@ -982,7 +978,7 @@ Future<ChatMessage?> getChatMessage({
 }
 
 Future<void> writeMessages({
-  required Chatable node,
+  required Palette2<Chatable> palette,
   required List<ID> ordered,
   required Map<ID, ChatMessage> state,
   required Map<ID, EmptyObject> videos,
@@ -1006,7 +1002,7 @@ Future<void> writeMessages({
     final isFirst = msgID == orderedSet.first;
     final m = await getChatMessage(
         state: state,
-        node: node,
+        palette: palette,
         msgID: msgID,
         prevMsgID: prv,
         nextMsgID: nxt,
@@ -1015,8 +1011,8 @@ Future<void> writeMessages({
         refreshCallback: refresh);
     if (m != null) {
       state[m.id] = m;
-      if (m.mediaInfo?.media.isVideo ?? false) videos[m.id] = EmptyObject();
-      if ((m.nodes ?? []).isNotEmpty) withNodes[m.id] = EmptyObject();
+      if (m.mediaInfo?.media.isVideo ?? false) videos[m.id] = EmptyObject("");
+      if ((m.nodes ?? []).isNotEmpty) withNodes[m.id] = EmptyObject("");
     }
   }
 }
@@ -1042,7 +1038,8 @@ Future<void> writePayments(
 
   for (final payment in paymentsToLoad) {
     state[payment.id] = Palette2(
-      node: Payment(payment: payment, selfID: g.self.id),
+      node: Payment(payment.id, payment: payment, selfID: g.self.id),
+      image: null,
       messagePreview: payment.textNote,
       buttonsInfo2: payment.isSpentBy(id: g.self.id)
           ? [

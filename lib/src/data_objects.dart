@@ -16,7 +16,7 @@ final _firestore = firestore.FirebaseFirestore.instance;
 final _nodeStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _messageStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-Map<ID, FireObject> globalCache = {};
+Map<ID, FireObject> _globalCache = {};
 
 // extension on Iterable {
 //   ISet<T> toISet<T>() => ISet<T>(toSet().cast<T>());
@@ -43,7 +43,8 @@ final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
 final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
 final isVideoMediaIndexConfig = ValueIndexConfiguration(["isVideo"]);
 
-Future<List<Palette2>> loadHomePalettes({required bool isHidden}) async {
+Future<List<Palette2<Chatable>>> loadHomePalettes(
+    {required bool isHidden}) async {
   final isHiddenProp = isHidden.toString();
   final q = const QueryBuilder()
       .select(SelectResult.all())
@@ -54,20 +55,26 @@ Future<List<Palette2>> loadHomePalettes({required bool isHidden}) async {
               .equalTo(Meta.id.from("medias"))))
       .where(Expression.property("isHidden")
           .from("nodes")
-          .equalTo(Expression.string(isHiddenProp)));
+          .equalTo(Expression.string(isHiddenProp))
+          .and(Expression.property("type").from("nodes").in_([
+            Expression.string("hyperchat"),
+            Expression.string("group"),
+            Expression.string("user"),
+            Expression.string("self"),
+          ])));
   final r = await q.execute();
   return Future.wait((await r.allResults()).map((e) async {
     final fullJson = e.toPlainMap();
     final nodeJson = fullJson["nodes"] as Map<String, String?>;
     final mediaJson = fullJson["medias"] as Map<String, String?>?;
-    final n = FireNode.fromJson(nodeJson);
+    final n = _fromJson<Chatable>(nodeJson);
     FireMedia? m = mediaJson != null ? FireMedia.fromJson(mediaJson) : null;
     if (!isHidden && m == null) {
       m = await _fetch<FireMedia>(n.media!,
           merge: true, withData: true, fromNodes: true);
     }
 
-    return Palette2(node: n, image: m);
+    return Palette2<Chatable>(node: n, image: m);
   }).toList());
 }
 
@@ -143,9 +150,9 @@ Future<T?> _fetch<T extends FireObject>(
       final media = FireMedia.fromJson(mediaJson);
       Uint8List? videoThumbnail;
       final bool isVideo = media.isVideo;
-      if (isVideo && withData) {
+      if (isVideo) {
         final url = await ref.getDownloadURL();
-        videoThumbnail = await VideoThumbnail.thumbnailData(
+        media.cachedImage = videoThumbnail = await VideoThumbnail.thumbnailData(
           video: url,
           quality: 50,
         );
@@ -197,21 +204,22 @@ Future<T?> _local<T extends FireObject>(ID id) async {
 }
 
 Future<(T?, GetType)> global<T extends FireObject>(
-  ID id, {
+  ID? id, {
   bool fetch = false,
   bool merge = false,
   bool mediaData = false,
   bool nodesMedia = false,
 }) async {
   const def = (null, GetType.empty);
-  final cached = globalCache[id];
+  if (id == null) return def;
+  final cached = _globalCache[id];
   if (cached != null && cached is T) return (cached, GetType.cache);
   final localed = await _local<T>(id);
-  if (localed != null) return (globalCache[id] = localed, GetType.cache);
+  if (localed != null) return (_globalCache[id] = localed, GetType.cache);
   if (!fetch) return def;
   final fetched = await _fetch<T>(id,
       merge: merge, withData: mediaData, fromNodes: nodesMedia);
-  if (fetched != null) return (globalCache[id] = fetched, GetType.fetch);
+  if (fetched != null) return (_globalCache[id] = fetched, GetType.fetch);
   return def;
 }
 
@@ -299,8 +307,10 @@ class FireMessage extends FireObject {
   final Set<ID>? replies, nodes;
   final String? forwarderID;
   final int timestamp;
-  final bool isRead, isSent;
-  bool _isSaved;
+  bool _isRead, _isSent;
+  final Set<ID> _references;
+
+  Iterable<ID> get references => _references;
 
   FireMessage(
     super.id, {
@@ -313,30 +323,66 @@ class FireMessage extends FireObject {
     this.text,
     this.nodes,
     this.replies,
-    this.isRead = false,
-    this.isSent = false,
-  }) : _isSaved = isSaved;
+    Set<ID>? references,
+    bool isRead = false,
+    bool isSent = false,
+  })  : _references = references ?? Set<ID>.identity(),
+        _isRead = isRead,
+        _isSent = isSent;
 
-  factory FireMessage.fromJson(Map<String, String?> decodedJson) {
-    return FireMessage(
-      decodedJson["id"] as ID,
-      sender: decodedJson["sender"] as ID,
-      forwarderID: decodedJson["forwarderID"],
-      text: decodedJson["text"],
-      isSaved: decodedJson["isSaved"] == "true",
-      media: decodedJson["media"],
-      onlineMedia: decodedJson["onlineMedia"],
-      timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
-      isRead: decodedJson["isRead"] == "true",
-      isSent: decodedJson["isSent"] == "true",
-      nodes: decodedJson["nodes"]?.split(" ").toSet(),
-      replies: decodedJson["replies"]?.split(" ").toSet(),
-    );
+  bool get isRead => _isRead;
+  bool get isSent => _isSent;
+
+  // Creates a new instance of a messages that will be uploaded
+  // removes the replies and local data
+  // puts a new timestamp and forwarderID as forwarder and a new ID
+  FireMessage forwarded(ID forwarder) {
+    return FireMessage(messagePushId(),
+        sender: sender,
+        timestamp: u.timeStamp(),
+        forwarderID: forwarder,
+        text: text,
+        nodes: nodes,
+        onlineMedia: onlineMedia);
   }
 
-  Future<void> updateSavedStatus(bool newIsSaved) async {
-    _isSaved = newIsSaved;
-    await _merge({"isSaved": _isSaved.toString()});
+  factory FireMessage.fromJson(Map<String, String?> decodedJson) {
+    return FireMessage(decodedJson["id"] as ID,
+        sender: decodedJson["sender"] as ID,
+        forwarderID: decodedJson["forwarderID"],
+        references: decodedJson["references"]?.split(" ").toSet(),
+        text: decodedJson["text"],
+        isSaved: decodedJson["isSaved"] == "true",
+        media: decodedJson["media"],
+        onlineMedia: decodedJson["onlineMedia"],
+        timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
+        isRead: decodedJson["isRead"] == "true",
+        isSent: decodedJson["isSent"] == "true",
+        nodes: decodedJson["nodes"]?.split(" ").toSet(),
+        replies: decodedJson["replies"]?.split(" ").toSet());
+  }
+
+  Future<void> addReference(ID ref) async {
+    _references.add(ref);
+    await _merge({"references": references.join(" ")});
+  }
+
+  Future<void> removeReference(ID ref) async {
+    _references.remove(ref);
+    if (references.isEmpty) return _delete();
+    await _merge({"references": references.join(" ")});
+  }
+
+  Future<void> markRead() async {
+    if (isRead) return;
+    _isRead = true;
+    await _merge({"isRead": "true"});
+  }
+
+  Future<void> markSent() async {
+    if (isSent) return;
+    _isSent = true;
+    await _merge({"isSent": "true"});
   }
 
   @override
@@ -347,7 +393,8 @@ class FireMessage extends FireObject {
         'timestamp': timestamp.toString(),
         if (media != null) 'media': media!,
         if (onlineMedia != null) 'onlineMedia': onlineMedia!,
-        if (withLocalValues) 'isSaved': _isSaved.toString(),
+        if (withLocalValues) 'references': _references.join(" "),
+        // if (withLocalValues) 'isSaved': _isSaved.toString(),
         if (withLocalValues) 'isRead': isRead.toString(),
         if (withLocalValues) 'isSent': isSent.toString(),
         if (forwarderID != null) 'forwarderID': forwarderID!,
@@ -399,13 +446,14 @@ abstract class FireNode extends FireObject {
   final Down4Keys? _neuter;
   ID? _media;
   bool? _isFriend, _isHidden, _isPrivate;
-  final Set<ID>? _messages;
-  final Set<ID>? _snips;
-  final Set<ID>? _group;
+  // final Set<ID>? _messages;
+  // final Set<ID>? _snips;
+  final Set<ID>? _group, _publics, _privates, _posts, _admins;
+  final String? _owner;
   // final Set<Id>? _nfts;
   // final Set<Id>? _images;
   // final Set<Id>? _videos;
-  final Set<ID>? _children;
+  // final Set<ID>? _children;
 
   @override
   Database _db() => _nodesDB;
@@ -428,15 +476,15 @@ abstract class FireNode extends FireObject {
           "isHidden": _isHidden.toString(),
         if (_lastName != null) "lastName": _lastName!,
         if (_media != null) "media": _media!,
-        if (_children != null) "children": _children!.join(" "),
+        if (_publics != null) "children": _publics!.join(" "),
         if (_neuter != null) "neuter": _neuter!.toYouKnow(),
         if (_group != null) "group": _group!.join(" "),
         // if (withLocalValues && _images != null) "images": _images!.join(" "),
         // if (withLocalValues && _videos != null) "videos": _videos!.join(" "),
         // if (withLocalValues && _nfts != null) "nfts": _nfts!.join(" "),
-        if (withLocalValues && _messages != null)
-          "messages": _messages!.join(" "),
-        if (withLocalValues && _snips != null) "snips": _snips!.join(" "),
+        // if (withLocalValues && _messages != null)
+        //   "messages": _messages!.join(" "),
+        // if (withLocalValues && _snips != null) "snips": _snips!.join(" "),
         if (withLocalValues) "activity": _activity.toString(),
       };
 
@@ -451,12 +499,13 @@ abstract class FireNode extends FireObject {
     String? description,
     Down4Keys? neuter,
     ID? media,
-    Set<ID>? messages,
-    Set<ID>? snips,
-    Set<ID>? group,
-    Set<ID>? nfts,
-    Set<ID>? images,
-    Set<ID>? videos,
+
+    // Set<ID>? messages,
+    // Set<ID>? snips,
+    // Set<ID>? group,
+    // Set<ID>? nfts,
+    // Set<ID>? images,
+    // Set<ID>? videos,
     Set<ID>? children,
   })  : _activity = activity,
         _name = name,
@@ -467,13 +516,13 @@ abstract class FireNode extends FireObject {
         _description = description,
         _neuter = neuter,
         _media = media,
-        _messages = messages,
-        _snips = snips,
+        // _messages = messages,
+        // _snips = snips,
         _group = group,
         // _nfts = nfts,
         // _images = images,
         // _videos = videos,
-        _children = children;
+        _publics = children;
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? u.timeStamp();
@@ -585,35 +634,29 @@ abstract mixin class Branchable implements FireNode {
 abstract mixin class Chatable implements FireNode {
   Iterable<ID> get messages;
   Iterable<ID> get snips;
+  bool get noMessagesNorSnips => messages.isEmpty && snips.isEmpty;
 
   Future<void> addMessage(FireMessage msg) async {
-    // message will be merged on fetch
-    _messages!.add(msg.id);
-    Map<String, String> merges = {};
-    merges["messages"] = _messages!.join(" ");
-    if (this is User) merges["isHidden"] = false.toString();
-    await _merge(merges);
+
   }
 
   Future<void> removeMessage(FireMessage msg) async {
+    await msg.removeReference(id);
     final n = this;
     if (msg.media != null) {
-      final (media, gt) = await global<FireMedia>(msg.media!);
+      final (media, _) = await global<FireMedia>(msg.media!);
       await media?.removeReference(msg.id);
     }
     _messages!.remove(msg.id);
-    if (messages.isEmpty &&
-        snips.isEmpty &&
-        (n is Hyperchat || (n is User && !n.isFriend))) {
+    if (noMessagesNorSnips && (n is Hyperchat || (n is User && !n.isFriend))) {
       _delete();
     } else {
       await _merge({"messages": messages.join(" ")});
     }
-
-    await msg._delete();
   }
 
   Future<void> addSnip(FireMedia snip) async {
+    await snip.addReference(id);
     _snips!.add(snip.id);
     Map<String, String> merges = {};
     merges["snips"] = snips.join(" ");
@@ -621,13 +664,40 @@ abstract mixin class Chatable implements FireNode {
     await _merge(merges);
   }
 
-  Future<u.Pair<bool, String>> messagingPreview() async {
-    final def = Future.value(const u.Pair(true, ""));
-    if (messages.isEmpty) def;
-    final lastMsgID = messages.last;
-    final (msg, gt) = await global<FireMessage>(lastMsgID);
-    if (msg == null) return def;
-    return u.Pair(msg.isRead, msg.text ?? "&attachment");
+  Future<void> removeSnip(FireMedia snip) async {
+    await snip.removeReference(id);
+    _snips!.remove(snip.id);
+    await _merge({"snips": snips.join(" ")});
+  }
+
+  Future<(bool isRead, String preview)> messagingPreview() async {
+    //
+    // final raw = "SELECT * FROM _ WHERE node = '$id' LIMIT 1";
+    // final qq = (await (await AsyncQuery.fromN1ql(_messagesDB, raw)).execute());
+    //
+
+    final q = await const QueryBuilder()
+        .select(SelectResult.all())
+        .from(DataSource.database(_messagesDB).as("messages"))
+        .where(Expression.property("node").equalTo(Expression.string(id)))
+        .limit(Expression.integer(1))
+        .execute();
+    final r = await q.allResults();
+    if (r.isEmpty) return const (true, "");
+    final json = r.single.toPlainMap()["messages"] as Map<String, String?>;
+    final msg = FireMessage.fromJson(json);
+    final preview = (msg.text ?? "").isEmpty ? "&attachment": msg.text!;
+    return (msg.isRead, preview);
+
+    // final q = await AsyncQuery.fromN1ql(_messagesDB, raw);
+
+    // final def = Future.value(const u.Pair(true, ""));
+    // if (messages.isEmpty) def;
+    // final lastMsgID = messages.last;
+
+    // final (msg, _) = await global<FireMessage>(lastMsgID);
+    // if (msg == null) return def;
+    // return u.Pair(msg.isRead, msg.text ?? "&attachment");
   }
 }
 
@@ -714,7 +784,7 @@ class User extends FireNode with Branchable, Personable, Chatable {
   bool get isFriend => _isFriend!;
 
   @override
-  Iterable<ID> get children => _children!;
+  Iterable<ID> get children => _publics!;
 
   @override
   NodesColor get colorCode =>
@@ -729,8 +799,8 @@ class User extends FireNode with Branchable, Personable, Chatable {
   @override
   ID? get media => _media;
 
-  @override
-  Iterable<ID> get messages => _messages!;
+  // @override
+  // Iterable<ID> get messages => _messages!;
 
   @override
   String get firstName => _name;
@@ -738,8 +808,8 @@ class User extends FireNode with Branchable, Personable, Chatable {
   @override
   Down4Keys get neuter => _neuter!;
 
-  @override
-  Iterable<ID> get snips => _snips!;
+  // @override
+  // Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.user;
@@ -767,7 +837,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   NodesColor get colorCode => NodesColor.self;
 
   @override
-  Iterable<ID> get children => _children!;
+  Iterable<ID> get children => _publics!;
 
   @override
   String? get description => _description;
@@ -779,7 +849,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   ID get media => _media!;
 
   @override
-  Iterable<ID> get messages => _messages!;
+  // Iterable<ID> get messages => _messages!;
 
   @override
   String get firstName => _name;
@@ -788,7 +858,7 @@ class Self extends FireNode with Branchable, Personable, Chatable, Editable {
   Down4Keys get neuter => _neuter!;
 
   @override
-  Iterable<ID> get snips => _snips!;
+  // Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.self;
@@ -832,11 +902,11 @@ class Group extends FireNode with Groupable, Editable, Chatable {
   @override
   ID? get media => _media;
 
-  @override
-  Iterable<ID> get messages => _messages!;
-
-  @override
-  Iterable<ID> get snips => _snips!;
+  // @override
+  // Iterable<ID> get messages => _messages!;
+  //
+  // @override
+  // Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.group;
@@ -871,11 +941,11 @@ class Hyperchat extends FireNode with Groupable, Chatable {
   @override
   ID? get media => _media;
 
-  @override
-  Iterable<ID> get messages => _messages!;
-
-  @override
-  Iterable<ID> get snips => _snips!;
+  // @override
+  // Iterable<ID> get messages => _messages!;
+  //
+  // @override
+  // Iterable<ID> get snips => _snips!;
 
   @override
   Nodes get type => Nodes.hyperchat;
@@ -889,7 +959,7 @@ class Payment extends FireNode {
   ID? get media => null;
 
   final Down4Payment _payment;
-  final FireObject selfID;
+  final ID selfID;
   Payment(
     super.id, {
     required Down4Payment payment,
@@ -898,7 +968,7 @@ class Payment extends FireNode {
         super(activity: payment.tsSeconds, name: payment.id);
 
   @override
-  String get displayName => payment.formattedName(selfID.id);
+  String get displayName => payment.formattedName(selfID);
 
   Down4Payment get payment => _payment;
 

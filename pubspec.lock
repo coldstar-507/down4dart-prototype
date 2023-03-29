@@ -45,10 +45,10 @@ packages:
     dependency: transitive
     description:
       name: async
-      sha256: "947bfcf187f74dbc5e146c9eb9c0f10c9f8b30743e341481c1e2ed3ecc18c20c"
+      sha256: bfe67ef28df125b7dddcea62755991f807aa39a2492a23e1550161692950bbe0
       url: "https://pub.dev"
     source: hosted
-    version: "2.11.0"
+    version: "2.10.0"
   base85:
     dependency: "direct main"
     description:
@@ -109,10 +109,10 @@ packages:
     dependency: transitive
     description:
       name: build_daemon
-      sha256: "757153e5d9cd88253cb13f28c2fb55a537dc31fefd98137549895b5beb7c6169"
+      sha256: "5f02d73eb2ba16483e693f80bee4f088563a820e47d1027d4cdfe62b5bb43e65"
       url: "https://pub.dev"
     source: hosted
-    version: "3.1.1"
+    version: "4.0.0"
   build_resolvers:
     dependency: transitive
     description:
@@ -125,10 +125,10 @@ packages:
     dependency: "direct dev"
     description:
       name: build_runner
-      sha256: b0a8a7b8a76c493e85f1b84bffa0588859a06197863dba8c9036b15581fd9727
+      sha256: "7b25ba738bc74c94187cebeb9cc29d38a32e8279ce950eabd821d3b454a5f03d"
       url: "https://pub.dev"
     source: hosted
-    version: "2.3.3"
+    version: "2.4.1"
   build_runner_core:
     dependency: transitive
     description:
@@ -780,10 +780,10 @@ packages:
     dependency: transitive
     description:
       name: meta
-      sha256: "3c74dbf8763d36539f114c799d8a2d87343b5067e9d796ca22b5eb8437090ee3"
+      sha256: "12307e7f0605ce3da64cf0db90e5fcab0869f3ca03f76be6bb2991ce0a55e82b"
       url: "https://pub.dev"
     source: hosted
-    version: "1.9.1"
+    version: "1.9.0"
   mime:
     dependency: "direct main"
     description:
@@ -868,10 +868,10 @@ packages:
     dependency: transitive
     description:
       name: petitparser
-      sha256: "49392a45ced973e8d94a85fdb21293fbb40ba805fc49f2965101ae748a3683b4"
+      sha256: a9346a3fbba7546a28374bdbcd7f54ea48bb47772bf3a7ab4bfaadc40bc8b8c6
       url: "https://pub.dev"
     source: hosted
-    version: "5.1.0"
+    version: "5.3.0"
   platform:
     dependency: transitive
     description:
@@ -1238,5 +1238,5 @@ packages:
     source: hosted
     version: "3.1.1"
 sdks:
-  dart: ">=3.0.0-0.0.dev <4.0.0"
+  dart: ">=3.0.0-134.0.dev <4.0.0"
   flutter: ">=3.3.0"

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
+import 'package:down4/src/render_objects/palette.dart';
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
 import '_down4_dart_utils.dart' show Pair;
@@ -36,14 +37,21 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<FireNode>?> getNodes(Iterable<String> ids) async {
+Future<List<Palette2>?> fetchPalettes(Iterable<String> ids) async {
   if (ids.isEmpty) return [];
-  final url =
-      Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes");
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
+  );
   final res = await http.post(url, body: ids.join(" "));
-  final jsonLists = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+  final jsonList = List<Map<String, Object?>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
-    return jsonLists.map((e) => FireNode.fromJson(e)).toList();
+    return jsonList.map((e) {
+      final nodeJson = e["node"] as Map<String, String?>;
+      final mediaJson = e["media"] as Map<String, String?>?;
+      final node = FireNode.fromJson(nodeJson);
+      final media = mediaJson == null ? null : FireMedia.fromJson(mediaJson);
+      return Palette2(node: node, image: media);
+    }).toList();
   }
   return null;
 }
