@@ -1,6 +1,6 @@
-import 'package:down4/src/_down4_dart_utils.dart';
+import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/home.dart';
-import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
+import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:down4/src/web_requests.dart';
 import 'package:flutter/material.dart';
 
@@ -16,13 +16,13 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "forward";
   final List<Down4Object> fObjects;
   final void Function() back;
-  final void Function(List<Down4Object>, Chatable) openNode;
+  final void Function(List<Down4Object>, Palette2<Chatable>) openChat;
   final void Function(List<Down4Object>, Transition) hyper;
-  final Future<void> Function(Payload, List<Chatable>) forward;
+  final Future<void> Function(Payload, Iterable<Palette2<Chatable>>) forward;
 
   const ForwardingPage({
     // required this.homePalettes,
-    required this.openNode,
+    required this.openChat,
     required this.hyper,
     required this.fObjects,
     required this.forward,
@@ -54,9 +54,11 @@ class _ForwadingPageState extends State<ForwardingPage> {
     super.dispose();
   }
 
-  Map<ID, Palette2> get _forwardState => g.vm.cv.cp.objects.cast();
+  Map<ID, Palette2<Chatable>> get _forwardState => g.vm.cv.cp.objects.cast();
 
-  List<Palette2> get _fList => _forwardState.values.toList();
+  Iterable<Palette2<Chatable>> get _fList => _forwardState.values;
+
+  Iterable<Palette2<Chatable>> get selection => _fList.where((p) => p.selected);
 
   Map<ID, Palette2> get hiddenState => g.vm.home.pages[1].objects.cast();
 
@@ -74,8 +76,13 @@ class _ForwadingPageState extends State<ForwardingPage> {
     return ConsoleMedias2(
       showImages: showImages,
       onSelect: (media) => widget.forward(
-          Payload(f: widget.fObjects, t: _tec.value.text, m: media, r: null),
-          _fList.selected().asNodes<Chatable>().toList()),
+          Payload(
+              isSnip: false,
+              forwards: widget.fObjects,
+              text: _tec.value.text,
+              media: media,
+              replies: null),
+          selection),
     );
   }
 
@@ -94,8 +101,13 @@ class _ForwadingPageState extends State<ForwardingPage> {
       consoleMedias2: ConsoleMedias2(
         showImages: images,
         onSelect: (media) => widget.forward(
-          Payload(f: fo, t: _tec.value.text, m: media, r: null),
-          _fList.selected().asNodes<Chatable>().toList(),
+          Payload(
+              isSnip: false,
+              forwards: fo,
+              text: _tec.value.text,
+              media: media,
+              replies: null),
+          selection,
         ),
       ),
       forwardingObjects: fo,
@@ -123,8 +135,13 @@ class _ForwadingPageState extends State<ForwardingPage> {
           onPress: () => extra
               ? loadForwardingConsole(extra: !extra)
               : widget.forward(
-                  Payload(r: null, f: fo, t: _tec.value.text, m: null),
-                  _fList.selected().asNodes<Chatable>().toList()),
+                  Payload(
+                      isSnip: false,
+                      replies: null,
+                      forwards: fo,
+                      text: _tec.value.text,
+                      media: null),
+                  selection),
           isSpecial: true,
           showExtra: extra,
           extraButtons: [
@@ -143,13 +160,14 @@ class _ForwadingPageState extends State<ForwardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final ps = _fList.toList(growable: false);
     return Andrew(pages: [
       Down4Page(
         staticList: true,
-        trueLen: _fList.length,
+        trueLen: ps.length,
         title: "Forward",
         console: _console,
-        list: _fList,
+        list: ps,
         scrollController: scroller,
       ),
     ]);

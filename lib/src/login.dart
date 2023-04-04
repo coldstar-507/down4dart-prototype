@@ -1,26 +1,18 @@
 import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
-import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 import 'web_requests.dart' as r;
 import 'globals.dart';
-import '_down4_dart_utils.dart' as d4utils;
+import '_dart_utils.dart' as d4utils;
 import 'home.dart';
 import 'data_objects.dart';
-import 'themes.dart';
-import 'bsv/wallet.dart';
-import 'bsv/utils.dart';
+import 'bsv/_bsv_utils.dart';
 
-import 'pages/welcome_page.dart';
 import 'pages/init_page.dart';
 import 'pages/loading_page.dart';
 
@@ -42,8 +34,7 @@ class _Down4State extends State<Down4> {
   @override
   void initState() {
     super.initState();
-    // FirebaseDatabase.instance.setPersistenceEnabled(false);
-    // fs.settings = const Settings(persistenceEnabled: false);
+    FirebaseDatabase.instance.setPersistenceEnabled(false);
     loadTokenChangeListener();
     loadUser();
   }
@@ -51,33 +42,43 @@ class _Down4State extends State<Down4> {
   void loadTokenChangeListener() {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       final res = await r.refreshTokenRequest(newToken);
+      if (res == 200) Token(newToken).merge();
     });
   }
 
   Future<void> loadUser() async {
-    if (g.notYetInitialized) {
+    g.loadExchangeRate(await ExchangeRate.exchangeRate);
+    g.loadWallet();
+    // this initialized self it it exists
+    if (await g.notYetInitialized) {
       createUser();
     } else {
       home();
     }
   }
 
-  Future<bool> initUser({
+  Future<void> initUser({
     required ID id,
     required String name,
     required String lastName,
-    required String imPath,
-    required String imExtension,
-    required double imAspectRatio,
-    required bool isReversed,
+    required FireMedia media,
   }) async {
+    void onFailure(String msg) => createUser(errorMessage: msg);
+
+    final goodMedia = await media.withNewOwnership(id, recalculateID: true);
+    if (goodMedia == null) {
+      print("Error setting the correct ownership over user media");
+      return onFailure("System failure");
+    }
+    goodMedia.writeFromCachedPath();
+
     _view = const LoadingPage2();
     setState(() {});
 
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
       print("error getting firebase messaging token");
-      return false;
+      return onFailure("Check if valid internet connection!");
     }
 
     final seed1 = unsafeSeed(32);
@@ -86,43 +87,34 @@ class _Down4State extends State<Down4> {
     g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
-    final imageData = File(imPath).readAsBytesSync();
-    final mediaID = d4utils.deterministicMediaID(imageData, id);
-
-    FireMedia image = FireMedia(mediaID,
-        owner: id,
-        timestamp: d4utils.timeStamp(),
-        aspectRatio: 1 / imAspectRatio,
-        extension: imExtension,
-        isReversed: isReversed,
-        isSquared: true, // all nodes images are squared
-        mimetype: '',
-        references: {id});
-
-    await image.write(imageData: imageData);
+    final successfulMediaUpload = await uploadMedia(goodMedia, isNode: true);
+    if (!successfulMediaUpload) {
+      print("Unsuccessful media upload");
+      return onFailure("Check internet connection!");
+    }
 
     final userInfo = {
       'id': id,
-      'nm': name,
-      'ln': lastName,
-      'sh': secret.toBase58(),
-      'tkn': token,
-      'nt': neuter.toYouKnow(),
-      'im': image,
+      'name': name,
+      'lastName': lastName,
+      'secret': secret.toBase58(),
+      'token': token,
+      'neuter': neuter.toYouKnow(),
+      'media': goodMedia.id,
     };
 
     final success = await r.initUser(jsonEncode(userInfo));
 
     if (!success) {
-      print("It was not a success");
-      return false;
+      print("Error initializing account, try again!");
+      return onFailure("Error initializing account, try again!");
     }
 
-    g.initSelf(id, image, neuter, name, lastName);
+    await g.initSelf(id, goodMedia, neuter, name, lastName);
 
-    g.boxes.personal.put("token", token);
+    await Token(token).merge();
 
-    return true;
+    home();
   }
 
   // ============================================================ RENDER ============================================================ //
@@ -132,8 +124,8 @@ class _Down4State extends State<Down4> {
     setState(() {});
   }
 
-  void createUser() {
-    _view = UserMakerPage(initUser: initUser, success: home);
+  void createUser({String? errorMessage}) {
+    _view = UserMakerPage(initUser: initUser, errorMessage: errorMessage);
     setState(() {});
   }
 
@@ -151,14 +143,17 @@ class _Down4State extends State<Down4> {
     final mediaQuery = MediaQuery.of(context);
     final size = mediaQuery.size;
     final truePadding = mediaQuery.viewPadding;
+    final headerHeight = size.height * 0.056;
+    final allPadding = truePadding.top - truePadding.bottom - headerHeight;
     // final fakePadding = mediaQuery.padding;
-    g.sizes.fullHeight = size.height;
-    g.sizes.headerHeight = size.height * 0.056;
-    g.sizes.h = size.height -
-        truePadding.top -
-        truePadding.bottom -
-        g.sizes.headerHeight;
-    g.sizes.w = size.width - truePadding.left - truePadding.right;
+    final sizes = Sizes(
+        h: size.height - allPadding,
+        w: size.width - truePadding.left - truePadding.right,
+        fullHeight: size.height,
+        headerHeight: headerHeight);
+
+    g.loadSizes(sizes);
+
     return _view ?? const LoadingPage2();
   }
 }

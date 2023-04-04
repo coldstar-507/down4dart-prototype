@@ -5,18 +5,19 @@ import 'dart:typed_data';
 
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:flutter/rendering.dart';
-import 'package:video_player/video_player.dart';
+import 'package:better_player/better_player.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../couch.dart';
 import '../data_objects.dart';
 import '../globals.dart';
 import '../themes.dart';
-import '../_down4_dart_utils.dart' show golden;
+import '../_dart_utils.dart' show golden;
 
 import 'palette.dart';
-import '_down4_flutter_utils.dart';
+import '_render_utils.dart';
 
 class ConsoleButton extends StatelessWidget {
   // RenderBox get renderBox => context.findRenderObject() as RenderBox;
@@ -267,27 +268,27 @@ class ConsoleMedias2 {
   ConsoleMedias2({required this.showImages, required this.onSelect});
 }
 
-class ImagePreview {
-  final String path;
-  final double imageAspectRatio;
-  final bool isReversed;
-  const ImagePreview({
-    required this.path,
-    required this.isReversed,
-    required this.imageAspectRatio,
-  });
-}
-
-class VideoPreview {
-  final VideoPlayer videoPlayer;
-  final double videoAspectRatio;
-  final bool isReversed;
-  VideoPreview({
-    required this.videoPlayer,
-    required this.videoAspectRatio,
-    required this.isReversed,
-  });
-}
+// class ImagePreview {
+//   final String path;
+//   final double imageAspectRatio;
+//   final bool isReversed;
+//   const ImagePreview({
+//     required this.path,
+//     required this.isReversed,
+//     required this.imageAspectRatio,
+//   });
+// }
+//
+// class VideoPreview {
+//   final BetterPlayer videoPlayer;
+//   final double videoAspectRatio;
+//   final bool isReversed;
+//   VideoPreview({
+//     required this.videoPlayer,
+//     required this.videoAspectRatio,
+//     required this.isReversed,
+//   });
+// }
 
 class Console extends StatelessWidget {
   final List<ConsoleButton>? _topButtons;
@@ -295,12 +296,13 @@ class Console extends StatelessWidget {
   final List<ConsoleInput>? _bottomInputs, _topInputs;
   final bool animatedInputs;
 
+  final FireMedia? previewMedia;
   final List<dynamic>? forwardingObjects;
   final List<Palette>? forwardingPalette;
   final bool invertedColors, initializationConsole;
   final ConsoleMedias2? consoleMedias2;
-  final ImagePreview? imageForPreview;
-  final VideoPreview? videoForPreview;
+  // final ImagePreview? imageForPreview;
+  // final VideoPreview? videoForPreview;
   final CameraController? cameraController;
   final MobileScanner? scanner;
 
@@ -450,8 +452,9 @@ class Console extends StatelessWidget {
       Duration(milliseconds: (100 * golden).toInt());
 
   bool get hasGadgets =>
-      imageForPreview != null ||
-      videoForPreview != null ||
+      previewMedia != null ||
+      // imageForPreview != null ||
+      // videoForPreview != null ||
       cameraController != null ||
       // forwardingObjects != null ||
       scanner != null ||
@@ -461,12 +464,13 @@ class Console extends StatelessWidget {
     required List<ConsoleButton> bottomButtons,
     this.invertedColors = false,
     this.forwardingPalette,
+    this.previewMedia,
     // this.forwardingPalette2,
     this.forwardingObjects,
     // this.forwardingMessage,
     this.cameraController,
-    this.imageForPreview,
-    this.videoForPreview,
+    // this.imageForPreview,
+    // this.videoForPreview,
     this.initializationConsole = false,
     // this.mediasInfo,
     this.scanner,
@@ -573,29 +577,15 @@ class Console extends StatelessWidget {
                     return GestureDetector(
                       onTap: () =>
                           consoleMedias2?.onSelect.call(snapshot.requireData),
-                      child: Down4ImageViewer(
-                          media: snapshot.requireData,
+                      child: snapshot.requireData.displayMedia(
                           displaySize: Size.square(mediaCelSize),
-                          forceSquareAnyways: true),
+                          forceSquare: true),
                     );
                   } else {
                     return SizedBox.square(dimension: mediaCelSize);
                   }
                 }),
               );
-              // if (i < nMedia) {
-              //   final theMedia = await medias(showingImages).elementAt(i);
-              //   return GestureDetector(
-              //     onTap: () => consoleMedias2?.onSelectMedia.call(theMedia),
-              //     child: Down4ImageViewer(
-              //       media: theMedia,
-              //       displaySize: Size.square(mediaCelSize),
-              //       forceSquareAnyways: true,
-              //     ),
-              //   );
-              // } else {
-              //   return const SizedBox.shrink();
-              // }
             }
 
             return Row(
@@ -631,7 +621,7 @@ class Console extends StatelessWidget {
               SizedBox(
                   width: Console.buttonHeight,
                   height: Console.buttonHeight,
-                  child: obj.image),
+                  child: obj.paletteMedia),
               Expanded(
                   child: Container(
                       padding: const EdgeInsets.all(4.0),
@@ -701,45 +691,62 @@ class Console extends StatelessWidget {
     );
   }
 
-  Widget videoPreview() {
-    final vfp = videoForPreview;
-    if (vfp == null) return const SizedBox.shrink();
+  Widget mediaPreview() {
+    if (previewMedia == null) return const SizedBox.shrink();
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
           borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
           border: Border.all(color: contourColor, width: contourWidth)),
-      child: SizedBox(
-          height: trueWidth,
-          width: trueWidth,
-          child: Down4VideoTransform(
-              displaySize: Size.square(trueWidth),
-              videoAspectRatio: vfp.videoAspectRatio,
-              video: vfp.videoPlayer,
-              isReversed: vfp.isReversed,
-              isSquared: true)),
+      child: previewMedia!.displayMedia(
+        displaySize: Size.square(trueWidth),
+        forceSquare: true,
+        videoController: BetterPlayerController(
+          const BetterPlayerConfiguration(autoPlay: true, looping: true),
+        ),
+      ),
     );
   }
 
-  Widget imagePreview() {
-    final ifp = imageForPreview;
-    if (ifp == null) return const SizedBox.shrink();
-    return Container(
-        clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(consoleRad)),
-            border: Border.all(color: contourColor, width: contourWidth)),
-        child: SizedBox(
-          height: trueWidth,
-          width: trueWidth,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.rotationY(ifp.isReversed ? math.pi : 0),
-            child: Image.file(io.File(ifp.path), fit: BoxFit.cover),
-          ),
-        ));
-  }
+  // Widget videoPreview() {
+  //   final vfp = videoForPreview;
+  //   if (vfp == null) return const SizedBox.shrink();
+  //   return Container(
+  //     clipBehavior: Clip.hardEdge,
+  //     decoration: BoxDecoration(
+  //         borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
+  //         border: Border.all(color: contourColor, width: contourWidth)),
+  //     child: SizedBox(
+  //         height: trueWidth,
+  //         width: trueWidth,
+  //         child: Down4VideoTransform(
+  //             displaySize: Size.square(trueWidth),
+  //             videoAspectRatio: vfp.videoAspectRatio,
+  //             video: vfp.videoPlayer,
+  //             isReversed: vfp.isReversed,
+  //             isSquared: true)),
+  //   );
+  // }
+  //
+  // Widget imagePreview() {
+  //   final ifp = imageForPreview;
+  //   if (ifp == null) return const SizedBox.shrink();
+  //   return Container(
+  //       clipBehavior: Clip.hardEdge,
+  //       decoration: BoxDecoration(
+  //           borderRadius:
+  //               BorderRadius.vertical(top: Radius.circular(consoleRad)),
+  //           border: Border.all(color: contourColor, width: contourWidth)),
+  //       child: SizedBox(
+  //         height: trueWidth,
+  //         width: trueWidth,
+  //         child: Transform(
+  //           alignment: Alignment.center,
+  //           transform: Matrix4.rotationY(ifp.isReversed ? math.pi : 0),
+  //           child: Image.file(io.File(ifp.path), fit: BoxFit.cover),
+  //         ),
+  //       ));
+  // }
 
   Widget get rotatingLogo {
     return AnimatedRotation(
@@ -861,8 +868,9 @@ class Console extends StatelessWidget {
           children: [
             consoleScanner(),
             consoleCamera(),
-            imagePreview(),
-            videoPreview(),
+            mediaPreview(),
+            // imagePreview(),
+            // videoPreview(),
             // forwardingPalettes(),
             consoleMedias(),
           ],

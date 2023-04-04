@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:down4/src/_down4_dart_utils.dart';
+import 'package:down4/src/_dart_utils.dart';
 
 import 'types.dart';
 
@@ -275,8 +275,9 @@ List<int> stripped(List<int> checkAddress) {
 
 List<int> hash160(List<int> pubKey) => ripemd160(sha256(pubKey));
 
-List<int> makeUint32(int i) =>
-    Uint8List(4)..buffer.asByteData().setUint32(0, i);
+List<int> makeUint32(int i) {
+  return Uint8List(4)..buffer.asByteData().setUint32(0, i);
+}
 
 ECPublicKey uncompressPublicKey(Uint8List publicKey) {
   final bigX = BigInt.parse(publicKey.sublist(1).toHex(), radix: 16);

@@ -1,81 +1,87 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
+import 'dart:typed_data' show Uint8List;
+
+import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
+import 'package:down4/src/render_objects/palette.dart';
+import 'package:firebase_database/firebase_database.dart' as realtime;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
-import '_down4_dart_utils.dart' as u;
-import 'dart:typed_data' show Uint8List;
-import 'bsv/types.dart';
-import 'package:cbl/cbl.dart' as cbl;
 
-final _realtime = FirebaseDatabase.instance.ref();
-final _firestore = FirebaseFirestore.instance;
+import 'bsv/types.dart';
+import 'bsv/wallet.dart';
+
+import 'package:cbl/cbl.dart';
+import 'data_objects.dart';
+
+final _realtime = realtime.FirebaseDatabase.instance.ref();
+final _firestore = firestore.FirebaseFirestore.instance;
 final _nodeStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _messageStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-// extension on Iterable {
-//   ISet<T> toISet<T>() => ISet<T>(toSet().cast<T>());
-// }
+late AsyncDatabase nodesDB,
+    personalDB,
+    mediasDB,
+    messagesDB,
+    utxosDB,
+    paymentsDB,
+    billsDB;
 
-// class ISet<T> {
-//   final Set<T> _set;
-//   final int size;
-//   Iterable<T> get values => _set;
-//   ISet(Set<T> set)
-//       : _set = Set<T>.unmodifiable(set),
-//         size = set.length;
-// }
+Map<ID, FireObject> _globalCache = {};
 
-late cbl.AsyncDatabase _nodesDB,
-    _mediasDB,
-    _messagesDB,
-    _utxosDB,
-    _paymentsDB,
-    _billsDB;
+void gCache(FireObject obj) => _globalCache[obj.id] = obj;
 
-final isHiddenNodeIndexConfig = cbl.ValueIndexConfiguration(["isHidden"]);
-final lastUseMediaIndexConfig = cbl.ValueIndexConfiguration(["lastUse"]);
-final isSavedMediaIndexConfig = cbl.ValueIndexConfiguration(["isSaved"]);
-final isVideoMediaIndexConfig = cbl.ValueIndexConfiguration(["isVideo"]);
+Future<void> loadIndexes() async {
+  final isHiddenNodeIndexConfig = ValueIndexConfiguration(["isHidden"]);
+  final nodeTypeIndexConfig = ValueIndexConfiguration(["type"]);
 
-Stream<Down4TXOUT> allUtxos() async* {
-  const raw = 'SELECT * FROM _';
-  final query = await cbl.AsyncQuery.fromN1ql(_utxosDB, raw);
-  final resultSet = await query.execute();
-  await for (final r in resultSet.asStream()) {
-    yield Down4TXOUT.fromJson(r.toPlainMap());
-  }
+  final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
+  final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
+  final isVideoMediaIndexConfig = ValueIndexConfiguration(["isVideo"]);
+
+  final isSavedMessageIndexConfig = ValueIndexConfiguration(["isSaved"]);
+  final isSnipMessageIndexConfig = ValueIndexConfiguration(["isSnip"]);
+  final rootMessageIndexConfig = ValueIndexConfiguration(["root"]);
+
+  await nodesDB.createIndex("hiddenIndex", isHiddenNodeIndexConfig);
+  await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
+
+  await mediasDB.createIndex("lastUseIndex", lastUseMediaIndexConfig);
+  await mediasDB.createIndex("isSavedIndex", isSavedMediaIndexConfig);
+  await mediasDB.createIndex("isVideoIndex", isVideoMediaIndexConfig);
+
+  await messagesDB.createIndex("isSavedIndex", isSavedMessageIndexConfig);
+  await messagesDB.createIndex("isSnipIndex", isSnipMessageIndexConfig);
+  await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
 }
 
-typedef Id = String;
-
 Future<T?> fetch<T extends FireObject>(
-  Id id, {
-  bool merge = false,
+  ID id, {
+  bool doMerge = false,
   bool withData = false,
   bool fromNodes = false,
 }) async {
-  Future<FireNode?> fetchNode(Id id, {bool merge = false}) async {
+  Future<FireNode?> fetchNode(ID id, {bool merge = false}) async {
     final snapshot = await _firestore
         .collection("Nodes")
         .doc(id)
-        .get(const GetOptions(source: Source.server));
+        .get(const firestore.GetOptions(source: firestore.Source.server));
     if (!snapshot.exists) return null;
-    final node = FireNode.fromJson(snapshot.data()!.cast())!;
-    if (merge) await node._merge();
+    final node = FireNode.fromJson(snapshot.data()!.cast());
+    if (merge) await node.merge();
     return node;
   }
 
-  Future<FireMessage?> fetchMessage(Id id, {bool merge = false}) async {
+  Future<FireMessage?> fetchMessage(ID id, {bool merge = false}) async {
     final snapshot = await _realtime.child("Message").child(id).get();
     if (!snapshot.exists) return null;
     final json = Map<String, String?>.from(snapshot.value as Map);
     final message = FireMessage.fromJson(json);
-    if (merge) message._merge();
+    if (merge) message.merge();
     return message;
   }
 
   Future<FireMedia?> fetchMedia(
-    Id id, {
+    ID id, {
     bool merge = false,
     bool withData = false,
     bool fromNodes = false,
@@ -83,25 +89,27 @@ Future<T?> fetch<T extends FireObject>(
     final ref = fromNodes ? _nodeStore.ref(id) : _messageStore.ref(id);
     try {
       final futureFullMetadata = ref.getMetadata();
-      final maybeFutureData = withData ? ref.getData() : null;
+      final mediaData = withData ? await ref.getData() : null;
       // will throw if no metadata, so we can use !
       final mediaJson = (await futureFullMetadata).customMetadata!;
       final media = FireMedia.fromJson(mediaJson);
       Uint8List? videoThumbnail;
       final bool isVideo = media.isVideo;
-      if (isVideo && withData) {
+      if (isVideo) {
         final url = await ref.getDownloadURL();
-        videoThumbnail = await VideoThumbnail.thumbnailData(
+        media.cachedImage = videoThumbnail = await VideoThumbnail.thumbnailData(
           video: url,
           quality: 50,
         );
+      } else {
+        media.cachedImage = mediaData;
       }
       if (merge) {
-        media._merge();
-        if (withData) {
-          await media._write(
-            videoData: isVideo ? await maybeFutureData : null,
-            imageData: isVideo ? videoThumbnail : await maybeFutureData,
+        media.merge();
+        if (withData && (mediaData != null || videoThumbnail != null)) {
+          await media.write(
+            videoData: isVideo ? mediaData : null,
+            imageData: isVideo ? videoThumbnail! : mediaData!,
           );
         }
       }
@@ -112,925 +120,265 @@ Future<T?> fetch<T extends FireObject>(
     }
   }
 
-  switch (T) {
-    case FireNode:
-      return fetchNode(id, merge: merge) as T;
-    case FireMessage:
-      return fetchMessage(id, merge: merge) as T;
-    case FireMedia:
-      return fetchMedia(id,
-          merge: merge, withData: withData, fromNodes: fromNodes) as T;
+  if (T is FireNode) {
+    return fetchNode(id, merge: doMerge) as T;
+  } else if (T is FireMessage) {
+    return fetchMessage(id, merge: doMerge) as T;
+  } else if (T is FireMedia) {
+    return fetchMedia(id,
+        merge: doMerge, withData: withData, fromNodes: fromNodes) as T;
   }
+
   throw 'Unsupported type for fetching $T';
 }
 
-cbl.Database db_<T extends FireObject>() {
+Database gdb<T extends FireObject>() {
   switch (T) {
     case FireNode:
-      return _nodesDB;
-    case FireMessage:
-      return _messagesDB;
+      return nodesDB;
+    case Branchable:
+      return nodesDB;
+    case Chatable:
+      return nodesDB;
+    case Groupable:
+      return nodesDB;
+    case Personable:
+      return nodesDB;
+    case Editable:
+      return nodesDB;
+    case User:
+      return nodesDB;
+    case Self:
+      return nodesDB;
+    case Group:
+      return nodesDB;
+    case Hyperchat:
+      return nodesDB;
     case FireMedia:
-      return _mediasDB;
+      return mediasDB;
+    case FireMessage:
+      return messagesDB;
+    case Down4TXOUT:
+      return utxosDB;
+    case Down4Payment:
+      return paymentsDB;
+    case Token:
+      return personalDB;
+    case ExchangeRate:
+      return personalDB;
+    case Wallet:
+      return personalDB;
   }
+
   throw 'No db exists for type: $T';
 }
 
-Future<T?> local<T extends FireObject>(Id id) async {
-  final doc = await db_<T>().document(id);
+Future<T?> local<T extends FireObject>(ID id) async {
+  final doc = await gdb<T>().document(id);
   if (doc == null) return null;
-  return _fromJson<T>(doc.toPlainMap().cast());
+  return fromJson<T>(doc.toPlainMap().cast());
 }
 
-T _fromJson<T extends FireObject>(Map<String, String?> json) {
+Future<T?> global<T extends FireObject>(
+  ID? id, {
+  bool doCache = true,
+  bool doFetch = false,
+  bool doMergeIfFetch = false,
+  bool withDataIfFetch = false,
+  bool fetchFromNodes = false,
+}) async {
+  if (id == null) return null;
+  final cached = _globalCache[id];
+  if (cached != null && cached is T) return cached;
+  final localed = await local<T>(id);
+  if (localed != null) return doCache ? _globalCache[id] = localed : localed;
+  if (!doFetch) return null;
+  final fetched = await fetch<T>(id,
+      doMerge: doMergeIfFetch,
+      withData: withDataIfFetch,
+      fromNodes: fetchFromNodes);
+  if (fetched != null) return doCache ? _globalCache[id] = fetched : fetched;
+  return null;
+}
+
+T fromJson<T extends FireObject>(Map<String, Object?> json) {
   switch (T) {
     case FireNode:
-      return FireNode.fromJson(json) as T;
-    case FireMessage:
-      return FireMessage.fromJson(json) as T;
+      return FireNode.fromJson(json.cast()) as T;
+    case Branchable:
+      return FireNode.fromJson(json.cast()) as T;
+    case Chatable:
+      return FireNode.fromJson(json.cast()) as T;
+    case Groupable:
+      return FireNode.fromJson(json.cast()) as T;
+    case Personable:
+      return FireNode.fromJson(json.cast()) as T;
+    case Editable:
+      return FireNode.fromJson(json.cast()) as T;
+    case User:
+      return FireNode.fromJson(json.cast()) as T;
+    case Self:
+      return FireNode.fromJson(json.cast()) as T;
+    case Group:
+      return FireNode.fromJson(json.cast()) as T;
+    case Hyperchat:
+      return FireNode.fromJson(json.cast()) as T;
     case FireMedia:
-      return FireMedia.fromJson(json) as T;
+      return FireMedia.fromJson(json.cast()) as T;
+    case FireMessage:
+      return FireMessage.fromJson(json.cast()) as T;
+    case Down4TXOUT:
+      return Down4TXOUT.fromJson(json) as T;
+    case Down4Payment:
+      return Down4Payment.fromJson(json) as T;
+    case Token:
+      return Token.fromJson(json) as T;
+    case ExchangeRate:
+      return ExchangeRate.fromJson(json) as T;
+    case Wallet:
+      return Wallet.fromJson(json) as T;
   }
-  throw 'Cannot create fireobject from json for this type: $T';
+
+  throw 'Cannot create FireObject from json for this type: $T';
 }
 
-abstract class StaticObject {
-  cbl.Database get db;
-  Id get id;
-  Map<String, Object> toJson();
-  Future<void> delete() async {
-    await db.purgeDocumentById(id);
-  }
-
-  Future<bool> save() async {
-    final doc = cbl.MutableDocument.withId(id)..setData(toJson());
-    return await db.saveDocument(doc);
-  }
-}
-
-abstract class FireObject {
-  final String id;
-  const FireObject(this.id);
-
-  cbl.Database _db();
-
-  Future<void> _delete() async => await _db().purgeDocumentById(id);
-
-  Map<String, String> toJson({bool withLocalValues = false});
-
-  Future<void> _merge([Map<String, String>? values]) async {
-    var db = _db();
-    // first, we get the current doc in the db
-    var document = (await db.document(id))?.toMutable();
-    bool wasLocal = (document != null);
-    // if it wasn't local, we create it
-    if (!wasLocal) document = cbl.MutableDocument.withId(id);
-
-    Map<String, Object> toMerge;
-    if (!wasLocal) {
-      // then we need to merge the whole thing with the parameter values
-      toMerge = {...toJson(withLocalValues: true), ...?values};
-    } else {
-      // we merge given values, or the values from the probably freshly
-      // fetched object without the local values to not overwrite them
-      toMerge = (values ?? toJson(withLocalValues: false));
-    }
-
-    toMerge.forEach((key, value) {
-      document!.setValue(value, key: key);
-    });
-
-    await db.saveDocument(document);
-  }
-
-  static T fromJson<T extends FireObject>(Map<String, String?> json) {
-    switch (T) {
-      case FireMessage:
-        return FireMessage.fromJson(json) as T;
-      case FireNode:
-        return FireNode.fromJson(json) as T;
-      case FireMedia:
-        return FireMedia.fromJson(json) as T;
-    }
-    throw '$T is not a supported type for the fromJson function';
-  }
-}
-
-class FireMessage extends FireObject {
-  final Id sender;
-  final Id? media, onlineMedia;
-  final String? text;
-  final Set<Id>? replies, nodes;
-  final String? forwarderID;
-  final int timestamp;
-  final bool isRead, isSent;
-
-  const FireMessage(
-    super.id, {
-    required this.sender,
-    required this.timestamp,
-    this.media,
-    this.onlineMedia,
-    this.forwarderID,
-    this.text,
-    this.nodes,
-    this.replies,
-    this.isRead = false,
-    this.isSent = false,
+Future<Set<ID>> allGroupIDs() async {
+  const rawq = "SELECT group FROM _ WHERE nodes.type in ('hyperchat', 'group')";
+  final q = await AsyncQuery.fromN1ql(nodesDB, rawq);
+  final e = await q.execute();
+  final r = await e.allResults();
+  return r.fold<Set<ID>>(Set<ID>.identity(), (value, element) {
+    final sGroup = element.toPlainMap()["group"] as String;
+    return value..addAll(sGroup.split(" "));
   });
-
-  factory FireMessage.fromJson(Map<String, String?> decodedJson) {
-    return FireMessage(
-      decodedJson["id"] as Id,
-      sender: decodedJson["sender"] as Id,
-      forwarderID: decodedJson["forwarderID"],
-      text: decodedJson["text"],
-      media: decodedJson["media"],
-      onlineMedia: decodedJson["onlineMedia"],
-      timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
-      isRead: decodedJson["isRead"] == "true",
-      isSent: decodedJson["isSent"] == "true",
-      nodes: decodedJson["nodes"]?.split(" ").toSet(),
-      replies: decodedJson["replies"]?.split(" ").toSet(),
-    );
-  }
-
-  @override
-  Map<String, String> toJson({bool withLocalValues = false}) => {
-        'id': id,
-        if (text != null) 'text': text!,
-        'sender': sender,
-        'timestamp': timestamp.toString(),
-        if (media != null) 'media': media!,
-        if (onlineMedia != null) 'onlineMedia': onlineMedia!,
-        if (withLocalValues) 'isRead': isRead.toString(),
-        if (withLocalValues) 'isSent': isSent.toString(),
-        if (forwarderID != null) 'forwarderID': forwarderID!,
-        if (replies != null) 'replies': replies!.join(" "),
-        if (nodes != null) 'nodes': nodes!.join(" "),
-      };
-
-  @override
-  cbl.Database _db() => _messagesDB;
 }
 
-enum Nodes {
-  user,
-  hyperchat,
-  group,
-  root,
-  market,
-  checkpoint,
-  journal,
-  item,
-  event,
-  ticket,
-  payment,
-  self,
+Future<Set<ID>> allMediaReferences() async {
+  const nq = "SELECT mediaID FROM _";
+  final q1 = await AsyncQuery.fromN1ql(messagesDB, nq);
+  final q2 = await AsyncQuery.fromN1ql(nodesDB, nq);
+  final e1 = q1.execute();
+  final e2 = q2.execute();
+
+  return (await (await e1).allResults())
+      .followedBy(await (await e2).allResults())
+      .map((e) => e.string("mediaID"))
+      .whereType<String>()
+      .toSet();
 }
 
-enum NodesColor {
-  friend,
-  nonFriend,
-  hyperchat,
-  group,
-  root,
-  market,
-  checkpoint,
-  journal,
-  item,
-  event,
-  ticket,
-  safeTx,
-  mediumTx,
-  unsafeTx,
-  self,
-}
+Future<void> mediaDeletingRoutine() async {
+  final fourDaysAgo = DateTime.now()
+      .toUtc()
+      .subtract(const Duration(days: 4))
+      .millisecondsSinceEpoch;
+  final raw = """
+      SELECT Meta.id() AS id FROM _
+      WHERE TONUMBER(timestamp) < $fourDaysAgo AND isSaved = 'false'
+      """;
 
-abstract class FireNode extends FireObject {
-  int _activity;
-  String _name;
-  String? _lastName, _description;
-  final Down4Keys? _neuter;
-  Id? _media;
-  bool? _isFriend, _isHidden;
-  final Set<Id>? _messages;
-  final Set<Id>? _snips;
-  final Set<Id>? _group;
-  // final Set<Id>? _nfts;
-  // final Set<Id>? _images;
-  // final Set<Id>? _videos;
-  final Set<Id>? _children;
+  final allMediaRefs = await allMediaReferences();
 
-  @override
-  cbl.Database _db() => _nodesDB;
-
-  Id? get media;
-  NodesColor get colorCode;
-  Nodes get type;
-  String get displayID;
-  String get displayName;
-  int get activity => _activity;
-
-  @override
-  Map<String, String> toJson({bool withLocalValues = true}) => {
-        "type": type.name,
-        "id": id,
-        "name": _name,
-        if (withLocalValues && _isFriend != null)
-          "isFriend": _isFriend!.toString(),
-        if (withLocalValues && _isHidden != null)
-          "isHidden": _isHidden.toString(),
-        if (_lastName != null) "lastName": _lastName!,
-        if (_media != null) "media": _media!,
-        if (_children != null) "children": _children!.join(" "),
-        if (_neuter != null) "neuter": _neuter!.toYouKnow(),
-        if (_group != null) "group": _group!.join(" "),
-        // if (withLocalValues && _images != null) "images": _images!.join(" "),
-        // if (withLocalValues && _videos != null) "videos": _videos!.join(" "),
-        // if (withLocalValues && _nfts != null) "nfts": _nfts!.join(" "),
-        if (withLocalValues && _messages != null)
-          "messages": _messages!.join(" "),
-        if (withLocalValues && _snips != null) "snips": _snips!.join(" "),
-        if (withLocalValues) "activity": _activity.toString(),
-      };
-
-  FireNode(
-    super.id, {
-    required int activity,
-    required String name,
-    String? lastName,
-    bool? isFriend,
-    bool? isHidden,
-    String? description,
-    Down4Keys? neuter,
-    Id? media,
-    Set<Id>? messages,
-    Set<Id>? snips,
-    Set<Id>? group,
-    Set<Id>? nfts,
-    Set<Id>? images,
-    Set<Id>? videos,
-    Set<Id>? children,
-  })  : _activity = activity,
-        _name = name,
-        _lastName = lastName,
-        _isFriend = isFriend,
-        _isHidden = isHidden,
-        _description = description,
-        _neuter = neuter,
-        _media = media,
-        _messages = messages,
-        _snips = snips,
-        _group = group,
-        // _nfts = nfts,
-        // _images = images,
-        // _videos = videos,
-        _children = children;
-
-  void updateActivity([int? newActivity]) {
-    _activity = newActivity ?? u.timeStamp();
-    _merge({"activity": _activity.toString()});
-  }
-
-  static FireNode? fromJson(Map<String, String?> json) {
-    final id = json["id"];
-    if (id == null) return null;
-    final activity = int.parse(json["activity"] ?? "0");
-    final type = Nodes.values.byName(json["type"] as String);
-    final media = json["media"];
-
-    final name = json["name"] as String;
-    final isFriend = json["isFriend"] == "true";
-    final isHidden = json["isHidden"] == "true";
-    final lastName = json["lastName"];
-    final description = json["description"];
-    final children = json["children"]?.split(" ").toSet();
-    final neuter = json["neuter"] != null
-        ? Down4Keys.fromYouKnow(json["neuter"] as String)
-        : null;
-    final group = json["group"]?.split(" ").toSet();
-    // final images = json["images"]?.split(" ").toSet();
-    // final videos = json["videos"]?.split(" ").toSet();
-    // final nfts = json["nfts"]?.split(" ").toSet();
-    final messages = json["messages"]?.split(" ").toSet();
-    final snips = json["snips"]?.split(" ").toSet();
-
-    switch (type) {
-      case Nodes.user:
-        return User(id,
-            activity: activity,
-            name: name,
-            lastName: lastName,
-            media: media,
-            isHidden: isHidden,
-            isFriend: isFriend,
-            children: children!,
-            messages: messages!,
-            snips: snips!,
-            neuter: neuter!,
-            description: description);
-
-      case Nodes.hyperchat:
-        return Hyperchat(id,
-            activity: activity,
-            firstWord: name,
-            secondWord: lastName!,
-            media: media,
-            messages: messages!,
-            snips: snips!,
-            group: group!);
-
-      case Nodes.group:
-        return Group(id,
-            activity: activity,
-            name: name,
-            media: media,
-            messages: messages!,
-            snips: snips!,
-            group: group!);
-
-      case Nodes.self:
-        return Self(id,
-            activity: activity,
-            name: name,
-            description: description,
-            lastName: lastName,
-            media: media!,
-            children: children!,
-            messages: messages!,
-            snips: snips!);
-
-      case Nodes.root:
-        // TODO: Handle this case.
-        break;
-      case Nodes.market:
-        // TODO: Handle this case.
-        break;
-      case Nodes.checkpoint:
-        // TODO: Handle this case.
-        break;
-      case Nodes.journal:
-        // TODO: Handle this case.
-        break;
-      case Nodes.item:
-        // TODO: Handle this case.
-        break;
-      case Nodes.event:
-        // TODO: Handle this case.
-        break;
-      case Nodes.ticket:
-        // TODO: Handle this case.
-        break;
-      case Nodes.payment:
-        break;
-      // return Payment(payment: Down4Payment.fromYouKnow(decodedJson["pay"]));
-    }
-    return null;
+  final q = await AsyncQuery.fromN1ql(mediasDB, raw);
+  final e = await q.execute();
+  await for (final r in e.asStream()) {
+    final pot = r.toPlainMap()["id"] as String;
+    if (!allMediaRefs.contains(pot)) await mediasDB.purgeDocumentById(pot);
   }
 }
 
-mixin Branchable on FireNode {
-  Iterable<Id> get children;
+Future<List<Palette2<Chatable>>> loadHome({required bool isHidden}) async {
+  final hiddenString = isHidden ? "'true'" : "'false'";
+  final raw = """
+    SELECT * FROM _ AS n
+    WHERE n.type in ('hyperchat', 'group', 'user')
+      AND n.isHidden = $hiddenString
+    """;
+
+  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
+  final r = await q.execute();
+  return Future.wait((await r.allResults()).map((e) async {
+    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
+    final n = fromJson<Chatable>(nodeJson)..cache();
+    final m = await global<FireMedia>(n.mediaID,
+        doFetch: true,
+        doMergeIfFetch: true,
+        withDataIfFetch: !isHidden,
+        fetchFromNodes: true);
+
+    return Palette2<Chatable>(node: n, image: m);
+  }).toList());
 }
 
-mixin Chatable on FireNode {
-  Iterable<Id> get messages;
-  Iterable<Id> get snips;
-
-  Future<void> addMessage(FireMessage msg) async {
-    // message will be merged on fetch
-    _messages!.add(msg.id);
-    Map<String, String> merges = {};
-    merges["messages"] = _messages!.join(" ");
-    if (this is User) merges["isHidden"] = false.toString();
-    await _merge(merges);
-  }
-
-  Future<void> removeMessage(FireMessage msg) async {
-    final n = this;
-    if (msg.media != null) {
-      final media = await local<FireMedia>(msg.media!);
-      await media?.removeReference(msg.id);
-    }
-    _messages!.remove(msg.id);
-    if (messages.isEmpty &&
-        snips.isEmpty &&
-        (n is Hyperchat || (n is User && !n.isFriend))) {
-      _delete();
-    } else {
-      await _merge({"messages": messages.join(" ")});
-    }
-
-    await msg._delete();
-  }
-
-  Future<void> addSnip(FireMedia snip) async {
-    _snips!.add(snip.id);
-    Map<String, String> merges = {};
-    merges["snips"] = snips.join(" ");
-    if (this is User) merges["isHidden"] = false.toString();
-    await _merge(merges);
-  }
-
-  Future<u.Pair<bool, String>> messagingPreview() async {
-    final def = Future.value(const u.Pair(true, ""));
-    if (messages.isEmpty) def;
-    final lastMsgID = messages.last;
-    final msg = await local<FireMessage>(lastMsgID);
-    if (msg == null) return def;
-    return u.Pair(msg.isRead, msg.text ?? "&attachment");
+Stream<FireMedia> savedMedia(bool images) async* {
+  final isVideo = images ? "'false'" : "'true'";
+  final raw = """
+        SELECT * FROM _ 
+        WHERE isSaved = 'true' AND isVideo = $isVideo
+        ORDER BY lastUse DESC
+        """;
+  final query = await AsyncQuery.fromN1ql(mediasDB, raw);
+  final results = await query.execute();
+  await for (final r in results.asStream()) {
+    yield FireMedia.fromJson(r.toPlainMap().cast());
   }
 }
 
-mixin Groupable on FireNode {
-  Iterable<Id> get group;
-  @override
-  String get displayID => group.map((id) => "@$id").join(" ");
-}
-
-mixin Personable on FireNode {
-  String get firstName;
-  String? get description;
-  String? get lastName;
-  Down4Keys get neuter;
-
-  @override
-  String get displayID => "@$id";
-
-  @override
-  String get displayName =>
-      firstName + ((lastName != null) ? " $lastName" : "");
-}
-
-mixin Editable on FireNode {
-  Future<void> editName(String newName) async {
-    _name = newName;
-    await _merge({"name": _name});
-  }
-
-  Future<void> editLastName(String? newLastName) async {
-    _lastName = newLastName;
-    await _merge({"lastName": _lastName ?? ""});
-  }
-
-  Future<void> editImage(FireMedia newImage) async {
-    await newImage.addReference(id);
-    if (media != null) {
-      await (await local<FireMedia>(media!))?.removeReference(id);
-    }
-    _media = newImage.id;
-    await _merge({"media": _media!});
-  }
-
-  Future<void> editDescription(String newDescription) async {
-    _description = newDescription;
-    await _merge({"description": _description!});
-  }
-}
-
-class User extends FireNode with Branchable, Personable, Chatable {
-  User(
-    super.id, {
-    required super.activity,
-    required super.name,
-    required bool isHidden,
-    required bool isFriend,
-    required Set<Id> children,
-    required Set<Id> messages,
-    required Set<Id> snips,
-    required super.description,
-    required super.lastName,
-    required super.media,
-    required Down4Keys neuter,
-  }) : super(
-            isHidden: isHidden,
-            isFriend: isFriend,
-            children: children,
-            messages: messages,
-            snips: snips);
-
-  Future<void> updateFriendStatus(bool newFriendStatus) async {
-    _isFriend = newFriendStatus;
-    await _merge({"isFriend": _isFriend.toString()});
-  }
-
-  Future<void> updateHiddenStatus(bool newHiddenStatus) async {
-    _isHidden = newHiddenStatus;
-    await _merge({"isHidden": _isHidden.toString()});
-  }
-
-  bool get isHidden => _isHidden!;
-
-  bool get isFriend => _isFriend!;
-
-  @override
-  Iterable<Id> get children => _children!;
-
-  @override
-  NodesColor get colorCode =>
-      isFriend ? NodesColor.friend : NodesColor.nonFriend;
-
-  @override
-  String? get description => _description;
-
-  @override
-  String? get lastName => _lastName;
-
-  @override
-  Id? get media => _media;
-
-  @override
-  Iterable<Id> get messages => _messages!;
-
-  @override
-  String get firstName => _name;
-
-  @override
-  Down4Keys get neuter => _neuter!;
-
-  @override
-  Iterable<Id> get snips => _snips!;
-
-  @override
-  Nodes get type => Nodes.user;
-}
-
-class Self extends FireNode with Branchable, Personable, Chatable, Editable {
-  Self(
-    super.id, {
-    required super.activity,
-    required super.name,
-    required super.description,
-    required super.lastName,
-    required Id media,
-    required Set<Id> children,
-    required Set<Id> messages,
-    required Set<Id> snips,
-  }) : super(
-          media: media,
-          children: children,
-          messages: messages,
-          snips: snips,
-        );
-
-  @override
-  NodesColor get colorCode => NodesColor.self;
-
-  @override
-  Iterable<Id> get children => _children!;
-
-  @override
-  String? get description => _description;
-
-  @override
-  String? get lastName => _lastName;
-
-  @override
-  Id get media => _media!;
-
-  @override
-  Iterable<Id> get messages => _messages!;
-
-  @override
-  String get firstName => _name;
-
-  @override
-  Down4Keys get neuter => _neuter!;
-
-  @override
-  Iterable<Id> get snips => _snips!;
-
-  @override
-  Nodes get type => Nodes.self;
-}
-
-class Group extends FireNode with Groupable, Editable, Chatable {
-  Group(
-    super.id, {
-    required super.activity,
-    required super.name,
-    required super.media,
-    required Set<Id> messages,
-    required Set<Id> snips,
-    required Set<Id> group,
-  }) : super(messages: messages, snips: snips, group: group);
-
-  Future<void> addMembers(Iterable<Personable> members) async {
-    final membersID = members.map((e) => e.id);
-    _group!.addAll(membersID);
-    final merges = members.map((e) => e._merge());
-    await Future.wait(merges);
-    await _merge({"group": group.join(" ")});
-  }
-
-  @override
-  NodesColor get colorCode => NodesColor.group;
-
-  @override
-  String get displayName => _name;
-
-  @override
-  Iterable<Id> get group => _group!;
-
-  @override
-  Id? get media => _media;
-
-  @override
-  Iterable<Id> get messages => _messages!;
-
-  @override
-  Iterable<Id> get snips => _snips!;
-
-  @override
-  Nodes get type => Nodes.group;
-}
-
-class Hyperchat extends FireNode with Groupable, Chatable {
-  Hyperchat(
-    super.id, {
-    required super.activity,
-    required String firstWord,
-    required String secondWord,
-    required super.media,
-    required Set<Id> messages,
-    required Set<Id> snips,
-    required Set<Id> group,
-  }) : super(
-            messages: messages,
-            snips: snips,
-            group: group,
-            name: firstWord,
-            lastName: secondWord);
-
-  @override
-  NodesColor get colorCode => NodesColor.group;
-
-  @override
-  String get displayName => "$_name $_lastName";
-
-  @override
-  Iterable<Id> get group => _group!;
-
-  @override
-  Id? get media => _media;
-
-  @override
-  Iterable<Id> get messages => _messages!;
-
-  @override
-  Iterable<Id> get snips => _snips!;
-
-  @override
-  Nodes get type => Nodes.hyperchat;
-}
-
-class Payment extends FireNode {
-  @override
-  int get activity => _payment.tsSeconds;
-
-  @override
-  Id? get media => null;
-
-  final Down4Payment _payment;
-  final FireObject selfID;
-  Payment(
-    super.id, {
-    required Down4Payment payment,
-    required this.selfID,
-  })  : _payment = payment,
-        super(activity: payment.tsSeconds, name: payment.id);
-
-  @override
-  String get displayName => payment.formattedName(selfID.id);
-
-  Down4Payment get payment => _payment;
-
-  @override
-  String get displayID =>
-      "Confirmations: ${_payment.lastConfirmations > 100 ? "100+" : _payment.lastConfirmations}";
-
-  @override
-  NodesColor get colorCode => _payment.lastConfirmations == 0
-      ? NodesColor.unsafeTx
-      : _payment.lastConfirmations < 6
-          ? NodesColor.mediumTx
-          : NodesColor.safeTx;
-
-  @override
-  Nodes get type => Nodes.payment;
-}
-
-class FireMedia extends FireObject {
-  final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
-  final String tinyThumbnail;
-  bool _isSaved;
-  final Id owner;
-  Id? _onlineId;
-  int _onlineTimestamp;
-  int _lastUse;
-  final String extension;
-  final String mimetype;
-  final double aspectRatio;
-  final String? text;
-  final int timestamp;
-  final Set<Id> _references;
-
-  bool get isVideo => extension.isVideoExtension();
-
-  Future<Uint8List?> get imageData async {
-    final blob = (await _db().document(id))?.blob("image");
-    return blob?.content();
-  }
-
-  Future<Uint8List?> get videoData async {
-    final blob = (await _db().document(id))?.blob("video");
-    return blob?.content();
-  }
-
-  @override
-  cbl.Database _db() => _mediasDB;
-
-  int get onlineTimestamp => _onlineTimestamp;
-
-  String? get onlineId => _onlineId;
-
-  FireMedia(
-    super.id, {
-    required this.owner,
-    required this.timestamp,
-    required this.aspectRatio,
-    required this.extension,
-    required this.mimetype,
-    required this.tinyThumbnail,
-    required Set<Id> references,
-    int onlineTimestamp = 0,
-    int lastUse = 0,
-    Id? onlineId,
-    bool isSaved = false,
-    this.isLocked = false,
-    this.isPaidToView = false,
-    this.isReversed = false,
-    this.isPaidToOwn = false,
-    this.isSquared = false,
-    this.text,
-  })  : _references = references,
-        _lastUse = lastUse,
-        _isSaved = isSaved,
-        _onlineId = onlineId,
-        _onlineTimestamp = onlineTimestamp;
-
-  Future<void> use() async {
-    _lastUse = u.timeStamp();
-    await _merge({"lastUse": _lastUse.toString()});
-  }
-
-  Future<void> updateSaveStatus(bool newSaveStatus) async {
-    _isSaved = newSaveStatus;
-    await _merge({"isSaved": _isSaved.toString()});
-  }
-
-  Future<void> updateOnlineReference(Id newOnlineId, int newStamp) async {
-    if (newStamp < onlineTimestamp) return;
-    _onlineId = newOnlineId;
-    _onlineTimestamp = newStamp;
-    await _merge({
-      "onlineTimestamp": _onlineTimestamp.toString(),
-      "onlineId": newOnlineId,
-    });
-  }
-
-  Future<void> addReference(Id reference) async {
-    _references.add(reference);
-    await _merge({"references": _references.join(" ")});
-  }
-
-  Future<void> removeReference(Id reference) async {
-    _references.remove(reference);
-    if (_references.isEmpty && !_isSaved) {
-      await _delete();
-    } else {
-      await _merge({"references": _references.join(" ")});
+extension WalletManager on Wallet {
+  Stream<Down4Payment> get payments async* {
+    const raw = "SELECT * FROM _ AS p ORDER BY META(p).id DESC";
+    final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
+    final r = await q.execute();
+    await for (final p in r.asStream()) {
+      yield Down4Payment.fromJson(p.toPlainMap()["p"]);
     }
   }
 
-  Future<void> _write({Uint8List? videoData, Uint8List? imageData}) async {
-    if (videoData == null && imageData == null) return;
-    final doc = (await _db().document(id))?.toMutable();
-    if (isVideo) {
-      final videoBlob = cbl.Blob.fromData(mimetype, videoData!);
-      doc?.setBlob(videoBlob, key: "video");
+  Stream<Down4TXOUT> get utxos async* {
+    const raw = "SELECT * FROM _ AS u";
+    final q = await AsyncQuery.fromN1ql(utxosDB, raw);
+    final r = await q.execute();
+    await for (final u in r.asStream()) {
+      yield Down4TXOUT.fromJson(u.toPlainMap()["u"]);
     }
-    final imageMime = isVideo ? "image/png" : mimetype;
-    final imageBlob = cbl.Blob.fromData(imageMime, imageData!);
-    doc?.setBlob(imageBlob, key: "image");
-    return;
   }
 
-  factory FireMedia.fromJson(Map<String, String?> decodedJson) {
-    return FireMedia(
-      decodedJson["id"]!,
-      owner: decodedJson["owner"]!,
-      timestamp: int.parse(decodedJson["timestamp"]!),
-      extension: decodedJson["extension"]!,
-      mimetype: decodedJson["mimetype"]!,
-      onlineId: decodedJson["onlineRef"]!,
-      lastUse: int.parse(decodedJson["lastUse"]!),
-      tinyThumbnail: decodedJson["tinyThumbnail"]!,
-      onlineTimestamp: int.parse(decodedJson["onlineTimestamp"]!),
-      references: decodedJson["references"]!.split(" ").toSet(),
-      isSaved: decodedJson["isSaved"] == "true",
-      isReversed: decodedJson["isReversed"] == "true",
-      isSquared: decodedJson["isSquared"] == "true",
-      isLocked: decodedJson["isLocked"] == "true",
-      isPaidToOwn: decodedJson["isPaidToView"] == "true",
-      isPaidToView: decodedJson["isPaidToOwn"] == "true",
-      aspectRatio: double.tryParse(decodedJson["aspectRatio"]!) ?? 1.0,
-      text: decodedJson["text"],
-    );
+  Future<Down4TXOUT?> getUtxo(ID id) async {
+    return local<Down4TXOUT>(id);
   }
 
-  @override
-  Map<String, String> toJson({bool withLocalValues = true}) => {
-        "owner": owner,
-        "timestamp": timestamp.toString(),
-        "extension": extension,
-        "mimetype": mimetype,
-        "tinyThumbnail": tinyThumbnail,
-        if (onlineId != null) "onlineRef": onlineId!,
-        "onlineTimestamp": onlineTimestamp.toString(),
-        if (text != null) "text": text!,
-        "isReversed": isReversed.toString(),
-        "isSquared": isSquared.toString(),
-        "isLocked": isLocked.toString(),
-        "isPaidToView": isPaidToView.toString(),
-        "isPaidToOwn": isPaidToOwn.toString(),
-        "aspectRatio": aspectRatio.toString(),
-        if (withLocalValues) "isVideo": isVideo.toString(), // for index
-        if (withLocalValues) "references": _references.join(" "),
-        if (withLocalValues) "isSaved": _isSaved.toString(),
-      };
-}
-
-class Location {
-  final String id;
-  final String? at, type;
-  int pageIndex;
-  double? scroll;
-  Location({
-    required this.id,
-    this.at,
-    this.type,
-    this.pageIndex = 0,
-    this.scroll,
-  });
-
-  Location copy() => Location(
-        id: id,
-        at: at,
-        type: type,
-        pageIndex: pageIndex,
-        scroll: scroll,
-      );
-}
-
-class ExchangeRate {
-  int lastUpdate;
-  double rate;
-  ExchangeRate({required this.lastUpdate, required this.rate});
-
-  factory ExchangeRate.fromJson(dynamic decodedJson) {
-    return ExchangeRate(
-      lastUpdate: decodedJson["lastUpdate"],
-      rate: decodedJson["rate"],
-    );
+  Future<void> removeUtxo(ID id) async {
+    await gdb<Down4TXOUT>().purgeDocumentById(id);
   }
 
-  Map<String, dynamic> toJson() => {
-        "rate": rate,
-        "lastUpdate": lastUpdate,
-      };
+  Future<Down4Payment?> getPayment(ID id) async {
+    return local<Down4Payment>(id);
+  }
+
+  Future<void> removePayment(ID id) async {
+    await gdb<Down4Payment>().purgeDocumentById(id);
+  }
+
+  Future<void> setPayment(Down4Payment payment) async {
+    await payment.merge();
+  }
+
+  Future<void> setUtxo(Down4TXOUT utxo) async {
+    await utxo.merge();
+  }
+
+  Future<bool> isSpent(ID utxoID) async {
+    return (await dbb.document(id))?.boolean(utxoID) ?? false;
+  }
+
+  Future<void> setSpent(ID id, bool spent) async {
+    await merge({id: spent});
+  }
+
+  static Future<Wallet?> load() async {
+    return local<Wallet>("wallet");
+  }
 }
-
-
-// Stream<Palette2> loadHomePalettes({bool isHidden = false}) async* {
-//   final raw = '''
-//       SELECT * FROM nodes
-//       LEFT JOIN ON medias.id = nodes.media
-//       WHERE nodes.isHidden = ${isHidden.toString()}
-//         AND nodes.type IN ('group', 'hyperchat', 'user', 'self')
-//       ''';
-
-//   final query = await cbl.Query.fromN1qlAsync(_nodesDB, raw);
-//   final results = await query.execute();
-//   await for (final result in results.asStream()) {
-//     Map<String, String?> nodeJson = result.toPlainMap().cast();
-//     Map<String, String?> mediaJson = result.toPlainMap().cast();
-//     final node = FireNode.fromJson(nodeJson)!;
-//     final media = FireMedia.fromJson(mediaJson);
-//     yield Palette2(node: node, media: media);
-//   }
-// }
 
 // Future<List<ChatMessage>> loadMessages(FireObject root,
 //     {required int take, required int skip}) async {

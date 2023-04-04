@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../themes.dart';
 import '../globals.dart';
 import '../data_objects.dart' show ID;
-import '../render_objects/_down4_flutter_utils.dart'
+import '../render_objects/_render_utils.dart'
     show down4Logo, Down4PageWidget;
 
 class LoadingPage2 extends StatefulWidget implements Down4PageWidget {

@@ -3,7 +3,6 @@ import 'dart:typed_data' show Uint8List;
 import 'package:down4/src/render_objects/palette.dart';
 import 'package:http/http.dart' as http;
 import 'data_objects.dart';
-import '_down4_dart_utils.dart' show Pair;
 import 'bsv/types.dart' show Down4Payment, Down4TX;
 
 Future<bool> usernameIsValid(String username) async {
@@ -31,8 +30,9 @@ Future<String?> generateMnemonic() async {
 }
 
 Future<bool> initUser(String encodedJson) async {
-  final uri =
-      Uri.parse("https://us-east1-down4-26ee1.cloudfunctions.net/InitUser");
+  final uri = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/InitUser",
+  );
   final res = await http.post(uri, body: encodedJson);
   return res.statusCode == 200;
 }
@@ -56,27 +56,27 @@ Future<List<Palette2>?> fetchPalettes(Iterable<String> ids) async {
   return null;
 }
 
-Future<MediaMetadata?> getMediaMetadata(String id) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/GetMediaMetadata",
-  );
-  final res = await http.post(url, body: id);
-  if (res.statusCode != 200) {
-    return null;
-  }
-  return MediaMetadata.fromJson(jsonDecode(res.body));
-}
+// Future<MediaMetadata?> getMediaMetadata(String id) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/GetMediaMetadata",
+//   );
+//   final res = await http.post(url, body: id);
+//   if (res.statusCode != 200) {
+//     return null;
+//   }
+//   return MediaMetadata.fromJson(jsonDecode(res.body));
+// }
 
-Future<Media?> getMessageMedia(String id) async {
-  final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMedia",
-  );
-  final res = await http.post(url, body: id);
-  if (res.statusCode != 200) return null;
-  return FireMedia.fromJson(jsonDecode(res.body));
-}
+// Future<Media?> getMessageMedia(String id) async {
+//   final url = Uri.parse(
+//     "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMedia",
+//   );
+//   final res = await http.post(url, body: id);
+//   if (res.statusCode != 200) return null;
+//   return FireMedia.fromJson(jsonDecode(res.body));
+// }
 
-Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
+Future<(Uint8List, (String, String))?> getHyperchat(
   List<String> pairs,
 ) async {
   final url = Uri.parse(
@@ -89,7 +89,7 @@ Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
   final json = jsonDecode(imageGenRes.body);
   final image = base64Decode(json["image"]);
   final prompt = (json["prompt"] as String).split(" ");
-  return Pair(image, Pair(prompt.first, prompt.last));
+  return (image, (prompt.first, prompt.last));
 }
 
 // TODO Might need adjustment for big batches

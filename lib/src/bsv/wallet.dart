@@ -1,16 +1,21 @@
 import 'dart:convert';
-// import 'dart:typed_data';
+import '../couch.dart';
 import '../data_objects.dart';
-import '../_down4_dart_utils.dart';
+import '../_dart_utils.dart';
 import '../web_requests.dart' as r;
 import 'dart:io' as io;
-import 'utils.dart';
+import '_bsv_utils.dart';
 import 'types.dart';
 import 'package:bs58/bs58.dart';
+import 'package:cbl/cbl.dart';
 
-import '../globals.dart' show WalletManager;
+class Wallet extends FireObject {
+  @override
+  Database get dbb => personalDB;
 
-class Wallet {
+  @override
+  ID get id => "wallet";
+
   final Down4Keys _keys;
   int _ix;
 
@@ -105,11 +110,11 @@ class Wallet {
     });
 
     // at this point, there is no reason for the payment to fail
-    // except if a key derivation returns, and in that case, calling the
+    // except if a key derivation returns null, and in that case, calling the
     // function again should solve the problem
     List<Down4TXOUT> outs = [];
     _ix = _ix + 1;
-    setIx(_ix);
+    merge({"ix": _ix});
     // the goal here is simply having a unique id everytime
     final txSecret = makeUint32(_ix) + utf8.encode(selfID);
     final d4Keys = DOWN4_NEUTER.derive(txSecret);
@@ -139,11 +144,10 @@ class Wallet {
       final selfKeys = _keys.derive(txSecret);
       if (selfKeys == null) return null;
       var changeOut = Down4TXOUT(
-        isChange: true,
-        sats: change,
-        scriptPubKey: p2pkh(selfKeys.rawAddress),
-        receiver: selfID,
-      );
+          isChange: true,
+          sats: change,
+          scriptPubKey: p2pkh(selfKeys.rawAddress),
+          receiver: selfID);
       outs.add(changeOut);
     }
 
@@ -338,70 +342,22 @@ class Wallet {
 
   Wallet({
     required Down4Keys keys,
-    // required Stream<Down4Payment> payments,
-    // required Stream<Down4TXOUT> utxos,
-    // required this.payments,
-    // required this.utxos,
-    // required Future<Down4TXOUT?> Function(Identifier) getUtxo,
-    // required Future<Down4Payment?> Function(Identifier) getPayment,
-    // required void Function(Identifier) removeUtxo,
-    // required void Function(Identifier) removePayment,
-    // required void Function(Identifier, bool) setSpent,
-    // required Future<bool> Function(Identifier) isSpent,
-    // required void Function(Down4Payment) setPayment,
-    // required void Function(Down4TXOUT) setUtxo,
-    // required void Function(int) setIx,
     required int? ix,
-    // Map<Identifier, Down4TXOUT>? utxos,
-    // Map<Identifier, Down4Payment>? payments,
-
-    // Map<Identifier, bool>? spent,
-  })  :
-
-        // _utxos = utxos ?? <Identifier, Down4TXOUT>{},
-        // _payments = payments ?? <Identifier, Down4Payment>{},
-        // _spent = spent ?? <Identifier, bool>{},
-        _keys = keys,
+  })  : _keys = keys,
         _ix = ix ?? -1;
-  // _setIx = setIx,
-  // // payments = payments,
-  // // utxos = utxos,
-  // _getPayment = getPayment,
-  // _getUtxo = getUtxo,
-  // _removePayment = removePayment,
-  // _removeUtxo = removeUtxo,
-  // _setPayment = setPayment,
-  // _setUtxo = setUtxo,
-  // _isSpent = isSpent,
-  // _setSpent = setSpent;
 
-  // factory Wallet.fromSeed(Uint8List seed1, Uint8List seed2) {
-  //   if (seed1.lengthInBytes < 32) throw 'invalid seed1 length';
-  //   if (seed2.lengthInBytes < 32) throw 'invalid seed2 length';
-  //   return Wallet(
-  //     keys: Down4Keys.fromRandom(seed1, seed2),
-  //   );
-  // }
+  factory Wallet.fromJson(dynamic decodedJson) {
+    return Wallet(
+      keys: Down4Keys.fromYouKnow(decodedJson["keys"]),
+      ix: decodedJson["ix"],
+    );
+  }
 
-  // factory Wallet.fromJson(dynamic decodedJson) {
-  //   return Wallet(
-  //     utxos: Map.from(decodedJson["utxos"])
-  //         .map((key, value) => MapEntry(key, Down4TXOUT.fromJson(value))),
-  //     payments: Map.from(decodedJson["payments"])
-  //         .map((key, value) => MapEntry(key, Down4Payment.fromJson(value))),
-  //     keys: Down4Keys.fromJson(decodedJson["keys"]),
-  //     ix: decodedJson["ix"],
-  //     spent: Map.from(decodedJson["spent"]),
-  //   );
-  // }
-
-  // Map<String, dynamic> toJson() => {
-  //       "utxos": _utxos.map((key, val) => MapEntry(key, val.toJson())),
-  //       "payments": _payments.map((key, val) => MapEntry(key, val.toJson())),
-  //       "keys": _keys.toJson(),
-  //       "ix": _ix,
-  //       "spent": _spent,
-  //     };
+  @override
+  Map<String, Object> toJson({bool toLocal = true}) => {
+        "keys": _keys.toYouKnow(),
+        "ix": _ix,
+      };
 }
 
 void main() {

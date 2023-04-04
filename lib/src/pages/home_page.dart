@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
+import 'package:down4/src/render_objects/_render_utils.dart';
 
 import '../data_objects.dart';
 
@@ -17,8 +17,8 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final String? promptMessage;
   final List<Palette2> palettes;
   final void Function(String text) ping;
-  final void Function(Chatable, List<Down4Object>) openNode;
-  final void Function(Payload, List<Chatable>) send;
+  final void Function(Palette2<Chatable>, List<FireObject>) openChat;
+  final void Function(Payload, List<Palette2<Chatable>>) send;
   final void Function(List<Palette2>) forward;
   final void Function() hyperchat;
   final void Function() group, money, search, delete, snip;
@@ -32,7 +32,7 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
     required this.search,
     required this.delete,
     required this.send,
-    required this.openNode,
+    required this.openChat,
     required this.forward,
     this.promptMessage,
     Key? key,
@@ -101,19 +101,17 @@ class _HomePageState extends State<HomePage> {
             extraButtons: [
               ConsoleButton(name: "Delete", onPress: widget.delete),
               ConsoleButton(
-                name: "Forward",
-                onPress: () => widget.forward(
-                  widget.palettes.selected().toList(),
-                ),
-              ),
+                  name: "Forward",
+                  onPress: () => widget.forward(
+                        widget.palettes.selected().toList(),
+                      )),
             ]),
         ConsoleButton(name: "Search", onPress: widget.search),
         ConsoleButton(
-          name: "Ping",
-          onPress: ping,
-          onLongPress: widget.snip,
-          isSpecial: true,
-        ),
+            name: "Ping",
+            onPress: ping,
+            onLongPress: widget.snip,
+            isSpecial: true),
       ],
     );
     setState(() {});

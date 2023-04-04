@@ -2,20 +2,20 @@ import 'dart:async';
 
 import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/_down4_dart_utils.dart';
+import 'package:down4/src/_dart_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr/qr.dart';
 
 import '../data_objects.dart';
 import '../bsv/types.dart';
-import '../bsv/utils.dart';
+import '../bsv/_bsv_utils.dart';
 import '../globals.dart';
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
-import '../render_objects/_down4_flutter_utils.dart'
+import '../render_objects/_render_utils.dart'
     show Down4PageWidget, Palette2Extensions, IterablePalette2Extensions;
 
 final base85 = Base85Codec(Alphabets.z85);

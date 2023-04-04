@@ -1,10 +1,11 @@
+import 'package:cbl_flutter/cbl_flutter.dart';
+import 'package:cbl/cbl.dart';
+import 'package:down4/src/couch.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:down4/src/_down4_dart_utils.dart';
-import 'package:hive/hive.dart';
+import 'package:down4/src/_dart_utils.dart';
 import 'dart:async';
-import 'package:path_provider/path_provider.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -12,23 +13,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'src/login.dart';
 import 'src/globals.dart';
-
-// String docDirPath = "";
-// String tempDirPath = "";
-// List<CameraDescription> cameras = [];
-
-Future<void> _initBox() async {
-  await Hive.openBox("Personal");
-  await Hive.openBox("MessageQueue");
-  await Hive.openLazyBox("Hidden");
-  await Hive.openLazyBox("Nodes");
-  await Hive.openLazyBox("Messages");
-  await Hive.openLazyBox("Bills");
-  await Hive.openLazyBox("Payments");
-  await Hive.openLazyBox("Medias");
-  await Hive.openLazyBox("Utxos");
-  await Hive.openLazyBox("Spents");
-}
 
 // Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 //   // If you're going to use other Firebase services in the background, such as Firestore,
@@ -49,9 +33,9 @@ Future<void> main() async {
     await Firebase.initializeApp();
     channel = const AndroidNotificationChannel(
       'Down4AndroidNotificationChannel', // id
-      'High Importance Notifications for Down4AndroidNotificationChannel',
+      'Default Importance Notifications for Down4AndroidNotificationChannel',
       // title // description
-      importance: Importance.high,
+      importance: Importance.defaultImportance,
     );
 
     flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -66,7 +50,7 @@ Future<void> main() async {
         ?.createNotificationChannel(channel);
 
     const initializationSettingsAndroid = AndroidInitializationSettings(
-      "@mipmap/ic_down4_inverted_white", // TODO change to real icon
+      "@mipmap/ic_down4_inverted_white",
     ); // <- default icon name is @mipmap/ic_launcher
     // var initializationSettingsIOS = IOSInitializationSettings(
     //     onDidReceiveLocalNotification: onDidReceiveLocalNotification);
@@ -112,13 +96,22 @@ Future<void> main() async {
     // TODO kIsWeb
   }
 
-  final appDir = await getApplicationDocumentsDirectory();
-  final tempDir = await getTemporaryDirectory();
-  Hive.init(appDir.path);
-  await _initBox();
-  g.boxes.docPath = appDir.path;
-  g.boxes.tempPath = tempDir.path;
+  // Initializing couchdb
+  {
+    await CouchbaseLiteFlutter.init();
+    nodesDB = await Database.openAsync("nodes");
+    mediasDB = await Database.openAsync("medias");
+    messagesDB = await Database.openAsync("messages");
+    personalDB = await Database.openAsync("personal");
+    paymentsDB = await Database.openAsync("payments");
+    utxosDB = await Database.openAsync("utxos");
+    billsDB = await Database.openAsync("bills");
+    await loadIndexes();
+  }
 
+  // loading some asset in memory, not having those assets in memory cause
+  // stutter in transitions for example, loading image from assets is
+  // actually slow
   {
     final a1 = await rootBundle.load("assets/images/50.png");
     final a2 = await rootBundle.load("assets/images/filled.png");
@@ -141,10 +134,13 @@ Future<void> main() async {
 
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  try {
-    g.cameras = await availableCameras();
-  } catch (err) {
-    print("Available cameras error $err");
+  // initializing cameras
+  {
+    try {
+      g.cameras = await availableCameras();
+    } catch (err) {
+      print("Available cameras error $err");
+    }
   }
 
   if (await hasNetwork()) {
@@ -158,9 +154,7 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       theme: ThemeData(fontFamily: "Alice"),
-      home: Material(
-        child: Down4(),
-      ),
+      home: const Material(child: Down4()),
     ),
   );
 }

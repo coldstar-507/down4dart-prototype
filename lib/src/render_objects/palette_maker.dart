@@ -9,7 +9,7 @@ import '../data_objects.dart';
 import '../themes.dart';
 
 import 'palette.dart';
-import '_down4_flutter_utils.dart';
+import '_render_utils.dart';
 
 class UserPaletteMaker extends StatelessWidget {
   final void Function(Map<String, String>) infoCallBack;
@@ -111,7 +111,8 @@ class UserPaletteMaker extends StatelessWidget {
 }
 
 class UserMakerPalette extends StatelessWidget {
-  final String name, lastName, id, imagePath;
+  final String name, lastName, id;
+  final FireMedia? media;
   final void Function() selectFile;
 
   const UserMakerPalette({
@@ -119,7 +120,7 @@ class UserMakerPalette extends StatelessWidget {
     required this.lastName,
     required this.id,
     required this.selectFile,
-    required this.imagePath,
+    required this.media,
     Key? key,
   }) : super(key: key);
 
@@ -134,12 +135,10 @@ class UserMakerPalette extends StatelessWidget {
           ),
           height: Palette.paletteHeight - 4.0,
           width: Palette.paletteHeight - 4.0, // borderWidth x2
-          child: imagePath.isNotEmpty
-              ? Image.file(
-                  File(imagePath),
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                )
+          child: media != null
+              ? media!.displayImage(
+                  displaySize: Size.square(Palette.paletteHeight - 4.0),
+                  forceSquare: true)
               : g.ph,
         ),
       );
@@ -335,10 +334,9 @@ class PaletteMaker extends StatelessWidget {
         child: SizedBox(
           width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image != null
-              ? Down4ImageViewer(
-                  media: image!,
+              ? image!.displayImage(
                   displaySize: Size.square(Palette.paletteHeight),
-                  forceSquareAnyways: true)
+                  forceSquare: true)
               : _defaultImage,
         ),
       );

@@ -1,6 +1,4 @@
-import 'dart:io';
-
-import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
+import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
 import '../data_objects.dart';
@@ -144,7 +142,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
     Key? key,
   }) : super(key: key);
 
-  Palette2 select() {
+  Palette2<T> select() {
     return Palette2(
       fold: fold,
       squish: squish,
@@ -164,7 +162,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
     );
   }
 
-  Palette2 animated({
+  Palette2<T> animated({
     bool? squish,
     bool? alignedRight,
     bool? fold,
@@ -195,7 +193,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
     );
   }
 
-  Palette2 deactivated() {
+  Palette2<T> deactivated() {
     return Palette2(
       squish: squish,
       fold: fold,
@@ -208,11 +206,11 @@ class Palette2<T extends FireNode> extends StatelessWidget
     );
   }
 
-  Palette2 withoutButton() {
+  Palette2<T> withoutButton() {
     return Palette2(squish: squish, fold: fold, node: node, image: image);
   }
 
-  Palette2 copy() {
+  Palette2<T> copy() {
     return Palette2(
         fold: fold,
         squish: squish,
@@ -344,10 +342,8 @@ class Palette2<T extends FireNode> extends StatelessWidget
 
   Widget get paletteMedia => image == null
       ? node.defaultNodeImage
-      : Down4ImageViewer(
-          media: image!,
-          displaySize: Size.square(Palette.paletteHeight),
-          forceSquareAnyways: true);
+      : image!.displayImage(
+          displaySize: Size.square(Palette.paletteHeight), forceSquare: true);
 
   @override
   Widget build(BuildContext context) {

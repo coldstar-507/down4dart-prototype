@@ -1,8 +1,9 @@
 import 'dart:convert';
 
 import 'package:convert/convert.dart';
+import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
-import 'bsv/utils.dart';
+import 'bsv/_bsv_utils.dart';
 import 'dart:typed_data';
 import 'data_objects.dart';
 import 'package:collection/collection.dart';
@@ -13,19 +14,11 @@ import 'package:english_words/english_words.dart' as w;
 
 const golden = 1.618;
 
-const videoExtensions = [".mp4", ".3gp", ".webm", ".mkv", ".m4a", ".mov"];
+const videoExtensions = ["mp4", "3gp", "webm", "mkv", "m4a", "mov"];
 
-const imageExtensions = [
-  ".jpeg",
-  ".jpg",
-  ".png",
-  ".gif",
-  ".bmp",
-  ".webp",
-  ".apng"
-];
+const imageExtensions = ["jpeg", "jpg", "png", "gif", "bmp", "webp", "apng"];
 
-const animatedImageExtensions = [".apng", ".gif"];
+const animatedImageExtensions = ["apng", "gif"];
 
 String makePrefix(int ms) {
   const differ = 78364164096; // 36^6
@@ -34,58 +27,58 @@ String makePrefix(int ms) {
   return diffed.toRadixString(36);
 }
 
-extension TrimmedExtensions on List<String> {
-  List<String> withoutDots() => map((e) => e.substring(1)).toList();
-}
+// extension TrimmedExtensions on List<String> {
+//   List<String> withoutDots() => map((e) => e.substring(1)).toList();
+// }
 
 final listEqual = const ListEquality().equals;
 
-class Pair<E, F> {
-  final E first;
-  final F second;
-  const Pair(this.first, this.second);
-}
-
-class Triple<E, F, G> {
-  final E first;
-  final F second;
-  final G third;
-  Triple(this.first, this.second, this.third);
-}
-
-class Quadruple<E, F, G, H> {
-  final E first;
-  final F second;
-  final G third;
-  final H fourth;
-  Quadruple(this.first, this.second, this.third, this.fourth);
-}
-
-class Quintuple<E, F, G, H, K> {
-  final E first;
-  final F second;
-  final G third;
-  final H fourth;
-  final K fifth;
-  Quintuple(this.first, this.second, this.third, this.fourth, this.fifth);
-}
-
-class Sixtuple<E, F, G, H, K, J> {
-  final E first;
-  final F second;
-  final G third;
-  final H fourth;
-  final K fifth;
-  final J sixth;
-  Sixtuple(
-    this.first,
-    this.second,
-    this.third,
-    this.fourth,
-    this.fifth,
-    this.sixth,
-  );
-}
+// class Pair<E, F> {
+//   final E first;
+//   final F second;
+//   const Pair(this.first, this.second);
+// }
+//
+// class Triple<E, F, G> {
+//   final E first;
+//   final F second;
+//   final G third;
+//   Triple(this.first, this.second, this.third);
+// }
+//
+// class Quadruple<E, F, G, H> {
+//   final E first;
+//   final F second;
+//   final G third;
+//   final H fourth;
+//   Quadruple(this.first, this.second, this.third, this.fourth);
+// }
+//
+// class Quintuple<E, F, G, H, K> {
+//   final E first;
+//   final F second;
+//   final G third;
+//   final H fourth;
+//   final K fifth;
+//   Quintuple(this.first, this.second, this.third, this.fourth, this.fifth);
+// }
+//
+// class Sixtuple<E, F, G, H, K, J> {
+//   final E first;
+//   final F second;
+//   final G third;
+//   final H fourth;
+//   final K fifth;
+//   final J sixth;
+//   Sixtuple(
+//     this.first,
+//     this.second,
+//     this.third,
+//     this.fourth,
+//     this.fifth,
+//     this.sixth,
+//   );
+// }
 
 Future<bool> hasNetwork() async {
   try {
@@ -96,48 +89,32 @@ Future<bool> hasNetwork() async {
   }
 }
 
-String deterministicHyperchatRoot(List<String> ids) {
-  final sortedList = ids..sort();
-  final asString = sortedList.join("");
-  return sha1(utf8.encode(asString)).toBase64();
-}
+// String deterministicHyperchatRoot(List<String> ids) {
+//   final sortedList = ids..sort();
+//   final asString = sortedList.join("");
+//   return sha1(utf8.encode(asString)).toBase64();
+// }
 
-Iterable<Pair<String, String>> randomPairs(int count) {
+Iterable<(String, String)> randomPairs(int count) {
   final random = math.Random();
 
   return Iterable.generate(
     count,
-    (_) => Pair(
+    (_) => (
       w.adjectives[random.nextInt(w.adjectives.length)],
       w.nouns[random.nextInt(w.nouns.length)],
     ),
   );
 }
 
-String deterministicGroupRoot(List<String> ids) {
-  final sortedList = ids..sort();
-  final asString = sortedList.reversed.join("");
-  return sha1(utf8.encode(asString)).toBase64();
-}
+// String deterministicGroupRoot(List<String> ids) {
+//   final sortedList = ids..sort();
+//   final asString = sortedList.reversed.join("");
+//   return sha1(utf8.encode(asString)).toBase64();
+// }
 
 String generateMessageID(String senderID, num timeStamp) {
   return sha1(utf8.encode(senderID + timeStamp.toString())).toBase58();
-}
-
-/// FNV-1a 64bit hash algorithm optimized for Dart Strings
-int fastHash(String string) {
-  var hash = 0xcbf29ce484222325;
-
-  var i = 0;
-  while (i < string.length) {
-    final codeUnit = string.codeUnitAt(i++);
-    hash ^= codeUnit >> 8;
-    hash *= 0x100000001b3;
-    hash ^= codeUnit & 0xFF;
-    hash *= 0x100000001b3;
-  }
-
-  return hash;
 }
 
 String deterministicMediaID(Uint8List mediaData, String selfID) {
@@ -155,7 +132,7 @@ String randomMediaID() {
   return randomBytes().toBase58();
 }
 
-int timeStamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
+int makeTimestamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
 extension IterableNodes on Iterable<FireNode> {
   List<FireNode> formatted() =>
@@ -166,13 +143,6 @@ extension IterableNodes on Iterable<FireNode> {
   Iterable<Groupable> groups() => whereType<Groupable>();
   Iterable<User> users() => whereType<User>();
 }
-
-// extension IsTypes on FireNode {
-//   bool get isFriendOrGroup => isFriendUser || this is Groupable;
-//   bool get isUserOrGroup => this is User || this is Groupable;
-//   bool get isFriendUser => this is User ? (this as User).isFriend : false;
-//   bool get isPublicGroup => this is Group ? !(this as Group).isPrivate : false;
-// }
 
 extension AsUint8List on List<int> {
   Uint8List toUint8List() => Uint8List.fromList(this);
@@ -187,7 +157,9 @@ extension ByteEncoding on List<int> {
 extension StringExtension on String {
   String capitalize() =>
       "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
-  String extension() => p.extension(this);
+  String mime() => lookupMimeType(this)!;
+  String extension() => extensionFromMime(mime());
+  // String extension() => p.extension(this);
   bool isVideoExtension() => videoExtensions.contains(this);
   bool isImageExtension() => imageExtensions.contains(this);
 }

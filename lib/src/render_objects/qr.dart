@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:qr/qr.dart';
 import '../themes.dart';
-import '../_down4_dart_utils.dart' show golden;
+import '../_dart_utils.dart' show golden;
 import 'chat_message.dart' show ChatMessage;
 
 class QrPainter extends CustomPainter {

@@ -5,6 +5,7 @@
 import FlutterMacOS
 import Foundation
 
+import cbl_flutter_ce
 import cloud_firestore
 import firebase_auth
 import firebase_core
@@ -18,6 +19,7 @@ import video_compress
 import wakelock_macos
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
+  CblFlutterCe.register(with: registry.registrar(forPlugin: "CblFlutterCe"))
   FLTFirebaseFirestorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseFirestorePlugin"))
   FLTFirebaseAuthPlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseAuthPlugin"))
   FLTFirebaseCorePlugin.register(with: registry.registrar(forPlugin: "FLTFirebaseCorePlugin"))

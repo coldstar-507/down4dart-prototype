@@ -1,35 +1,29 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:convert' show base64Encode, utf8;
-import 'dart:typed_data';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/bsv/utils.dart';
+import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:flutter_video_info/flutter_video_info.dart';
-import 'package:video_player/video_player.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
+
+import '_page_utils.dart';
 
 import '../globals.dart';
-import '../_down4_dart_utils.dart' as u;
-import '../web_requests.dart' as r;
+import '../_dart_utils.dart' as u;
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
-import '../render_objects/_down4_flutter_utils.dart';
+import '../render_objects/_render_utils.dart';
 
 class GroupPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "group";
   final List<Palette2> homePalettes, palettesForTransition;
-  final Iterable<Personable> people;
+  final Iterable<Palette2<Personable>> people;
   final int nHidden;
   final void Function() back;
-  final void Function(Group group, Payload p) makeGroup;
+  final void Function(Palette2<Group> group, Payload p) makeGroup;
   final double initialOffset;
 
   const GroupPage({
@@ -47,24 +41,40 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
   State<GroupPage> createState() => _GroupPageState();
 }
 
-class _GroupPageState extends State<GroupPage> {
-  // GlobalKey mediaModeKey = GlobalKey(); // TODO this button is not in group
-  Console? _console;
+class _GroupPageState extends State<GroupPage>
+    with Pager, Backable, Medias, Camera, Chatter {
+  @override
+  late Console console;
   late List<Widget> _items = [...widget.homePalettes];
-  var _tec = TextEditingController();
-  var _tec2 = TextEditingController();
+  final _tec = TextEditingController();
+  final _tec2 = TextEditingController();
   bool _private = true;
   late final double offset = Palette.fullHeight * (widget.nHidden + 1);
-  late var _scrollController = ScrollController(
+  late final _scrollController = ScrollController(
     initialScrollOffset: widget.initialOffset,
   );
 
   FireMedia? _groupImage;
   String _groupName = "";
 
-  FireMedia? _cameraInput;
+  @override
+  List<(String, void Function(FireMedia m))> get mediasMode => [
+        ("Send", (m) => send(mediaInput: m)),
+        ("Remove", (m) => m.updateSaveStatus(false)),
+      ];
 
-  ConsoleInput get consoleInput => ConsoleInput(placeHolder: ":)", tec: _tec);
+  @override
+  ID get selfID => g.self.id;
+  @override
+  FireMedia? cameraInput;
+  @override
+  void back() => widget.back();
+  @override
+  List<Down4Object>? fo = null;
+  @override
+  void setTheState() => setState(() {});
+  @override
+  ConsoleInput get mainInput => ConsoleInput(placeHolder: ":)", tec: _tec);
 
   @override
   void initState() {
@@ -97,35 +107,39 @@ class _GroupPageState extends State<GroupPage> {
       image: _groupImage,
       nameCallBack: (name) => setState(() => _groupName = name),
       type: Nodes.group,
-      imagePress: () => loadMediaConsole(forGroupImage: true),
+      imagePress: () => loadMediasConsole(true, false, (m) {
+        _groupImage = m;
+        reloadItems();
+      }),
     );
   }
 
+  @override
   Future<void> send({FireMedia? mediaInput}) async {
-    final media = mediaInput ?? _cameraInput;
+    final media = mediaInput ?? cameraInput;
     final text = _tec.value.text;
     if (_groupImage == null || _groupName.isEmpty) return;
     if (text.isEmpty && media == null) return;
 
-    final ts = u.timeStamp();
+    final ts = u.makeTimestamp();
     final idd =
         utf8.encode(_groupName + _groupImage!.id + ts.toRadixString(16));
     final groupID = sha1(idd).toBase58();
 
-    final p = Payload(t: text, m: media, r: null, f: null);
+    final p = Payload(
+        text: text, media: media, replies: null, forwards: null, isSnip: false);
 
     final members = Set<ID>.from(widget.people.asIds())..add(g.self.id);
 
-    final Group group = Group(groupID,
+    final group = Group(groupID,
         activity: ts,
         isPrivate: _private,
         name: _groupName,
-        media: _groupImage!.id,
-        group: members,
-        messages: {},
-        snips: {});
+        mediaID: _groupImage!.id,
+        group: members);
 
-    widget.makeGroup(group, p);
+    final pGroup = Palette2<Group>(node: group, image: _groupImage);
+    widget.makeGroup(pGroup, p);
   }
 
   void reloadItems() {
@@ -137,63 +151,72 @@ class _GroupPageState extends State<GroupPage> {
     });
   }
 
-  void loadMediaConsole({bool images = true, bool forGroupImage = false}) {
-    void selectMedia(FireMedia media) {
-      if (forGroupImage) {
-        _groupImage = media;
-        loadBaseConsole();
-        reloadItems();
-      } else {
-        send(mediaInput: media);
-      }
-    }
-
-    _console = Console(
-      bottomInputs: [consoleInput],
-      consoleMedias2: ConsoleMedias2(
-          showImages: images, onSelect: (media) => selectMedia(media)),
-      topButtons: [
-        ConsoleButton(
-            name: "Import",
-            onPress: () async {
-              if (forGroupImage) {
-                final nodeMedia = await importNodeMedia();
-                if (nodeMedia != null) {
-                  _groupImage = nodeMedia;
-                  loadBaseConsole();
-                  reloadItems();
-                } else {
-                  await importConsoleMedias(images: images);
-                  loadMediaConsole();
-                }
-              }
-            }),
-      ],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: () => loadBaseConsole(images: images),
-        ),
-        ConsoleButton(
-          isMode: true,
-          isActivated: !forGroupImage,
-          isGreyedOut: forGroupImage,
-          name: images ? "Images" : "Videos",
-          onPress: () => loadMediaConsole(images: !images),
-        ),
-      ],
-    );
-    setState(() {});
-  }
+  // @override
+  // void loadMediasConsole([
+  //   bool images = true,
+  //   bool extra = false,
+  //   void Function(FireMedia)? forGroup,
+  // ]) {
+  //   console = mediaConsole(
+  //       uselessInput: mainInput,
+  //       selectMedia: forGroup ?? ,
+  //       afterImport: () => loadMediasConsole(images, mode, extra, group),
+  //       back: back,
+  //       switchMediasType: () => loadMediasConsole(!images, mode, extra, group),
+  //       switchMediaMode: switchMode,
+  //       switchExtra: () => loadMediasConsole(images, !extra, forGroup),
+  //       importGroupMedia: forGroup,
+  //       mode: mediasMode[currentMode].$1,
+  //       extra: extra,
+  //       images: images);
+  //
+  //   // console = Console(
+  //   //   bottomInputs: [input],
+  //   //   consoleMedias2: ConsoleMedias2(
+  //   //       showImages: images, onSelect: (media) => selectMedia(media)),
+  //   //   topButtons: [
+  //   //     ConsoleButton(
+  //   //         name: "Import",
+  //   //         onPress: () async {
+  //   //           if (group) {
+  //   //             final nodeMedia = await importNodeMedia();
+  //   //             if (nodeMedia != null) {
+  //   //               _groupImage = nodeMedia;
+  //   //               loadBaseConsole();
+  //   //               reloadItems();
+  //   //             } else {
+  //   //               await importConsoleMedias(images: images);
+  //   //               loadMediasConsole(images, mode, group);
+  //   //             }
+  //   //           }
+  //   //         }),
+  //   //   ],
+  //   //   bottomButtons: [
+  //   //     ConsoleButton(
+  //   //       name: "Back",
+  //   //       onPress: () => loadBaseConsole(images: images),
+  //   //     ),
+  //   //     ConsoleButton(
+  //   //       isMode: true,
+  //   //       isActivated: !group,
+  //   //       isGreyedOut: group,
+  //   //       name: images ? "Images" : "Videos",
+  //   //       onPress: () => loadMediaConsole(images: !images),
+  //   //     ),
+  //   //   ],
+  //   // );
+  //   setState(() {});
+  // }
 
   void loadFullCamera() {
     // TODO
   }
 
+  @override
   void loadBaseConsole({bool images = true}) {
-    _console = Console(
+    console = Console(
       // mediasInfo: consoleMedias(images: images, show: false),
-      bottomInputs: [consoleInput],
+      bottomInputs: [mainInput],
       topButtons: [
         ConsoleButton(
           isMode: true,
@@ -210,156 +233,154 @@ class _GroupPageState extends State<GroupPage> {
       bottomButtons: [
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
-          name: _cameraInput == null ? "Camera" : "@Camera",
+          name: cameraInput == null ? "Camera" : "@Camera",
           onPress: loadSquaredCameraConsole,
         ),
-        ConsoleButton(name: "Medias", onPress: loadMediaConsole),
+        ConsoleButton(name: "Medias", onPress: loadMediasConsole),
       ],
     );
     setState(() {});
   }
 
-  Future<void> loadSquaredCameraConsole({
-    CameraController? ctrl,
-    int cam = 0,
-    String? path,
-    String? mimetype,
-  }) async {
-    if (ctrl == null) {
-      try {
-        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
-        await ctrl.initialize();
-      } catch (err) {
-        loadBaseConsole();
-      }
-    }
-
-    Future<void> nextCam() async {
-      await ctrl?.dispose();
-      return loadSquaredCameraConsole(cam: (cam + 1) % 2);
-    }
-
-    if (path == null) {
-      _console = Console(
-        bottomInputs: [consoleInput],
-        cameraController: ctrl,
-        topButtons: [
-          ConsoleButton(
-            name: "Capture",
-            isSpecial: true,
-            shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
-            onPress: () async {
-              final XFile f = await ctrl!.takePicture();
-              loadSquaredCameraConsole(
-                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
-            },
-            onLongPress: () async {
-              await ctrl!.startVideoRecording();
-              loadSquaredCameraConsole(ctrl: ctrl, cam: cam);
-            },
-            onLongPressUp: () async {
-              final XFile f = await ctrl!.stopVideoRecording();
-              loadSquaredCameraConsole(
-                  ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
-            },
-          ),
-        ],
-        bottomButtons: [
-          ConsoleButton(
-              name: "Back",
-              onPress: () {
-                ctrl?.dispose();
-                loadBaseConsole();
-              }),
-          ConsoleButton(
-            name: cam == 0 ? "Rear" : "Front",
-            onPress: nextCam,
-            isMode: true,
-          ),
-        ],
-      );
-    } else {
-      VideoPlayerController? vpc;
-      final topBottons = [
-        ConsoleButton(
-          name: "Accept",
-          onPress: () async {
-            Uint8List? tn;
-            final Uint8List data = File(path).readAsBytesSync();
-            final mediaID = u.deterministicMediaID(data, g.self.id);
-            final bool isVideo = path.extension().isVideoExtension();
-            if (isVideo) {
-              tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
-            }
-            vpc?.dispose();
-            final tiny = resizeImage(isVideo ? tn! : data, 20, 20);
-            _cameraInput = FireMedia(mediaID,
-                tinyThumbnail: base64Encode(tiny),
-                owner: g.self.id,
-                timestamp: u.timeStamp(),
-                aspectRatio: ctrl!.value.aspectRatio,
-                extension: path.extension(),
-                isReversed: cam == 1,
-                isSquared: true,
-                mimetype: mimetype!,
-                references: {});
-            await _cameraInput!.write(
-                imageData: isVideo ? tn : data,
-                videoData: isVideo ? data : null);
-            loadBaseConsole();
-          },
-        ),
-      ];
-      final bottomButtons = [
-        ConsoleButton(
-          name: "Back",
-          onPress: () {
-            File(path).delete();
-            vpc?.dispose();
-            loadSquaredCameraConsole(ctrl: ctrl, cam: cam);
-          },
-        ),
-        ConsoleButton(
-            name: "Cancel",
-            onPress: () {
-              File(path).delete();
-              vpc?.dispose();
-              ctrl?.dispose();
-              loadBaseConsole();
-            }),
-      ];
-
-      print("PATH EXTENSION = ${path.extension()}");
-      if (path.extension().isVideoExtension()) {
-        vpc = VideoPlayerController.file(File(path));
-        await vpc.initialize();
-        await vpc.setLooping(true);
-        await vpc.play();
-        _console = Console(
-            bottomInputs: [consoleInput],
-            videoForPreview: VideoPreview(
-                videoPlayer: VideoPlayer(vpc),
-                videoAspectRatio: ctrl!.value.aspectRatio,
-                isReversed: cam == 1),
-            topButtons: topBottons,
-            bottomButtons: bottomButtons);
-      } else {
-        _console = Console(
-            bottomInputs: [consoleInput],
-            imageForPreview: ImagePreview(
-                path: path,
-                isReversed: cam == 1,
-                imageAspectRatio: ctrl!.value.aspectRatio),
-            topButtons: topBottons,
-            bottomButtons: bottomButtons);
-      }
-    }
-    setState(() {});
-  }
+  // Future<void> loadSquaredCameraConsole({
+  //   CameraController? ctrl,
+  //   int cam = 0,
+  //   String? path,
+  //   String? mimetype,
+  // }) async {
+  //   if (ctrl == null) {
+  //     try {
+  //       ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
+  //       await ctrl.initialize();
+  //     } catch (err) {
+  //       loadBaseConsole();
+  //     }
+  //   }
+  //
+  //   Future<void> nextCam() async {
+  //     await ctrl?.dispose();
+  //     return loadSquaredCameraConsole(cam: (cam + 1) % 2);
+  //   }
+  //
+  //   if (path == null) {
+  //     console = Console(
+  //       bottomInputs: [input],
+  //       cameraController: ctrl,
+  //       topButtons: [
+  //         ConsoleButton(
+  //           name: "Capture",
+  //           isSpecial: true,
+  //           shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
+  //           onPress: () async {
+  //             final XFile f = await ctrl!.takePicture();
+  //             loadSquaredCameraConsole(
+  //                 ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
+  //           },
+  //           onLongPress: () async {
+  //             await ctrl!.startVideoRecording();
+  //             loadSquaredCameraConsole(ctrl: ctrl, cam: cam);
+  //           },
+  //           onLongPressUp: () async {
+  //             final XFile f = await ctrl!.stopVideoRecording();
+  //             loadSquaredCameraConsole(
+  //                 ctrl: ctrl, cam: cam, path: f.path, mimetype: f.mimeType);
+  //           },
+  //         ),
+  //       ],
+  //       bottomButtons: [
+  //         ConsoleButton(
+  //             name: "Back",
+  //             onPress: () {
+  //               ctrl?.dispose();
+  //               loadBaseConsole();
+  //             }),
+  //         ConsoleButton(
+  //           name: cam == 0 ? "Rear" : "Front",
+  //           onPress: nextCam,
+  //           isMode: true,
+  //         ),
+  //       ],
+  //     );
+  //   } else {
+  //     BetterPlayerController? vpc;
+  //     final topBottons = [
+  //       ConsoleButton(
+  //         name: "Accept",
+  //         onPress: () async {
+  //           Uint8List? tn;
+  //           final Uint8List data = File(path).readAsBytesSync();
+  //           final mediaID = u.deterministicMediaID(data, g.self.id);
+  //           final bool isVideo = path.extension().isVideoExtension();
+  //           if (isVideo) {
+  //             tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
+  //           }
+  //           vpc?.dispose();
+  //           cameraInput = FireMedia(mediaID,
+  //               tinyThumbnail: makeTiny(tn ?? data),
+  //               owner: g.self.id,
+  //               timestamp: u.timeStamp(),
+  //               aspectRatio: ctrl!.value.aspectRatio,
+  //               extension: path.extension(),
+  //               isReversed: cam == 1,
+  //               isSquared: true,
+  //               mime: mimetype!);
+  //           await cameraInput!.write(
+  //               imageData:  tn ?? data,
+  //               videoData: isVideo ? data : null);
+  //           loadBaseConsole();
+  //         },
+  //       ),
+  //     ];
+  //     final bottomButtons = [
+  //       ConsoleButton(
+  //         name: "Back",
+  //         onPress: () {
+  //           File(path).delete();
+  //           vpc?.dispose();
+  //           loadSquaredCameraConsole(ctrl: ctrl, cam: cam);
+  //         },
+  //       ),
+  //       ConsoleButton(
+  //           name: "Cancel",
+  //           onPress: () {
+  //             File(path).delete();
+  //             vpc?.dispose();
+  //             ctrl?.dispose();
+  //             loadBaseConsole();
+  //           }),
+  //     ];
+  //
+  //     print("PATH EXTENSION = ${path.extension()}");
+  //     if (path.extension().isVideoExtension()) {
+  //       vpc = BetterPlayerController(const BetterPlayerConfiguration());
+  //       await vpc.setupDataSource(BetterPlayerDataSource.file(path));
+  //       await vpc.setLooping(true);
+  //       await vpc.play();
+  //       console = Console(
+  //           bottomInputs: [input],
+  //           videoForPreview: VideoPreview(
+  //               videoPlayer: BetterPlayer(controller: vpc),
+  //               videoAspectRatio: ctrl!.value.aspectRatio,
+  //               isReversed: cam == 1),
+  //           topButtons: topBottons,
+  //           bottomButtons: bottomButtons);
+  //     } else {
+  //       console = Console(
+  //           bottomInputs: [input],
+  //           imageForPreview: ImagePreview(
+  //               path: path,
+  //               isReversed: cam == 1,
+  //               imageAspectRatio: ctrl!.value.aspectRatio),
+  //           topButtons: topBottons,
+  //           bottomButtons: bottomButtons);
+  //     }
+  //   }
+  //   setState(() {});
+  // }
 
   @override
   void dispose() async {
-    _cameraInput?.delete();
+    cameraInput?.delete();
     super.dispose();
   }
 
@@ -372,7 +393,7 @@ class _GroupPageState extends State<GroupPage> {
         trueLen: widget.people.length + 1,
         title: "Group",
         list: _items,
-        console: _console!,
+        console: console,
       ),
     ]);
   }

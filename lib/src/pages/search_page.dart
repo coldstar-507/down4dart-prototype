@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
-import 'package:down4/src/_down4_dart_utils.dart';
+import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/types.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
+import 'package:down4/src/couch.dart';
+import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../globals.dart';
@@ -27,9 +28,9 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   // final List<Palette> palettes;
   // final Future<bool> Function(List<String>) search;
   // final void Function(User node) putNodeOffline;
-  final void Function(FireNode) openNode;
+  final void Function(Palette2<Branchable>) openNode;
   final void Function(List<Palette2>) forwardNodes;
-  final void Function(Iterable<Palette2>) add;
+  final void Function(Iterable<Palette2<Personable>>) add;
   final void Function(FireNode) onScan;
   final Future<void> Function(String) search;
   final void Function() back;
@@ -54,12 +55,13 @@ class _AddFriendPageState extends State<AddFriendPage> {
   CameraController? _cameraController;
   MobileScannerController? scanner;
 
-  Future<List<ButtonsInfo2>> bGen(FireNode node) async {
+  Future<List<ButtonsInfo2>> bGen(Palette2<Branchable> p) async {
     return [
       ButtonsInfo2(
-          asset: g.fifty,
-          pressFunc: () => widget.openNode(node),
-          rightMost: true)
+        asset: g.fifty,
+        pressFunc: () => widget.openNode(p),
+        rightMost: true,
+      )
     ];
   }
 
@@ -88,9 +90,10 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   String get qrData => [
         g.self.id,
-        g.self.firstName,
-        g.self.lastName,
-        g.self.neuter.toYouKnow(),
+        g.self.node.firstName,
+        g.self.node.lastName,
+        g.self.node.mediaID,
+        g.self.node.neuter.toYouKnow(),
       ].join("~");
 
   static double get qrDimension => g.sizes.w - (g.sizes.w * 0.08 * golden * 2);
@@ -115,21 +118,19 @@ class _AddFriendPageState extends State<AddFriendPage> {
   void scanCallBack(Barcode bc, MobileScannerArguments? args) async {
     if (bc.rawValue == null) return;
     final data = bc.rawValue!.split("~");
-    if (data.length != 4) return;
-    final (localUser, gt) = await global<User>(data[0]);
+    if (data.length != 5) return;
+    final localUser = await global<User>(data[0]);
     final node = localUser ??
         User(data[0],
             name: data[1],
             lastName: data[2],
-            neuter: Down4Keys.fromYouKnow(data[3]),
-            messages: {},
-            snips: {},
+            mediaID: data[3],
+            neuter: Down4Keys.fromYouKnow(data[4]),
             publics: {},
-            activity: timeStamp(),
+            activity: makeTimestamp(),
             isFriend: false,
             isHidden: false,
-            description: "",
-            media: null);
+            description: "");
     widget.onScan(node);
   }
 
@@ -148,7 +149,9 @@ class _AddFriendPageState extends State<AddFriendPage> {
       topButtons: [
         ConsoleButton(
           name: "Add",
-          onPress: () => widget.add(searchs.values.selected()),
+          onPress: () => widget.add(
+            searchs.values.selected().whereNodeIs<Personable>(),
+          ),
         ),
         ConsoleButton(
             name: "Search",

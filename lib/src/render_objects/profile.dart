@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:down4/src/_down4_dart_utils.dart';
-import 'package:down4/src/bsv/utils.dart';
-import 'package:down4/src/render_objects/_down4_flutter_utils.dart';
+import 'package:down4/src/_dart_utils.dart';
+import 'package:down4/src/bsv/_bsv_utils.dart';
+import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
 import 'palette.dart';

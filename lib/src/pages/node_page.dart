@@ -6,7 +6,7 @@ import 'package:down4/src/data_objects.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/lists.dart';
-import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
+import '../render_objects/_render_utils.dart' show Down4PageWidget;
 import '../render_objects/navigator.dart';
 import '../render_objects/profile.dart';
 
@@ -15,7 +15,9 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   ID get id => "node-${palette.node.id}";
 
   final Palette2 palette;
-  final void Function(Palette2) openNode, openChat, payNode;
+  final void Function(Palette2<Chatable>) openChat;
+  final void Function(Palette2<Branchable>) openNode;
+  final void Function(Palette2<Personable>) payNode;
   final void Function() back;
 
   const NodePage({
@@ -79,14 +81,18 @@ class _NodePageState extends State<NodePage> {
         topButtons: [
           ConsoleButton(
             name: "Message",
-            onPress: () => widget.openChat(widget.palette),
+            onPress: () => widget.openChat(
+              widget.palette as Palette2<Chatable>,
+            ),
           ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.back),
           ConsoleButton(
             name: "Pay",
-            onPress: () => widget.payNode(widget.palette),
+            onPress: () => widget.payNode(
+              widget.palette as Palette2<Personable>,
+            ),
           ),
         ],
       );

@@ -4,10 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:video_player/video_player.dart';
+import 'package:better_player/better_player.dart';
 
 import '../data_objects.dart' show ID;
-import '../render_objects/_down4_flutter_utils.dart' show Down4PageWidget;
+import '../render_objects/_render_utils.dart' show Down4PageWidget;
 import '../render_objects/console.dart';
 import '../globals.dart';
 
@@ -20,6 +20,7 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
   final int camNum;
   final void Function() cameraBack, nextRes, flip;
   final void Function({
+    required String mimetype,
     required String path,
     required bool isReversed,
     required double aspectRatio,
@@ -104,7 +105,7 @@ class _SnipCameraState extends State<SnipCamera> {
       final xfile = await widget.ctrl.takePicture();
       final path = xfile.path;
       await precacheImage(FileImage(File(path)), context);
-      imagePreview(path, widget.camNum == 1);
+      imagePreview(path, xfile.mimeType!, widget.camNum == 1);
     } catch (e) {
       widget.cameraBack();
     }
@@ -123,22 +124,17 @@ class _SnipCameraState extends State<SnipCamera> {
       XFile? f = await widget.ctrl.stopVideoRecording();
       final path = f.path;
       final vpc = await initVPC(path);
-      videoPreview(vpc, path, widget.camNum == 1);
+      videoPreview(vpc, path, f.mimeType!, widget.camNum == 1);
     } catch (e) {
       widget.cameraBack();
     }
   }
 
-  Future<VideoPlayerController> initVPC(String filePath) async {
-    var vpc = VideoPlayerController.file(File(filePath));
-    try {
-      await vpc.initialize();
-      await vpc.setLooping(true);
-      await vpc.play();
-    } catch (err) {
-      widget.cameraBack();
-    }
-    return vpc;
+  Future<BetterPlayerController> initVPC(String filePath) async {
+    return BetterPlayerController(
+      const BetterPlayerConfiguration(autoPlay: true, looping: true),
+      betterPlayerDataSource: BetterPlayerDataSource.file(filePath),
+    );
   }
 
   Widget previewsContainer({bool reverse = false, required Widget child}) =>
@@ -220,14 +216,18 @@ class _SnipCameraState extends State<SnipCamera> {
   }
 
   void videoPreview(
-    VideoPlayerController vpc,
+    BetterPlayerController bpc,
     String filePath,
+    String mimetype,
     bool toReverse, [
     String? text,
     bool hasInput = false,
   ]) {
     _preview = Stack(children: [
-      previewsContainer(child: VideoPlayer(vpc), reverse: toReverse),
+      previewsContainer(
+        child: BetterPlayer(controller: bpc),
+        reverse: toReverse,
+      ),
       inputBody(hasInput),
       consoleBody(
         Console(
@@ -235,10 +235,11 @@ class _SnipCameraState extends State<SnipCamera> {
           topButtons: [
             ConsoleButton(
               name: "Accept",
-              onPress: () async {
-                await vpc.dispose();
+              onPress: () {
+                bpc.dispose();
                 widget.cameraCallBack(
                   path: filePath,
+                  mimetype: mimetype,
                   isReversed: toReverse,
                   text: tec.value.text,
                   aspectRatio: widget.ctrl.value.aspectRatio,
@@ -252,7 +253,7 @@ class _SnipCameraState extends State<SnipCamera> {
               onPress: () => setState(() {
                 File(filePath).delete();
                 tec.clear();
-                vpc.dispose();
+                bpc.dispose();
                 setState(() {
                   _preview = null;
                 });
@@ -261,8 +262,9 @@ class _SnipCameraState extends State<SnipCamera> {
             ConsoleButton(
               name: "Text",
               onPress: () => videoPreview(
-                vpc,
+                bpc,
                 filePath,
+                mimetype,
                 toReverse,
                 text,
                 !hasInput,
@@ -277,6 +279,7 @@ class _SnipCameraState extends State<SnipCamera> {
 
   void imagePreview(
     String filePath,
+    String mimetype,
     bool toReverse, [
     String? text,
     bool hasInput = false,
@@ -291,6 +294,7 @@ class _SnipCameraState extends State<SnipCamera> {
             name: "Accept",
             onPress: () => widget.cameraCallBack(
               path: filePath,
+              mimetype: mimetype,
               isReversed: toReverse,
               text: tec.value.text,
               aspectRatio: widget.ctrl.value.aspectRatio,
@@ -313,6 +317,7 @@ class _SnipCameraState extends State<SnipCamera> {
             isMode: false,
             onPress: () => imagePreview(
               filePath,
+              mimetype,
               toReverse,
               text,
               !hasInput,
