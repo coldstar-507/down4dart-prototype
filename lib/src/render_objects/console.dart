@@ -370,9 +370,11 @@ class Console extends StatelessWidget {
         return Positioned(
           left: position.dx - contourWidth,
           top: position.dy -
-              g.sizes.viewPaddingHeight -
-              contourWidth -
-              (nButton * (buttonHeight)),
+              // g.sizes.fullSize.height -
+              // g.sizes.viewPaddingHeight -
+              contourWidth
+          //  - (nButton * (buttonHeight))
+          ,
           child: Container(
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
@@ -693,6 +695,7 @@ class Console extends StatelessWidget {
 
   Widget mediaPreview() {
     if (previewMedia == null) return const SizedBox.shrink();
+    print("PREVIEWING THIS FUCKING SHIT ");
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(

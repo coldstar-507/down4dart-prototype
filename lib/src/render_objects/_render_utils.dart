@@ -150,10 +150,12 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay>
   Image netIm(String url) =>
       Image.network(url, fit: BoxFit.cover, gaplessPlayback: true);
 
-  void loadIfNull() async {
+  void loadThatBoy() async {
     media ??= await global<FireMedia>(widget.node.mediaID, doFetch: true);
     if (media == null) return;
     loadImage();
+
+    if (await media?.file != null) return print("Found file!");
 
     if (media!.cachedImage == null && await media!.imageData != null) {
       loadImage();
@@ -167,10 +169,19 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay>
   }
 
   @override
+  void didUpdateWidget(FireNodeImageDisplay old) {
+    super.didUpdateWidget(old);
+    if (widget.node.mediaID != media?.id) {
+      print("RELOADING THAT BOY!");
+      loadThatBoy();
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     print("Creating state!");
-    loadIfNull();
+    loadThatBoy();
   }
 
   @override
@@ -241,21 +252,37 @@ class _FireImageDisplay extends State<FireImageDisplay> {
     setState(() {});
   }
 
-  Image memoryIm(Uint8List d) =>
-      Image.memory(d, fit: BoxFit.cover, gaplessPlayback: true);
+  Image memoryIm(Uint8List d) {
+    print("RENDERING FROM MEMORY");
+    return Image.memory(d, fit: BoxFit.cover, gaplessPlayback: true);
+  }
 
-  Image fileIm(String p) =>
-      Image.file(File(p), fit: BoxFit.cover, gaplessPlayback: true);
+  Image fileIm(String p) {
+    print("RENDING FROM FILE");
+    return Image.file(File(p), fit: BoxFit.cover, gaplessPlayback: true);
+  }
 
-  Image netIm(String url) =>
-      Image.network(url, fit: BoxFit.cover, gaplessPlayback: true);
+  Image netIm(String url) {
+    print("RENDERING FROM WEB");
+    return Image.network(url, fit: BoxFit.cover, gaplessPlayback: true);
+  }
 
   void loadThatBoy() async {
     loadImage();
+    if (media.cachePath != null) return;
     if (media.cachedImage == null) await media.imageData;
     if (media.cachedImage != null) return loadImage();
     if (media.cachedUrl == null && !media.isVideo) await media.url;
     if (media.cachedUrl != null) return loadImage();
+  }
+
+  @override
+  void didUpdateWidget(FireImageDisplay old) {
+    super.didUpdateWidget(old);
+    if (media.id != widget.media.id) {
+      media = widget.media;
+      loadThatBoy();
+    }
   }
 
   @override
@@ -869,10 +896,12 @@ class Down4ImageTransform extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print("ar: $imageAspectRatio, ds = $displaySize, squared = $isSquared");
-    return Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.rotationY(isReversed ? math.pi : 0),
-        child: image);
+    return SizedBox.fromSize(
+        size: displaySize,
+        child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(isReversed ? math.pi : 0),
+            child: image));
     // return ClipRect(
     //   clipper: MediaSizeClipper(displaySize),
     //   child: Transform(

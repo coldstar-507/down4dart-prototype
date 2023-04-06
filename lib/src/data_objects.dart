@@ -714,6 +714,12 @@ class FireMedia extends FireObject {
 
   bool get isVideo => extension.isVideoExtension();
 
+  Future<File?> get file async {
+    if (cachePath == null) return null;
+    if (!await File(cachePath!).exists()) return null;
+    return File(cachePath!);
+  }
+
   Future<String?> get url async {
     if (!onlineTimestamp.isExpired && onlineID != null) {
       // online time stamp is not expired, online id isn't null
@@ -844,7 +850,7 @@ class FireMedia extends FireObject {
 
   factory FireMedia.fromJson(Map<String, String?> decodedJson) {
     return FireMedia(decodedJson["id"]!,
-        ownerID: decodedJson["owner"]!,
+        ownerID: decodedJson["ownerID"]!,
         timestamp: int.parse(decodedJson["timestamp"]!),
         mime: decodedJson["mime"]!,
         onlineID: decodedJson["onlineID"],
