@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data' show Uint8List;
 
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
-import 'package:down4/src/render_objects/palette.dart';
 import 'package:firebase_database/firebase_database.dart' as realtime;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -25,6 +24,25 @@ late AsyncDatabase nodesDB,
     utxosDB,
     paymentsDB,
     billsDB;
+
+Future<List<T>> globall<T extends FireObject>(
+  Iterable<ID> ids, {
+  bool doCache = true,
+  bool doMerge = false,
+  bool doFetch = false,
+  bool withData = false,
+  bool fromNodes = false,
+}) async {
+  final reqs = await Future.wait(ids
+      .map((e) => global<T>(e,
+          doCache: doCache,
+          doMergeIfFetch: doMerge,
+          doFetch: doFetch,
+          withDataIfFetch: withData,
+          fetchFromNodes: fromNodes))
+      .toList());
+  return reqs.whereType<T>().toList();
+}
 
 Map<ID, FireObject> _globalCache = {};
 
@@ -179,6 +197,9 @@ Future<T?> local<T extends FireObject>(ID id) async {
   return fromJson<T>(doc.toPlainMap().cast());
 }
 
+T? cache<T extends FireObject>(ID? id) =>
+    id == null ? null : _globalCache[id] as T?;
+
 Future<T?> global<T extends FireObject>(
   ID? id, {
   bool doCache = true,
@@ -188,8 +209,8 @@ Future<T?> global<T extends FireObject>(
   bool fetchFromNodes = false,
 }) async {
   if (id == null) return null;
-  final cached = _globalCache[id];
-  if (cached != null && cached is T) return cached;
+  final cached = cache<T>(id);
+  if (cached != null) return cached;
   final localed = await local<T>(id);
   if (localed != null) return doCache ? _globalCache[id] = localed : localed;
   if (!doFetch) return null;
@@ -287,7 +308,7 @@ Future<void> mediaDeletingRoutine() async {
   }
 }
 
-Future<List<Palette2<Chatable>>> loadHome({required bool isHidden}) async {
+Future<List<Chatable>> loadHome({required bool isHidden}) async {
   final hiddenString = isHidden ? "'true'" : "'false'";
   final raw = """
     SELECT * FROM _ AS n
@@ -299,14 +320,7 @@ Future<List<Palette2<Chatable>>> loadHome({required bool isHidden}) async {
   final r = await q.execute();
   return Future.wait((await r.allResults()).map((e) async {
     final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
-    final n = fromJson<Chatable>(nodeJson)..cache();
-    final m = await global<FireMedia>(n.mediaID,
-        doFetch: true,
-        doMergeIfFetch: true,
-        withDataIfFetch: !isHidden,
-        fetchFromNodes: true);
-
-    return Palette2<Chatable>(node: n, image: m);
+    return fromJson<Chatable>(nodeJson)..cache();
   }).toList());
 }
 

@@ -13,7 +13,9 @@ import 'dart:typed_data' show Uint8List;
 import 'bsv/types.dart';
 import 'package:cbl/cbl.dart';
 
-final _messageStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+final _messageStore =
+    FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
+final _nodesStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
 typedef ID = String;
 
@@ -565,7 +567,7 @@ class Self extends FireNode with Branchable, Chatable, Personable, Editable {
   @override
   Down4Keys get neuter => _neuter!;
 
-  static Future<Palette2<Self>?> get loadSelf async {
+  static Future<Self?> loadSelf() async {
     const raw = "SELECT * FROM _ AS n WHERE n.type = 'self'";
 
     final q = await AsyncQuery.fromN1ql(nodesDB, raw);
@@ -575,9 +577,9 @@ class Self extends FireNode with Branchable, Chatable, Personable, Editable {
     if (r.isEmpty) return null;
     final json = r.single.toPlainMap();
     final jsonNode = Map<String, String?>.from(json["n"] as Map);
-    final Self self = fromJson<Self>(jsonNode)..cache();
-    final FireMedia? media = await global<FireMedia>(self.mediaID);
-    return Palette2<Self>(node: self, image: media);
+    final self = fromJson<Self>(jsonNode)..cache();
+    await global<FireMedia>(self.mediaID);
+    return self;
   }
 
   @override
@@ -695,10 +697,10 @@ class FireMedia extends FireObject {
   @override
   final ID id;
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
-  String? cachePath;
+  String? cachePath, cachedUrl;
   String? tinyThumbnail;
   bool _isSaved;
-  final ID owner;
+  final ID ownerID;
   ID? _onlineID;
   int _onlineTimestamp;
   int _lastUse;
@@ -712,9 +714,23 @@ class FireMedia extends FireObject {
 
   bool get isVideo => extension.isVideoExtension();
 
-  Future<String?> get videoUrl async {
-    if (onlineID == null || onlineTimestamp.isExpired) return null;
-    return await _messageStore.ref(onlineID).getDownloadURL();
+  Future<String?> get url async {
+    if (!onlineTimestamp.isExpired && onlineID != null) {
+      // online time stamp is not expired, online id isn't null
+      // good chances we will find the message media URL
+      try {
+        return cachedUrl = await _messageStore.ref(onlineID!).getDownloadURL();
+      } catch (e) {
+        return null;
+      }
+      // else if can try to fetch a node image
+    } else {
+      try {
+        return cachedUrl = await _nodesStore.ref(id).getDownloadURL();
+      } catch (e) {
+        return null;
+      }
+    }
   }
 
   Future<Uint8List?> get imageData async {
@@ -732,7 +748,7 @@ class FireMedia extends FireObject {
   String? get onlineID => _onlineID;
 
   FireMedia(this.id,
-      {required this.owner,
+      {required this.ownerID,
       required this.timestamp,
       required this.aspectRatio,
       required this.mime,
@@ -760,7 +776,7 @@ class FireMedia extends FireObject {
   Future<FireMedia?> withNewOwnership(ID newOwner,
       {bool recalculateID = false}) async {
     final json = toJson(toLocal: true);
-    json["owner"] = newOwner;
+    json["ownerID"] = newOwner;
     if (recalculateID) {
       Uint8List? data;
       if (cachePath != null) {
@@ -813,6 +829,7 @@ class FireMedia extends FireObject {
   }) async {
     tinyThumbnail ??= makeTiny(imageData);
     final doc = MutableDocument.withId(id);
+    doc.setData(toJson(toLocal: true));
     if (isVideo && videoData != null) {
       final videoBlob = Blob.fromData(mime, videoData);
       doc.setBlob(videoBlob, key: "video");
@@ -820,7 +837,6 @@ class FireMedia extends FireObject {
     final imageMime = isVideo ? "image/png" : mime;
     final imageBlob = Blob.fromData(imageMime, imageData);
     doc.setBlob(imageBlob, key: "image");
-    doc.setData(toJson(toLocal: true));
     final success = await dbb.saveDocument(doc);
     if (!success) print("Error writing media document!");
     return;
@@ -828,7 +844,7 @@ class FireMedia extends FireObject {
 
   factory FireMedia.fromJson(Map<String, String?> decodedJson) {
     return FireMedia(decodedJson["id"]!,
-        owner: decodedJson["owner"]!,
+        ownerID: decodedJson["owner"]!,
         timestamp: int.parse(decodedJson["timestamp"]!),
         mime: decodedJson["mime"]!,
         onlineID: decodedJson["onlineID"],
@@ -848,7 +864,7 @@ class FireMedia extends FireObject {
   @override
   Map<String, String> toJson({bool toLocal = true}) => {
         "id": id,
-        "owner": owner,
+        "ownerID": ownerID,
         "timestamp": timestamp.toString(),
         "mime": mime,
         if (onlineID != null) "onlineID": onlineID!,

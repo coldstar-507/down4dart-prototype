@@ -28,9 +28,9 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   // final List<Palette> palettes;
   // final Future<bool> Function(List<String>) search;
   // final void Function(User node) putNodeOffline;
-  final void Function(Palette2<Branchable>) openNode;
+  final void Function(Branchable) openNode;
   final void Function(List<Palette2>) forwardNodes;
-  final void Function(Iterable<Palette2<Personable>>) add;
+  final void Function(Iterable<Personable>) add;
   final void Function(FireNode) onScan;
   final Future<void> Function(String) search;
   final void Function() back;
@@ -55,11 +55,11 @@ class _AddFriendPageState extends State<AddFriendPage> {
   CameraController? _cameraController;
   MobileScannerController? scanner;
 
-  Future<List<ButtonsInfo2>> bGen(Palette2<Branchable> p) async {
+  Future<List<ButtonsInfo2>> bGen(Branchable b) async {
     return [
       ButtonsInfo2(
         asset: g.fifty,
-        pressFunc: () => widget.openNode(p),
+        pressFunc: () => widget.openNode(b),
         rightMost: true,
       )
     ];
@@ -90,10 +90,10 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   String get qrData => [
         g.self.id,
-        g.self.node.firstName,
-        g.self.node.lastName,
-        g.self.node.mediaID,
-        g.self.node.neuter.toYouKnow(),
+        g.self.firstName,
+        g.self.lastName,
+        g.self.mediaID,
+        g.self.neuter.toYouKnow(),
       ].join("~");
 
   static double get qrDimension => g.sizes.w - (g.sizes.w * 0.08 * golden * 2);
@@ -150,7 +150,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
         ConsoleButton(
           name: "Add",
           onPress: () => widget.add(
-            searchs.values.selected().whereNodeIs<Personable>(),
+            searchs.values.selected().asNodes<Personable>(),
           ),
         ),
         ConsoleButton(

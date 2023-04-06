@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
@@ -102,7 +103,7 @@ class _HyperchatPageState extends State<HyperchatPage>
         replies: null,
         isSnip: false);
 
-    final group = Set<ID>.from(widget.transition.trueTargets.asIds())
+    final group = Set<ID>.from(widget.transition.trueTargets.asIDs())
       ..add(g.self.id);
     widget.makeHyperchat(p, group);
   }

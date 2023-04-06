@@ -150,7 +150,7 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "money";
   final Transition? transition;
-  final Palette2? single;
+  final Personable? single;
   final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
   final Future<void> Function() loadMorePayments;
@@ -203,9 +203,7 @@ class _MoneyPageState extends State<MoneyPage> {
   };
   late var palettes = widget.transition != null
       ? widget.transition!.preTransition
-      : widget.single != null
-          ? [widget.single!]
-          : _users.values.toList();
+      :_users.values.toList(growable: false);
 
   late final _offset = (widget.transition?.nHidden ?? 0) * Palette.fullHeight;
   late ScrollController scroller0 = ScrollController(

@@ -37,7 +37,8 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<Palette2>?> fetchPalettes(Iterable<String> ids) async {
+Future<List<(FireNode, FireMedia?)>> fetchNodes<T extends FireNode>(
+    Iterable<String> ids) async {
   if (ids.isEmpty) return [];
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
@@ -50,10 +51,10 @@ Future<List<Palette2>?> fetchPalettes(Iterable<String> ids) async {
       final mediaJson = e["media"] as Map<String, String?>?;
       final node = FireNode.fromJson(nodeJson);
       final media = mediaJson == null ? null : FireMedia.fromJson(mediaJson);
-      return Palette2(node: node, image: media);
+      return (node, media);
     }).toList();
   }
-  return null;
+  return [];
 }
 
 // Future<MediaMetadata?> getMediaMetadata(String id) async {

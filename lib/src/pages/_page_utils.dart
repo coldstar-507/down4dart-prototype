@@ -222,7 +222,7 @@ FireMedia makeCameraMedia(String p, double ar, bool ir, String o) {
   final data = File(p).readAsBytesSync();
   final id = deterministicMediaID(data, o);
   return FireMedia(id,
-      owner: o,
+      ownerID: o,
       timestamp: makeTimestamp(),
       aspectRatio: ar,
       cachePath: p,

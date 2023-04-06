@@ -17,8 +17,8 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final String? promptMessage;
   final List<Palette2> palettes;
   final void Function(String text) ping;
-  final void Function(Palette2<Chatable>, List<FireObject>) openChat;
-  final void Function(Payload, List<Palette2<Chatable>>) send;
+  final void Function(Chatable, List<FireObject>) openChat; // TODO what is this?
+  final void Function(Payload, List<Chatable>) send;
   final void Function(List<Palette2>) forward;
   final void Function() hyperchat;
   final void Function() group, money, search, delete, snip;

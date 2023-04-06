@@ -18,7 +18,7 @@ import 'render_objects/chat_message.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
-import 'web_requests.dart' show fetchPalettes;
+import 'web_requests.dart' show fetchNodes;
 
 final g = Singletons.instance;
 final db = FirebaseDatabase.instance.ref();
@@ -26,14 +26,10 @@ final _fs = FirebaseFirestore.instance;
 final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-Future<List<Palette2>> slowNodeIDsToPalettes(Iterable<ID> nodeIDs) async {
-  var fNodes = nodeIDs.map((nodeID) => global<FireNode>(nodeID, doFetch: true));
-  final theNodes = (await Future.wait(fNodes)).whereType<FireNode>();
-  final fPalettes = theNodes.map((node) async {
-    final nMedia = await global<FireMedia>(node.mediaID, withDataIfFetch: true);
-    return Palette2(node: node, image: nMedia);
-  });
-  return Future.wait(fPalettes);
+Future<List<FireNode>> nodesFetchWithCachedMedias(Iterable<ID> nodeIDs) async {
+  final nodes = await globall<FireNode>(nodeIDs);
+  await globall<FireMedia>(nodes.map((e) => e.mediaID).whereType());
+  return nodes;
 }
 
 Future<bool> uploadPayment(Down4Payment pay) async {
@@ -57,23 +53,23 @@ Future<bool> uploadNode(FireNode node) async {
   }
 }
 
-Future<bool> uploadPalette(Palette2 p) async {
-  final nodeUpload = uploadNode(p.node);
-  final mediaUpload = p.image == null
-      ? Future.value(true)
-      : uploadMedia(p.image!, isNode: true);
-
-  final nSuccess = await nodeUpload;
-  final mSuccess = await mediaUpload;
-  return nSuccess && mSuccess;
-  // if (nSuccess && !mSuccess) {
-  //   print("uploadPalette: Successfullly uploaded node but not the media");
-  //   await _fs.collection("Nodes").doc(p.node.id).delete();
-  // } else if (mSuccess && !nSuccess && p.image != null) {
-  //   print("uploadPalette: Successfullly uploaded node but not the media");
-  //   await _st_node.ref(p.image!.id).delete();
-  // }
-}
+// Future<bool> uploadPalette(Palette2 p) async {
+//   final nodeUpload = uploadNode(p.node);
+//   final mediaUpload = p.image == null
+//       ? Future.value(true)
+//       : uploadMedia(p.image!, isNode: true);
+//
+//   final nSuccess = await nodeUpload;
+//   final mSuccess = await mediaUpload;
+//   return nSuccess && mSuccess;
+//   // if (nSuccess && !mSuccess) {
+//   //   print("uploadPalette: Successfullly uploaded node but not the media");
+//   //   await _fs.collection("Nodes").doc(p.node.id).delete();
+//   // } else if (mSuccess && !nSuccess && p.image != null) {
+//   //   print("uploadPalette: Successfullly uploaded node but not the media");
+//   //   await _st_node.ref(p.image!.id).delete();
+//   // }
+// }
 
 String messagePushId() => db.child("Messages").push().key!;
 
@@ -149,12 +145,12 @@ class P {
 }
 
 class V {
-  final Palette2? p;
+  final FireNode? node;
   final ID id;
   final List<P> pages;
   int ci;
 
-  V({required this.id, required this.pages, int? ix, this.p}) : ci = ix ?? 0;
+  V({required this.id, required this.pages, int? ix, this.node}) : ci = ix ?? 0;
 
   P get cp => pages[ci];
 }
@@ -250,7 +246,7 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
-  late Palette2<Self> self;
+  late Self self;
   late Wallet wallet;
   late Sizes sizes;
   late ExchangeRate exchangeRate;
@@ -263,7 +259,7 @@ class Singletons {
   ]);
 
   Future<bool> get notYetInitialized async {
-    final self_ = await Self.loadSelf;
+    final self_ = await Self.loadSelf();
     if (self_ != null) {
       self = self_;
       return false;
@@ -303,10 +299,13 @@ class Singletons {
         mediaID: media.id,
         publics: {},
         neuter: neuter,
-        privates: {});
-    await selfNode.merge();
-    await media.merge();
-    self = Palette2(node: selfNode, image: media);
+        privates: {})
+      ..cache()
+      ..merge();
+    media
+      ..cache
+      ..merge();
+    self = selfNode;
   }
 }
 
@@ -316,22 +315,23 @@ void unselectedSelectedPalettes(Map<ID, Palette2> state) {
   }
 }
 
-Future<void> writeHomePalette<T extends Chatable>(
-  Palette2<T> p,
-  Map<ID, Palette2<Chatable>> state,
-  Future<List<ButtonsInfo2>> Function(Palette2<T>)? bGen,
+Future<void> writeHomePalette(
+  Chatable c,
+  Map<ID, Palette2> state,
+  Future<List<ButtonsInfo2>> Function(Chatable)? bGen,
   void Function()? onSel, {
   bool? sel,
 }) async {
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false
+
   bool? selectionIfReload;
-  final Palette2? pInState = state[p.node.id];
+  final Palette2? pInState = state[c.id];
   selectionIfReload = pInState?.selected;
   bool isSelected = sel ?? selectionIfReload ?? false;
 
-  final lastMsg = await p.node.lastMessage();
+  final lastMsg = await c.lastMessage();
   final preview = lastMsg == null
       ? null
       : (lastMsg.text ?? "").isNotEmpty
@@ -341,26 +341,31 @@ Future<void> writeHomePalette<T extends Chatable>(
   void Function()? onSelect = onSel == null
       ? null
       : () async {
-          await writeHomePalette(p, state, bGen, onSel, sel: !isSelected);
+          await writeHomePalette(c, state, bGen, onSel, sel: !isSelected);
           onSel.call();
         };
 
-  state[p.node.id] = Palette2<Chatable>(
-      node: p.node,
-      image: p.image,
+  state[c.id] = Palette2(
+      node: c,
+      // image: pInState?.image ??
+      //     await global(c.mediaID,
+      //         doFetch: true,
+      //         doMergeIfFetch: true,
+      //         withDataIfFetch: true,
+      //         fetchFromNodes: true),
       selected: isSelected,
       messagePreview: preview,
       imPress: onSelect,
       bodyPress: onSelect,
-      buttonsInfo2: await bGen?.call(p) ?? []);
+      buttonsInfo2: await bGen?.call(c) ?? []);
 
-  print("SUCCESS FULLY WROTE ${p.node.id} TO STATE = $state");
+  print("SUCCESS FULLY WROTE ${c.id} TO STATE = $state");
 }
 
-void writePalette3(
-  Palette2 p,
-  Map<ID, Down4Object> state,
-  List<ButtonsInfo2> Function(Palette2)? bGen,
+void writePalette3<T extends FireNode>(
+  T n,
+  Map<ID, Palette2> state,
+  List<ButtonsInfo2> Function(T)? bGen,
   void Function()? onSel, {
   bool? sel,
   String? pr,
@@ -369,31 +374,30 @@ void writePalette3(
   // if the palette is a reload and use it's current status, or else it will
   // default to false
   bool? selectionIfReload;
-  final Palette2? pInState = state[p.node.id] as Palette2?;
+  final Palette2? pInState = state[n.id];
   selectionIfReload = pInState?.selected;
   bool isSelected = sel ?? selectionIfReload ?? false;
 
   void Function()? onSelect = onSel == null
       ? null
       : () {
-          writePalette3(p, state, bGen, onSel, sel: !isSelected, pr: pr);
+          writePalette3(n, state, bGen, onSel, sel: !isSelected, pr: pr);
           onSel.call();
         };
 
-  state[p.node.id] = Palette2(
-      node: p.node,
-      image: p.image,
+  state[n.id] = Palette2(
+      node: n,
       selected: isSelected,
       imPress: onSelect,
       bodyPress: onSelect,
       messagePreview: pr,
-      buttonsInfo2: bGen?.call(p) ?? []);
+      buttonsInfo2: bGen?.call(n) ?? []);
 
-  print("SUCCESS FULLY WROTE ${p.node.id} TO STATE = $state");
+  print("SUCCESS FULLY WROTE ${n.id} TO STATE = $state");
 }
 
 class Transition {
-  final Iterable<Palette2<Personable>> trueTargets;
+  final Iterable<Personable> trueTargets;
   final List<Palette2> preTransition, postTransition;
   final Map<ID, Palette2> state;
   final int nHidden;
@@ -415,34 +419,22 @@ Transition selectionTransition({
   required Map<ID, Palette2> hiddenState,
   required double scrollOffset,
 }) {
-  // originalList.forEach((e) =>
-  //     print("${e.node.runtimeType}, isPersonable: ${e.node is Personable}"));
-
   final ogOrder = originalList.asIds();
   final hidden = List<Palette2>.from(hiddenState.values);
   final selected = originalList.selected();
   final unselected = originalList.notSelected();
 
-  // selected.forEach((element) {
-  //   print ("""
-  //   element node is Personable = ${element.node is Personable}
-  //   element node runtimeType = ${element.node.runtimeType}
-  //
-  //   element is Palette2<Personable> = ${element is Palette2<Personable>}
-  //   element runtimeType = ${element.runtimeType}
-  //   """);
-  // });
-
-  final selectedPeople = selected.whereNodeIs<Personable>()..forEach((e) =>
-      print("${e.node.runtimeType}, isPersonable: ${e.node is Personable}"));
-
-  // selectedPeople.forEach((e) =>
-  //     print("${e.node.runtimeType}, isPersonable: ${e.node is Personable}"));
+  final selectedPeople = selected.whereNodeIs<Personable>()
+    ..forEach((e) =>
+        print("${e.node.runtimeType}, isPersonable: ${e.node is Personable}"));
 
   final selectedGroups = selected.whereNodeIs<Groupable>();
 
-  final idsInGroups =
-      selectedGroups.map((g) => g.node.group).expand((id) => id).toSet();
+  final idsInGroups = selectedGroups
+      .asNodes<Groupable>()
+      .map((g) => g.group)
+      .expand((id) => id)
+      .toSet();
 
   final unselectedGroups = unselected.whereNodeIs<Groupable>();
   final unselectedUsers = unselected.whereNodeIs<Personable>();
@@ -455,7 +447,7 @@ Transition selectionTransition({
   // not selected should get a fold transition
   // selected are unselected
   // all are deactivated
-  final pals = <Palette2<FireNode>>{
+  final pals = <Palette2>{
     ...unHide,
     ...selectedPeople.map(
         (e) => e.deactivated().animated(selected: false, fadeButton: true)),
@@ -472,7 +464,7 @@ Transition selectionTransition({
 
   print("pals=${pals.map((e) => e.node.displayName).toList()}");
   return Transition(
-      trueTargets: pals.where((p) => !p.fold).whereNodeIs<Personable>(),
+      trueTargets: pals.where((p) => !p.fold).asNodes<Personable>(),
       preTransition: originalList,
       postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIds())),
       state: state,
@@ -511,12 +503,12 @@ Transition selectionTransition({
 
 Future<ChatMessage?> getChatMessage({
   required Map<ID, ChatMessage> state,
-  required Palette2<Chatable> palette,
+  required Chatable ch,
   required ID msgID,
   required ID? prevMsgID,
   required ID? nextMsgID,
   required bool isLast,
-  required void Function(Palette2<Branchable>)? openNode,
+  required void Function(FireNode)? openNode,
   required void Function() refreshCallback,
 }) async {
   final msg = await global<FireMessage>(msgID);
@@ -548,22 +540,21 @@ Future<ChatMessage?> getChatMessage({
   msg.markRead();
 
   final bool senderIsSelf = msg.senderID == g.self.id;
-  final bool hasHeader = !senderIsSelf &&
-      palette is Groupable &&
-      nextMsg?.senderID != msg.senderID;
+  final bool hasHeader =
+      !senderIsSelf && ch is Groupable && nextMsg?.senderID != msg.senderID;
 
   final cm = ChatMessage(
       key: GlobalKey(),
       hasGap: hasGap,
       message: msg,
-      nodeRef: palette.id,
+      nodeRef: ch.id,
       mediaInfo: await ChatMessage.generateMediaInfo(msg),
       nodes: null,
       repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
         print("TODO, GO TO REPLY ID = $replyID");
       }),
       hasHeader: hasHeader,
-      openPalette: openNode,
+      openNode: openNode,
       myMessage: g.self.id == msg.senderID,
       select: (_) {
         state[msgID] = state[msgID]!.invertedSelection();
@@ -575,9 +566,9 @@ Future<ChatMessage?> getChatMessage({
   // the palettes showing properly
   Future.microtask(() async {
     if ((msg.nodes ?? {}).isNotEmpty) {
-      final ps = await slowNodeIDsToPalettes(msg.nodes!);
-      if (ps.isNotEmpty) {
-        state[msg.id] = state[msg.id]!.withPalettes(ps);
+      final nodes = await nodesFetchWithCachedMedias(msg.nodes!);
+      if (nodes.isNotEmpty) {
+        state[msg.id] = state[msg.id]!.withNodes(nodes);
         refreshCallback();
       }
     }
@@ -587,13 +578,13 @@ Future<ChatMessage?> getChatMessage({
 }
 
 Future<void> writeMessages({
-  required Palette2<Chatable> palette,
+  required Chatable ch,
   required List<ID> ordered,
   required Map<ID, ChatMessage> state,
   required Map<ID, EmptyObject> videos,
   required Map<ID, EmptyObject> withNodes,
   required void Function() refresh,
-  required void Function(Palette2<Branchable>)? openNode,
+  required void Function(FireNode)? openNode,
   int limit = 20,
 }) async {
   final orderedSet = ordered.toSet();
@@ -611,7 +602,7 @@ Future<void> writeMessages({
     final isFirst = msgID == orderedSet.first;
     final m = await getChatMessage(
         state: state,
-        palette: palette,
+        ch: ch,
         msgID: msgID,
         prevMsgID: prv,
         nextMsgID: nxt,
@@ -634,7 +625,7 @@ Future<void> writePayments(
   await for (final p in g.wallet.payments) {
     state[p.id] = Palette2(
       node: Payment(p.id, payment: p, selfID: g.self.id),
-      image: null,
+      // image: null,
       messagePreview: p.textNote,
       buttonsInfo2: p.isSpentBy(id: g.self.id)
           ? [

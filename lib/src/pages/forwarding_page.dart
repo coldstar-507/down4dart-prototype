@@ -16,9 +16,9 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "forward";
   final List<Down4Object> fObjects;
   final void Function() back;
-  final void Function(List<Down4Object>, Palette2<Chatable>) openChat;
+  final void Function(List<Down4Object>, Chatable) openChat;
   final void Function(List<Down4Object>, Transition) hyper;
-  final Future<void> Function(Payload, Iterable<Palette2<Chatable>>) forward;
+  final Future<void> Function(Payload, Iterable<Chatable>) forward;
 
   const ForwardingPage({
     // required this.homePalettes,
@@ -54,11 +54,11 @@ class _ForwadingPageState extends State<ForwardingPage> {
     super.dispose();
   }
 
-  Map<ID, Palette2<Chatable>> get _forwardState => g.vm.cv.cp.objects.cast();
+  Map<ID, Palette2> get _forwardState => g.vm.cv.cp.objects.cast();
 
-  Iterable<Palette2<Chatable>> get _fList => _forwardState.values;
+  Iterable<Palette2> get _fList => _forwardState.values;
 
-  Iterable<Palette2<Chatable>> get selection => _fList.where((p) => p.selected);
+  Iterable<Palette2> get selection => _fList.where((p) => p.selected);
 
   Map<ID, Palette2> get hiddenState => g.vm.home.pages[1].objects.cast();
 
@@ -82,7 +82,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
               text: _tec.value.text,
               media: media,
               replies: null),
-          selection),
+          selection.asNodes<Chatable>()),
     );
   }
 
@@ -101,14 +101,13 @@ class _ForwadingPageState extends State<ForwardingPage> {
       consoleMedias2: ConsoleMedias2(
         showImages: images,
         onSelect: (media) => widget.forward(
-          Payload(
-              isSnip: false,
-              forwards: fo,
-              text: _tec.value.text,
-              media: media,
-              replies: null),
-          selection,
-        ),
+            Payload(
+                isSnip: false,
+                forwards: fo,
+                text: _tec.value.text,
+                media: media,
+                replies: null),
+            selection.asNodes<Chatable>()),
       ),
       forwardingObjects: fo,
       bottomButtons: [
@@ -141,7 +140,7 @@ class _ForwadingPageState extends State<ForwardingPage> {
                       forwards: fo,
                       text: _tec.value.text,
                       media: null),
-                  selection),
+                  selection.asNodes<Chatable>()),
           isSpecial: true,
           showExtra: extra,
           extraButtons: [

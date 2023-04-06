@@ -3,12 +3,15 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';
 
+import 'package:image_fade/image_fade.dart' as fade;
+
 import 'package:flutter/services.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:better_player/better_player.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mime/mime.dart';
+import '../couch.dart' show cache, global;
 import 'package:image/image.dart' as IMG;
 
 import 'palette.dart';
@@ -90,27 +93,210 @@ import '../globals.dart';
 //   }
 // }
 
+class FireNodeImageDisplay extends StatefulWidget {
+  final FireNode node;
+  const FireNodeImageDisplay(
+    this.node, [
+    Key? key,
+  ]) : super(key: key);
+
+  @override
+  State<FireNodeImageDisplay> createState() => _FireNodeImageDisplayState();
+}
+
+class _FireNodeImageDisplayState extends State<FireNodeImageDisplay>
+// with TickerProviderStateMixin
+{
+  late FireMedia? media = cache<FireMedia>(widget.node.mediaID);
+  late Image image = widget.node.defaultNodeImage;
+  Image? realImage;
+
+  // late final AnimationController _controller = AnimationController(
+  //     duration: const Duration(seconds: 3),
+  //     vsync: this,
+  //     value: realImage == null ? 0 : 1);
+  // late final Animation<double> _animation =
+  //     CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+
+  void loadImage() {
+    if (media?.cachePath != null) {
+      print("Will render file image");
+      realImage = fileIm(media!.cachePath!);
+    } else if (media?.cachedImage != null) {
+      print("Will render memory image");
+      realImage = memoryIm(media!.cachedImage!);
+    } else if (media?.cachedUrl != null) {
+      print("Will render network image");
+      realImage = netIm(media!.cachedUrl!);
+    } else if (media?.tinyThumbnail != null) {
+      image = memoryIm(base64Decode(media!.tinyThumbnail!));
+    }
+    setState(() {});
+  }
+
+  Widget transformedImage(Image image) => Down4ImageTransform(
+      image: image,
+      imageAspectRatio: media?.aspectRatio ?? 1.0,
+      displaySize: Size.square(Palette.paletteHeight),
+      isSquared: true,
+      isReversed: media?.isReversed ?? false);
+
+  Image memoryIm(Uint8List d) =>
+      Image.memory(d, fit: BoxFit.cover, gaplessPlayback: true);
+
+  Image fileIm(String p) =>
+      Image.file(File(p), fit: BoxFit.cover, gaplessPlayback: true);
+
+  Image netIm(String url) =>
+      Image.network(url, fit: BoxFit.cover, gaplessPlayback: true);
+
+  void loadIfNull() async {
+    media ??= await global<FireMedia>(widget.node.mediaID, doFetch: true);
+    if (media == null) return;
+    loadImage();
+
+    if (media!.cachedImage == null && await media!.imageData != null) {
+      loadImage();
+      return print("Found data!");
+    }
+
+    if (media!.cachedUrl == null && await media!.url != null) {
+      loadImage();
+      return print("Found url!");
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    print("Creating state!");
+    loadIfNull();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+        // duration: const Duration(milliseconds: 2),
+        width: Palette.paletteHeight,
+        height: Palette.paletteHeight,
+        decoration: BoxDecoration(
+            image: DecorationImage(image: image.image, fit: BoxFit.cover)),
+        child: AnimatedOpacity(
+            curve: Curves.easeInExpo,
+            duration: const Duration(seconds: 2),
+            opacity: realImage == null ? 0 : 1,
+            child: realImage ?? const SizedBox.shrink()));
+
+    //   FadeTransition(
+    //       opacity: _animation, child: transformedImage(realImage ?? image)),
+    // );
+    // return Stack(
+    //   children: [
+    //     transformedImage(image),
+    //     AnimatedOpacity(
+    //         opacity: realImage == null ? 0 : 1,
+    //         duration: const Duration(milliseconds: 700),
+    //         child: transformedImage(realImage ?? image))
+    //   ],
+    // );
+    //
+    // return Down4ImageTransform(
+    //     image: fade.ImageFade(image: image.image, fit: BoxFit.cover),
+    //     imageAspectRatio: media?.aspectRatio ?? 1.0,
+    //     displaySize: Size.square(Palette.paletteHeight),
+    //     isSquared: true,
+    //     isReversed: media?.isReversed ?? false);
+  }
+}
+
+class FireImageDisplay extends StatefulWidget {
+  final FireMedia media;
+  final Size displaySize;
+  final bool forceSquareAnyways;
+  const FireImageDisplay(
+    this.media,
+    this.displaySize, [
+    this.forceSquareAnyways = false,
+    Key? key,
+  ]) : super(key: key);
+
+  @override
+  State<FireImageDisplay> createState() => _FireImageDisplay();
+}
+
+class _FireImageDisplay extends State<FireImageDisplay> {
+  late FireMedia media = widget.media;
+  late Image? image;
+
+  void loadImage() {
+    if (media.cachePath != null) {
+      image = fileIm(media.cachePath!);
+    } else if (media.cachedImage != null) {
+      image = memoryIm(media.cachedImage!);
+    } else if (media.cachedUrl != null) {
+      image = netIm(media.cachedUrl!);
+    } else if (media.tinyThumbnail != null) {
+      image = memoryIm(base64Decode(media.tinyThumbnail!));
+    }
+    setState(() {});
+  }
+
+  Image memoryIm(Uint8List d) =>
+      Image.memory(d, fit: BoxFit.cover, gaplessPlayback: true);
+
+  Image fileIm(String p) =>
+      Image.file(File(p), fit: BoxFit.cover, gaplessPlayback: true);
+
+  Image netIm(String url) =>
+      Image.network(url, fit: BoxFit.cover, gaplessPlayback: true);
+
+  void loadThatBoy() async {
+    loadImage();
+    if (media.cachedImage == null) await media.imageData;
+    if (media.cachedImage != null) return loadImage();
+    if (media.cachedUrl == null && !media.isVideo) await media.url;
+    if (media.cachedUrl != null) return loadImage();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadThatBoy();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (image == null) return SizedBox.fromSize(size: widget.displaySize);
+    return Down4ImageTransform(
+        image: image!,
+        imageAspectRatio: media.aspectRatio,
+        displaySize: widget.displaySize,
+        isSquared: media.isSquared,
+        isReversed: media.isReversed);
+  }
+}
+
 extension MediaDisplay on FireMedia {
   // Widget displayVideo({required Size displaySize, bool forceSquare = false}) {
-
+  //
   //   Widget videoTransform(BetterPlayer video) => Down4VideoTransform(
   //       displaySize: displaySize,
   //       videoAspectRatio: aspectRatio,
   //       video: video,
   //       isReversed: isReversed,
   //       isSquared: isSquared || forceSquare);
-
+  //
   //   Future<BetterPlayerDataSource?> playerDataSource() async {
   //     Uint8List? local = await videoData;
   //     if (local != null) {
   //       return BetterPlayerDataSource.memory(local, videoExtension: extension);
   //     } else {
-  //       final url = await videoUrl;
+  //       final url = await url;
   //       if (url == null) return null;
   //       return BetterPlayerDataSource.network(url);
   //     }
   //   }
-
+  //
   //   Future<BetterPlayerController?> player() async {
   //     final datasource = await playerDataSource();
   //     if (datasource == null) return null;
@@ -118,7 +304,7 @@ extension MediaDisplay on FireMedia {
   //         BetterPlayerConfiguration(aspectRatio: aspectRatio),
   //         betterPlayerDataSource: datasource);
   //   }
-
+  //
   //   Widget preview() {
   //     return Stack(
   //       children: [
@@ -152,47 +338,50 @@ extension MediaDisplay on FireMedia {
     );
   }
 
-  Widget displayImage({required Size displaySize, bool forceSquare = false}) {
-    Widget imageTransform(Image image) => Down4ImageTransform(
-        image: image,
-        imageAspectRatio: aspectRatio,
-        displaySize: displaySize,
-        isSquared: isSquared || forceSquare,
-        isReversed: isReversed);
-
-    Future<Image?> theImage() async {
-      if (cachePath != null) {
-        return Image.file(File(cachePath!),
-            fit: BoxFit.cover, gaplessPlayback: true);
-      } else {
-        final d = await imageData;
-        if (d != null) {
-          return Image.memory(d, fit: BoxFit.cover, gaplessPlayback: true);
-        }
-      }
-      return null;
-    }
-
-    if (cachedImage != null) {
-      return imageTransform(
-          Image.memory(cachedImage!, fit: BoxFit.cover, gaplessPlayback: true));
-    }
-    return FutureBuilder(
-      future: theImage(),
-      builder: (ctx, asn) {
-        if (!asn.hasData) {
-          final ttn = tinyThumbnail;
-          if (ttn != null) {
-            return imageTransform(Image.memory(base64Decode(ttn),
-                fit: BoxFit.cover, gaplessPlayback: true));
-          } else {
-            return const SizedBox.shrink();
-          }
-        }
-        return imageTransform(asn.requireData!);
-      },
-    );
-  }
+  // Widget displayImage({required Size displaySize, bool forceSquare = false}) {
+  //   Widget imageTransform(Image image) => Down4ImageTransform(
+  //       image: image,
+  //       imageAspectRatio: aspectRatio,
+  //       displaySize: displaySize,
+  //       isSquared: isSquared || forceSquare,
+  //       isReversed: isReversed);
+  //
+  //   // return Image.memory(base64Decode(tinyThumbnail!),
+  //   //     fit: BoxFit.cover, gaplessPlayback: true);
+  //
+  //   // Future<Image?> theImage() async {
+  //   //   if (cachePath != null) {
+  //   //     return Image.file(File(cachePath!),
+  //   //         fit: BoxFit.cover, gaplessPlayback: true);
+  //   //   } else {
+  //   //     final d = await imageData;
+  //   //     if (d != null) {
+  //   //       return Image.memory(d, fit: BoxFit.cover, gaplessPlayback: true);
+  //   //     }
+  //   //   }
+  //   //   return null;
+  //   // }
+  //   //
+  //   // if (cachedImage != null) {
+  //   //   return imageTransform(
+  //   //       Image.memory(cachedImage!, fit: BoxFit.cover, gaplessPlayback: true));
+  //   // }
+  //   // return FutureBuilder(
+  //   //   future: theImage(),
+  //   //   builder: (ctx, asn) {
+  //   //     if (!asn.hasData) {
+  //   //       final ttn = tinyThumbnail;
+  //   //       if (ttn != null) {
+  //   //         return imageTransform(Image.memory(base64Decode(ttn),
+  //   //             fit: BoxFit.cover, gaplessPlayback: true));
+  //   //       } else {
+  //   //         return const SizedBox.shrink();
+  //   //       }
+  //   //     }
+  //   //     return imageTransform(asn.requireData!);
+  //   //   },
+  //   // );
+  // }
 
   Widget displayMedia({
     required Size displaySize,
@@ -205,7 +394,7 @@ extension MediaDisplay on FireMedia {
           forceSquare: forceSquare,
           controller: videoController);
     } else {
-      return displayImage(displaySize: displaySize, forceSquare: forceSquare);
+      return FireImageDisplay(this, displaySize, forceSquare);
     }
   }
 }
@@ -529,7 +718,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
       return BetterPlayerDataSource.memory(local,
           videoExtension: widget.media.extension);
     } else {
-      final url = await widget.media.videoUrl;
+      final url = await widget.media.url;
       if (url == null) return null;
       return BetterPlayerDataSource.network(url);
     }
@@ -614,9 +803,8 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
   }
 
   Widget thumbnail() {
-    return widget.media.displayImage(
-        displaySize: widget.displaySize,
-        forceSquare: widget.forceSquareAnyways);
+    return FireImageDisplay(
+        widget.media, widget.displaySize, widget.forceSquareAnyways);
   }
 
   Widget playButton() {
@@ -668,7 +856,7 @@ class Down4ImageTransform extends StatelessWidget {
   final double imageAspectRatio;
   final Size displaySize;
   final bool isSquared, isReversed;
-  final Image image;
+  final Widget image;
   const Down4ImageTransform({
     required this.image,
     required this.imageAspectRatio,
@@ -821,10 +1009,22 @@ extension ChatMessageExtension on Iterable<ChatMessage> {
 //       where((p) => p.node.isPublicGroup || p.node is User);
 // }
 
+extension MapHelpers on Map<ID, Palette2> {
+  Iterable<Palette2?> those(Iterable<ID> ids) sync* {
+    for (final id in ids) {
+      yield this[id];
+    }
+  }
+}
+
+extension NonNullPalettes on Iterable<Palette2?> {
+  Iterable<Palette2> noNull() => whereType<Palette2>();
+}
+
 extension Palette2Extensions on List<Palette2> {
-  List<Palette2> formatted() => toList(growable: false)
-    ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
   List<Palette2> formattedReverse() => toList(growable: false)
+    ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
+  List<Palette2> formatted() => toList(growable: false)
     ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
 }
 
@@ -834,9 +1034,8 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   Iterable<Palette2> notSelected() => where((p) => !p.selected);
   Iterable<Palette2> whereNodeIsNot<T extends FireNode>() =>
       where((p) => p.node is! T);
-  Iterable<Palette2<T>> whereNodeIs<T extends FireNode>() =>
-      where((p) => p.node is T)
-          .map((p) => Palette2<T>(node: p.node as T, image: p.image));
+  Iterable<Palette2> whereNodeIs<T extends FireNode>() =>
+      where((p) => p.node is T);
 
   Iterable<ID> asIds() => map((e) => e.node.id);
   Iterable<BaseNode> asNodes<BaseNode>() =>
@@ -881,6 +1080,12 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
 }
 
 extension ImageOfNodes on FireNode {
+  Widget get nodeImage => FireNodeImageDisplay(this);
+  // cache<FireMedia>(mediaID)?.displayImage(
+  //     displaySize: Size.square(Palette.paletteHeight * 2),
+  //     forceSquare: true) ??
+  // defaultNodeImage;
+
 //   Widget get transformedImage {
 //     if (media != null) {
 //       return Down4ImageTransform(
@@ -1072,7 +1277,7 @@ Future<FireMedia?> importNodeMedia() async {
       mime: mime,
       tinyThumbnail: makeTiny(bytes),
       isSquared: true,
-      owner: g.self.id,
+      ownerID: g.self.id,
       timestamp: makeTimestamp(),
       aspectRatio: 1.0 / size.aspectRatio);
 }
@@ -1112,7 +1317,7 @@ Future<void> importConsoleMedias({required bool images}) async {
           mime: mime,
           tinyThumbnail: tiny,
           timestamp: makeTimestamp(),
-          owner: g.self.id,
+          ownerID: g.self.id,
           aspectRatio: 1.0 / size.aspectRatio);
       await media.write(imageData: image.bytes!);
       // g.self.images.add(mediaID);
@@ -1143,7 +1348,7 @@ Future<void> importConsoleMedias({required bool images}) async {
           isSquared: false,
           isSaved: true,
           timestamp: makeTimestamp(),
-          owner: g.self.id,
+          ownerID: g.self.id,
           aspectRatio: (videoInfo?.width ?? 1.0) / (videoInfo?.height ?? 1.0));
       await media.write(videoData: video.bytes!, imageData: tn);
     }

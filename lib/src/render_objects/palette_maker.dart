@@ -136,7 +136,7 @@ class UserMakerPalette extends StatelessWidget {
           height: Palette.paletteHeight - 4.0,
           width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: media != null
-              ? media!.displayImage(
+              ? media!.displayMedia(
                   displaySize: Size.square(Palette.paletteHeight - 4.0),
                   forceSquare: true)
               : g.ph,
@@ -334,7 +334,7 @@ class PaletteMaker extends StatelessWidget {
         child: SizedBox(
           width: Palette.paletteHeight - 4.0, // borderWidth x2
           child: image != null
-              ? image!.displayImage(
+              ? image!.displayMedia(
                   displaySize: Size.square(Palette.paletteHeight),
                   forceSquare: true)
               : _defaultImage,

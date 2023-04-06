@@ -15,16 +15,14 @@ import '../render_objects/lists.dart';
 
 class ProfileWidget extends StatelessWidget implements Down4Object {
   @override
-  ID get id => palette.node is Group
-      ? palette.node.id
-      : sha1(utf8.encode(palette.node.id)).toBase58();
+  ID get id => node.id;
 
-  final Palette2 palette;
-  const ProfileWidget({required this.palette, Key? key}) : super(key: key);
+  final FireNode node;
+  const ProfileWidget({required this.node, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final node_ = palette.node;
+    final node_ = node;
     // final squareImageSize = g.sizes.w - (2 * Palette.paletteMargin);
     final additionalGap = g.sizes.w * 0.02;
     final theGap = additionalGap + Palette.paletteMargin;
@@ -63,10 +61,10 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           // displaySize: Size.square(squareImageSize),
           // isSquared: media?.isSquared ?? false,
           // isReversed: media?.isReversed ?? false),
-          palette.paletteMedia,
+          node.nodeImage,
           const SizedBox(height: 8.0),
           Down4Text(
-              text: palette.node.displayName,
+              text: node.displayName,
               style: const TextStyle(
                   fontSize: 22.0,
                   fontWeight: FontWeight.bold,

@@ -20,10 +20,10 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "group";
   final List<Palette2> homePalettes, palettesForTransition;
-  final Iterable<Palette2<Personable>> people;
+  final Iterable<Personable> people;
   final int nHidden;
   final void Function() back;
-  final void Function(Palette2<Group> group, Payload p) makeGroup;
+  final void Function(Group group, FireMedia m, Payload p) makeGroup;
   final double initialOffset;
 
   const GroupPage({
@@ -129,7 +129,7 @@ class _GroupPageState extends State<GroupPage>
     final p = Payload(
         text: text, media: media, replies: null, forwards: null, isSnip: false);
 
-    final members = Set<ID>.from(widget.people.asIds())..add(g.self.id);
+    final members = Set<ID>.from(widget.people.asIDs())..add(g.self.id);
 
     final group = Group(groupID,
         activity: ts,
@@ -138,8 +138,7 @@ class _GroupPageState extends State<GroupPage>
         mediaID: _groupImage!.id,
         group: members);
 
-    final pGroup = Palette2<Group>(node: group, image: _groupImage);
-    widget.makeGroup(pGroup, p);
+    widget.makeGroup(group, _groupImage!, p);
   }
 
   void reloadItems() {

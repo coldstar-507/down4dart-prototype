@@ -100,7 +100,7 @@ class _Down4State extends State<Down4> {
       'secret': secret.toBase58(),
       'token': token,
       'neuter': neuter.toYouKnow(),
-      'media': goodMedia.id,
+      'mediaID': goodMedia.id,
     };
 
     final success = await r.initUser(jsonEncode(userInfo));

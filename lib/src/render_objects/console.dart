@@ -621,7 +621,7 @@ class Console extends StatelessWidget {
               SizedBox(
                   width: Console.buttonHeight,
                   height: Console.buttonHeight,
-                  child: obj.paletteMedia),
+                  child: obj.node.nodeImage),
               Expanded(
                   child: Container(
                       padding: const EdgeInsets.all(4.0),

@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
+import '../couch.dart';
 import '../data_objects.dart';
 import '../globals.dart';
 import '../themes.dart';
@@ -109,22 +112,22 @@ class ButtonsInfo2 {
       );
 }
 
-class Palette2<T extends FireNode> extends StatelessWidget
-    implements Down4Object {
+class Palette2 extends StatelessWidget implements Down4Object {
   @override
   ID get id => node.id;
+  final Widget _image;
 
-  final T node;
-  final FireMedia? image;
+  final FireNode node;
+  // final FireMedia? image;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish;
   final List<ButtonsInfo2> buttonsInfo2;
   final int containerMS, fadeMS, fadeButtonMS;
   final String? messagePreview;
 
-  const Palette2({
+  Palette2({
     required this.node,
-    required this.image,
+    // required this.image,
     this.fadeMS = 100,
     this.containerMS = 600,
     this.fadeButtonMS = 100,
@@ -140,13 +143,14 @@ class Palette2<T extends FireNode> extends StatelessWidget
     this.fadeButton = false,
     this.fade = false,
     Key? key,
-  }) : super(key: key);
+  })  : _image = node.nodeImage,
+        super(key: key);
 
-  Palette2<T> select() {
+  Palette2 select() {
     return Palette2(
       fold: fold,
       squish: squish,
-      image: image,
+      // image: image,
       node: node,
       fade: fade,
       fadeButton: fadeButton,
@@ -162,7 +166,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
     );
   }
 
-  Palette2<T> animated({
+  Palette2 animated({
     bool? squish,
     bool? alignedRight,
     bool? fold,
@@ -178,7 +182,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
       squish: squish ?? this.squish,
       fold: fold ?? this.fold,
       node: node,
-      image: image,
+      // image: image,
       messagePreview: messagePreview,
       selected: selected ?? this.selected,
       imPress: imPress,
@@ -193,11 +197,11 @@ class Palette2<T extends FireNode> extends StatelessWidget
     );
   }
 
-  Palette2<T> deactivated() {
+  Palette2 deactivated() {
     return Palette2(
       squish: squish,
       fold: fold,
-      image: image,
+      // image: image,
       messagePreview: messagePreview,
       node: node,
       buttonsInfo2: buttonsInfo2
@@ -206,17 +210,17 @@ class Palette2<T extends FireNode> extends StatelessWidget
     );
   }
 
-  Palette2<T> withoutButton() {
-    return Palette2(squish: squish, fold: fold, node: node, image: image);
+  Palette2 withoutButton() {
+    return Palette2(squish: squish, fold: fold, node: node); //, image: image);
   }
 
-  Palette2<T> copy() {
+  Palette2 copy() {
     return Palette2(
         fold: fold,
         squish: squish,
         node: node,
         fade: fade,
-        image: image,
+        // image: image,
         fadeButton: fadeButton,
         fadeButtonMS: fadeButtonMS,
         fadeMS: fadeMS,
@@ -340,10 +344,12 @@ class Palette2<T extends FireNode> extends StatelessWidget
         ),
       );
 
-  Widget get paletteMedia => image == null
-      ? node.defaultNodeImage
-      : image!.displayImage(
-          displaySize: Size.square(Palette.paletteHeight), forceSquare: true);
+  // Widget get paletteMedia => image == null
+  //     ? node.defaultNodeImage
+  //     : image!.displayImage(
+  //         displaySize: Size.square(Palette.paletteHeight),
+  //         forceSquare: true,
+  //       );
 
   @override
   Widget build(BuildContext context) {
@@ -354,7 +360,7 @@ class Palette2<T extends FireNode> extends StatelessWidget
       child: Column(children: [
         animatedContainer2(
           child: mainContainer(
-            child: row(children: [paletteMedia, body, buttons]),
+            child: row(children: [_image, body, buttons]),
           ),
         ),
         AnimatedContainer(

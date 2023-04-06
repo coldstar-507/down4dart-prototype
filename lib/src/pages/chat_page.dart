@@ -15,9 +15,9 @@ import '_page_utils.dart';
 
 class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "chat-${p.id}";
+  ID get id => "chat-${n.id}";
 
-  final Palette2<Chatable> p;
+  final Chatable n;
   // final List<BaseNode>? subNodes;
   final Map<ID, ChatMessage> messages;
   final Map<ID, Palette2> members;
@@ -26,7 +26,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function(int) onPageChange;
   final void Function() back;
   final Future<void> Function([int limit]) loadMore;
-  final void Function(Palette2<Branchable>) openNode;
+  final void Function(Branchable) openNode;
   final void Function(Payload) send;
 
   const ChatPage({
@@ -38,7 +38,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
     required this.onPageChange,
     required this.back,
     required this.send,
-    required this.p,
+    required this.n,
     required this.openNode,
     this.fo,
     Key? key,
@@ -80,7 +80,7 @@ class _ChatPageState extends State<ChatPage>
           g.vm.cv.pages[0].scroll = scroller0.offset;
         });
 
-  late ScrollController? scroller1 = widget.p.node is Groupable
+  late ScrollController? scroller1 = widget.n is Groupable
       ? (ScrollController(initialScrollOffset: g.vm.cv.pages[1].scroll)
         ..addListener(() {
           g.vm.cv.pages[1].scroll = scroller1!.offset;
@@ -510,12 +510,12 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   Widget build(BuildContext context) {
-    final pages = widget.p is Groupable
+    final pages = widget.n is Groupable
         ? [
             Down4Page(
                 scrollController: scroller0,
                 isChatPage: true,
-                title: widget.p.node.displayName,
+                title: widget.n.displayName,
                 console: console,
                 asMap: widget.messages,
                 orderedKeys: widget.ordered,
@@ -531,7 +531,7 @@ class _ChatPageState extends State<ChatPage>
             Down4Page(
                 scrollController: scroller0,
                 isChatPage: true,
-                title: widget.p.node.displayName,
+                title: widget.n.displayName,
                 console: console,
                 asMap: widget.messages,
                 orderedKeys: widget.ordered,

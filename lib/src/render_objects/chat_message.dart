@@ -56,11 +56,11 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   final void Function(ID id)? select;
   final FireMessage message;
   final bool hasGap, hasHeader;
-  final void Function(Palette2<Branchable>)? openPalette;
+  final void Function(FireNode)? openNode;
 
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
-  final List<Palette2>? nodes;
+  final List<FireNode>? nodes;
 
   bool get videoIsPlaying => mediaInfo?.videoController?.isPlaying() ?? false;
 
@@ -72,7 +72,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     required this.myMessage,
     required this.hasGap,
     required this.mediaInfo,
-    required this.openPalette,
+    required this.openNode,
     required this.repliesInfo,
     this.isPost = false,
     this.selected = false,
@@ -81,14 +81,14 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }) : super(key: key);
 
   ChatMessage withOpenNode({
-    required void Function(Palette2<Branchable>)? open,
+    required void Function(FireNode)? open,
   }) {
     return ChatMessage(
         message: message,
         repliesInfo: repliesInfo,
         nodeRef: nodeRef,
         mediaInfo: mediaInfo,
-        openPalette: open,
+        openNode: open,
         nodes: nodes,
         isPost: isPost,
         myMessage: myMessage,
@@ -103,7 +103,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       message: message,
       repliesInfo: repliesInfo,
       mediaInfo: mediaInfo,
-      openPalette: openPalette,
+      openNode: openNode,
       nodes: nodes,
       nodeRef: nodeRef,
       isPost: isPost,
@@ -123,7 +123,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       repliesInfo: repliesInfo,
       nodes: nodes,
       mediaInfo: mediaInfo,
-      openPalette: openPalette,
+      openNode: openNode,
       hasHeader: hasHeader,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -132,13 +132,13 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage withPalettes(List<Palette2>? pNodes) {
+  ChatMessage withNodes(List<FireNode>? pNodes) {
     return ChatMessage(
         message: message,
         repliesInfo: repliesInfo,
         nodeRef: nodeRef,
         mediaInfo: mediaInfo,
-        openPalette: openPalette,
+        openNode: openNode,
         nodes: pNodes,
         isPost: isPost,
         myMessage: myMessage,
@@ -156,7 +156,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       repliesInfo: repliesInfo,
       nodes: nodes,
       mediaInfo: mediaInfo,
-      openPalette: openPalette,
+      openNode: openNode,
       hasHeader: hasHeader,
       myMessage: myMessage,
       hasGap: hasGap,
@@ -176,7 +176,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
           ?..videoController?.pause()
           ..videoController?.seekTo(Duration.zero),
         nodes: nodes,
-        openPalette: openPalette,
+        openNode: openNode,
         hasHeader: hasHeader,
         myMessage: myMessage,
         hasGap: hasGap,
@@ -425,37 +425,27 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       );
     }
 
-    Widget loadedPalette(Palette2 p) {
-      Widget nodeImage() {
-        return SizedBox.square(
-          dimension: mpHeight(),
-          child: p.paletteMedia,
-        );
-      }
-
+    Widget loadedPalette(FireNode n) {
       return Container(
         height: mpHeight(),
-        color: p.id == g.self.id
+        color: n.id == g.self.id
             ? PinkTheme.nodeColors[NodesColor.self]
-            : PinkTheme.nodeColors[p.node.colorCode],
+            : PinkTheme.nodeColors[n.colorCode],
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            nodeImage(),
+            n.nodeImage,
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 6.0, left: 6.0),
-                    child: Text(p.node.displayName,
+                    child: Text(n.displayName,
                         maxLines: 1, textAlign: TextAlign.start))),
             GestureDetector(
-                onTap: () => p.node is Branchable
-                    ? openPalette?.call(p as Palette2<Branchable>)
-                    : null,
+                onTap: () => openNode?.call(n),
                 child: Center(
                     child: Padding(
                   padding: const EdgeInsets.all(6.0),
-                  child:
-                      openPalette == null ? const SizedBox.shrink() : g.fifty,
+                  child: openNode == null ? const SizedBox.shrink() : g.fifty,
                 )))
           ],
         ),
@@ -519,9 +509,18 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     }
 
     Widget theMedia() {
-      return mi.media.displayMedia(
-          displaySize: mi.precalculatedMediaSize,
-          videoController: mi.videoController);
+      if (mi.media.isVideo) {
+        return Down4VideoPlayer(
+            videoController: mi.videoController!,
+            backgroundColor: Colors.black45,
+            media: mi.media,
+            displaySize: mi.precalculatedMediaSize);
+      } else {
+        return FireImageDisplay(mi.media, mi.precalculatedMediaSize);
+      }
+      // return mi.media.displayMedia(
+      //     displaySize: mi.precalculatedMediaSize,
+      //     videoController: mi.videoController);
     }
 
     return mediaBody(child: theMedia());

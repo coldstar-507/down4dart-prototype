@@ -137,7 +137,7 @@ int makeTimestamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
 extension IterableNodes on Iterable<FireNode> {
   List<FireNode> formatted() =>
       toList(growable: false)..sort((a, b) => b.activity.compareTo(a.activity));
-  Iterable<String> asIds() => map((node) => node.id);
+  Iterable<String> asIDs() => map((node) => node.id);
   Iterable<FireNode> those(List<ID> ids) =>
       where((node) => ids.contains(node.id));
   Iterable<Groupable> groups() => whereType<Groupable>();

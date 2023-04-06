@@ -12,16 +12,16 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "node-${palette.node.id}";
+  ID get id => "node-${node.id}";
 
-  final Palette2 palette;
-  final void Function(Palette2<Chatable>) openChat;
-  final void Function(Palette2<Branchable>) openNode;
-  final void Function(Palette2<Personable>) payNode;
+  final FireNode node;
+  final void Function(Chatable) openChat;
+  final void Function(FireNode) openNode;
+  final void Function(Personable) payNode;
   final void Function() back;
 
   const NodePage({
-    required this.palette,
+    required this.node,
     required this.payNode,
     required this.openNode,
     required this.openChat,
@@ -51,14 +51,14 @@ class _NodePageState extends State<NodePage> {
   @override
   void initState() {
     super.initState();
-    if (widget.palette.node is Personable) {
+    if (widget.node is Personable) {
       _view = Andrew(pages: [
         Down4Page(
           scrollController: scroller,
           reversedList: false,
-          title: widget.palette.node.displayName,
+          title: widget.node.displayName,
           console: userPaletteConsole,
-          list: [ProfileWidget(palette: widget.palette)],
+          list: [ProfileWidget(node: widget.node)],
         ),
       ]);
     } // TODO other node types
@@ -81,18 +81,14 @@ class _NodePageState extends State<NodePage> {
         topButtons: [
           ConsoleButton(
             name: "Message",
-            onPress: () => widget.openChat(
-              widget.palette as Palette2<Chatable>,
-            ),
+            onPress: () => widget.openChat(widget.node as Chatable),
           ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.back),
           ConsoleButton(
             name: "Pay",
-            onPress: () => widget.payNode(
-              widget.palette as Palette2<Personable>,
-            ),
+            onPress: () => widget.payNode(widget.node as Personable),
           ),
         ],
       );
