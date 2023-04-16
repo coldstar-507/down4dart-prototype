@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:down4/src/couch.dart';
-import 'package:better_player/better_player.dart';
+import 'package:video_player/video_player.dart';
 import '../_dart_utils.dart' show Pair, golden;
 
 import '../data_objects.dart';
@@ -25,7 +25,7 @@ class ChatReplyInfo {
 class ChatMediaInfo {
   final FireMedia media;
   final Size precalculatedMediaSize;
-  final BetterPlayerController? videoController;
+  final VideoPlayerController? videoController;
   const ChatMediaInfo({
     required this.media,
     required this.precalculatedMediaSize,
@@ -62,7 +62,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   final List<ChatReplyInfo>? repliesInfo;
   final List<FireNode>? nodes;
 
-  bool get videoIsPlaying => mediaInfo?.videoController?.isPlaying() ?? false;
+  bool get videoIsPlaying =>
+      mediaInfo?.videoController?.value.isPlaying ?? false;
 
   const ChatMessage({
     required this.nodeRef,
@@ -258,11 +259,11 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     final media = await global<FireMedia>(message.mediaID!);
     if (media == null) return null;
     mediaWidth = ChatMessage.maxMessageWidth - ChatMessage.messageBorder;
-    mediaHeight = mediaWidth * (media.isSquared ? 1.0 : media.aspectRatio);
+    mediaHeight = mediaWidth * (media.isSquared ? 1.0 : 1 / media.aspectRatio);
 
-    BetterPlayerController? vpc;
+    VideoPlayerController? vpc;
     if (media.isVideo) {
-      vpc = BetterPlayerController(const BetterPlayerConfiguration());
+      vpc = await media.videoController;
     }
 
     return ChatMediaInfo(
@@ -409,6 +410,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     double mpHeight() => Palette.paletteHeight / golden;
     Widget unloadedPalette(ID id) {
       return Container(
+        key: GlobalKey(),
         height: mpHeight(),
         color: Colors.black54,
         child: Row(
@@ -427,6 +429,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
     Widget loadedPalette(FireNode n) {
       return Container(
+        key: GlobalKey(),
         height: mpHeight(),
         color: n.id == g.self.id
             ? PinkTheme.nodeColors[NodesColor.self]
@@ -434,7 +437,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            n.nodeImage,
+            n.nodeImage(Size.square(mpHeight())),
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 6.0, left: 6.0),
@@ -469,23 +472,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                       .map((nodeID) => unloadedPalette(nodeID))
                       .toList())),
     );
-
-    //    FutureBuilder(
-    //     future: getNodesFromEverywhere(message.nodes!.toSet()),
-    //     builder: (context, snapshot) {
-    //       if (snapshot.connectionState == ConnectionState.waiting) {
-    //         return Column(
-    //           children:
-    //               message.nodes!.map((id) => unloadedPalette(id)).toList(),
-    //         );
-    //       } else if (snapshot.connectionState == ConnectionState.done &&
-    //           snapshot.hasData) {
-    //       } else {
-    //         return const SizedBox.shrink();
-    //       }
-    //     },
-    //   ),
-    // ));
   }
 
   Widget? get media {
@@ -508,22 +494,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
               child: child));
     }
 
-    Widget theMedia() {
-      if (mi.media.isVideo) {
-        return Down4VideoPlayer(
-            videoController: mi.videoController!,
-            backgroundColor: Colors.black45,
-            media: mi.media,
-            displaySize: mi.precalculatedMediaSize);
-      } else {
-        return FireImageDisplay(mi.media, mi.precalculatedMediaSize);
-      }
-      // return mi.media.displayMedia(
-      //     displaySize: mi.precalculatedMediaSize,
-      //     videoController: mi.videoController);
-    }
-
-    return mediaBody(child: theMedia());
+    return mediaBody(child: mi.media.display(size: mi.precalculatedMediaSize));
   }
 
   Widget? get text {

@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show Size;
 
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
-import 'package:down4/src/render_objects/palette.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:mime/mime.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import '_dart_utils.dart';
 import 'couch.dart';
 import '_dart_utils.dart' as u;
 import 'dart:typed_data' show Uint8List;
@@ -28,11 +31,19 @@ abstract class FireObject extends Down4Object {
 
   void cache() => gCache(this);
 
-  Future<void> delete() async => await dbb.purgeDocumentById(id);
+  Future<void> delete() async {
+    dbb.purgeDocumentById(id);
+    final ref = this;
+    if (ref is FireMedia && ref.isVideo) {
+      final f = await ref.videoFile;
+      f?.delete();
+    }
+  }
 
   Map<String, Object> toJson({bool toLocal = false});
 
   Future<void> merge([Map<String, Object?>? values]) async {
+    print("DBB NAME=${dbb.name}");
     // first, we get the current doc in the db
     var document = (await dbb.document(id))?.toMutable();
     bool wasLocal = (document != null);
@@ -121,21 +132,21 @@ class FireMessage extends FireObject {
         onlineMediaID: onlineMediaID);
   }
 
-  factory FireMessage.fromJson(Map<String, String?> decodedJson) {
+  factory FireMessage.fromJson(Map<String, Object?> decodedJson) {
     return FireMessage(decodedJson["id"] as ID,
         root: decodedJson["root"] as ID,
         senderID: decodedJson["senderID"] as ID,
-        forwarderID: decodedJson["forwarderID"],
-        text: decodedJson["text"],
+        forwarderID: decodedJson["forwarderID"] as ID?,
+        text: decodedJson["text"] as String?,
         isSaved: decodedJson["isSaved"] == "true",
-        mediaID: decodedJson["mediaID"],
+        mediaID: decodedJson["mediaID"] as ID?,
         isSnip: decodedJson["isSnip"] == "true",
-        onlineMediaID: decodedJson["onlineMediaID"],
-        timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
+        onlineMediaID: decodedJson["onlineMediaID"] as ID?,
+        timestamp: int.parse(decodedJson["timestamp"] as String),
         isRead: decodedJson["isRead"] == "true",
         isSent: decodedJson["isSent"] == "true",
-        nodes: decodedJson["nodes"]?.split(" ").toSet(),
-        replies: decodedJson["replies"]?.split(" ").toSet());
+        nodes: (decodedJson["nodes"] as String?)?.split(" ").toSet(),
+        replies: (decodedJson["replies"] as String?)?.split(" ").toSet());
   }
 
   Future<void> markRead() async {
@@ -208,13 +219,16 @@ enum NodesColor {
 
 abstract class FireNode extends FireObject {
   @override
+  Database get dbb => nodesDB;
+
+  @override
   final ID id;
   int _activity;
   String _name;
   String? _lastName, _description;
   final Down4Keys? _neuter;
   ID? _mediaID;
-  bool? _isFriend, _isHidden, _isPrivate;
+  bool? _isFriend, _isPrivate, _isHidden;
   final Set<ID>? _group, _publics, _privates, _posts, _admins;
   final ID? _ownerID;
 
@@ -265,7 +279,7 @@ abstract class FireNode extends FireObject {
         _lastName = lastName,
         _isFriend = isFriend,
         _isPrivate = isPrivate,
-        _isHidden = isHidden,
+        _isHidden = isHidden ?? false,
         _description = description,
         _neuter = neuter,
         _mediaID = mediaID,
@@ -281,26 +295,26 @@ abstract class FireNode extends FireObject {
     merge({"activity": _activity.toString()});
   }
 
-  factory FireNode.fromJson(Map<String, String?> json) {
+  factory FireNode.fromJson(Map<String, Object?> json) {
     final id = json["id"] as ID;
-    final activity = int.parse(json["activity"] ?? "0");
+    final activity = int.parse(json["activity"] as String? ?? "0");
     final type = Nodes.values.byName(json["type"] as String);
-    final mediaID = json["mediaID"];
+    final mediaID = json["mediaID"] as ID?;
 
-    final ownerID = json["ownerID"];
+    final ownerID = json["ownerID"] as ID?;
     final name = json["name"] as String;
     final isFriend = json["isFriend"] == "true";
     final isHidden = json["isHidden"] == "true";
     final isPrivate = json["isPrivate"] == "true";
-    final lastName = json["lastName"];
-    final description = json["description"];
-    final publics = json["publics"]?.split(" ").toSet();
-    final privates = json["privates"]?.split(" ").toSet();
-    final admins = json["admins"]?.split(" ").toSet();
+    final lastName = json["lastName"] as String?;
+    final description = json["description"] as String?;
+    final publics = (json["publics"] as String?)?.split(" ").toSet();
+    final privates = (json["privates"] as String?)?.split(" ").toSet();
+    final admins = (json["admins"] as String?)?.split(" ").toSet();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
-    final group = json["group"]?.split(" ").toSet();
+    final group = (json["group"] as String?)?.split(" ").toSet();
 
     switch (type) {
       case Nodes.user:
@@ -311,7 +325,7 @@ abstract class FireNode extends FireObject {
             mediaID: mediaID,
             isHidden: isHidden,
             isFriend: isFriend,
-            publics: publics!,
+            publics: publics ?? {},
             neuter: neuter!,
             description: description);
 
@@ -376,7 +390,8 @@ mixin Branchable on FireNode {
 }
 
 mixin Chatable on FireNode {
-  Future<Iterable<ID>> orderedChatIDs() async {
+  Future<Pair<Iterable<ID>, AsyncListenStream<QueryChange<ResultSet>>>>
+      getTheChat() async {
     final raw = """
         SELECT META().id AS id FROM _
         WHERE root = '$id' AND isSnip = 'false'
@@ -384,7 +399,10 @@ mixin Chatable on FireNode {
         """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
     final r = await q.execute();
-    return (await r.allResults()).map((e) => e.toPlainMap()["id"] as ID);
+    return Pair(
+      (await r.allResults()).map((e) => e.toPlainMap()["id"] as ID),
+      q.changes(),
+    );
   }
 
   Future<Iterable<ID>> unreadSnipIDs() async {
@@ -408,10 +426,10 @@ mixin Chatable on FireNode {
     }
   }
 
-  Future<FireMessage?> lastMessage() async {
+  Future<FireMessage?> lastChatMessage() async {
     final raw = """
             SELECT * FROM _ AS m
-            WHERE root = '$id'
+            WHERE root = '$id' AND isSnip = 'false'
             ORDER BY META(m).id DESC LIMIT 1
             """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -419,8 +437,14 @@ mixin Chatable on FireNode {
     final a = await r.allResults();
 
     if (a.isEmpty) return null;
-    final json = a.single.toPlainMap()["m"] as Map<String, String?>;
+    final json = a.single.toPlainMap()["m"] as Map<String, Object?>;
     return FireMessage.fromJson(json);
+  }
+
+  Future<Pair<FireMessage?, Iterable<ID>>> homeChatInfo() async {
+    final lastChat = lastChatMessage();
+    final unreadSnips = unreadSnipIDs();
+    return Pair(await lastChat, await unreadSnips);
   }
 }
 
@@ -467,9 +491,6 @@ mixin Editable on FireNode {
 }
 
 class User extends FireNode with Branchable, Chatable, Personable {
-  @override
-  Database get dbb => nodesDB;
-
   User(
     super.id, {
     required super.activity,
@@ -481,7 +502,11 @@ class User extends FireNode with Branchable, Chatable, Personable {
     required super.lastName,
     required super.mediaID,
     required Down4Keys neuter,
-  }) : super(isHidden: isHidden, isFriend: isFriend, publics: publics);
+  }) : super(
+            isHidden: isHidden,
+            isFriend: isFriend,
+            publics: publics,
+            neuter: neuter);
 
   Future<void> updateFriendStatus(bool newFriendStatus) async {
     _isFriend = newFriendStatus;
@@ -527,9 +552,6 @@ class User extends FireNode with Branchable, Chatable, Personable {
 }
 
 class Self extends FireNode with Branchable, Chatable, Personable, Editable {
-  @override
-  Database get dbb => nodesDB;
-
   Self(
     super.id, {
     required super.activity,
@@ -576,7 +598,7 @@ class Self extends FireNode with Branchable, Chatable, Personable, Editable {
 
     if (r.isEmpty) return null;
     final json = r.single.toPlainMap();
-    final jsonNode = Map<String, String?>.from(json["n"] as Map);
+    final jsonNode = Map<String, Object?>.from(json["n"] as Map);
     final self = fromJson<Self>(jsonNode)..cache();
     await global<FireMedia>(self.mediaID);
     return self;
@@ -587,9 +609,6 @@ class Self extends FireNode with Branchable, Chatable, Personable, Editable {
 }
 
 class Group extends FireNode with Chatable, Groupable, Editable {
-  @override
-  Database get dbb => nodesDB;
-
   Group(
     super.id, {
     required super.activity,
@@ -623,9 +642,6 @@ class Group extends FireNode with Chatable, Groupable, Editable {
 }
 
 class Hyperchat extends FireNode with Chatable, Groupable {
-  @override
-  Database get dbb => nodesDB;
-
   Hyperchat(
     super.id, {
     required super.activity,
@@ -636,7 +652,7 @@ class Hyperchat extends FireNode with Chatable, Groupable {
   }) : super(group: group, name: firstWord, lastName: secondWord);
 
   @override
-  NodesColor get colorCode => NodesColor.group;
+  NodesColor get colorCode => NodesColor.hyperchat;
 
   @override
   String get displayName => "$_name $_lastName";
@@ -705,19 +721,40 @@ class FireMedia extends FireObject {
   int _onlineTimestamp;
   int _lastUse;
   final String mime;
-  final double aspectRatio;
+  final double width, height;
+  // final double aspectRatio;
   final String? text;
   final int timestamp;
   Uint8List? cachedImage;
+
+  Size get size => Size(width, height);
+
+  double get aspectRatio => size.aspectRatio;
 
   String get extension => extensionFromMime(mime);
 
   bool get isVideo => extension.isVideoExtension();
 
-  Future<File?> get file async {
+  Future<VideoPlayerController?> get videoController async {
+    if (!isVideo) throw 'Media needs to be a video';
+    final f = (await cachedFile) ?? videoFile;
+    if (f != null) return VideoPlayerController.file(f);
+    final url_ = await url;
+    if (url_ != null) return VideoPlayerController.network(url_);
+    return null;
+  }
+
+  String get videoPath => "${g.appDirPath}/$id";
+
+  Future<File?> get cachedFile async {
     if (cachePath == null) return null;
     if (!await File(cachePath!).exists()) return null;
     return File(cachePath!);
+  }
+
+  File? get videoFile {
+    if (!File(videoPath).existsSync()) return null;
+    return File(videoPath);
   }
 
   Future<String?> get url async {
@@ -744,11 +781,6 @@ class FireMedia extends FireObject {
     return cachedImage = await blob?.content();
   }
 
-  Future<Uint8List?> get videoData async {
-    final blob = (await dbb.document(id))?.blob("video");
-    return blob?.content();
-  }
-
   int get onlineTimestamp => _onlineTimestamp;
 
   String? get onlineID => _onlineID;
@@ -756,7 +788,8 @@ class FireMedia extends FireObject {
   FireMedia(this.id,
       {required this.ownerID,
       required this.timestamp,
-      required this.aspectRatio,
+      required this.width,
+      required this.height,
       required this.mime,
       this.cachePath,
       this.tinyThumbnail,
@@ -779,28 +812,18 @@ class FireMedia extends FireObject {
     return FireMedia.fromJson(toJson(toLocal: true));
   }
 
-  Future<FireMedia?> withNewOwnership(ID newOwner,
-      {bool recalculateID = false}) async {
+  // special function upon user intialization
+  Future<FireMedia?> userInitRecalculation(ID properID) async {
     final json = toJson(toLocal: true);
-    json["ownerID"] = newOwner;
-    if (recalculateID) {
-      Uint8List? data;
-      if (cachePath != null) {
-        data = File(cachePath!).readAsBytesSync();
-      } else {
-        data = await (isVideo ? videoData : imageData);
-      }
-      if (data == null) {
-        print("Cannot recalculate the ID in withNewOwnership: no data");
-        return null;
-      }
-      json["id"] = u.deterministicMediaID(data, newOwner);
-    }
+    final data = File(cachePath!).readAsBytesSync();
+    json["ownerID"] = properID;
+    json["id"] = u.deterministicMediaID(data, properID);
     return FireMedia.fromJson(json)..cachePath = cachePath;
   }
 
   Future<void> use() async {
     _lastUse = u.makeTimestamp();
+    print("USING MEDIA ID = $id");
     await merge({"lastUse": _lastUse.toString()});
   }
 
@@ -825,46 +848,36 @@ class FireMedia extends FireObject {
     Uint8List? tn;
     if (isVideo) {
       tn = await VideoThumbnail.thumbnailData(video: cachePath!, quality: 80);
+      await File(videoPath).writeAsBytes(d);
     }
-    await write(imageData: isVideo ? tn! : d, videoData: isVideo ? d : null);
+    await write(imageData: tn ?? d);
   }
 
-  Future<void> write({
-    Uint8List? videoData,
-    required Uint8List imageData,
-  }) async {
+  Future<void> write({required Uint8List imageData}) async {
     tinyThumbnail ??= makeTiny(imageData);
-    final doc = MutableDocument.withId(id);
-    doc.setData(toJson(toLocal: true));
-    if (isVideo && videoData != null) {
-      final videoBlob = Blob.fromData(mime, videoData);
-      doc.setBlob(videoBlob, key: "video");
-    }
     final imageMime = isVideo ? "image/png" : mime;
     final imageBlob = Blob.fromData(imageMime, imageData);
-    doc.setBlob(imageBlob, key: "image");
-    final success = await dbb.saveDocument(doc);
-    if (!success) print("Error writing media document!");
-    return;
+    await merge({"image": imageBlob});
   }
 
-  factory FireMedia.fromJson(Map<String, String?> decodedJson) {
-    return FireMedia(decodedJson["id"]!,
-        ownerID: decodedJson["ownerID"]!,
-        timestamp: int.parse(decodedJson["timestamp"]!),
-        mime: decodedJson["mime"]!,
-        onlineID: decodedJson["onlineID"],
-        lastUse: int.parse(decodedJson["lastUse"] ?? "0"),
-        tinyThumbnail: decodedJson["tinyThumbnail"],
-        onlineTimestamp: int.parse(decodedJson["onlineTimestamp"]!),
+  factory FireMedia.fromJson(Map<String, Object?> decodedJson) {
+    return FireMedia(decodedJson["id"] as String,
+        ownerID: decodedJson["ownerID"] as String,
+        timestamp: int.parse(decodedJson["timestamp"] as String),
+        mime: decodedJson["mime"] as String,
+        onlineID: decodedJson["onlineID"] as String?,
+        lastUse: int.parse(decodedJson["lastUse"] as String? ?? "0"),
+        tinyThumbnail: decodedJson["tinyThumbnail"] as String?,
+        onlineTimestamp: int.parse(decodedJson["onlineTimestamp"] as String),
         isSaved: decodedJson["isSaved"] == "true",
         isReversed: decodedJson["isReversed"] == "true",
         isSquared: decodedJson["isSquared"] == "true",
         isLocked: decodedJson["isLocked"] == "true",
         isPaidToOwn: decodedJson["isPaidToView"] == "true",
         isPaidToView: decodedJson["isPaidToOwn"] == "true",
-        aspectRatio: double.parse(decodedJson["aspectRatio"]!),
-        text: decodedJson["text"]);
+        width: double.parse(decodedJson["width"] as String),
+        height: double.parse(decodedJson["height"] as String),
+        text: decodedJson["text"] as String?);
   }
 
   @override
@@ -882,7 +895,8 @@ class FireMedia extends FireObject {
         "isLocked": isLocked.toString(),
         "isPaidToView": isPaidToView.toString(),
         "isPaidToOwn": isPaidToOwn.toString(),
-        "aspectRatio": aspectRatio.toString(),
+        "width": width.toString(),
+        "height": height.toString(),
         if (toLocal) "lastUse": _lastUse.toString(),
         if (toLocal) "isVideo": isVideo.toString(),
         if (toLocal) "isSaved": _isSaved.toString(),

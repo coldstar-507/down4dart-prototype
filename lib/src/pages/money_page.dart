@@ -151,7 +151,8 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "money";
   final Transition? transition;
   final Personable? single;
-  final List<Palette2> payments;
+  final ViewState viewState;
+  // final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
   final Future<void> Function() loadMorePayments;
   final void Function() back;
@@ -162,7 +163,8 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
     required this.onScan,
     required this.back,
     required this.makePayment,
-    required this.payments,
+    required this.viewState,
+    // required this.payments,
     this.transition,
     this.single,
     Key? key,
@@ -203,7 +205,7 @@ class _MoneyPageState extends State<MoneyPage> {
   };
   late var palettes = widget.transition != null
       ? widget.transition!.preTransition
-      :_users.values.toList(growable: false);
+      : _users.values.toList(growable: false);
 
   late final _offset = (widget.transition?.nHidden ?? 0) * Palette.fullHeight;
   late ScrollController scroller0 = ScrollController(
@@ -211,19 +213,21 @@ class _MoneyPageState extends State<MoneyPage> {
         ? widget.transition!.scroll
         : widget.single != null
             ? 0
-            : g.vm.cv.pages[0].scroll,
+            : widget.viewState.pages[0].scroll,
   )..addListener(() {
-      g.vm.cv.pages[0].scroll = scroller0.offset;
+      widget.viewState.pages[0].scroll = scroller0.offset;
     });
   late ScrollController scroller1 = ScrollController(
-    initialScrollOffset: g.vm.cv.pages[1].scroll,
+    initialScrollOffset: widget.viewState.pages[1].scroll,
   )..addListener(() {
-      g.vm.cv.pages[1].scroll = scroller1.offset;
+      widget.viewState.pages[1].scroll = scroller1.offset;
     });
 
   int? _balance;
 
-  Map<ID, Palette2> get _users => g.vm.cv.pages[0].objects.cast();
+  Map<ID, Palette2> get _payments => widget.viewState.pages[1].objects.cast();
+
+  Map<ID, Palette2> get _users => widget.viewState.pages[0].objects.cast();
 
   List<Personable> get people => _users.values.asNodes<Personable>().toList();
 
@@ -561,7 +565,7 @@ class _MoneyPageState extends State<MoneyPage> {
     setState(() {});
   }
 
-  void loadImportConsole([List<Down4TXOUT>? utxos]) {
+  void loadImportConsole([Iterable<Down4TXOUT>? utxos]) {
     ConsoleInput input;
     if (utxos == null) {
       input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
@@ -604,8 +608,10 @@ class _MoneyPageState extends State<MoneyPage> {
         ),
         ConsoleButton(
           name: "Check",
-          onPress: () async =>
-              loadImportConsole(await checkPrivateKey(importTec.value.text)),
+          onPress: () async {
+            final fetchedUtxos = await checkPrivateKey(importTec.value.text);
+            loadImportConsole(fetchedUtxos?.values);
+          },
         ),
       ],
     );
@@ -614,10 +620,10 @@ class _MoneyPageState extends State<MoneyPage> {
 
   @override
   Widget build(BuildContext context) {
-    print("PALLETSN = ${widget.payments.length}");
+    print("PALLETSN = ${_payments.length}");
     return Andrew(
-      initialPageIndex: g.vm.cv.ci,
-      onPageChange: (idx) => g.vm.cv.ci = idx,
+      initialPageIndex: widget.viewState.currentIndex,
+      onPageChange: (idx) => widget.viewState.currentIndex = idx,
       pages: [
         Down4Page(
             scrollController: scroller0,
@@ -629,7 +635,7 @@ class _MoneyPageState extends State<MoneyPage> {
         Down4Page(
             onRefresh: widget.loadMorePayments,
             title: "Status",
-            list: widget.payments,
+            list: _payments.values.toList(),
             console: _console),
       ],
     );

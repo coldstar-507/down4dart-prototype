@@ -122,13 +122,20 @@ Future<void> main() async {
     final ph = await rootBundle.load("assets/images/place_holder.png");
     final bg = await rootBundle.load("assets/images/triangles.png");
 
-    g.d1 = Image.memory(d1.buffer.asUint8List(), gaplessPlayback: true);
-    g.d2 = Image.memory(d2.buffer.asUint8List(), gaplessPlayback: true);
-    g.d3 = Image.memory(d3.buffer.asUint8List(), gaplessPlayback: true);
-    g.ph = Image.memory(ph.buffer.asUint8List(), gaplessPlayback: true);
-    g.fifty = Image.memory(a1.buffer.asUint8List(), gaplessPlayback: true);
-    g.black = Image.memory(a2.buffer.asUint8List(), gaplessPlayback: true);
-    g.red = Image.memory(a3.buffer.asUint8List(), gaplessPlayback: true);
+    g.d1 = Image.memory(d1.buffer.asUint8List(),
+        fit: BoxFit.cover, gaplessPlayback: true);
+    g.d2 = Image.memory(d2.buffer.asUint8List(),
+        fit: BoxFit.cover, gaplessPlayback: true);
+    g.d3 = Image.memory(d3.buffer.asUint8List(),
+        fit: BoxFit.cover, gaplessPlayback: true);
+    g.ph = Image.memory(ph.buffer.asUint8List(),
+        fit: BoxFit.cover, gaplessPlayback: true);
+    g.fifty = Image.memory(a1.buffer.asUint8List(),
+        fit: BoxFit.contain, gaplessPlayback: true);
+    g.black = Image.memory(a2.buffer.asUint8List(),
+        fit: BoxFit.contain, gaplessPlayback: true);
+    g.red = Image.memory(a3.buffer.asUint8List(),
+        fit: BoxFit.contain, gaplessPlayback: true);
     g.background = bg.buffer.asUint8List();
   }
 

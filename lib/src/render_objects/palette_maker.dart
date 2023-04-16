@@ -133,12 +133,14 @@ class UserMakerPalette extends StatelessWidget {
               left: Radius.circular(4.0),
             ),
           ),
-          height: Palette.paletteHeight - 4.0,
-          width: Palette.paletteHeight - 4.0, // borderWidth x2
+          height: Palette.paletteHeight,
+          width: Palette.paletteHeight, // borderWidth x2
           child: media != null
-              ? media!.displayMedia(
-                  displaySize: Size.square(Palette.paletteHeight - 4.0),
-                  forceSquare: true)
+              ? FireImageDisplay(
+                  media!,
+                  Size.square(Palette.paletteHeight),
+                  true,
+                )
               : g.ph,
         ),
       );
@@ -332,11 +334,10 @@ class PaletteMaker extends StatelessWidget {
   Widget get paletteImage => GestureDetector(
         onTap: imagePress,
         child: SizedBox(
-          width: Palette.paletteHeight - 4.0, // borderWidth x2
+          width: Palette.paletteHeight, // borderWidth x2
           child: image != null
-              ? image!.displayMedia(
-                  displaySize: Size.square(Palette.paletteHeight),
-                  forceSquare: true)
+              ? image!.display(
+                  size: Size.square(Palette.paletteHeight), forceSquare: true)
               : _defaultImage,
         ),
       );

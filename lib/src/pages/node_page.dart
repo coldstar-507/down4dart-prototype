@@ -12,16 +12,18 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "node-${node.id}";
+  ID get id => "node-${viewState.node!.id}";
 
-  final FireNode node;
+  final ViewState viewState;
+  // final FireNode node;
   final void Function(Chatable) openChat;
   final void Function(FireNode) openNode;
   final void Function(Personable) payNode;
   final void Function() back;
 
   const NodePage({
-    required this.node,
+    required this.viewState,
+    // required this.node,
     required this.payNode,
     required this.openNode,
     required this.openChat,
@@ -35,11 +37,12 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
 
 class _NodePageState extends State<NodePage> {
   Widget? _view;
+  FireNode get node => widget.viewState.node!;
 
   late final ScrollController scroller =
-      ScrollController(initialScrollOffset: g.vm.cv.cp.scroll)
+      ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
         ..addListener(() {
-          g.vm.cv.cp.scroll = scroller.offset;
+          widget.viewState.pages[0].scroll = scroller.offset;
         });
 
   @override
@@ -51,14 +54,14 @@ class _NodePageState extends State<NodePage> {
   @override
   void initState() {
     super.initState();
-    if (widget.node is Personable) {
+    if (node is Personable) {
       _view = Andrew(pages: [
         Down4Page(
           scrollController: scroller,
           reversedList: false,
-          title: widget.node.displayName,
+          title: node.displayName,
           console: userPaletteConsole,
-          list: [ProfileWidget(node: widget.node)],
+          list: [ProfileWidget(node: node)],
         ),
       ]);
     } // TODO other node types
@@ -81,14 +84,14 @@ class _NodePageState extends State<NodePage> {
         topButtons: [
           ConsoleButton(
             name: "Message",
-            onPress: () => widget.openChat(widget.node as Chatable),
+            onPress: () => widget.openChat(node as Chatable),
           ),
         ],
         bottomButtons: [
           ConsoleButton(name: "Back", onPress: widget.back),
           ConsoleButton(
             name: "Pay",
-            onPress: () => widget.payNode(widget.node as Personable),
+            onPress: () => widget.payNode(node as Personable),
           ),
         ],
       );

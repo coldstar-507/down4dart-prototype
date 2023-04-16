@@ -4,10 +4,12 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:better_player/better_player.dart';
+import 'package:mime/mime.dart';
+import 'package:video_player/video_player.dart';
 
 import '../data_objects.dart' show ID;
-import '../render_objects/_render_utils.dart' show Down4PageWidget;
+import '../render_objects/_render_utils.dart'
+    show Down4PageWidget, InvertedSize;
 import '../render_objects/console.dart';
 import '../globals.dart';
 
@@ -15,46 +17,60 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "snip";
 
-  final CameraController ctrl;
-  final double minZoom, maxZoom;
-  final int camNum;
-  final void Function() cameraBack, nextRes, flip;
+  // final CameraController ctrl;
+  // final double minZoom, maxZoom;
+  // final int camNum;
+  final void Function() cameraBack; //, nextRes, flip;
   final void Function({
     required String mimetype,
     required String path,
     required bool isReversed,
-    required double aspectRatio,
+    required Size size,
     String? text,
   }) cameraCallBack;
   final bool enableVideo;
 
   const SnipCamera({
-    required this.maxZoom,
-    required this.minZoom,
-    required this.camNum,
-    required this.ctrl,
+    // required this.maxZoom,
+    // required this.minZoom,
+    // required this.camNum,
+    // required this.ctrl,
     required this.cameraBack,
     required this.cameraCallBack,
-    required this.nextRes,
-    required this.flip,
+    // required this.nextRes,
+    // required this.flip,
     this.enableVideo = true,
     Key? key,
   }) : super(key: key);
 
   @override
-  _SnipCameraState createState() => _SnipCameraState();
+  State<SnipCamera> createState() => _SnipCameraState();
 }
 
 class _SnipCameraState extends State<SnipCamera> {
   Widget? _preview;
   double _scale = 1.0;
   double _baseScale = 1.0;
+  late double maxZoom, minZoom;
   var tec = TextEditingController();
   bool _extra = false;
 
-  double get scale => widget.ctrl.value.aspectRatio * g.sizes.fullAspectRatio;
+  int camNum = 0;
 
-  bool get toReverse => widget.camNum != 0;
+  void initCamera() async {
+    await ctrl.initialize();
+    maxZoom = await ctrl.getMaxZoomLevel();
+    minZoom = await ctrl.getMinZoomLevel();
+    setState(() {});
+  }
+
+  late var ctrl = CameraController(g.cameras[camNum], ResolutionPreset.high);
+
+  bool get readyCamera => ctrl.value.isInitialized;
+
+  double get scale => ctrl.value.aspectRatio * g.sizes.fullAspectRatio;
+
+  bool get toReverse => camNum != 0;
 
   Widget inputBody(bool input) => input
       ? Center(
@@ -88,53 +104,68 @@ class _SnipCameraState extends State<SnipCamera> {
   @override
   void initState() {
     super.initState();
-    capturingPage();
-    widget.ctrl.setFlashMode(FlashMode.off);
+    initCamera();
+    // capturingPage();
+    // widget.ctrl.setFlashMode(FlashMode.off);
   }
 
   void _nextFlashMode() {
-    if (widget.ctrl.value.flashMode == FlashMode.off) {
-      widget.ctrl.setFlashMode(FlashMode.torch);
+    if (ctrl.value.flashMode == FlashMode.off) {
+      ctrl.setFlashMode(FlashMode.torch);
     } else {
-      widget.ctrl.setFlashMode(FlashMode.off);
+      ctrl.setFlashMode(FlashMode.off);
     }
+  }
+
+  void flip() async {
+    camNum = (camNum + 1) % 2;
+    await ctrl.dispose();
+    ctrl = CameraController(g.cameras[camNum], ResolutionPreset.high);
+    initCamera();
   }
 
   Future<void> _takePicture() async {
     try {
-      final xfile = await widget.ctrl.takePicture();
+      final xfile = await ctrl.takePicture();
       final path = xfile.path;
       await precacheImage(FileImage(File(path)), context);
-      imagePreview(path, xfile.mimeType!, widget.camNum == 1);
+      imagePreview(path, lookupMimeType(path)!, camNum == 1);
     } catch (e) {
+      print("ERROR AFTER TAKING PICTURE: $e");
       widget.cameraBack();
     }
   }
 
   Future<void> _startRecording() async {
     try {
-      await widget.ctrl.startVideoRecording();
+      await ctrl.startVideoRecording();
+      setState(() {});
     } catch (e) {
+      throw "ERROR TRYING TO RECORD VIDEO $e";
       widget.cameraBack();
     }
   }
 
   Future<void> _stopRecording() async {
     try {
-      XFile? f = await widget.ctrl.stopVideoRecording();
+      XFile? f = await ctrl.stopVideoRecording();
       final path = f.path;
       final vpc = await initVPC(path);
-      videoPreview(vpc, path, f.mimeType!, widget.camNum == 1);
+      final mime = lookupMimeType(path);
+      videoPreview(vpc, path, mime!, camNum == 1);
     } catch (e) {
-      widget.cameraBack();
+      throw "ERROR WHEN STOPPING TO RECORD $e";
+      // print("ERROR WHEN STOPPING TO RECORD $e");
+      // widget.cameraBack();
     }
   }
 
-  Future<BetterPlayerController> initVPC(String filePath) async {
-    return BetterPlayerController(
-      const BetterPlayerConfiguration(autoPlay: true, looping: true),
-      betterPlayerDataSource: BetterPlayerDataSource.file(filePath),
-    );
+  Future<VideoPlayerController> initVPC(String filePath) async {
+    final vpc = VideoPlayerController.file(File(filePath));
+    await vpc.initialize();
+    return vpc
+      ..setLooping(true)
+      ..play();
   }
 
   Widget previewsContainer({bool reverse = false, required Widget child}) =>
@@ -145,7 +176,7 @@ class _SnipCameraState extends State<SnipCamera> {
           child: Transform.scale(
             scale: scale > 1 ? scale : 1 / scale,
             child: SizedBox(
-              height: widget.ctrl.value.aspectRatio * g.sizes.w,
+              height: ctrl.value.aspectRatio * g.sizes.w,
               width: g.sizes.w,
               child: child,
             ),
@@ -163,52 +194,53 @@ class _SnipCameraState extends State<SnipCamera> {
       ));
 
   Widget capturingPage([bool extra = false]) {
-    final cscal = 1.143;
-    final cal = 1 / (widget.ctrl.value.aspectRatio * g.sizes.fullAspectRatio);
-    print("full = ${g.sizes.fullAspectRatio}");
-    print("cam = ${widget.ctrl.value.aspectRatio}");
-    print("cscal = $cscal");
-    print("calll = $cal");
+    // final cscal = 1.143;
+    // final cal = 1 / (ctrl.value.aspectRatio * g.sizes.fullAspectRatio);
+    // print("full = ${g.sizes.fullAspectRatio}");
+    // print("cam = ${ctrl.value.aspectRatio}");
+    // print("cscal = $cscal");
+    // print("calll = $cal");
+    // print("CAMERA IS READY? $readyCamera");
     return Stack(children: [
-      GestureDetector(
-        onTap: () => print("LALALALALAL"),
-        onScaleStart: (details) => _baseScale = _scale,
-        onScaleUpdate: (details) {
-          if (_baseScale * details.scale < widget.minZoom) {
-            _scale = widget.minZoom;
-          } else if (_baseScale * details.scale > widget.maxZoom) {
-            _scale = widget.maxZoom;
-          } else {
-            _scale = _baseScale * details.scale;
-          }
-          if (_scale >= widget.minZoom && _scale <= widget.maxZoom) {
-            widget.ctrl.setZoomLevel(_scale);
-          }
-        },
-        child: previewsContainer(
-          child: CameraPreview(widget.ctrl),
-        ),
-      ),
+      !readyCamera
+          ? Container(color: Colors.black)
+          : GestureDetector(
+              onTap: () => print("LALALALALAL"),
+              onScaleStart: (details) => _baseScale = _scale,
+              onScaleUpdate: (details) {
+                if (_baseScale * details.scale < minZoom) {
+                  _scale = minZoom;
+                } else if (_baseScale * details.scale > maxZoom) {
+                  _scale = maxZoom;
+                } else {
+                  _scale = _baseScale * details.scale;
+                }
+                if (_scale >= minZoom && _scale <= maxZoom) {
+                  ctrl.setZoomLevel(_scale);
+                }
+              },
+              child: previewsContainer(
+                child: CameraPreview(ctrl),
+              ),
+            ),
       consoleBody(
         Console(
           invertedColors: true,
           topButtons: [
             ConsoleButton(
-              shouldBeDownButIsnt: widget.ctrl.value.isRecordingVideo,
-              name: "Capture",
-              isSpecial: widget.enableVideo,
-              onPress: _takePicture,
-              onLongPress: widget.enableVideo ? _startRecording : null,
-              onLongPressUp: widget.enableVideo ? _stopRecording : null,
-            ),
+                shouldBeDownButIsnt: ctrl.value.isRecordingVideo,
+                name: "Capture",
+                isSpecial: widget.enableVideo,
+                onPress: _takePicture,
+                onLongPress: widget.enableVideo ? _startRecording : null,
+                onLongPressUp: widget.enableVideo ? _stopRecording : null),
           ],
           bottomButtons: [
             ConsoleButton(name: "Back", onPress: widget.cameraBack),
             ConsoleButton(
-              isMode: true,
-              name: widget.camNum == 0 ? "Rear" : "Front",
-              onPress: widget.flip,
-            ),
+                isMode: true,
+                name: camNum == 0 ? "Rear" : "Front",
+                onPress: flip),
           ],
         ),
       ),
@@ -216,7 +248,7 @@ class _SnipCameraState extends State<SnipCamera> {
   }
 
   void videoPreview(
-    BetterPlayerController bpc,
+    VideoPlayerController vpc,
     String filePath,
     String mimetype,
     bool toReverse, [
@@ -225,7 +257,7 @@ class _SnipCameraState extends State<SnipCamera> {
   ]) {
     _preview = Stack(children: [
       previewsContainer(
-        child: BetterPlayer(controller: bpc),
+        child: VideoPlayer(vpc),
         reverse: toReverse,
       ),
       inputBody(hasInput),
@@ -236,13 +268,13 @@ class _SnipCameraState extends State<SnipCamera> {
             ConsoleButton(
               name: "Accept",
               onPress: () {
-                bpc.dispose();
+                vpc.dispose();
                 widget.cameraCallBack(
                   path: filePath,
                   mimetype: mimetype,
                   isReversed: toReverse,
                   text: tec.value.text,
-                  aspectRatio: widget.ctrl.value.aspectRatio,
+                  size: ctrl.value.previewSize!.inverted,
                 );
               },
             ),
@@ -253,7 +285,7 @@ class _SnipCameraState extends State<SnipCamera> {
               onPress: () => setState(() {
                 File(filePath).delete();
                 tec.clear();
-                bpc.dispose();
+                vpc.dispose();
                 setState(() {
                   _preview = null;
                 });
@@ -262,7 +294,7 @@ class _SnipCameraState extends State<SnipCamera> {
             ConsoleButton(
               name: "Text",
               onPress: () => videoPreview(
-                bpc,
+                vpc,
                 filePath,
                 mimetype,
                 toReverse,
@@ -293,12 +325,11 @@ class _SnipCameraState extends State<SnipCamera> {
           ConsoleButton(
             name: "Accept",
             onPress: () => widget.cameraCallBack(
-              path: filePath,
-              mimetype: mimetype,
-              isReversed: toReverse,
-              text: tec.value.text,
-              aspectRatio: widget.ctrl.value.aspectRatio,
-            ),
+                path: filePath,
+                mimetype: mimetype,
+                isReversed: toReverse,
+                text: tec.value.text,
+                size: ctrl.value.previewSize!.inverted),
           ),
         ],
         bottomButtons: [
@@ -332,7 +363,7 @@ class _SnipCameraState extends State<SnipCamera> {
   @override
   Future<void> dispose() async {
     super.dispose();
-    await widget.ctrl.dispose();
+    await ctrl.dispose();
   }
 
   @override

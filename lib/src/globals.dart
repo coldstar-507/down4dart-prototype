@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:cbl/cbl.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'render_objects/palette.dart';
 import 'package:flutter/cupertino.dart';
 import 'couch.dart';
@@ -89,10 +91,17 @@ Future<Down4Payment?> downloadPayment(ID paymentID) async {
   }
 }
 
-Future<bool> uploadMedia(FireMedia media,
-    {bool isNode = false, bool isSnip = false}) async {
+Future<bool> uploadMedia(
+  FireMedia media, {
+  bool isNode = false,
+  bool isSnip = false,
+}) async {
   // if the media doesn't need update and is a message media, we are good
-  if (!media.onlineTimestamp.shouldBeUpdated && !isNode) return true;
+  if (!media.onlineTimestamp.shouldBeUpdated && !isNode) {
+    print("NO NEED TO UPLOAD mediaID: ${media.id}");
+    return true;
+  }
+  print("UPLOADING mediaID: ${media.id}");
   // if it's a message media and needs an update, we update it
   final copy = media.copy();
 
@@ -103,17 +112,32 @@ Future<bool> uploadMedia(FireMedia media,
     media.updateOnlineReference(newID, newTs);
   }
   final ref = isNode ? _st_node.ref(media.id) : _st.ref(media.onlineID!);
+  File? cachedFile, videoFile;
+  Uint8List? imageData;
   try {
-    final data = await (media.isVideo ? media.videoData : media.imageData);
-    if (data == null && media.cachePath == null) {
-      print("No media data nor path, cannot upload anything...");
-      return false;
-    }
     final jsonMetadata = media.toJson(toLocal: false);
     final metadata = SettableMetadata(customMetadata: jsonMetadata);
-    await (data == null && media.cachePath != null
-        ? ref.putFile(File(media.cachePath!), metadata)
-        : ref.putData(data!, metadata));
+    if ((cachedFile = await media.cachedFile) != null) {
+      await ref.putFile(cachedFile!, metadata);
+      return true;
+    } else {
+      if (media.isVideo) {
+        videoFile = await media.videoFile;
+        if (videoFile == null) {
+          print("Can't find video file!");
+          return false;
+        }
+        await ref.putFile(videoFile, metadata);
+        return true;
+      } else {
+        imageData = await media.imageData;
+        if (imageData == null) {
+          print("Can't find image data!");
+          return false;
+        }
+        await ref.putData(imageData, metadata);
+      }
+    }
     print("Successfully uploaded media id: ${media.id}");
     return true;
   } catch (e) {
@@ -145,14 +169,104 @@ class P {
 }
 
 class V {
+  Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
   final FireNode? node;
   final ID id;
   final List<P> pages;
   int ci;
 
-  V({required this.id, required this.pages, int? ix, this.node}) : ci = ix ?? 0;
+  V({
+    required this.id,
+    required this.pages,
+    int? ix,
+    this.node,
+    this.chat,
+  }) : ci = ix ?? 0;
 
   P get cp => pages[ci];
+}
+
+class ViewManager {
+  List<ID> route;
+  Map<ID, ViewState?> views;
+
+  ViewManager()
+      : route = [],
+        views = {};
+
+  ViewState at(ID viewID) => views[viewID]!;
+
+  ViewState get home => views[route.first]!;
+  ViewState get currentView => views[route.last]!;
+
+  void push(ViewState view) {
+    route.add(view.id);
+    views[view.id] ??= view;
+  }
+
+  ViewState? pop() {
+    final popped = route.removeLast();
+    if (!route.contains(popped)) {
+      return views.remove(popped);
+    }
+    return null;
+  }
+
+  void popUntilHome() {
+    for (final viewID in route.sublist(1)) {
+      views.remove(viewID);
+    }
+    route = [route[0]];
+  }
+
+  // can be useful after forwarding, creating a group, hyperchat, etc
+  void popInBetween() {
+    final newRoute = [route.first, route.last];
+    for (final viewID in route.sublist(1, route.length - 1)) {
+      if (viewID == newRoute.last) {
+        views.remove(viewID);
+      }
+    }
+    route = newRoute;
+  }
+}
+
+class PageState {
+  // a page has a scroll state
+  double scroll;
+  // a page has a state of objects
+  Map<ID, Down4Object> objects;
+  PageState({double? scroll, Map<ID, Down4Object>? objects})
+      : scroll = scroll ?? 0.0,
+        objects = objects ?? {};
+}
+
+class ViewState {
+  // A view can have a single chat
+  Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
+  // A view can be from a single node (chatPage, nodePage) both require a node
+  final FireNode? node;
+  // Every view has an ID
+  final ID id;
+  // A view has a least 1 page, limited to 3
+  final List<PageState> pages;
+  // A view has a current index of the page
+  int currentIndex;
+  // A view can have maps of special references, ex: messagesWithVideos
+  Map<String, Set<ID>> notableReferences;
+
+  Set<ID> refs(String name) => notableReferences[name] ??= Set<ID>.identity();
+
+  ViewState({
+    required this.id,
+    required this.pages,
+    int? ix,
+    this.node,
+    this.chat,
+  })  : currentIndex = ix ?? 0,
+        notableReferences = {};
+
+  PageState get currentPage => pages[currentIndex];
 }
 
 // view IDs code
@@ -166,9 +280,9 @@ class V {
 // ForwardPage   -> 'forward'
 // MoneyPage     -> 'money'
 // LoadingPage   -> 'loading'
-class ViewManager {
+class ViewManager2 {
   List<V> views;
-  ViewManager(this.views);
+  ViewManager2(this.views);
   V get cv => views.last;
   V get pv => views[views.length - 2];
 
@@ -199,7 +313,7 @@ class Payload {
 
   Set<ID> get nodesRef => forwardables.whereType<Palette2>().asIds().toSet();
 
-  FireMessage? generateMessage({required ID root}) {
+  FireMessage? makeMsg({required ID root, required ID? onlineMediaID}) {
     if (text.isEmpty && media == null && nodesRef.isEmpty) return null;
     return FireMessage(messagePushId(),
         root: root,
@@ -207,6 +321,7 @@ class Payload {
         timestamp: makeTimestamp(),
         isSnip: isSnip,
         mediaID: media?.id,
+        onlineMediaID: onlineMediaID,
         isSent: root == g.self.id,
         text: text,
         replies: replies.isEmpty ? null : replies.toSet(),
@@ -235,7 +350,7 @@ class Sizes {
   double w;
   double fullHeight;
   double headerHeight;
-  Size get fullSize => Size(w, fullAspectRatio);
+  Size get fullSize => Size(w, fullHeight);
   Size get paddedSize => Size(w, h);
   double get viewPaddingHeight => fullHeight - h;
   double get fullAspectRatio => w / fullHeight;
@@ -246,17 +361,16 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
+  late String appDirPath;
   late Self self;
   late Wallet wallet;
   late Sizes sizes;
   late ExchangeRate exchangeRate;
+  List<ID> savedImageIDs = [];
+  List<ID> savedVideoIDs = [];
   late Image fifty, black, red, ph, d1, d2, d3;
   late Uint8List background;
   late List<CameraDescription> cameras;
-
-  ViewManager vm = ViewManager([
-    V(id: 'home', pages: [P(), P()]) // left is homeState, right is hiddenState
-  ]);
 
   Future<bool> get notYetInitialized async {
     final self_ = await Self.loadSelf();
@@ -271,6 +385,10 @@ class Singletons {
   void loadExchangeRate(ExchangeRate er) => exchangeRate = er;
 
   void loadSizes(Sizes s) => sizes = s;
+
+  Future<void> loadAppDirPath() async {
+    appDirPath = (await getApplicationDocumentsDirectory()).path;
+  }
 
   Future<void> loadWallet() async {
     final wallet_ = await WalletManager.load();
@@ -318,7 +436,9 @@ void unselectedSelectedPalettes(Map<ID, Palette2> state) {
 Future<void> writeHomePalette(
   Chatable c,
   Map<ID, Palette2> state,
-  Future<List<ButtonsInfo2>> Function(Chatable)? bGen,
+  Future<List<ButtonsInfo2>> Function(Chatable n,
+          {Pair<FireMessage?, Iterable<ID>>? chatInfo})?
+      bGen,
   void Function()? onSel, {
   bool? sel,
 }) async {
@@ -331,11 +451,12 @@ Future<void> writeHomePalette(
   selectionIfReload = pInState?.selected;
   bool isSelected = sel ?? selectionIfReload ?? false;
 
-  final lastMsg = await c.lastMessage();
-  final preview = lastMsg == null
+  final chatInfo = await c.homeChatInfo();
+  // final lastMsg = await c.lastChatMessage();
+  final preview = chatInfo.first == null
       ? null
-      : (lastMsg.text ?? "").isNotEmpty
-          ? lastMsg.text!
+      : (chatInfo.first?.text ?? "").isNotEmpty
+          ? chatInfo.first?.text!
           : "&attachment";
 
   void Function()? onSelect = onSel == null
@@ -346,6 +467,7 @@ Future<void> writeHomePalette(
         };
 
   state[c.id] = Palette2(
+      key: Key(c.id),
       node: c,
       // image: pInState?.image ??
       //     await global(c.mediaID,
@@ -357,7 +479,7 @@ Future<void> writeHomePalette(
       messagePreview: preview,
       imPress: onSelect,
       bodyPress: onSelect,
-      buttonsInfo2: await bGen?.call(c) ?? []);
+      buttonsInfo2: await bGen?.call(c, chatInfo: chatInfo) ?? []);
 
   print("SUCCESS FULLY WROTE ${c.id} TO STATE = $state");
 }
@@ -386,6 +508,7 @@ void writePalette3<T extends FireNode>(
         };
 
   state[n.id] = Palette2(
+      key: Key(n.id),
       node: n,
       selected: isSelected,
       imPress: onSelect,
@@ -419,14 +542,15 @@ Transition selectionTransition({
   required Map<ID, Palette2> hiddenState,
   required double scrollOffset,
 }) {
+  print("STATE = $state");
+  print("HIDDEN STATE = $hiddenState");
+
   final ogOrder = originalList.asIds();
   final hidden = List<Palette2>.from(hiddenState.values);
   final selected = originalList.selected();
   final unselected = originalList.notSelected();
 
-  final selectedPeople = selected.whereNodeIs<Personable>()
-    ..forEach((e) =>
-        print("${e.node.runtimeType}, isPersonable: ${e.node is Personable}"));
+  final selectedPeople = selected.whereNodeIs<Personable>();
 
   final selectedGroups = selected.whereNodeIs<Groupable>();
 
@@ -581,8 +705,8 @@ Future<void> writeMessages({
   required Chatable ch,
   required List<ID> ordered,
   required Map<ID, ChatMessage> state,
-  required Map<ID, EmptyObject> videos,
-  required Map<ID, EmptyObject> withNodes,
+  required Set<ID> videos,
+  required Set<ID> withNodes,
   required void Function() refresh,
   required void Function(FireNode)? openNode,
   int limit = 20,
@@ -611,8 +735,8 @@ Future<void> writeMessages({
         refreshCallback: refresh);
     if (m != null) {
       state[m.id] = m;
-      if (m.mediaInfo?.media.isVideo ?? false) videos[m.id] = EmptyObject();
-      if ((m.nodes ?? []).isNotEmpty) withNodes[m.id] = EmptyObject();
+      if (m.mediaInfo?.media.isVideo ?? false) videos.add(m.id);
+      if ((m.message.nodes ?? {}).isNotEmpty) withNodes.add(m.id);
     }
   }
 }
@@ -624,6 +748,7 @@ Future<void> writePayments(
 ]) async {
   await for (final p in g.wallet.payments) {
     state[p.id] = Palette2(
+      key: Key(p.id),
       node: Payment(p.id, payment: p, selfID: g.self.id),
       // image: null,
       messagePreview: p.textNote,

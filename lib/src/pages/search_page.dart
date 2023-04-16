@@ -24,10 +24,7 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "search";
 
-  // final Self self;
-  // final List<Palette> palettes;
-  // final Future<bool> Function(List<String>) search;
-  // final void Function(User node) putNodeOffline;
+  final ViewState viewState;
   final void Function(Branchable) openNode;
   final void Function(List<Palette2>) forwardNodes;
   final void Function(Iterable<Personable>) add;
@@ -36,6 +33,7 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   final void Function() back;
 
   const AddFriendPage({
+    required this.viewState,
     required this.openNode,
     required this.search,
     required this.onScan,
@@ -65,7 +63,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
     ];
   }
 
-  Map<ID, Palette2> get searchs => g.vm.cv.cp.objects.cast();
+  Map<ID, Palette2> get searchs => widget.viewState.currentPage.objects.cast();
 
   @override
   void initState() {

@@ -4,7 +4,9 @@ import 'dart:convert' show base64Encode, utf8;
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/data_objects.dart';
+import 'package:video_player/video_player.dart';
 
+import '../_dart_utils.dart';
 import '_page_utils.dart';
 
 import '../globals.dart';
@@ -42,7 +44,7 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _GroupPageState extends State<GroupPage>
-    with Pager, Backable, Medias, Camera, Chatter {
+    with Pager, Backable, Medias, Camera, Sender {
   @override
   late Console console;
   late List<Widget> _items = [...widget.homePalettes];
@@ -57,10 +59,19 @@ class _GroupPageState extends State<GroupPage>
   FireMedia? _groupImage;
   String _groupName = "";
 
+  // @override
+  // VideoPlayerController? videoPreview;
+
   @override
-  List<(String, void Function(FireMedia m))> get mediasMode => [
-        ("Send", (m) => send(mediaInput: m)),
-        ("Remove", (m) => m.updateSaveStatus(false)),
+  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
+        Pair("Send", (m) async {
+          await m.use();
+          send(mediaInput: m);
+        }),
+        Pair("Remove", (m) {
+          m.updateSaveStatus(false);
+          loadMediasConsole(!m.isVideo, true);
+        }),
       ];
 
   @override
@@ -69,8 +80,6 @@ class _GroupPageState extends State<GroupPage>
   FireMedia? cameraInput;
   @override
   void back() => widget.back();
-  @override
-  List<Down4Object>? fo = null;
   @override
   void setTheState() => setState(() {});
   @override
@@ -108,6 +117,7 @@ class _GroupPageState extends State<GroupPage>
       nameCallBack: (name) => setState(() => _groupName = name),
       type: Nodes.group,
       imagePress: () => loadMediasConsole(true, false, (m) {
+        print("GO MAN");
         _groupImage = m;
         reloadItems();
       }),

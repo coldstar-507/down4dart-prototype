@@ -1,11 +1,9 @@
-import 'dart:io' as io;
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:flutter/rendering.dart';
-import 'package:better_player/better_player.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -264,8 +262,8 @@ class ConsoleInput extends StatelessWidget {
 
 class ConsoleMedias2 {
   final void Function(FireMedia) onSelect;
-  final bool showImages;
-  ConsoleMedias2({required this.showImages, required this.onSelect});
+  final bool images;
+  ConsoleMedias2({required this.images, required this.onSelect});
 }
 
 // class ImagePreview {
@@ -296,7 +294,7 @@ class Console extends StatelessWidget {
   final List<ConsoleInput>? _bottomInputs, _topInputs;
   final bool animatedInputs;
 
-  final FireMedia? previewMedia;
+  final Widget? previewMedia;
   final List<dynamic>? forwardingObjects;
   final List<Palette>? forwardingPalette;
   final bool invertedColors, initializationConsole;
@@ -370,11 +368,9 @@ class Console extends StatelessWidget {
         return Positioned(
           left: position.dx - contourWidth,
           top: position.dy -
-              // g.sizes.fullSize.height -
-              // g.sizes.viewPaddingHeight -
-              contourWidth
-          //  - (nButton * (buttonHeight))
-          ,
+              g.sizes.viewPaddingHeight -
+              contourWidth -
+              (nButton * (buttonHeight)),
           child: Container(
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
@@ -422,31 +418,12 @@ class Console extends StatelessWidget {
   bool get topButtonsHasTop =>
       _bottomInputs != null || _topInputs != null || hasGadgets;
 
-  double get consoleGap => g.sizes.w * 0.015;
-  static double get contourWidth => .6; // 0.9;
+  static double get consoleGap => g.sizes.w * 0.015;
+  static double get contourWidth => .6;
   static Color get contourColor => Colors.black45;
-  double get consoleWidth => g.sizes.w - (2.0 * consoleGap);
-  double get trueWidth => consoleWidth - (4 * contourWidth);
-  double get bbWidth => consoleWidth - (2 * contourWidth);
-
-  // contour width is actually applied 2 times horizontally, (4 times)
-  // (it is also applied 2 times vertically)
-  // static int nMedias(bool images) =>
-  //     images ? g.self.images.length : g.self.videos.length;
-  // static Stream<FireMedia> medias(bool images) async* {
-  //   // final ids = List<ID>.from(images ? g.self.images : g.self.videos);
-  //   for (final mediaID in ids) {
-  //     if (g.cachedConsoleMedias[mediaID] != null) {
-  //       yield g.cachedConsoleMedias[mediaID]!;
-  //     } else {
-  //       final media = await mediaID.getLocalMessageMedia();
-  //       if (media != null) {
-  //         g.cachedConsoleMedias[media.id] = media;
-  //         yield media;
-  //       }
-  //     }
-  //   }
-  // }
+  static double get consoleWidth => g.sizes.w - (2.0 * consoleGap);
+  static double get trueWidth => consoleWidth - (4 * contourWidth);
+  static double get bbWidth => consoleWidth - (2 * contourWidth);
 
   bool get bottomInputsHasTop => _topInputs != null;
 
@@ -462,19 +439,16 @@ class Console extends StatelessWidget {
       scanner != null ||
       consoleMedias2 != null;
 
+  final String? name;
   const Console({
+    this.name,
     required List<ConsoleButton> bottomButtons,
     this.invertedColors = false,
     this.forwardingPalette,
     this.previewMedia,
-    // this.forwardingPalette2,
     this.forwardingObjects,
-    // this.forwardingMessage,
     this.cameraController,
-    // this.imageForPreview,
-    // this.videoForPreview,
     this.initializationConsole = false,
-    // this.mediasInfo,
     this.scanner,
     this.animatedInputs = true,
     this.consoleMedias2,
@@ -548,16 +522,7 @@ class Console extends StatelessWidget {
 
   Widget consoleMedias() {
     if (consoleMedias2 == null) return const SizedBox.shrink();
-
-    // final nMedia = nMedias(consoleMedias2?.showImages ?? true);
-    // final theoreticalRows = (nMedia / mediaPerRow).ceil();
-    // final trueRows = theoreticalRows > 0
-    //     ? theoreticalRows < 4
-    //         ? theoreticalRows
-    //         : 3
-    //     : 1;
-
-    final showingImages = consoleMedias2?.showImages ?? true;
+    final ids = consoleMedias2!.images ? g.savedImageIDs : g.savedVideoIDs;
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
@@ -568,38 +533,52 @@ class Console extends StatelessWidget {
           constraints: BoxConstraints(
               maxHeight: maximumMediaRows * mediaCelSize, maxWidth: trueWidth),
           child: ListView.builder(
-              // itemCount: theoreticalRows,
+              itemCount: ids.length,
               itemBuilder: ((context, index) {
-            Widget f(int i) {
-              return FutureBuilder(
-                future: savedMedia(showingImages).elementAt(i),
-                builder: ((context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.done &&
-                      snapshot.hasData) {
-                    return GestureDetector(
-                      onTap: () =>
-                          consoleMedias2?.onSelect.call(snapshot.requireData),
-                      child: snapshot.requireData.displayMedia(
-                          displaySize: Size.square(mediaCelSize),
-                          forceSquare: true),
+                Widget f(int i) {
+                  if (i < ids.length) {
+                    // print("DISPLAYING IMAGE AT $i ID=${g.savedImageIDs[i]}");
+                    final cachedMedia = cache<FireMedia>(ids[i]);
+                    if (cachedMedia != null) {
+                      return GestureDetector(
+                          onTap: () => consoleMedias2!.onSelect(cachedMedia),
+                          child: (cachedMedia.displayImage(
+                              size: Size.square(mediaCelSize),
+                              forceSquare: true)));
+                    }
+                    return FutureBuilder(
+                      future: global<FireMedia>(ids[i]),
+                      builder: (ctx, ans) {
+                        if (ans.connectionState == ConnectionState.done &&
+                            ans.hasData) {
+                          return GestureDetector(
+                              onTap: () => ans.data != null
+                                  ? consoleMedias2!.onSelect(ans.data!)
+                                  : null,
+                              child: (ans.requireData?.displayImage(
+                                      size: Size.square(mediaCelSize),
+                                      forceSquare: true)) ??
+                                  SizedBox.square(dimension: mediaCelSize));
+                        } else {
+                          return SizedBox.square(dimension: mediaCelSize);
+                        }
+                      },
                     );
                   } else {
                     return SizedBox.square(dimension: mediaCelSize);
                   }
-                }),
-              );
-            }
+                }
 
-            return Row(
-              children: [
-                f((index * 5)),
-                f((index * 5) + 1),
-                f((index * 5) + 2),
-                f((index * 5) + 3),
-                f((index * 5) + 4)
-              ],
-            );
-          }))),
+                return Row(
+                  children: [
+                    f((index * 5)),
+                    f((index * 5) + 1),
+                    f((index * 5) + 2),
+                    f((index * 5) + 3),
+                    f((index * 5) + 4)
+                  ],
+                );
+              }))),
     );
   }
 
@@ -609,21 +588,14 @@ class Console extends StatelessWidget {
     Widget individualObject(Down4Object obj) {
       if (obj is Palette2) {
         return Flexible(
-            child:
-                //  Container(
-                //     decoration: BoxDecoration(
-                //         borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-                //         border:
-                //             Border.all(color: contourColor, width: contourWidth)),
-                //     child:
-                Row(
-                    textDirection: TextDirection.ltr,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+            child: Row(
+                textDirection: TextDirection.ltr,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               SizedBox(
                   width: Console.buttonHeight,
                   height: Console.buttonHeight,
-                  child: obj.node.nodeImage),
+                  child: obj.node.nodeImage(Size.square(Console.buttonHeight))),
               Expanded(
                   child: Container(
                       padding: const EdgeInsets.all(4.0),
@@ -638,23 +610,13 @@ class Console extends StatelessWidget {
             );
       } else if (obj is ChatMessage) {
         return Flexible(
-            child:
-                // Container(
-                //     decoration: BoxDecoration(
-                //         borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-                //         color: obj.myMessage
-                //             ? PinkTheme.myBubblesColor
-                //             : PinkTheme.buttonColor,
-                //         border:
-                //             Border.all(color: contourColor, width: contourWidth)),
-                //     child:
-                Expanded(
-                    child: Text(
-                        (obj.message.text ?? "").isEmpty
-                            ? "&attachment"
-                            : obj.message.text!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis))
+            child: Expanded(
+                child: Text(
+                    (obj.message.text ?? "").isEmpty
+                        ? "&attachment"
+                        : obj.message.text!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis))
             //)
             );
       }
@@ -697,59 +659,13 @@ class Console extends StatelessWidget {
     if (previewMedia == null) return const SizedBox.shrink();
     print("PREVIEWING THIS FUCKING SHIT ");
     return Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-          border: Border.all(color: contourColor, width: contourWidth)),
-      child: previewMedia!.displayMedia(
-        displaySize: Size.square(trueWidth),
-        forceSquare: true,
-        videoController: BetterPlayerController(
-          const BetterPlayerConfiguration(autoPlay: true, looping: true),
-        ),
-      ),
-    );
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(consoleRad)),
+            border: Border.all(color: contourColor, width: contourWidth)),
+        child: previewMedia!);
   }
-
-  // Widget videoPreview() {
-  //   final vfp = videoForPreview;
-  //   if (vfp == null) return const SizedBox.shrink();
-  //   return Container(
-  //     clipBehavior: Clip.hardEdge,
-  //     decoration: BoxDecoration(
-  //         borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-  //         border: Border.all(color: contourColor, width: contourWidth)),
-  //     child: SizedBox(
-  //         height: trueWidth,
-  //         width: trueWidth,
-  //         child: Down4VideoTransform(
-  //             displaySize: Size.square(trueWidth),
-  //             videoAspectRatio: vfp.videoAspectRatio,
-  //             video: vfp.videoPlayer,
-  //             isReversed: vfp.isReversed,
-  //             isSquared: true)),
-  //   );
-  // }
-  //
-  // Widget imagePreview() {
-  //   final ifp = imageForPreview;
-  //   if (ifp == null) return const SizedBox.shrink();
-  //   return Container(
-  //       clipBehavior: Clip.hardEdge,
-  //       decoration: BoxDecoration(
-  //           borderRadius:
-  //               BorderRadius.vertical(top: Radius.circular(consoleRad)),
-  //           border: Border.all(color: contourColor, width: contourWidth)),
-  //       child: SizedBox(
-  //         height: trueWidth,
-  //         width: trueWidth,
-  //         child: Transform(
-  //           alignment: Alignment.center,
-  //           transform: Matrix4.rotationY(ifp.isReversed ? math.pi : 0),
-  //           child: Image.file(io.File(ifp.path), fit: BoxFit.cover),
-  //         ),
-  //       ));
-  // }
 
   Widget get rotatingLogo {
     return AnimatedRotation(

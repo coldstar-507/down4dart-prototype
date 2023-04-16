@@ -1,29 +1,34 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
+import 'package:video_player/video_player.dart';
 
+import '../_dart_utils.dart';
 import '../data_objects.dart';
 
+import '../render_objects/_render_utils.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 
 import '../globals.dart';
 
+import '_page_utils.dart';
+
 class HomePage extends StatefulWidget implements Down4PageWidget {
   @override
   ID get id => "home";
   final String? promptMessage;
-  final List<Palette2> palettes;
+  final ViewState homeState;
+  // final List<Palette2> palettes;
   final void Function(String text) ping;
-  final void Function(Chatable, List<FireObject>) openChat; // TODO what is this?
-  final void Function(Payload, List<Chatable>) send;
+  final void Function(Chatable, List<FireObject>)
+      openChat; // TODO what is this?
+  final void Function(Payload, Iterable<Chatable>) send;
   final void Function(List<Palette2>) forward;
   final void Function() hyperchat;
   final void Function() group, money, search, delete, snip;
   const HomePage({
-    required this.palettes,
+    required this.homeState,
     required this.hyperchat,
     required this.group,
     required this.money,
@@ -42,18 +47,21 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with Pager, Sender, Medias, Camera {
   late String placeHolder = widget.promptMessage ?? ":)";
 
   late ScrollController scroller =
-      ScrollController(initialScrollOffset: g.vm.home.cp.scroll)
+      ScrollController(initialScrollOffset: widget.homeState.currentPage.scroll)
         ..addListener(() {
-          g.vm.home.cp.scroll = scroller.offset;
+          widget.homeState.currentPage.scroll = scroller.offset;
         });
 
   void ref() => setState(() {});
 
   ConsoleInput get input => ConsoleInput(tec: _tec, placeHolder: placeHolder);
+
+  Map<ID, Palette2> get palettes => widget.homeState.currentPage.objects.cast();
 
   @override
   void initState() {
@@ -73,8 +81,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  late Console _homeConsole;
-
   final _tec = TextEditingController();
 
   void ping() {
@@ -83,8 +89,9 @@ class _HomePageState extends State<HomePage> {
     _tec.clear();
   }
 
+  @override
   void loadBaseConsole({bool extra = false}) {
-    _homeConsole = Console(
+    console = Console(
       bottomInputs: [input],
       topButtons: [
         ConsoleButton(name: "Hyperchat", onPress: () => widget.hyperchat()),
@@ -100,11 +107,16 @@ class _HomePageState extends State<HomePage> {
             onLongPress: () => loadBaseConsole(extra: !extra),
             extraButtons: [
               ConsoleButton(name: "Delete", onPress: widget.delete),
+              ConsoleButton(name: "Medias", onPress: loadMediasConsole),
+              ConsoleButton(
+                  name: cameraInput == null ? "Camera" : "@Camera",
+                  onPress: loadSquaredCameraConsole),
               ConsoleButton(
                   name: "Forward",
                   onPress: () => widget.forward(
-                        widget.palettes.selected().toList(),
+                        palettes.values.selected().toList(),
                       )),
+              ConsoleButton(name: "Send", onPress: send)
             ]),
         ConsoleButton(name: "Search", onPress: widget.search),
         ConsoleButton(
@@ -124,9 +136,53 @@ class _HomePageState extends State<HomePage> {
           scrollController: scroller,
           staticList: true,
           title: "Home",
-          trueLen: widget.palettes.length,
-          list: widget.palettes,
-          console: _homeConsole)
+          trueLen: palettes.length,
+          list: palettes.values.toList().formatted(),
+          console: console)
     ]);
+  }
+
+  // @override
+  // VideoPlayerController? videoPreview;
+
+  @override
+  FireMedia? cameraInput;
+
+  @override
+  late Console console;
+
+  @override
+  ConsoleInput get mainInput => input;
+
+  @override
+  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
+        Pair("Send", (m) async {
+          await m.use();
+          send(mediaInput: m);
+        }),
+        Pair("Remove", (m) {
+          m.updateSaveStatus(false);
+          loadMediasConsole(!m.isVideo, true);
+        }),
+      ];
+  @override
+  ID get selfID => g.self.id;
+
+  @override
+  Future<void> send({FireMedia? mediaInput}) async {
+    final p = Payload(
+        replies: [],
+        forwards: [],
+        text: _tec.value.text,
+        media: mediaInput ?? cameraInput,
+        isSnip: false);
+
+    widget.send(p, palettes.values.selected().asNodes<Chatable>());
+    _tec.clear();
+  }
+
+  @override
+  void setTheState() {
+    setState(() {});
   }
 }

@@ -47,6 +47,9 @@ class _Down4State extends State<Down4> {
   }
 
   Future<void> loadUser() async {
+    ImageCache().maximumSize = 0;
+
+    await g.loadAppDirPath();
     g.loadExchangeRate(await ExchangeRate.exchangeRate);
     g.loadWallet();
     // this initialized self it it exists
@@ -65,7 +68,11 @@ class _Down4State extends State<Down4> {
   }) async {
     void onFailure(String msg) => createUser(errorMessage: msg);
 
-    final goodMedia = await media.withNewOwnership(id, recalculateID: true);
+    // exception, recalculate the media information with the proper ID
+    // this is because the mediaID is calculated with the userID
+    // and when it was calculated in the init user, we are not sure if
+    // the ID was the proper one
+    final goodMedia = await media.userInitRecalculation(id);
     if (goodMedia == null) {
       print("Error setting the correct ownership over user media");
       return onFailure("System failure");
@@ -144,7 +151,7 @@ class _Down4State extends State<Down4> {
     final size = mediaQuery.size;
     final truePadding = mediaQuery.viewPadding;
     final headerHeight = size.height * 0.056;
-    final allPadding = truePadding.top - truePadding.bottom - headerHeight;
+    final allPadding = truePadding.top + truePadding.bottom + headerHeight;
     // final fakePadding = mediaQuery.padding;
     final sizes = Sizes(
         h: size.height - allPadding,

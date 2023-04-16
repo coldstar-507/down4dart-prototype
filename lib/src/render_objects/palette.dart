@@ -8,47 +8,47 @@ import '../data_objects.dart';
 import '../globals.dart';
 import '../themes.dart';
 
-class BasicActionButton extends StatelessWidget {
-  final void Function(String, String) goPress;
-  final void Function(String, String)? goLongPress;
-  final bool rightMost;
-  final String location, id, assetPathFromLib;
-  // final Color? color;
-  const BasicActionButton({
-    required this.goPress,
-    required this.location,
-    required this.id,
-    required this.rightMost,
-    required this.assetPathFromLib,
-    // this.color = PinkTheme.headerColor,
-    this.goLongPress,
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => goPress(id, location),
-      onLongPress: () => goLongPress?.call(id, location),
-      child: Container(
-        height: Palette.paletteHeight,
-        width: Palette.paletteHeight,
-        padding: const EdgeInsets.all(6.0),
-        decoration: BoxDecoration(
-          // color: color,
-          borderRadius: rightMost
-              ? const BorderRadius.only(
-                  topRight: Radius.circular(4.0),
-                  bottomRight: Radius.circular(4.0),
-                )
-              : null,
-        ),
-        child: Image.asset(assetPathFromLib,
-            fit: BoxFit.contain, gaplessPlayback: true),
-      ),
-    );
-  }
-}
+// class BasicActionButton extends StatelessWidget {
+//   final void Function(String, String) goPress;
+//   final void Function(String, String)? goLongPress;
+//   final bool rightMost;
+//   final String location, id, assetPathFromLib;
+//   // final Color? color;
+//   const BasicActionButton({
+//     required this.goPress,
+//     required this.location,
+//     required this.id,
+//     required this.rightMost,
+//     required this.assetPathFromLib,
+//     // this.color = PinkTheme.headerColor,
+//     this.goLongPress,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return GestureDetector(
+//       onTap: () => goPress(id, location),
+//       onLongPress: () => goLongPress?.call(id, location),
+//       child: Container(
+//         height: Palette.paletteHeight,
+//         width: Palette.paletteHeight,
+//         padding: const EdgeInsets.all(6.0),
+//         decoration: BoxDecoration(
+//           // color: color,
+//           borderRadius: rightMost
+//               ? const BorderRadius.only(
+//                   topRight: Radius.circular(4.0),
+//                   bottomRight: Radius.circular(4.0),
+//                 )
+//               : null,
+//         ),
+//         child: Image.asset(assetPathFromLib,
+//             fit: BoxFit.contain, gaplessPlayback: true),
+//       ),
+//     );
+//   }
+// }
 
 class BasicActionButton2 extends StatelessWidget {
   final ButtonsInfo2 bi;
@@ -74,24 +74,24 @@ class BasicActionButton2 extends StatelessWidget {
   }
 }
 
-class ButtonsInfo {
-  final String assetPath;
-  final void Function(String, String) pressFunc;
-  final void Function(String, String)? longPressFunc;
-  final bool rightMost;
-  ButtonsInfo({
-    required this.assetPath,
-    required this.pressFunc,
-    required this.rightMost,
-    this.longPressFunc,
-  });
-
-  ButtonsInfo thatDoesNothing() => ButtonsInfo(
-        assetPath: assetPath,
-        pressFunc: (a, b) {},
-        rightMost: rightMost,
-      );
-}
+// class ButtonsInfo {
+//   final String assetPath;
+//   final void Function(String, String) pressFunc;
+//   final void Function(String, String)? longPressFunc;
+//   final bool rightMost;
+//   ButtonsInfo({
+//     required this.assetPath,
+//     required this.pressFunc,
+//     required this.rightMost,
+//     this.longPressFunc,
+//   });
+//
+//   ButtonsInfo thatDoesNothing() => ButtonsInfo(
+//         assetPath: assetPath,
+//         pressFunc: (a, b) {},
+//         rightMost: rightMost,
+//       );
+// }
 
 class ButtonsInfo2 {
   final Image asset;
@@ -118,7 +118,6 @@ class Palette2 extends StatelessWidget implements Down4Object {
   final Widget _image;
 
   final FireNode node;
-  // final FireMedia? image;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish;
   final List<ButtonsInfo2> buttonsInfo2;
@@ -127,7 +126,6 @@ class Palette2 extends StatelessWidget implements Down4Object {
 
   Palette2({
     required this.node,
-    // required this.image,
     this.fadeMS = 100,
     this.containerMS = 600,
     this.fadeButtonMS = 100,
@@ -142,12 +140,14 @@ class Palette2 extends StatelessWidget implements Down4Object {
     this.fold = false,
     this.fadeButton = false,
     this.fade = false,
-    Key? key,
-  })  : _image = node.nodeImage,
+    required Key key,
+  })  : _image = GestureDetector(
+            onTap: imPress, onLongPress: imLongPress, child: node.nodeImage()),
         super(key: key);
 
   Palette2 select() {
     return Palette2(
+      key: key!,
       fold: fold,
       squish: squish,
       // image: image,
@@ -178,6 +178,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
     int? fadeButtonMS,
   }) {
     return Palette2(
+      key: key!,
       fadeButton: fadeButton ?? this.fadeButton,
       squish: squish ?? this.squish,
       fold: fold ?? this.fold,
@@ -199,23 +200,24 @@ class Palette2 extends StatelessWidget implements Down4Object {
 
   Palette2 deactivated() {
     return Palette2(
-      squish: squish,
-      fold: fold,
-      // image: image,
-      messagePreview: messagePreview,
-      node: node,
-      buttonsInfo2: buttonsInfo2
-          .map((button) => button.thatDoesNothing())
-          .toList(growable: false),
-    );
+        key: key!,
+        squish: squish,
+        fold: fold,
+        messagePreview: messagePreview,
+        node: node,
+        buttonsInfo2: buttonsInfo2
+            .map((button) => button.thatDoesNothing())
+            .toList(growable: false));
   }
 
   Palette2 withoutButton() {
-    return Palette2(squish: squish, fold: fold, node: node); //, image: image);
+    return Palette2(
+        squish: squish, fold: fold, node: node, key: key!); //, image: image);
   }
 
   Palette2 copy() {
     return Palette2(
+        key: key!,
         fold: fold,
         squish: squish,
         node: node,

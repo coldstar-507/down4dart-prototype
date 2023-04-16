@@ -101,9 +101,9 @@ class Down4Payment extends FireObject {
     List<Down4TX> txs = [];
     int offset = textOffsetEnd + nTxDataLen;
     for (int i = 0; i < nTxVarInt.asInt; i++) {
-      final (tx_, offset_) = Down4TX.fromCompressed(buf.sublist(offset));
-      txs.add(tx_);
-      offset = offset + offset_;
+      final txinfo = Down4TX.fromCompressed(buf.sublist(offset));
+      txs.add(txinfo.first);
+      offset = offset + txinfo.second;
     }
 
     final tsBuf = buf.sublist(offset, offset + 7);
@@ -335,7 +335,7 @@ class Down4TXIN {
     ];
   }
 
-  static (Down4TXIN, int) fromCompressed(Uint8List d4) {
+  static Pair<Down4TXIN, int> fromCompressed(Uint8List d4) {
     final utxoID = TXID(d4.sublist(0, 32));
     final utxoIX = FourByteInt.fromRaw(d4.sublist(32, 36));
     final scriptLenVarInt = VarInt.fromRaw(d4.sublist(36));
@@ -361,7 +361,7 @@ class Down4TXIN {
         sequenceNo: seqNo.asInt,
         spender: spender);
 
-    return (txin, d4Offset + 1 + d4[d4Offset]); // final offset
+    return Pair(txin, d4Offset + 1 + d4[d4Offset]); // final offset
   }
 
   String get utxoID => down4UtxoID(utxoTXID, utxoIndex);
@@ -411,7 +411,7 @@ class Down4TXIN {
 
 class Down4TXOUT extends FireObject {
   @override
-  Database get dbb => paymentsDB;
+  Database get dbb => utxosDB;
 
   final List<int> scriptPubKey;
   final VarInt scriptPubKeyLen;
@@ -450,9 +450,7 @@ class Down4TXOUT extends FireObject {
       );
 
   @override
-  String get id =>
-      sha256((txid!.data + FourByteInt(outIndex!).data).toUint8List())
-          .toBase58();
+  String get id => down4UtxoID(txid!, FourByteInt(outIndex!));
 
   bool get isGets => !(isFee || isChange);
 
@@ -484,7 +482,7 @@ class Down4TXOUT extends FireObject {
                 : 0x02
       ];
 
-  static (Down4TXOUT, int) fromCompressed(Uint8List d4) {
+  static Pair<Down4TXOUT, int> fromCompressed(Uint8List d4) {
     final satInt = Uint8List.fromList(d4.sublist(0, 8))
         .buffer
         .asByteData()
@@ -517,14 +515,14 @@ class Down4TXOUT extends FireObject {
         isChange: isChange,
         isFee: isFee);
 
-    return (txout, curOffset + 1 + receiverLen + 1);
+    return Pair(txout, curOffset + 1 + receiverLen + 1);
   }
 
   @override
   Map<String, Object> toJson({bool toLocal = true}) => {
         "if": isFee,
         "ic": isChange,
-        "rc": receiver!,
+        if (receiver != null) "rc": receiver!,
         "st": secret!,
         "oi": outIndex!,
         "id": txid!.asHex,
@@ -612,24 +610,24 @@ class Down4TX {
         ...VarInt.fromInt(confirmations).data,
       ];
 
-  static (Down4TX, int) fromCompressed(Uint8List buf) {
+  static Pair<Down4TX, int> fromCompressed(Uint8List buf) {
     final vNo = FourByteInt.fromRaw(buf.sublist(0, 4));
     final inCountVarInt = VarInt.fromRaw(buf.sublist(4));
     var txsIn = <Down4TXIN>[];
     var offset = 4 + inCountVarInt.data.length;
     for (int i = 0; i < inCountVarInt.asInt; i++) {
-      final (txin_, offset_) = Down4TXIN.fromCompressed(buf.sublist(offset));
-      txsIn.add(txin_);
-      offset = offset + offset_;
+      final txinInfo = Down4TXIN.fromCompressed(buf.sublist(offset));
+      txsIn.add(txinInfo.first);
+      offset = offset + txinInfo.second;
     }
 
     final outCounterVarInt = VarInt.fromRaw(buf.sublist(offset));
     var txsOut = <Down4TXOUT>[];
     offset = offset + outCounterVarInt.data.length;
     for (int i = 0; i < outCounterVarInt.asInt; i++) {
-      final (txout_, offset_) = Down4TXOUT.fromCompressed(buf.sublist(offset));
-      txsOut.add(txout_);
-      offset = offset + offset_;
+      final txoutInfo = Down4TXOUT.fromCompressed(buf.sublist(offset));
+      txsOut.add(txoutInfo.first);
+      offset = offset + txoutInfo.second;
     }
 
     final nLockTime = FourByteInt.fromRaw(buf.sublist(offset, offset + 4));
@@ -649,7 +647,7 @@ class Down4TX {
         nLock: nLockTime,
         confirmations: conf.asInt);
 
-    return (down4Tx, finalOffset);
+    return Pair(down4Tx, finalOffset);
   }
 
   List<TXID> get txidDeps {

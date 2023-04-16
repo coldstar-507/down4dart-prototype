@@ -33,11 +33,11 @@ String makePrefix(int ms) {
 
 final listEqual = const ListEquality().equals;
 
-// class Pair<E, F> {
-//   final E first;
-//   final F second;
-//   const Pair(this.first, this.second);
-// }
+class Pair<E, F> {
+  final E first;
+  final F second;
+  const Pair(this.first, this.second);
+}
 //
 // class Triple<E, F, G> {
 //   final E first;
@@ -95,17 +95,17 @@ Future<bool> hasNetwork() async {
 //   return sha1(utf8.encode(asString)).toBase64();
 // }
 
-Iterable<(String, String)> randomPairs(int count) {
-  final random = math.Random();
-
-  return Iterable.generate(
-    count,
-    (_) => (
-      w.adjectives[random.nextInt(w.adjectives.length)],
-      w.nouns[random.nextInt(w.nouns.length)],
-    ),
-  );
-}
+// Iterable<(String, String)> randomPairs(int count) {
+//   final random = math.Random();
+//
+//   return Iterable.generate(
+//     count,
+//     (_) => (
+//       w.adjectives[random.nextInt(w.adjectives.length)],
+//       w.nouns[random.nextInt(w.nouns.length)],
+//     ),
+//   );
+// }
 
 // String deterministicGroupRoot(List<String> ids) {
 //   final sortedList = ids..sort();
@@ -175,7 +175,7 @@ extension Down4TimestampExpiration on int {
   bool get shouldBeUpdated {
     final now = DateTime.now().millisecondsSinceEpoch;
     final diff = now - this;
-    final duration = Duration(minutes: diff);
-    return duration.inHours > 80;
+    final duration = Duration(milliseconds: diff);
+    return duration.inDays > 20;
   }
 }

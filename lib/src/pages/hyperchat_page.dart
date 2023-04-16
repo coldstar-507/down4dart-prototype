@@ -4,6 +4,7 @@ import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
+import 'package:video_player/video_player.dart';
 
 import '_page_utils.dart';
 
@@ -36,17 +37,26 @@ class HyperchatPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _HyperchatPageState extends State<HyperchatPage>
-    with Pager, Backable, Camera, Medias, Chatter {
+    with Pager, Backable, Camera, Medias, Sender, Forwarder {
   final _tec = TextEditingController();
 
   @override
   ID get selfID => g.self.id;
 
   @override
-  List<(String, void Function(FireMedia m))> get mediasMode => [
-        ("Send", (m) => send(mediaInput: m)),
-        ("Remove", (m) => m.updateSaveStatus(false)),
+  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
+        Pair("Send", (m) async {
+          await m.use();
+          send(mediaInput: m);
+        }),
+        Pair("Remove", (m) {
+          m.updateSaveStatus(false);
+          loadMediasConsole(!m.isVideo, true);
+        }),
       ];
+
+  // @override
+  // VideoPlayerController? videoPreview;
 
   @override
   ConsoleInput get mainInput {
@@ -175,7 +185,7 @@ class _HyperchatPageState extends State<HyperchatPage>
         ConsoleButton(name: "Back", onPress: widget.back),
         ConsoleButton(
             name: cameraInput == null ? "Camera" : "@Camera",
-            onPress: () => loadSquaredCameraConsole(null, 0)),
+            onPress: () => loadSquaredCameraConsole(0)),
         ConsoleButton(name: "Medias", onPress: loadMediasConsole),
       ],
     );

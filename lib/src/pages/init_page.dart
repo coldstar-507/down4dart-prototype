@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import '../data_objects.dart';
 import '_page_utils.dart';
@@ -62,6 +63,9 @@ class _UserMakerPageState extends State<UserMakerPage> with Pager, Camera {
   void setTheState() => setState(() {});
 
   List<Future<bool>> _calls = [];
+
+  // @override
+  // VideoPlayerController? videoPreview;
 
   late List<ConsoleInput> _inputs;
   bool _onBaseConsole = true;
@@ -279,7 +283,12 @@ class _UserMakerPageState extends State<UserMakerPage> with Pager, Camera {
             if (r?.files.single.path != null && r?.files.single.bytes != null) {
               final String p = r!.files.single.path!;
               final s = await decodeImageSize(r.files.single.bytes!);
-              cameraInput = makeCameraMedia(p, s.aspectRatio, false, selfID);
+              cameraInput = makeCameraMedia(
+                  cachedPath: p,
+                  size: s,
+                  isReversed: false,
+                  isSquared: true,
+                  owner: selfID);
               loadBaseConsole();
             }
           },

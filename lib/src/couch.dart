@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data' show Uint8List;
 
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
@@ -6,6 +7,9 @@ import 'package:firebase_database/firebase_database.dart' as realtime;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
+import 'globals.dart';
+
+import '_dart_utils.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
 
@@ -14,8 +18,9 @@ import 'data_objects.dart';
 
 final _realtime = realtime.FirebaseDatabase.instance.ref();
 final _firestore = firestore.FirebaseFirestore.instance;
-final _nodeStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
-final _messageStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+final _nodeStore = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
+final _messageStore =
+    FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 
 late AsyncDatabase nodesDB,
     personalDB,
@@ -26,20 +31,21 @@ late AsyncDatabase nodesDB,
     billsDB;
 
 Future<List<T>> globall<T extends FireObject>(
-  Iterable<ID> ids, {
+  Iterable<ID>? ids, {
   bool doCache = true,
-  bool doMerge = false,
   bool doFetch = false,
-  bool withData = false,
-  bool fromNodes = false,
+  bool doMergeIfFetch = false,
+  bool doHideIfFetch = false,
+  Pair<bool, ID?>? mediaInfo,
 }) async {
+  if (ids == null) return [];
   final reqs = await Future.wait(ids
       .map((e) => global<T>(e,
           doCache: doCache,
-          doMergeIfFetch: doMerge,
           doFetch: doFetch,
-          withDataIfFetch: withData,
-          fetchFromNodes: fromNodes))
+          doMergeIfFetch: doMergeIfFetch,
+          doHideIfFetch: doHideIfFetch,
+          mediaInfo: mediaInfo))
       .toList());
   return reqs.whereType<T>().toList();
 }
@@ -75,36 +81,45 @@ Future<void> loadIndexes() async {
 Future<T?> fetch<T extends FireObject>(
   ID id, {
   bool doMerge = false,
-  bool withData = false,
-  bool fromNodes = false,
+  Pair<bool, ID?>? mediaInfo, // fireMedia specific
+  bool doHide = false, // fireNode specific
 }) async {
-  Future<FireNode?> fetchNode(ID id, {bool merge = false}) async {
+  Future<T?> fetchNode() async {
     final snapshot = await _firestore
         .collection("Nodes")
         .doc(id)
         .get(const firestore.GetOptions(source: firestore.Source.server));
     if (!snapshot.exists) return null;
+    final Map<String, Object?> json = snapshot.data()!.cast();
+    json["isHidden"] = doHide;
     final node = FireNode.fromJson(snapshot.data()!.cast());
-    if (merge) await node.merge();
-    return node;
+    if (doMerge) {
+      print("MERGING NODE ID=$id");
+      await node.merge();
+    }
+    print("===RETRIEVED NODE ID=$id FROM FETCH===");
+    return node as T;
   }
 
-  Future<FireMessage?> fetchMessage(ID id, {bool merge = false}) async {
-    final snapshot = await _realtime.child("Message").child(id).get();
+  Future<FireMessage?> fetchMessage() async {
+    final snapshot = await _realtime.child("Messages").child(id).get();
     if (!snapshot.exists) return null;
-    final json = Map<String, String?>.from(snapshot.value as Map);
+    final json = Map<String, Object?>.from(snapshot.value as Map);
+    if (json["root"] == g.self.id) json["root"] = json["senderID"];
     final message = FireMessage.fromJson(json);
-    if (merge) message.merge();
+    if (doMerge) {
+      print("MERGING MESSAGE ID: $id");
+      message.merge();
+    }
+    print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
     return message;
   }
 
-  Future<FireMedia?> fetchMedia(
-    ID id, {
-    bool merge = false,
-    bool withData = false,
-    bool fromNodes = false,
-  }) async {
-    final ref = fromNodes ? _nodeStore.ref(id) : _messageStore.ref(id);
+  Future<FireMedia?> fetchMedia() async {
+    final onlineID = mediaInfo!.second;
+    final withData = mediaInfo.first;
+    final fromNodes = onlineID == null;
+    final ref = fromNodes ? _nodeStore.ref(id) : _messageStore.ref(onlineID);
     try {
       final futureFullMetadata = ref.getMetadata();
       final mediaData = withData ? await ref.getData() : null;
@@ -122,15 +137,17 @@ Future<T?> fetch<T extends FireObject>(
       } else {
         media.cachedImage = mediaData;
       }
-      if (merge) {
-        media.merge();
-        if (withData && (mediaData != null || videoThumbnail != null)) {
-          await media.write(
-            videoData: isVideo ? mediaData : null,
-            imageData: isVideo ? videoThumbnail! : mediaData!,
-          );
+      if (doMerge) {
+        await media.merge();
+        print("MERGING MEDIA ID: $id");
+        if (withData && mediaData != null) {
+          if (isVideo) {
+            await File(media.id).writeAsBytes(mediaData);
+          }
+          await media.write(imageData: isVideo ? videoThumbnail! : mediaData);
         }
       }
+      print("===RETRIEVED MEDIA ID=$id FROM FETCH===");
       return media;
     } catch (e) {
       print("Error downloading media id: $id from storage, err: $e");
@@ -138,13 +155,33 @@ Future<T?> fetch<T extends FireObject>(
     }
   }
 
-  if (T is FireNode) {
-    return fetchNode(id, merge: doMerge) as T;
-  } else if (T is FireMessage) {
-    return fetchMessage(id, merge: doMerge) as T;
-  } else if (T is FireMedia) {
-    return fetchMedia(id,
-        merge: doMerge, withData: withData, fromNodes: fromNodes) as T;
+  switch (T) {
+    case FireNode:
+      return fetchNode();
+    case Branchable:
+      return fetchNode();
+    case Chatable:
+      return fetchNode();
+    case Groupable:
+      return fetchNode();
+    case Personable:
+      return fetchNode();
+    case Editable:
+      return fetchNode();
+    case User:
+      return fetchNode();
+    case Self:
+      return fetchNode();
+    case Group:
+      return fetchNode();
+    case Hyperchat:
+      return fetchNode();
+    case FireMedia:
+      return fetchMedia() as Future<T?>;
+    case FireMessage:
+      return fetchMessage() as Future<T?>;
+    case Down4Payment:
+      return downloadPayment(id) as Future<T?>;
   }
 
   throw 'Unsupported type for fetching $T';
@@ -194,19 +231,27 @@ Database gdb<T extends FireObject>() {
 Future<T?> local<T extends FireObject>(ID id) async {
   final doc = await gdb<T>().document(id);
   if (doc == null) return null;
-  return fromJson<T>(doc.toPlainMap().cast());
+  final element = fromJson<T>(doc.toPlainMap().cast());
+  print("===RETRIEVED $T WITH ID=$id FROM LOCAL===");
+  return element;
 }
 
-T? cache<T extends FireObject>(ID? id) =>
-    id == null ? null : _globalCache[id] as T?;
+T? cache<T extends FireObject>(ID? id) {
+  final element = id == null ? null : _globalCache[id] as T?;
+  if (element != null) {
+    print("===RETRIEVED $T WITH ID=$id FROM CACHE===");
+    return element;
+  }
+  return null;
+}
 
 Future<T?> global<T extends FireObject>(
   ID? id, {
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
-  bool withDataIfFetch = false,
-  bool fetchFromNodes = false,
+  bool doHideIfFetch = false,
+  Pair<bool, ID?>? mediaInfo,
 }) async {
   if (id == null) return null;
   final cached = cache<T>(id);
@@ -214,10 +259,8 @@ Future<T?> global<T extends FireObject>(
   final localed = await local<T>(id);
   if (localed != null) return doCache ? _globalCache[id] = localed : localed;
   if (!doFetch) return null;
-  final fetched = await fetch<T>(id,
-      doMerge: doMergeIfFetch,
-      withData: withDataIfFetch,
-      fromNodes: fetchFromNodes);
+  final fetched =
+      await fetch<T>(id, doMerge: doMergeIfFetch, mediaInfo: mediaInfo);
   if (fetched != null) return doCache ? _globalCache[id] = fetched : fetched;
   return null;
 }
@@ -225,29 +268,29 @@ Future<T?> global<T extends FireObject>(
 T fromJson<T extends FireObject>(Map<String, Object?> json) {
   switch (T) {
     case FireNode:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Branchable:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Chatable:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Groupable:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Personable:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Editable:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case User:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Self:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Group:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case Hyperchat:
-      return FireNode.fromJson(json.cast()) as T;
+      return FireNode.fromJson(json) as T;
     case FireMedia:
-      return FireMedia.fromJson(json.cast()) as T;
+      return FireMedia.fromJson(json) as T;
     case FireMessage:
-      return FireMessage.fromJson(json.cast()) as T;
+      return FireMessage.fromJson(json) as T;
     case Down4TXOUT:
       return Down4TXOUT.fromJson(json) as T;
     case Down4Payment:
@@ -304,22 +347,29 @@ Future<void> mediaDeletingRoutine() async {
   final e = await q.execute();
   await for (final r in e.asStream()) {
     final pot = r.toPlainMap()["id"] as String;
-    if (!allMediaRefs.contains(pot)) await mediasDB.purgeDocumentById(pot);
+    if (!allMediaRefs.contains(pot)) {
+      await mediasDB.purgeDocumentById(pot);
+      final videoPath = "${g.appDirPath}/$pot";
+      try {
+        File(videoPath).delete();
+      } catch (_) {
+        continue;
+      }
+    }
   }
 }
 
-Future<List<Chatable>> loadHome({required bool isHidden}) async {
-  final hiddenString = isHidden ? "'true'" : "'false'";
-  final raw = """
+Future<List<Chatable>> loadHome() async {
+  const raw = """
     SELECT * FROM _ AS n
     WHERE n.type in ('hyperchat', 'group', 'user')
-      AND n.isHidden = $hiddenString
     """;
 
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
   final r = await q.execute();
   return Future.wait((await r.allResults()).map((e) async {
-    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
+    final nodeJson = e.toPlainMap()["n"] as Map<String, Object?>;
+    print("Loading home node id =${nodeJson["id"]}");
     return fromJson<Chatable>(nodeJson)..cache();
   }).toList());
 }
@@ -327,20 +377,55 @@ Future<List<Chatable>> loadHome({required bool isHidden}) async {
 Stream<FireMedia> savedMedia(bool images) async* {
   final isVideo = images ? "'false'" : "'true'";
   final raw = """
-        SELECT * FROM _ 
-        WHERE isSaved = 'true' AND isVideo = $isVideo
-        ORDER BY lastUse DESC
+        SELECT * FROM _ AS im
+        WHERE im.isSaved = 'true' AND im.isVideo = $isVideo
+        ORDER BY im.lastUse DESC
         """;
   final query = await AsyncQuery.fromN1ql(mediasDB, raw);
   final results = await query.execute();
   await for (final r in results.asStream()) {
-    yield FireMedia.fromJson(r.toPlainMap().cast());
+    print("returning an image!");
+    final json = r.toPlainMap()["im"] as Map<String, Object?>;
+    print("image ID=${json['id']}");
+    yield FireMedia.fromJson(json);
   }
 }
 
+Future<AsyncListenStream<QueryChange<ResultSet>>> savedMediaIDs({
+  required bool isVideo,
+}) async {
+  final raw = """
+        SELECT META().id FROM _
+        WHERE isSaved = 'true' AND isVideo = '$isVideo'
+        ORDER BY lastUse DESC
+        """;
+  print("RAW Q = $raw");
+
+  final query = await AsyncQuery.fromN1ql(mediasDB, raw);
+  return query.changes();
+}
+
+// Stream<ID> savedMediaIDs(bool images) async* {
+//   final isVideo = images ? "'false'" : "'true'";
+//   final raw = """
+//         SELECT META().id FROM _ AS id
+//         WHERE im.isSaved = 'true' AND im.isVideo = $isVideo
+//         ORDER BY im.lastUse DESC
+//         """;
+//   final query = await AsyncQuery.fromN1ql(mediasDB, raw);
+//   final results = await query.execute();
+//   await for (final r in results.asStream()) {
+//     // print("returning an image!");
+//     yield r.string("id")!;
+//     // final json = r.toPlainMap()["im/id"]["id"] as Map<String, Object?>;
+//     // print("image ID=${json['id']}");
+//     // yield FireMedia.fromJson(json);
+//   }
+// }
+
 extension WalletManager on Wallet {
   Stream<Down4Payment> get payments async* {
-    const raw = "SELECT * FROM _ AS p ORDER BY META(p).id DESC";
+    const raw = "SELECT * FROM _ AS p ORDER BY META(p).id ASC";
     final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
     final r = await q.execute();
     await for (final p in r.asStream()) {

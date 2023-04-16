@@ -18,8 +18,8 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0-0.0.dev"
-#  sdk: ">=2.19.0 <3.0.0"
+#  sdk: ">=3.0.0-0.0.beta"
+  sdk: ">=2.19.0 <3.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -46,9 +46,10 @@ dependencies:
   http: ^0.13.4
   file_picker: ^5.2.2
   english_words: ^4.0.0
-  better_player: ^0.0.69
-  video_compress: ^3.1.2
-  image_fade: ^0.6.2
+  video_player: ^2.6.1
+  # better_player:
+  #   git:
+  #     url: https://github.com/tintran-dev/betterplayer.git #^0.0.83
   mime: ^1.0.4
   cbl: ^2.1.8
   camera: ^0.10.0+4

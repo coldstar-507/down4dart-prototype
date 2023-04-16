@@ -23,7 +23,6 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
   @override
   Widget build(BuildContext context) {
     final node_ = node;
-    // final squareImageSize = g.sizes.w - (2 * Palette.paletteMargin);
     final additionalGap = g.sizes.w * 0.02;
     final theGap = additionalGap + Palette.paletteMargin;
     final squareImageSize = g.sizes.w - 2 * theGap;
@@ -47,21 +46,7 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           color: PinkTheme.nodeColors[node_.colorCode]),
       child: Column(
         children: [
-          // Down4ImageTransform(
-          // image: media != null
-          //     ? Image.memory(media.data,
-          //         cacheHeight: squareImageSize.toInt(),
-          //         cacheWidth: squareImageSize.toInt(),
-          //         fit: BoxFit.cover)
-          //     : Image.asset('assets/images/hashirama.jpg',
-          //         cacheHeight: squareImageSize.toInt(),
-          //         cacheWidth: squareImageSize.toInt(),
-          //         fit: BoxFit.cover),
-          // imageAspectRatio: media?.aspectRatio ?? 1.0,
-          // displaySize: Size.square(squareImageSize),
-          // isSquared: media?.isSquared ?? false,
-          // isReversed: media?.isReversed ?? false),
-          node.nodeImage,
+          node.nodeImage(Size.square(squareImageSize)),
           const SizedBox(height: 8.0),
           Down4Text(
               text: node.displayName,

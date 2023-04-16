@@ -1,7 +1,12 @@
 import 'dart:io';
 
+// import 'package:better_player/better_player.dart';
 import 'package:camera/camera.dart';
+import 'package:down4/main.dart';
+import 'package:down4/src/couch.dart';
+import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
+import 'package:video_player/video_player.dart';
 
 import '../_dart_utils.dart';
 import '../data_objects.dart';
@@ -25,85 +30,226 @@ mixin Backable {
 mixin Camera on Pager {
   FireMedia? get cameraInput;
   set cameraInput(FireMedia? m);
-  Future<void> loadSquaredCameraConsole([
-    CameraController? ctrl,
-    int cam = 0,
-  ]) async {
-    if (ctrl == null) {
+  Size get _squaredCamSize => Size.square(Console.trueWidth);
+  VideoPlayerController? videoPreview;
+  CameraController? cameraController;
+
+  Future<void> loadSquaredCameraConsole([int cam = 0]) async {
+    if (cameraController == null) {
       try {
-        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
-        await ctrl.initialize();
+        cameraController =
+            CameraController(g.cameras[cam], ResolutionPreset.high);
+        await cameraController?.initialize();
       } catch (e) {
         loadBaseConsole();
       }
     }
-    console = squaredCapturingConsole(
-      user: selfID,
-      cam: cam,
-      uselessInput: mainInput,
-      goToPreview: (m) {
-        ctrl?.dispose();
-        loadPreviewConsole(m);
-      },
-      back: () {
-        ctrl?.dispose();
-        loadBaseConsole();
-      },
-      onVideoStarted: () => loadSquaredCameraConsole(ctrl, cam),
-      nextCam: () => loadSquaredCameraConsole(null, (cam + 1) % 2),
-      ctrl: ctrl!,
+
+    final bool isReversed = cam == 1;
+    console = Console(
+      bottomInputs: [mainInput],
+      cameraController: cameraController,
+      topButtons: [
+        ConsoleButton(
+          name: "Capture",
+          isSpecial: true,
+          shouldBeDownButIsnt: cameraController!.value.isRecordingVideo,
+          onPress: () async {
+            final XFile f = await cameraController!.takePicture();
+            print(
+                "CAMERA PREVIEW SIZE = ${cameraController?.value.previewSize}");
+            final media = makeCameraMedia(
+                cachedPath: f.path,
+                size: cameraController!.value.previewSize!.inverted,
+                isReversed: isReversed,
+                owner: selfID,
+                isSquared: true);
+            loadPreviewConsole(media);
+          },
+          onLongPress: () async {
+            await cameraController!.startVideoRecording();
+            loadSquaredCameraConsole(cam);
+          },
+          onLongPressUp: () async {
+            final XFile f = await cameraController!.stopVideoRecording();
+            final media = makeCameraMedia(
+                cachedPath: f.path,
+                size: cameraController!.value.previewSize!.inverted,
+                isReversed: isReversed,
+                owner: selfID,
+                isSquared: true);
+            loadPreviewConsole(media);
+          },
+        ),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+            name: "Back",
+            onPress: () {
+              cameraController?.dispose();
+              cameraController = null;
+              loadBaseConsole();
+            }),
+        ConsoleButton(
+            name: cam == 0 ? "Rear" : "Front",
+            onPress: () async {
+              await cameraController?.dispose();
+              cameraController = null;
+              loadSquaredCameraConsole((cam + 1) % 2);
+            },
+            isMode: true),
+      ],
     );
+
     setTheState();
   }
 
-  void loadPreviewConsole(FireMedia m) {
-    console = squaredPreviewConsole(
-      media: m,
-      uselessInput: mainInput,
-      back: () => loadSquaredCameraConsole(null, m.isReversed ? 1 : 0),
-      cancel: loadBaseConsole,
-      accept: () {
-        cameraInput = m;
-        loadBaseConsole();
-      },
+  Future<VideoPlayerController?> _loopingController(FireMedia m) async {
+    if (!m.isVideo) return null;
+    final vpc = await m.videoController;
+    await vpc?.initialize();
+    return vpc
+      ?..setLooping(true)
+      ..play();
+  }
+
+  void loadPreviewConsole(FireMedia m) async {
+    // videoPreview = await _loopingController(m);
+    if (m.isVideo) {
+      final file = await m.cachedFile;
+      videoPreview = VideoPlayerController.file(file!);
+      await videoPreview?.initialize();
+      videoPreview?.setLooping(true);
+      videoPreview?.play();
+    }
+
+    Widget videoPlayer() {
+      return Down4VideoTransform(
+          displaySize: _squaredCamSize,
+          videoAspectRatio: m.aspectRatio,
+          video: VideoPlayer(videoPreview!),
+          isReversed: m.isReversed,
+          isSquared: true);
+    }
+
+    console = Console(
+      bottomInputs: [mainInput],
+      previewMedia: m.isVideo
+          ? videoPlayer()
+          : m.displayImage(
+              size: _squaredCamSize,
+              forceSquare: true,
+            ), //, controller: vpc),
+      topButtons: [
+        ConsoleButton(
+            name: "Accept",
+            onPress: () {
+              // vpc?.dispose();
+              cameraController?.dispose();
+              cameraController = null;
+              videoPreview?.dispose();
+              cameraInput = m;
+              loadBaseConsole();
+            }),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () {
+            // vpc?.dispose();
+            videoPreview?.dispose();
+            loadSquaredCameraConsole(m.isReversed ? 1 : 0);
+          },
+        ),
+        ConsoleButton(
+            name: "Cancel",
+            onPress: () {
+              cameraController?.dispose();
+              cameraController = null;
+              videoPreview?.dispose();
+              loadBaseConsole();
+            }),
+      ],
     );
     setTheState();
   }
 }
 
 mixin Medias on Pager {
-  List<(String mode, void Function(FireMedia m) onSelect)> get mediasMode;
+  List<Pair<String, void Function(FireMedia)>> get mediasMode;
   int currentMode = 0;
 
-  void switchMediaMode() {
-    currentMode = (currentMode + 1) % mediasMode.length;
-    setTheState();
-  }
+  Pair<String, void Function(FireMedia)> get curMode => mediasMode[currentMode];
 
   void loadMediasConsole([
     bool images = true,
     bool extra = false,
     void Function(FireMedia)? forNode,
   ]) {
-    console = mediaConsole(
-        uselessInput: mainInput,
-        selectMedia: forNode ?? mediasMode[currentMode].$2,
-        afterImport: () => loadMediasConsole(images, extra),
-        back: loadBaseConsole,
-        switchMediasType: () => loadMediasConsole(!images, extra),
-        switchMediaMode: switchMediaMode,
-        switchExtra: () => loadMediasConsole(images, !extra),
-        importGroupMedia: forNode,
-        mode: mediasMode[currentMode].$1,
-        extra: extra,
-        images: images);
+    console = Console(
+      bottomInputs: [mainInput],
+      consoleMedias2: ConsoleMedias2(
+        images: images,
+        onSelect: forNode ?? curMode.second,
+      ),
+      topButtons: [
+        ConsoleButton(
+            name: "Import",
+            onPress: () async {
+              if (forNode != null) {
+                final nodeMedia = await importNodeMedia();
+                if (nodeMedia != null) {
+                  forNode.call(nodeMedia);
+                }
+              } else {
+                await importConsoleMedias(images: images);
+                loadMediasConsole(images, extra, forNode);
+              }
+            }),
+      ],
+      bottomButtons: [
+        ConsoleButton(
+          showExtra: extra,
+          isSpecial: forNode == null ? true : false,
+          name: "Back",
+          onPress: () => extra && forNode == null
+              ? loadMediasConsole(images, !extra, forNode)
+              : loadBaseConsole(),
+          onLongPress: () => forNode == null
+              ? loadMediasConsole(images, !extra, forNode)
+              : null,
+          extraButtons: [
+            ConsoleButton(
+              name: curMode.first,
+              onPress: () {
+                currentMode = (currentMode + 1) % mediasMode.length;
+                loadMediasConsole(images, extra, forNode);
+              },
+              isMode: true,
+            ),
+          ],
+        ),
+        ConsoleButton(
+          isMode: true,
+          isActivated: forNode == null,
+          isGreyedOut: forNode != null,
+          name: images ? "Images" : "Videos",
+          onPress: () => loadMediasConsole(!images, extra, forNode),
+        ),
+      ],
+    );
 
     setTheState();
   }
 }
 
-mixin Chatter on Camera, Backable {
+mixin Sender {
+  Future<void> send({FireMedia? mediaInput});
+}
+
+mixin Forwarder on Backable, Sender, Camera, Medias {
   List<Down4Object>? get fo;
+  void Function()? get hyper => null;
   // set cameraInput(FireMedia? m);
   // FireMedia? get cameraInput;
   // ConsoleInput get input;
@@ -111,8 +257,6 @@ mixin Chatter on Camera, Backable {
   // set console(Console c);
 
   // void loadBaseConsole();
-
-  Future<void> send({FireMedia? mediaInput});
 
   // Future<void> loadSquaredCameraConsole([
   //   CameraController? ctrl,
@@ -193,232 +337,175 @@ mixin Chatter on Camera, Backable {
   //   setTheState();
   // }
 
+  List<String> get forwardingConsoles => [
+        "ForwardingConsole",
+        "ForwardingMediasConsole",
+        "ForwardingCameraConsole",
+        "ForwardingPreviewConsole",
+      ];
+
   void loadForwardingConsole([bool extra = false]) {
-    console = forwardingConsole(
-        usefulInput: mainInput,
-        fObjects: fo!,
-        loadForwardingMediaConsole: loadForwardingMediasConsole,
-        forward: send,
-        switchExtra: () => loadForwardingConsole(!extra),
-        back: back,
-        extra: extra);
+    console = Console(
+      name: "ForwardingConsole",
+      bottomInputs: [mainInput],
+      forwardingObjects: fo,
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: back),
+        ConsoleButton(name: "Medias", onPress: loadForwardingMediasConsole),
+        ConsoleButton(
+          name: "Forward",
+          onPress: () => extra ? loadForwardingConsole(!extra) : send(),
+          onLongPress: () => loadForwardingConsole(!extra),
+          isSpecial: true,
+          showExtra: extra,
+          extraButtons: [
+            ConsoleButton(
+              name: cameraInput == null ? "Camera" : "@Camera",
+              onPress: loadForwardingCameraConsole,
+            ),
+            ...(hyper != null
+                ? [ConsoleButton(name: "Hyper", onPress: hyper!)]
+                : [])
+          ],
+        )
+      ],
+    );
+
     setTheState();
   }
 
   void loadForwardingMediasConsole([bool images = true]) {
-    console = forwardingMediaConsole(
-        uselessInput: mainInput,
-        onSelectMedia: (media) => send(mediaInput: media),
-        switchType: () => loadForwardingMediasConsole(!images),
-        forwardingObjects: fo!,
-        back: loadForwardingConsole,
-        images: images);
+    console = Console(
+      name: "ForwardingMediasConsole",
+      bottomInputs: [mainInput],
+      consoleMedias2: ConsoleMedias2(
+        images: images,
+        onSelect: (m) => send(mediaInput: m),
+      ),
+      forwardingObjects: fo,
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadForwardingConsole),
+        ConsoleButton(
+            name: images ? "Images" : "Videos",
+            onPress: () => loadForwardingMediasConsole(!images))
+      ],
+    );
+    setTheState();
+  }
+
+  Future<void> loadForwardingCameraConsole([
+    CameraController? ctrl,
+    int cam = 0,
+  ]) async {
+    if (ctrl == null) {
+      try {
+        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
+        await ctrl.initialize();
+      } catch (e) {
+        loadBaseConsole();
+      }
+    }
+
+    final double aspectRatio = ctrl!.value.aspectRatio;
+    final bool isReversed = cam == 1;
+    console = Console(
+      name: "ForwardingCameraConsole",
+      bottomInputs: [mainInput],
+      cameraController: ctrl,
+      forwardingObjects: fo,
+      bottomButtons: [
+        ConsoleButton(name: "Back", onPress: loadBaseConsole),
+        ConsoleButton(
+            name: cam == 0 ? "Rear" : "Front",
+            onPress: () => loadForwardingCameraConsole(null, (cam + 1) % 2),
+            isMode: true),
+        ConsoleButton(
+          name: "Capture",
+          isSpecial: true,
+          shouldBeDownButIsnt: ctrl.value.isRecordingVideo,
+          onPress: () async {
+            final XFile f = await ctrl!.takePicture();
+            final media = makeCameraMedia(
+                cachedPath: f.path,
+                size: ctrl.value.previewSize!,
+                isReversed: isReversed,
+                owner: selfID,
+                isSquared: true);
+            loadForwardingPreviewConsole(media);
+          },
+          onLongPress: () async {
+            await ctrl!.startVideoRecording();
+            loadForwardingCameraConsole(ctrl, cam);
+          },
+          onLongPressUp: () async {
+            final XFile f = await ctrl!.stopVideoRecording();
+            final media = makeCameraMedia(
+                cachedPath: f.path,
+                size: ctrl.value.previewSize!,
+                isReversed: isReversed,
+                owner: selfID,
+                isSquared: true);
+            loadForwardingPreviewConsole(media);
+          },
+        ),
+      ],
+    );
+
+    setTheState();
+  }
+
+  void loadForwardingPreviewConsole(FireMedia m) async {
+    final vpc = await _loopingController(m);
+    console = Console(
+      name: "ForwardingPreviewConsole",
+      bottomInputs: [mainInput],
+      previewMedia: m.display(size: _squaredCamSize, controller: vpc),
+      forwardingObjects: fo,
+      bottomButtons: [
+        ConsoleButton(
+          name: "Back",
+          onPress: () {
+            vpc?.dispose();
+            loadForwardingCameraConsole(null, m.isReversed ? 1 : 0);
+          },
+        ),
+        ConsoleButton(
+            name: "Cancel",
+            onPress: () {
+              vpc?.dispose();
+              loadForwardingConsole();
+            }),
+        ConsoleButton(
+            name: "Accept",
+            onPress: () {
+              vpc?.dispose();
+              cameraInput = m;
+              loadForwardingConsole();
+            }),
+      ],
+    );
+
     setTheState();
   }
 }
 
-FireMedia makeCameraMedia(String p, double ar, bool ir, String o) {
-  final mime = lookupMimeType(p)!;
-  final data = File(p).readAsBytesSync();
-  final id = deterministicMediaID(data, o);
+FireMedia makeCameraMedia({
+  required String cachedPath,
+  required Size size,
+  required bool isReversed,
+  required String owner,
+  required bool isSquared,
+}) {
+  final mime = lookupMimeType(cachedPath)!;
+  final data = File(cachedPath).readAsBytesSync();
+  final id = deterministicMediaID(data, owner);
   return FireMedia(id,
-      ownerID: o,
+      ownerID: owner,
       timestamp: makeTimestamp(),
-      aspectRatio: ar,
-      cachePath: p,
-      isReversed: ir,
+      width: size.width,
+      height: size.height,
+      cachePath: cachedPath,
+      isSquared: isSquared,
+      isReversed: isReversed,
       mime: mime);
-}
-
-Console squaredCapturingConsole({
-  required ID user,
-  required ConsoleInput uselessInput,
-  required void Function(FireMedia) goToPreview,
-  required void Function() back,
-  required void Function() onVideoStarted,
-  required void Function() nextCam,
-  required CameraController ctrl,
-  required int cam,
-}) {
-  final double ar = ctrl.value.aspectRatio;
-  final bool isReversed = cam == 1;
-  return Console(
-    bottomInputs: [uselessInput],
-    cameraController: ctrl,
-    topButtons: [
-      ConsoleButton(
-        name: "Capture",
-        isSpecial: true,
-        shouldBeDownButIsnt: ctrl.value.isRecordingVideo,
-        onPress: () async {
-          final XFile f = await ctrl.takePicture();
-          final media = makeCameraMedia(f.path, ar, isReversed, user);
-          goToPreview(media);
-        },
-        onLongPress: () async {
-          await ctrl.startVideoRecording();
-          onVideoStarted();
-        },
-        onLongPressUp: () async {
-          final XFile f = await ctrl.stopVideoRecording();
-          final media = makeCameraMedia(f.path, ar, isReversed, user);
-          goToPreview(media);
-        },
-      ),
-    ],
-    bottomButtons: [
-      ConsoleButton(name: "Back", onPress: back),
-      ConsoleButton(
-        name: cam == 0 ? "Rear" : "Front",
-        onPress: nextCam,
-        isMode: true,
-      ),
-    ],
-  );
-}
-
-Console squaredPreviewConsole({
-  required ConsoleInput uselessInput,
-  required FireMedia media,
-  required void Function() back,
-  required void Function() cancel,
-  required void Function() accept,
-}) {
-  // BetterPlayerController? vpc;
-
-  return Console(
-    bottomInputs: [uselessInput],
-    previewMedia: media,
-    topButtons: [
-      ConsoleButton(name: "Accept", onPress: accept),
-    ],
-    bottomButtons: [
-      ConsoleButton(name: "Back", onPress: back),
-      ConsoleButton(name: "Cancel", onPress: cancel),
-    ],
-  );
-
-  // if (extensionFromMime(lookupMimeType(path)!).isVideoExtension()) {
-  //   vpc = BetterPlayerController(const BetterPlayerConfiguration());
-  //   await vpc.setupDataSource(BetterPlayerDataSource.file(path));
-  //   await vpc.setLooping(true);
-  //   await vpc.play();
-  //   return Console(
-  //       bottomInputs: [uselessInput],
-  //       videoForPreview: VideoPreview(
-  //           videoPlayer: BetterPlayer(controller: vpc),
-  //           videoAspectRatio: aspectRatio,
-  //           isReversed: isReversed),
-  //       topButtons: topButtons,
-  //       bottomButtons: bottomButtons);
-  // } else {
-  //   return Console(
-  //       bottomInputs: [uselessInput],
-  //       imageForPreview: ImagePreview(
-  //           path: path, isReversed: isReversed, imageAspectRatio: aspectRatio),
-  //       topButtons: topButtons,
-  //       bottomButtons: bottomButtons);
-  // }
-}
-
-Console mediaConsole({
-  required ConsoleInput uselessInput,
-  required void Function(FireMedia) selectMedia,
-  required void Function() afterImport,
-  required void Function() back,
-  required void Function() switchMediasType,
-  required void Function() switchMediaMode,
-  required void Function() switchExtra,
-  required void Function(FireMedia)? importGroupMedia,
-  required String mode,
-  required bool extra,
-  required bool images,
-  // bool forGroupImage = false,
-}) {
-  return Console(
-    bottomInputs: [uselessInput],
-    consoleMedias2: ConsoleMedias2(showImages: images, onSelect: selectMedia),
-    topButtons: [
-      ConsoleButton(
-          name: "Import",
-          onPress: () async {
-            if (importGroupMedia != null) {
-              final nodeMedia = await importNodeMedia();
-              if (nodeMedia != null) {
-                importGroupMedia(nodeMedia);
-              } else {
-                await importConsoleMedias(images: images);
-                afterImport();
-              }
-            }
-          }),
-    ],
-    bottomButtons: [
-      ConsoleButton(
-        showExtra: extra,
-        isSpecial: true,
-        name: "Back",
-        onPress: () => extra ? switchExtra() : back(),
-        onLongPress: switchExtra,
-        extraButtons: [
-          ConsoleButton(name: mode, onPress: switchMediaMode, isMode: true),
-        ],
-      ),
-      ConsoleButton(
-        isMode: true,
-        isActivated: importGroupMedia == null,
-        isGreyedOut: importGroupMedia != null,
-        name: images ? "Images" : "Videos",
-        onPress: switchMediasType,
-      ),
-    ],
-  );
-  // setState(() {});
-}
-
-Console forwardingConsole({
-  required ConsoleInput usefulInput,
-  required List<Down4Object> fObjects,
-  required void Function() loadForwardingMediaConsole,
-  required void Function() forward,
-  required void Function() switchExtra,
-  required void Function() back,
-  required bool extra,
-}) {
-  return Console(
-    bottomInputs: [usefulInput],
-    forwardingObjects: fObjects,
-    bottomButtons: [
-      ConsoleButton(name: "Back", onPress: back),
-      ConsoleButton(
-        name: "Forward",
-        onPress: () => extra ? switchExtra() : forward(),
-        onLongPress: switchExtra,
-        isSpecial: true,
-        showExtra: extra,
-        extraButtons: [
-          ConsoleButton(name: "Medias", onPress: loadForwardingMediaConsole),
-        ],
-      )
-    ],
-  );
-}
-
-Console forwardingMediaConsole({
-  required ConsoleInput uselessInput,
-  required void Function(FireMedia) onSelectMedia,
-  required void Function() switchType,
-  required List<Down4Object> forwardingObjects,
-  required void Function() back,
-  required bool images,
-}) {
-  return Console(
-    bottomInputs: [uselessInput],
-    consoleMedias2: ConsoleMedias2(showImages: images, onSelect: onSelectMedia),
-    forwardingObjects: forwardingObjects,
-    bottomButtons: [
-      ConsoleButton(name: "Back", onPress: back),
-      ConsoleButton(name: images ? "Images" : "Videos", onPress: switchType)
-    ],
-  );
 }

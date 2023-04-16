@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
 import 'package:down4/src/render_objects/palette.dart';
 import 'package:http/http.dart' as http;
+import '_dart_utils.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart' show Down4Payment, Down4TX;
 
@@ -37,21 +38,22 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<(FireNode, FireMedia?)>> fetchNodes<T extends FireNode>(
+Future<List<Pair<FireNode, FireMedia?>>> fetchNodes<T extends FireNode>(
     Iterable<String> ids) async {
   if (ids.isEmpty) return [];
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
   );
   final res = await http.post(url, body: ids.join(" "));
+  print("THE BODY: ${res.body}");
   final jsonList = List<Map<String, Object?>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
     return jsonList.map((e) {
-      final nodeJson = e["node"] as Map<String, String?>;
-      final mediaJson = e["media"] as Map<String, String?>?;
+      final nodeJson = e["node"] as Map<String, Object?>;
+      final mediaJson = e["media"] as Map<String, Object?>?;
       final node = FireNode.fromJson(nodeJson);
       final media = mediaJson == null ? null : FireMedia.fromJson(mediaJson);
-      return (node, media);
+      return Pair(node, media);
     }).toList();
   }
   return [];
@@ -77,7 +79,7 @@ Future<List<(FireNode, FireMedia?)>> fetchNodes<T extends FireNode>(
 //   return FireMedia.fromJson(jsonDecode(res.body));
 // }
 
-Future<(Uint8List, (String, String))?> getHyperchat(
+Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
   List<String> pairs,
 ) async {
   final url = Uri.parse(
@@ -90,7 +92,7 @@ Future<(Uint8List, (String, String))?> getHyperchat(
   final json = jsonDecode(imageGenRes.body);
   final image = base64Decode(json["image"]);
   final prompt = (json["prompt"] as String).split(" ");
-  return (image, (prompt.first, prompt.last));
+  return Pair(image, Pair(prompt.first, prompt.last));
 }
 
 // TODO Might need adjustment for big batches

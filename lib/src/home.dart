@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:cbl/cbl.dart';
 import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
-import 'package:better_player/better_player.dart';
+import 'package:video_player/video_player.dart';
 
 import 'couch.dart';
 import 'globals.dart';
@@ -52,11 +54,21 @@ class _HomeState extends State<Home> {
 
   ru.Down4PageWidget page = const LoadingPage2();
 
-  ViewManager get vm => g.vm;
+  // view manager getters
+  ViewManager viewManager = ViewManager()
+    ..push(ViewState(id: "home", pages: [PageState(), PageState()]));
+  Iterable<String> get route => viewManager.route;
+  ViewState get homeView => viewManager.home;
+  PageState get homePageState => homeView.currentPage;
+  ViewState get currentView => viewManager.currentView;
 
-  Iterable<String> get route => vm.views.map((e) => e.id);
-
-  V get cv => vm.cv;
+  // homestate getters
+  Map<ID, Palette2> get _homePalettes => homeView.pages[0].objects.cast();
+  Map<ID, Palette2> get _hiddenPalettes => homeView.pages[1].objects.cast();
+  Map<ID, Palette2> get _all => {..._homePalettes, ..._hiddenPalettes};
+  Iterable<Palette2> get homePalettes => _homePalettes.values;
+  Iterable<Palette2> get selectedHome => homePalettes.selected();
+  List<Palette2> get formattedHome => homePalettes.toList().formatted();
 
   void setPage(ru.Down4PageWidget p) {
     page = p;
@@ -64,23 +76,26 @@ class _HomeState extends State<Home> {
   }
 
   void back({required bool withPop, List<Down4Object>? f}) async {
-    V? popedView;
-    if (withPop) popedView = vm.pop();
+    ViewState? popedView;
+    if (withPop) popedView = viewManager.pop();
     final pID = popedView?.id.split('-');
     final pp0 = pID?.first;
     final n = popedView?.node;
     if (pID != null && pID.length > 1 && pp0 == "chat" && n is Chatable) {
+      popedView?.chat?.second.cancel();
       await writeHomePalette(n, _homePalettes, bGen, rfHome);
     }
-    final id = cv.id.split('-');
+    final id = currentView.id.split('-');
     final p0 = id.first;
     switch (p0) {
       case 'home':
         return setPage(homePage());
       case 'chat':
-        return setPage(chatPage(cv.node as Chatable, fo: f));
+        final node = currentView.node as Chatable;
+        return setPage(chatPage(node, fo: f, isReload: true));
       case 'node':
-        return setPage(nodePage(cv.node!));
+        final node = currentView.node as FireNode;
+        return setPage(nodePage(node));
       case 'money':
         return setPage(moneyPage());
       case 'search':
@@ -91,19 +106,14 @@ class _HomeState extends State<Home> {
   }
 
   Transition homeTransition() {
+    print("HOME PRE $_homePalettes}");
+    print("HIDDEN PRE $_hiddenPalettes}");
     return selectionTransition(
         originalList: formattedHome,
         state: _homePalettes,
         hiddenState: _hiddenPalettes,
-        scrollOffset: vm.home.pages[0].scroll);
+        scrollOffset: homePageState.scroll);
   }
-
-  Map<ID, Palette2> get _homePalettes => vm.home.pages[0].objects.cast();
-  Map<ID, Palette2> get _hiddenPalettes => vm.home.pages[1].objects.cast();
-  Map<ID, Palette2> get _all => {..._homePalettes, ..._hiddenPalettes};
-  Iterable<Palette2> get homePalettes => _homePalettes.values;
-  Iterable<Palette2> get selectedHome => homePalettes.selected();
-  List<Palette2> get formattedHome => homePalettes.toList().formatted();
 
   // Iterable<Palette2> get homePalettes => _homePalettes.values;
   // Iterable<Palette2> get selectedHome => homePalettes.where((p) => p.selected);
@@ -113,19 +123,43 @@ class _HomeState extends State<Home> {
   // List<Palette2> get formattedHomePalettes => homePalettes.toList()
   //   ..sort((p1, p2) => p1.node.activity.compareTo(p2.node.activity));
 
-  StreamSubscription? _messageListener;
+  // Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? currentChat;
 
-  double get homeScroll => vm.home.pages[0].scroll;
+  StreamSubscription? _messageListener, _savedImageIDs, _savedVideoIDs;
 
-  void homeScrollToZero() => vm.home.pages[0].scroll = 0;
+  void homeScrollToZero() => homePageState.scroll = 0;
 
   // ======================================================= INITIALIZATION ============================================================ //
 
   void rfHome() => setPage(homePage());
 
+  void loadSavedMediasListeners() async {
+    final imageIDs = await savedMediaIDs(isVideo: false);
+    _savedImageIDs = imageIDs.listen((event) async {
+      final ar = await event.results.allResults();
+      g.savedImageIDs = ar.map((e) => e.string("id")!).toList();
+    });
+
+    final videoIDs = await savedMediaIDs(isVideo: true);
+    _savedVideoIDs = videoIDs.listen((event) async {
+      final ar = await event.results.allResults();
+      g.savedVideoIDs = ar.map((e) => e.string("id")!).toList();
+      // ids.forEach((id) async {
+      //   final m = await global<FireMedia>(id);
+      //   try {
+      //     File(m!.videoPath).delete();
+      //     m.delete();
+      //   } catch (e) {
+      //     print("Error $e");
+      //   }
+      // });
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    loadSavedMediasListeners();
     localPalettesRoutine(init: true);
     ru.clearAppCache();
     g.wallet.walletRoutine();
@@ -137,23 +171,28 @@ class _HomeState extends State<Home> {
   @override
   void dispose() {
     _messageListener?.cancel();
+    _savedImageIDs?.cancel();
+    _savedVideoIDs?.cancel();
     super.dispose();
   }
 
   Future<void> localPalettesRoutine({bool init = false}) async {
-    final homeNodes = await loadHome(isHidden: false);
-    final hiddenHomeNodes = await loadHome(isHidden: true);
+    final allHomeNodes = (await loadHome()).followedBy([g.self]);
+    final Iterable<Groupable> groups = allHomeNodes.whereType<Groupable>();
+    final Iterable<User> users = allHomeNodes.whereType<User>();
+    final Iterable<User> hiddenUsers = users.where((u) => u.isHidden);
 
-    final homeIDs = homeNodes.asIDs().toSet();
-    await globall(homeNodes.map((e) => e.mediaID).whereType());
-    globall(hiddenHomeNodes.map((e) => e.mediaID).whereType());
+    final homeIDs = allHomeNodes.asIDs().toSet();
+    await globall<FireMedia>(allHomeNodes.map((e) => e.mediaID).whereType(),
+        doFetch: true, doMergeIfFetch: true, mediaInfo: const Pair(true, null));
+    globall<FireMedia>(hiddenUsers.map((e) => e.mediaID).whereType(),
+        doFetch: true, doMergeIfFetch: true, mediaInfo: const Pair(true, null));
 
-    final hiddenIDs = hiddenHomeNodes.asIDs().toSet();
+    final hiddenIDs = hiddenUsers.asIDs().toSet();
     final shouldDump = hiddenIDs.intersection(homeIDs);
     final allLocal = homeIDs.followedBy(hiddenIDs).toSet();
 
-    final groupNodes = homeNodes.whereType<Groupable>();
-    final groupIds = groupNodes.map((e) => e.group).expand((id) => id).toSet();
+    final groupIds = groups.map((e) => e.group).expand((id) => id).toSet();
     final calcHidden = groupIds.difference(homeIDs);
 
     final stayHidden = hiddenIDs.intersection(calcHidden);
@@ -165,18 +204,18 @@ class _HomeState extends State<Home> {
       gdb<FireNode>().purgeDocumentById(dump);
     }
 
-    for (final n in homeNodes.followedBy([g.self])) {
-      await writeHomePalette(n, _homePalettes, bGen, rfHome);
+    for (final n in allHomeNodes) {
+      if (n is User && n.isHidden) {
+        await writeHomePalette(n, _hiddenPalettes, null, null);
+      } else {
+        await writeHomePalette(n, _homePalettes, bGen, rfHome);
+      }
     }
 
     if (init) setPage(homePage());
 
-    for (final n in hiddenHomeNodes) {
-      await writeHomePalette(n, _hiddenPalettes, null, null);
-    }
-
-    final fetchedNodes =
-        await globall<Chatable>(hiddenToFetch, doFetch: true, doMerge: true);
+    final fetchedNodes = await globall<Chatable>(hiddenToFetch,
+        doFetch: true, doMergeIfFetch: true, doHideIfFetch: true);
     for (final n in fetchedNodes) {
       writeHomePalette(n, _hiddenPalettes, null, null);
     }
@@ -185,9 +224,12 @@ class _HomeState extends State<Home> {
     print("HOMES = ${_homePalettes.keys.toList()}");
   }
 
-  Future<List<ButtonsInfo2>> bGen(Chatable n) async {
-    final lastMsg = await n.lastMessage();
-    if (lastMsg?.isSnip ?? false) {
+  Future<List<ButtonsInfo2>> bGen(Chatable n,
+      {Pair<FireMessage?, Iterable<ID>>? chatInfo}) async {
+    final ci = chatInfo ?? await n.homeChatInfo();
+    final lastMsg = ci.first;
+    final snips = ci.second;
+    if (snips.isNotEmpty) {
       return [
         ButtonsInfo2(
             asset: g.red,
@@ -268,28 +310,48 @@ class _HomeState extends State<Home> {
       } else if (eventPayload.first == "m") {
         // MESSAGE!
         final msgID = eventPayload[1];
-        final root = eventPayload[2];
-
-        final msg = await global<FireMessage>(msgID,
-            doFetch: true, doMergeIfFetch: true);
+        // get the message, we wait until we get the maybe associated media
+        // before merging, the reason for that is merging would trigger
+        // reload chat if we are in the chat, but we want to have the media
+        // before reloading the chat
+        final msg = await global<FireMessage>(msgID, doFetch: true);
         if (msg == null) return;
 
-        final node =
-            await global<Chatable>(root, doFetch: true, doMergeIfFetch: true);
+        // get the node
+        final node = await global<Chatable>(msg.root,
+            doFetch: true, doMergeIfFetch: true);
         if (node == null) return;
+
+        // if is snip from a user that isn't a friend, we don't predownload
+        if (msg.isSnip && node is User && !node.isFriend) {
+          await global<FireMedia>(node.mediaID,
+              doFetch: true,
+              doMergeIfFetch: true,
+              mediaInfo: Pair(false, msg.onlineMediaID));
+        } else {
+          await global<FireMedia>(node.mediaID,
+              doFetch: true,
+              doMergeIfFetch: true,
+              mediaInfo: Pair(true, msg.onlineMediaID));
+        }
+        // get the node media
         await global<FireMedia>(node.mediaID,
             doFetch: true,
             doMergeIfFetch: true,
-            withDataIfFetch: true,
-            fetchFromNodes: true);
+            mediaInfo: const Pair(true, null));
 
-        await writeHomePalette(node, _homePalettes, bGen, rfHome);
+        // get the msgMedia
+        await global<FireMedia>(msg.mediaID,
+            doFetch: true,
+            doMergeIfFetch: true,
+            mediaInfo: Pair(true, msg.onlineMediaID));
 
-        if (page is HomePage) {
-          setPage(homePage());
-        } else if (page is ChatPage) {
-          if (vm.cv.node?.id == root) setPage(chatPage(node));
-        }
+        await msg.merge();
+
+        await writeHomePalette(
+            node..updateActivity(), _homePalettes, bGen, rfHome);
+
+        if (page is HomePage) setPage(homePage());
       }
       // else if (eventPayload.first == "s") {
       // final String mediaID = eventPayload[1];
@@ -340,7 +402,7 @@ class _HomeState extends State<Home> {
         g.exchangeRate.rate = rate;
         g.exchangeRate.lastUpdate = rightNow;
         g.exchangeRate.merge();
-        if (cv.id == 'money') setPage(moneyPage());
+        if (currentView.id == 'money') setPage(moneyPage());
       }
     }
   }
@@ -373,6 +435,7 @@ class _HomeState extends State<Home> {
 
   Future<void> metaSend(Payload p, Iterable<Chatable> targets) async {
     final targetIDs = targets.asIDs();
+    final selfInTargets = targetIDs.contains(g.self.id);
     print("Target IDs = $targetIDs");
 
     final messagesToForward = p.forwardables.whereType<ChatMessage>();
@@ -380,12 +443,17 @@ class _HomeState extends State<Home> {
     // helper that will send the messages only after the successful uploads
     void s(r.MessageRequest req, Chatable t, FireMessage msg) async {
       final success = await req.process();
-      if (success && !msg.isSnip) {
-        await msg.markSent();
-        if (page is ChatPage && cv.node?.id == t.id) {
-          setPage(chatPage(t, msgRe: msg, isReload: true));
+      if (success) {
+        await writeHomePalette(t, _homePalettes, bGen, rfHome);
+        if (!msg.isSnip) {
+          await msg.markSent();
+          if (page is ChatPage && currentView.node?.id == t.id) {
+            print("RELOADING CHAT");
+            setPage(chatPage(t, msgRe: msg, isReload: true));
+          }
         }
       }
+      if (page is HomePage) setPage(homePage(prompt: "Sent!"));
     }
 
     List<Future<bool>> u = [];
@@ -407,14 +475,22 @@ class _HomeState extends State<Home> {
     // We start with uploading the payload media if there is one
     // If it's a snip, we can know because there's the media cached path
     // If it's not a snip, it should be pre-written
-    final isSnip = p.isSnip;
+    final bool isSnip = p.isSnip;
+    final bool doSave = !isSnip || selfInTargets;
     if (p.media != null) {
-      u.add(uploadMedia(p.media!, isSnip: isSnip));
-      if (!isSnip && p.media?.cachePath != null) p.media!.writeFromCachedPath();
+      u.add(uploadMedia(p.media!..cache(), isSnip: isSnip));
+      if (doSave && p.media?.cachePath != null) p.media!.writeFromCachedPath();
     }
     for (final t in targets) {
-      final ourMsg = p.generateMessage(root: t.id);
-      if (!isSnip) ourMsg?.markRead();
+      t.updateActivity();
+      final ourMsg = p.makeMsg(root: t.id, onlineMediaID: p.media?.onlineID)
+        ?..cache();
+      print("OUR MESSAGE = ${ourMsg?.toJson()}");
+
+      if (doSave) await ourMsg?.merge();
+      // this way we can send snips to ourself
+      final dontMarkRead = isSnip && t.id == g.self.id;
+      if (!dontMarkRead) await ourMsg?.markRead();
 
       FireNode nodeRef = t;
       List<ID> receipients;
@@ -446,7 +522,9 @@ class _HomeState extends State<Home> {
         // markRead will save the message locally
         // we mark read every new forwarded messages, no exceptions
         final fMedia = m.mediaInfo?.media;
-        final fMsg = m.message.forwarded(g.self.id, t.id)..markRead();
+        final fMsg = m.message.forwarded(g.self.id, t.id)
+          ..cache()
+          ..markRead();
         // we don't send the message if the receipient is us
         if (t.id != g.self.id) {
           u.add(uploadMessage(fMsg));
@@ -581,35 +659,36 @@ class _HomeState extends State<Home> {
     final prompts = await ru.randomPrompts(10);
     final hc = await r.getHyperchat(prompts);
     if (hc == null) {
-      vm.popUntilHome();
+      viewManager.popUntilHome();
       await unselectHomeSelection(updateActivity: false);
       setPage(homePage(prompt: "Failed to create hyperchat!"));
       return;
     }
-    final (hcMediaData, (firstWord, secondWord)) = hc;
 
-    final hcID = sha1(hcMediaData).toBase58();
-    final hcMedia = FireMedia(deterministicMediaID(hcMediaData, g.self.id),
-        tinyThumbnail: ru.makeTiny(hcMediaData),
+    final hcID = sha1(hc.first).toBase58();
+    final hcMedia = FireMedia(deterministicMediaID(hc.first, g.self.id),
+        tinyThumbnail: ru.makeTiny(hc.first),
         mime: "image/png",
         ownerID: g.self.id,
         timestamp: makeTimestamp(),
-        aspectRatio: 1.0);
+        width: 512,
+        height: 512);
+    await hcMedia.write(imageData: hc.first);
 
     final hyper = Hyperchat(hcID,
-        firstWord: firstWord,
-        secondWord: secondWord,
+        firstWord: hc.second.first,
+        secondWord: hc.second.second,
         activity: makeTimestamp(),
         group: grp,
         mediaID: hcMedia.id);
-    final uploads = [uploadMedia(hcMedia), uploadNode(hyper)];
+    final uploads = [uploadMedia(hcMedia, isNode: true), uploadNode(hyper)];
     final success = (await Future.wait(uploads)).every((u) => u);
 
     if (!success) {
-      vm.popUntilHome();
+      hcMedia.delete();
+      viewManager.popUntilHome();
       return setPage(homePage(prompt: "Failed to upload Hyperchat"));
     } else {
-      await hcMedia.write(imageData: hcMediaData);
       hyper.merge();
       gCache(hcMedia);
       gCache(hyper);
@@ -617,24 +696,28 @@ class _HomeState extends State<Home> {
 
     await metaSend(p, [hyper]);
     unselectHomeSelection();
-    vm.popUntilHome();
+    viewManager.popUntilHome();
     setPage(chatPage(hyper, isPush: true));
     return;
   }
 
   Future<void> makeGroup(Group group, FireMedia m, Payload p) async {
     setPage(loadingPage());
-    final uploads = [uploadMedia(m), uploadNode(group)];
+    final uploads = [uploadMedia(m, isNode: true), uploadNode(group)];
     final success = (await Future.wait(uploads)).every((u) => u);
 
     if (success) {
+      await group.merge();
+      await m.merge();
+      m.cache();
+      group.cache();
       await metaSend(p, [group]);
-      await writeHomePalette(group, _homePalettes, bGen, rfHome);
+      // await writeHomePalette(group, _homePalettes, bGen, rfHome);
       await unselectHomeSelection();
-      vm.popUntilHome();
+      viewManager.popUntilHome();
       setPage(chatPage(group, isPush: true));
     } else {
-      vm.popUntilHome();
+      viewManager.popUntilHome();
       setPage(homePage(prompt: "Failed to create group"));
     }
   }
@@ -667,7 +750,7 @@ class _HomeState extends State<Home> {
     required String path,
     required String mimetype,
     required bool isReversed,
-    required double aspectRatio,
+    required Size size,
     String? text,
   }) async {
     // image from camera are cached files, so they are
@@ -675,8 +758,6 @@ class _HomeState extends State<Home> {
 
     final timestamp = makeTimestamp();
     setPage(loadingPage());
-
-    print("The ASPECT RATIO = $aspectRatio");
 
     final media = FireMedia(messagePushId(),
         tinyThumbnail: "",
@@ -687,7 +768,8 @@ class _HomeState extends State<Home> {
         cachePath: path,
         isReversed: isReversed,
         text: text,
-        aspectRatio: aspectRatio);
+        width: size.width,
+        height: size.height);
     // payload could potentially have forwards in a snip...
     final payload = Payload(
         isSnip: true, replies: null, forwards: null, text: null, media: media);
@@ -726,7 +808,7 @@ class _HomeState extends State<Home> {
     // }
 
     await unselectHomeSelection();
-    vm.popUntilHome();
+    viewManager.popUntilHome();
     setPage(homePage(prompt: "Pinged &attachment"));
   }
 
@@ -741,17 +823,17 @@ class _HomeState extends State<Home> {
       send: (p, t) async {
         await metaSend(p, t);
         await unselectHomeSelection(updateActivity: true);
-        vm.popUntilHome();
+        viewManager.popUntilHome();
         setPage(homePage(prompt: "Sent messages!"));
       },
-      palettes: formattedHome,
+      homeState: homeView,
       hyperchat: () => setPage(hyperchatPage()),
       group: () => setPage(groupPage()),
       money: () => setPage(
         moneyPage(transition: homeTransition(), isPush: true),
       ),
       ping: (text) => ping(text, selectedHome.asNodes<Chatable>()),
-      snip: () async => setPage(await snipPage()),
+      snip: () => setPage(snipPage()),
       search: () => setPage(searchPage(isPush: true)),
       delete: () async {
         for (final p in List<Palette2>.from(homePalettes)) {
@@ -771,7 +853,7 @@ class _HomeState extends State<Home> {
   }
 
   ru.Down4PageWidget forwardPage(List<Down4Object> fo, {bool isPush = false}) {
-    Map<ID, Palette2> _fState() => cv.cp.objects.cast();
+    Map<ID, Palette2> _fState() => currentView.currentPage.objects.cast();
     void rf() => setPage(forwardPage(fo));
     List<ButtonsInfo2> fbGen(Chatable c) {
       return [
@@ -783,8 +865,8 @@ class _HomeState extends State<Home> {
     }
 
     if (isPush) {
-      vm.popUntilHome();
-      vm.push(V(id: "forward", pages: [P()]));
+      viewManager.popUntilHome();
+      viewManager.push(ViewState(id: "forward", pages: [PageState()]));
       for (final c in formattedHome.asNodes<Chatable>()) {
         writePalette3<Chatable>(c, _fState(), fbGen, rf,
             pr: _homePalettes[c.id]?.messagePreview);
@@ -792,6 +874,8 @@ class _HomeState extends State<Home> {
     }
 
     return ForwardingPage(
+        hiddenHomeState: _hiddenPalettes,
+        viewState: viewManager.currentView,
         fObjects: fo,
         openChat: (fObjects, node) =>
             setPage(chatPage(node, fo: fObjects, isPush: true)),
@@ -801,7 +885,7 @@ class _HomeState extends State<Home> {
           await metaSend(p, t);
           await unselectHomeSelection();
           homeScrollToZero();
-          vm.popUntilHome();
+          viewManager.popUntilHome();
           setPage(homePage(prompt: "Forwarded messages"));
         },
         back: () => back(withPop: true));
@@ -810,7 +894,7 @@ class _HomeState extends State<Home> {
   ru.Down4PageWidget paymentPage(Down4Payment payment) {
     return PaymentPage(
       ok: () {
-        vm.popUntilHome();
+        viewManager.popUntilHome();
         setPage(homePage());
       },
       sendPayment: (pay) async {
@@ -827,7 +911,7 @@ class _HomeState extends State<Home> {
             header: "${g.self.displayName} payed you",
             body: pay.textNote,
           ).process();
-          vm.popUntilHome();
+          viewManager.popUntilHome();
           setPage(homePage(prompt: "Sent payment"));
         }
       },
@@ -847,8 +931,8 @@ class _HomeState extends State<Home> {
     // payment, it would not be necessary if listeners work on lazy box, but
     // haven't found a way to make the listener work yet...
   }) {
-    Map<ID, Palette2> people() => cv.pages[0].objects.cast();
-    Map<ID, Palette2> payments() => cv.pages[1].objects.cast();
+    Map<ID, Palette2> people() => currentView.pages[0].objects.cast();
+    Map<ID, Palette2> payments() => currentView.pages[1].objects.cast();
     void rf() => setPage(moneyPage());
     void openPay(Down4Payment payment) => setPage(paymentPage(payment));
 
@@ -859,7 +943,9 @@ class _HomeState extends State<Home> {
         });
 
     if (isPush) {
-      vm.push(V(id: "money", pages: [P(), P()]));
+      viewManager.push(
+        ViewState(id: "money", pages: [PageState(), PageState()]),
+      );
       final users = transition?.trueTargets ?? (single != null ? [single] : []);
       for (final u in users) {
         writePalette3(u, people(), null, null);
@@ -872,7 +958,7 @@ class _HomeState extends State<Home> {
     return MoneyPage(
         single: single,
         transition: transition,
-        payments: payments().values.toList().formatted(),
+        viewState: currentView,
         loadMorePayments: () async => loadSomePayments(8),
         onScan: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
@@ -881,7 +967,7 @@ class _HomeState extends State<Home> {
         makePayment: (payment) async {
           await g.wallet.parsePayment(g.self.id, payment);
           unselectHomeSelection(updateActivity: true);
-          vm.popUntilHome();
+          viewManager.popUntilHome();
           setPage(paymentPage(payment));
         },
         back: () => back(withPop: true));
@@ -916,22 +1002,23 @@ class _HomeState extends State<Home> {
 
   ru.Down4PageWidget searchPage({bool isPush = false}) {
     if (isPush) {
-      vm.push(V(id: "search", pages: [P()]));
+      viewManager.push(ViewState(id: "search", pages: [PageState()]));
     }
 
     void rf() => setPage(searchPage());
-    Map<ID, Palette2> searchs() => cv.cp.objects.cast();
+    Map<ID, Palette2> searchs() => currentView.currentPage.objects.cast();
 
     return AddFriendPage(
+        viewState: currentView,
         search: (strIDs) async {
           final ids = strIDs.split(" ").toSet();
           final inHome = _all.those(ids).noNull().whereNodeIs<Personable>();
           final toFetch = ids.difference(inHome.asIds().toSet());
 
           final fetchedNodes = await r.fetchNodes(toFetch);
-          for (final (n, m) in fetchedNodes) {
-            m?.cache();
-            writePalette3(n..cache(), searchs(), bGen2, rf);
+          for (final fn in fetchedNodes) {
+            fn.second?.cache();
+            writePalette3(fn.first..cache(), searchs(), bGen2, rf);
           }
           rf();
         },
@@ -953,39 +1040,52 @@ class _HomeState extends State<Home> {
         back: () => back(withPop: true));
   }
 
-  Future<ru.Down4PageWidget> snipPage({
+  ru.Down4PageWidget snipPage({
     CameraController? ctrl,
     int camera = 0,
     ResolutionPreset res = ResolutionPreset.high,
     bool reload = false,
-  }) async {
-    void nextRes() {
-      snipPage(
-        ctrl: ctrl,
-        camera: camera,
-        reload: true,
-        res: res == ResolutionPreset.low
-            ? ResolutionPreset.medium
-            : res == ResolutionPreset.medium
-                ? ResolutionPreset.high
-                : ResolutionPreset.low,
-      );
-    }
+  }) {
+    // void nextRes() {
+    //   snipPage(
+    //     ctrl: ctrl,
+    //     camera: camera,
+    //     reload: true,
+    //     res: res == ResolutionPreset.low
+    //         ? ResolutionPreset.medium
+    //         : res == ResolutionPreset.medium
+    //             ? ResolutionPreset.high
+    //             : ResolutionPreset.low,
+    //   );
+    // }
 
-    Future<void> nextCam() async {
-      setPage(await snipPage(
-          ctrl: ctrl, camera: (camera + 1) % 2, reload: true, res: res));
-    }
+    // Future<void> nextCam() async {
+    //   setPage(await snipPage(
+    //       ctrl: ctrl, camera: (camera + 1) % 2, reload: true, res: res));
+    // }
+    return SnipCamera(
+      // maxZoom: await ctrl!.getMaxZoomLevel(),
+      // minZoom: await ctrl.getMinZoomLevel(),
+      // camNum: camera,
+      cameraCallBack: sendSnip,
+      // ctrl: ctrl,
+      // nextRes: nextRes,
+      // flip: nextCam,
+      cameraBack: () {
+        ctrl?.dispose();
+        back(withPop: false);
+      },
+    );
 
     Future<ru.Down4PageWidget> snip() async {
       return SnipCamera(
-        maxZoom: await ctrl!.getMaxZoomLevel(),
-        minZoom: await ctrl.getMinZoomLevel(),
-        camNum: camera,
+        // maxZoom: await ctrl!.getMaxZoomLevel(),
+        // minZoom: await ctrl.getMinZoomLevel(),
+        // camNum: camera,
         cameraCallBack: sendSnip,
-        ctrl: ctrl,
-        nextRes: nextRes,
-        flip: nextCam,
+        // ctrl: ctrl,
+        // nextRes: nextRes,
+        // flip: nextCam,
         cameraBack: () {
           ctrl?.dispose();
           back(withPop: false);
@@ -993,13 +1093,13 @@ class _HomeState extends State<Home> {
       );
     }
 
-    if (ctrl == null || reload) {
-      await ctrl?.dispose();
-      ctrl = CameraController(g.cameras[camera], res);
-      await ctrl.initialize();
-    }
-
-    return snip();
+    // if (ctrl == null || reload) {
+    //   await ctrl?.dispose();
+    //   ctrl = CameraController(g.cameras[camera], res);
+    //   await ctrl.initialize();
+    // }
+    //
+    // return snip();
   }
 
   ru.Down4PageWidget nodePage(FireNode n, {bool isPush = false}) {
@@ -1009,19 +1109,21 @@ class _HomeState extends State<Home> {
       if (r.contains(id)) {
         // we don't allow cycles
         while (route.last != id) {
-          final v = vm.pop();
+          final v = viewManager.pop();
           final l = r.removeLast();
           print("ROUTE = $route");
-          print("POPPED VIEW ${v.id}");
+          print("POPPED VIEW ${v?.id}");
           print("POPPED $l");
         }
       } else {
-        vm.push(V(id: "node-${n.id}", pages: [P()], node: n));
+        viewManager.push(
+          ViewState(id: "node-${n.id}", pages: [PageState()], node: n),
+        );
       }
     }
 
     return NodePage(
-        node: n,
+        viewState: currentView,
         openChat: (p_) => setPage(chatPage(p_, isPush: true)),
         openNode: (p_) => setPage(nodePage(p_, isPush: true)),
         payNode: (p_) => setPage(moneyPage(single: p_, isPush: true)),
@@ -1030,38 +1132,41 @@ class _HomeState extends State<Home> {
 
   ru.Down4PageWidget chatPage(
     Chatable c, {
-    List<ID> ordered = const [],
     bool isPush = false,
     bool isReload = false,
     bool rewriteMsgWithNodes = false,
     FireMessage? msgRe,
     List<Down4Object>? fo,
   }) {
-    bool forwarding() => fo != null;
     ID chatID() => "chat-${c.id}";
-    Map<ID, ChatMessage> messages() => vm.cv.pages[0].objects.cast();
-    Map<ID, Palette2> members() => vm.cv.pages[1].objects.cast();
-    Map<ID, EmptyObject> msgWithVideos() => vm.cv.pages[2].objects.cast();
-    Map<ID, EmptyObject> msgWithNodes() => vm.cv.pages[3].objects.cast();
+    ViewState chat() => viewManager.at(chatID());
+
+    List<ID> orderedMsgsIDs() => chat().chat?.first ?? [];
+    Map<ID, ChatMessage> messages() => chat().pages[0].objects.cast();
+    Map<ID, Palette2> members() => chat().pages[1].objects.cast();
+    Set<ID> msgsWithVideos() => chat().refs("messages_with_videos");
+    Set<ID> msgsWithNodes() => chat().refs("messages_with_nodes");
+
+    bool forwarding() => fo != null;
+
     void opn(FireNode n_) => setPage(nodePage(n_, isPush: true));
     void Function(FireNode)? openNode() => forwarding() ? null : opn;
-
     List<ButtonsInfo2> Function(Chatable)? cbGen = forwarding() ? null : bGen2;
 
-    void refreshChat({bool stopVid = false, List<ID>? newOrder}) {
+    void refreshChat({bool stopVid = false}) async {
       final pg = page;
-      if (pg is! ChatPage || pg.n.id != c.id) return;
+      if (pg is! ChatPage || pg.viewState.node!.id != c.id) return;
 
       if (stopVid) {
-        for (final v in msgWithVideos().keys) {
+        for (final v in msgsWithVideos()) {
           messages()[v] = messages()[v]!.onPageTransition();
         }
       }
 
-      setPage(chatPage(c, fo: pg.fo, ordered: newOrder ?? ordered));
+      setPage(chatPage(c, fo: pg.fo));
     }
 
-    void writeGroupNodes() {
+    void writeGroupNodesIfGroup() {
       final FireNode ref = c;
       if (ref is Groupable) {
         for (final n in _all.those(ref.group).noNull().asNodes<Personable>()) {
@@ -1074,10 +1179,10 @@ class _HomeState extends State<Home> {
       await writeMessages(
           limit: i,
           ch: c,
-          ordered: ordered,
+          ordered: orderedMsgsIDs(),
           state: messages(),
-          withNodes: msgWithNodes(),
-          videos: msgWithVideos(),
+          withNodes: msgsWithNodes(),
+          videos: msgsWithVideos(),
           refresh: refreshChat,
           openNode: openNode());
       refreshChat();
@@ -1087,10 +1192,10 @@ class _HomeState extends State<Home> {
       Future(() async {
         // is a reload, load all new messages
         final pg = page;
-        if (pg is! ChatPage || pg.n.id != c.id) return;
+        if (pg is! ChatPage || pg.viewState.node?.id != c.id) return;
         final loaded = messages().keys;
         List<ID> toLoad = [];
-        for (final id in ordered) {
+        for (final id in orderedMsgsIDs()) {
           if (!loaded.contains(id)) {
             toLoad.add(id);
           } else {
@@ -1100,9 +1205,9 @@ class _HomeState extends State<Home> {
         await writeMessages(
             limit: toLoad.length,
             ch: c,
-            ordered: toLoad,
-            videos: msgWithVideos(),
-            withNodes: msgWithNodes(),
+            ordered: orderedMsgsIDs(),
+            videos: msgsWithVideos(),
+            withNodes: msgsWithNodes(),
             state: messages(),
             refresh: refreshChat,
             openNode: openNode());
@@ -1111,40 +1216,45 @@ class _HomeState extends State<Home> {
 
     void initChat() {
       Future(() async {
+        final theChat = await c.getTheChat();
+        final currentMessages = theChat.first.toList();
+        chat().chat = Pair(
+          theChat.first.toList(),
+          theChat.second.listen((event) async {
+            final r = await event.results.allResults();
+            chat().chat = Pair(
+              r.map((e) => e.string("id")!).toList(),
+              chat().chat!.second,
+            );
+            reloadChat();
+          }),
+        );
+
         // if is group, write members
-        writeGroupNodes();
-        final theOrder = (await c.orderedChatIDs()).toList();
+        writeGroupNodesIfGroup();
         // write the messages
         await writeMessages(
             limit: 20,
-            ordered: theOrder,
+            ordered: currentMessages,
             ch: c,
             state: messages(),
-            videos: msgWithVideos(),
-            withNodes: msgWithNodes(),
-            refresh: () => refreshChat(),
+            videos: msgsWithVideos(),
+            withNodes: msgsWithNodes(),
+            refresh: refreshChat,
             openNode: openNode());
 
-        refreshChat(newOrder: theOrder);
+        refreshChat();
       });
     }
 
     if (isPush) {
-      final id = chatID();
-      final r = List<String>.from(route);
-      if (r.contains(id)) {
-        // we don't allow cycles
-        while (route.last != id) {
-          print("ROUTE BEFORE POP = $route");
-          final v = vm.pop();
-          final l = r.removeLast();
-          print("ROUTE = $route");
-          print("POPPED AFTER POP ${v.id}");
-          print("POPPED $l");
-        }
+      final wasAlreadyOnRoute = route.contains(chatID());
+      viewManager.push(
+        ViewState(id: chatID(), pages: [PageState(), PageState()], node: c),
+      );
+      if (wasAlreadyOnRoute) {
         reloadChat();
       } else {
-        vm.push(V(id: id, pages: [P(), P(), P(), P()], node: c));
         initChat();
       }
     }
@@ -1156,27 +1266,27 @@ class _HomeState extends State<Home> {
     if (isReload) reloadChat();
 
     if (rewriteMsgWithNodes) {
-      for (final id in msgWithNodes().keys) {
+      for (final id in msgsWithNodes()) {
         messages()[id] = messages()[id]!.withOpenNode(open: openNode());
       }
-      writeGroupNodes();
+      writeGroupNodesIfGroup();
       refreshChat();
     }
 
     return ChatPage(
-        onPageChange: (_) => refreshChat(stopVid: true),
-        messages: messages(),
-        ordered: ordered,
-        members: members(),
+        onPageChange: (ix) {
+          refreshChat(stopVid: true);
+          chat().currentIndex = ix;
+        },
         loadMore: loadMore,
-        n: c,
+        viewState: viewManager.at(chatID()),
         fo: fo,
         openNode: opn,
         send: (payload) async {
           await metaSend(payload, [c]);
-          if (forwarding()) vm.popInBetween(); // poping the forwarding page
+          // poping the forwarding page
+          if (forwarding()) viewManager.popInBetween();
           setPage(chatPage(c,
-              ordered: ordered,
               isReload: true,
               rewriteMsgWithNodes: payload.forwardables.isNotEmpty));
         }, // TODO, will need future nodes
@@ -1185,6 +1295,7 @@ class _HomeState extends State<Home> {
 
   Future<ru.Down4PageWidget> snipView(Chatable node, [List<ID>? l]) async {
     final unreadSnips = l ?? (await node.unreadSnipIDs()).toList();
+    print("Unread snips=$unreadSnips");
     if (unreadSnips.isEmpty) {
       await writeHomePalette(node, _homePalettes, bGen, rfHome);
       setPage(homePage());
@@ -1192,7 +1303,8 @@ class _HomeState extends State<Home> {
     final s = await global<FireMessage>(unreadSnips.first, doCache: false);
     s!.markRead();
 
-    final m = await global<FireMedia>(s.mediaID, doCache: false, doFetch: true);
+    final m = await global<FireMedia>(s.mediaID,
+        doCache: false, doFetch: true, mediaInfo: Pair(false, s.onlineMediaID));
 
     if (m == null) return snipView(node);
 
@@ -1211,42 +1323,52 @@ class _HomeState extends State<Home> {
     //       ),
     //     );
 
-    Widget displayMedia;
-    String? text = m.text;
-    BetterPlayerController? bpc;
+    VideoPlayerController? vpc;
+    Future<Widget> Function(FireMedia m) displayBody;
+
+    if (m.isVideo) {
+      vpc = await m.videoController;
+      if (vpc == null) return snipView(node);
+      await vpc.initialize();
+      await vpc.setLooping(true);
+      await vpc.play();
+      displayBody = (media) async => ru.Down4VideoTransform(
+          displaySize: g.sizes.fullSize,
+          videoAspectRatio: media.aspectRatio,
+          video: VideoPlayer(vpc!),
+          isReversed: media.isReversed,
+          isSquared: false);
+    } else {
+      displayBody = (media) async => media.displayImage(size: g.sizes.fullSize);
+    }
 
     void back_() async {
+      vpc?.dispose();
       await writeHomePalette(node, _homePalettes, bGen, rfHome);
       back(withPop: false);
     }
 
     void next_() async {
-      if (unreadSnips.length > 1) {
+      vpc?.dispose();
+      if (unreadSnips.sublist(1).isEmpty) {
         back_();
       } else {
         setPage(await snipView(node, unreadSnips.sublist(1)));
       }
     }
 
-    if (m.isVideo) {
-      bpc = BetterPlayerController(const BetterPlayerConfiguration());
-      await bpc.setLooping(true);
-      await bpc.play();
-    }
-
-    displayMedia =
-        m.displayMedia(displaySize: g.sizes.fullSize, videoController: bpc);
+    print("FULL SIZE = ${g.sizes.fullSize}");
 
     return SnipViewPage(
-      displayMedia: displayMedia,
-      text: text,
-      back: back_,
-      next: next_,
-    );
+        displayMedia: await displayBody(m),
+        text: m.text,
+        back: back_,
+        next: next_);
   }
 
   @override
   Widget build(BuildContext context) {
+    print("CURRENT IMAGE CACHE SIZE = ${ImageCache().currentSize}");
     print("REBUILDING HOME");
     return page;
   }

@@ -21,6 +21,13 @@ import 'dart:io' as io;
 
 final listEqual_ = const ListEquality().equals;
 
+// extension on List<int> {
+//   Uint8List toUint8List() => Uint8List.fromList(this);
+//   String toBase58() => base58.encode(toUint8List());
+//   String toBase64() => base64.encode(this);
+//   String toHex() => hex.encode(this);
+// }
+
 int randomSats() {
   return Random().nextInt(50);
 }
@@ -135,7 +142,7 @@ List<int>? sigData({
   return null;
 }
 
-Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
+Future<Map<String, Down4TXOUT>?> getUtxos(String checkAddress) async {
   final url = Uri.parse(
     "https://api.whatsonchain.com/v1/bsv/test/address/$checkAddress/unspent",
   );
@@ -153,7 +160,7 @@ Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
 
   final utxos = List.from(jsonDecode(res.body));
 
-  var d4utxos = <Down4TXOUT>[];
+  var d4utxos = <String, Down4TXOUT>{};
   for (final utxo in utxos) {
     var d4txout = Down4TXOUT(
       txid: TXID.fromHex(utxo["tx_hash"]),
@@ -161,15 +168,16 @@ Future<List<Down4TXOUT>?> getUtxos(String checkAddress) async {
       outIndex: utxo["tx_pos"],
       scriptPubKey: p2pkh(rawAddress),
     );
-    d4utxos.add(d4txout);
+    d4utxos[d4txout.id] = d4txout;
   }
   return d4utxos;
 }
 
 String down4UtxoID(TXID txid, FourByteInt ix) =>
-    sha256((txid.data + ix.data)).toBase64();
+    sha256((txid.data + ix.data)).toBase58();
 
-Future<List<Down4TXOUT>?> checkPrivateKey(String base58PrivateKey) async {
+Future<Map<String, Down4TXOUT>?> checkPrivateKey(
+    String base58PrivateKey) async {
   final asByte = base58.decode(base58PrivateKey);
   final big = BigInt.parse(asByte.toHex(), radix: 16);
 
@@ -293,7 +301,8 @@ void main() {
 
   // io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
 
-  final pkHex = io.File("/home/scott/jeff.txt").readAsStringSync();
+  // final pkHex = io.File("/home/scott/jeff.txt").readAsStringSync();
+  final pkHex = io.File("C:/Users/coton/Desktop/jeff.txt").readAsStringSync();
 
   var pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
   var pair1 = pair0.derive(makeUint32(1))!;

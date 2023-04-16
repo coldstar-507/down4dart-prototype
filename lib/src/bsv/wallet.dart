@@ -200,8 +200,8 @@ class Wallet extends FireObject {
     final fetchedUtxos = await getUtxos(importedAddress.toBase58());
     if (fetchedUtxos == null) return null;
 
-    final availSats =
-        fetchedUtxos.fold<Sats>(Sats(0), (tot, utxo) => tot + utxo.sats);
+    final availableSats =
+        fetchedUtxos.values.fold<Sats>(Sats(0), (tot, utxo) => tot + utxo.sats);
 
     // outs(34*2) + nOut(1) + version(4) + nSeq(4) + nIn(var) + ins(148*nIn)
     final nIn = VarInt.fromInt(fetchedUtxos.length);
@@ -209,7 +209,7 @@ class Wallet extends FireObject {
 
     final minerFees = Sats((SATS_PER_BYTE * txSize).ceil());
     final down4Fees = Sats((minerFees.asInt * 1.2).ceil() + randomSats());
-    final encaissement = availSats - minerFees - down4Fees;
+    final encaissement = availableSats - minerFees - down4Fees;
 
     if (encaissement.asInt <= 0) return null;
 
@@ -234,7 +234,7 @@ class Wallet extends FireObject {
     final List<Down4TXOUT> outs = [down4Out, selfOut];
 
     List<Down4TXIN> ins = [];
-    for (var utxo in fetchedUtxos) {
+    for (var utxo in fetchedUtxos.values) {
       var txin = Down4TXIN(
         utxoIndex: FourByteInt(utxo.outIndex!),
         utxoTXID: utxo.txid!,
@@ -244,9 +244,7 @@ class Wallet extends FireObject {
     }
 
     for (var i = 0; i < ins.length; i++) {
-      final theUtxo = fetchedUtxos.firstWhere(
-        (element) => element.id == ins[i].utxoID,
-      );
+      final theUtxo = fetchedUtxos[ins[i].utxoID]!;
       final sData = sigData(txsIn: ins, txsOut: outs, nIn: i, utxo: theUtxo);
       if (sData == null) return null;
       final scriptSig = p2pkhSig(keys: importedKeys, sigData: sData);
