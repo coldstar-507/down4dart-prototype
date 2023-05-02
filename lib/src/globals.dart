@@ -55,24 +55,6 @@ Future<bool> uploadNode(FireNode node) async {
   }
 }
 
-// Future<bool> uploadPalette(Palette2 p) async {
-//   final nodeUpload = uploadNode(p.node);
-//   final mediaUpload = p.image == null
-//       ? Future.value(true)
-//       : uploadMedia(p.image!, isNode: true);
-//
-//   final nSuccess = await nodeUpload;
-//   final mSuccess = await mediaUpload;
-//   return nSuccess && mSuccess;
-//   // if (nSuccess && !mSuccess) {
-//   //   print("uploadPalette: Successfullly uploaded node but not the media");
-//   //   await _fs.collection("Nodes").doc(p.node.id).delete();
-//   // } else if (mSuccess && !nSuccess && p.image != null) {
-//   //   print("uploadPalette: Successfullly uploaded node but not the media");
-//   //   await _st_node.ref(p.image!.id).delete();
-//   // }
-// }
-
 String messagePushId() => db.child("Messages").push().key!;
 
 Future<Down4Payment?> downloadPayment(ID paymentID) async {
@@ -103,15 +85,14 @@ Future<bool> uploadMedia(
   }
   print("UPLOADING mediaID: ${media.id}");
   // if it's a message media and needs an update, we update it
-  final copy = media.copy();
-
+  ID? newID;
+  int? newTs;
   if (!isNode) {
     // we refresh onlineID and onlineTimestamp
-    final newID = messagePushId();
-    final newTs = makeTimestamp();
-    media.updateOnlineReference(newID, newTs);
+    newID = messagePushId();
+    newTs = makeTimestamp();
   }
-  final ref = isNode ? _st_node.ref(media.id) : _st.ref(media.onlineID!);
+  final ref = isNode ? _st_node.ref(media.id) : _st.ref(newID);
   File? cachedFile, videoFile;
   Uint8List? imageData;
   try {
@@ -119,31 +100,28 @@ Future<bool> uploadMedia(
     final metadata = SettableMetadata(customMetadata: jsonMetadata);
     if ((cachedFile = await media.cachedFile) != null) {
       await ref.putFile(cachedFile!, metadata);
-      return true;
     } else {
       if (media.isVideo) {
-        videoFile = await media.videoFile;
+        videoFile = media.videoFile;
         if (videoFile == null) {
-          print("Can't find video file!");
+          print("ERROR UPLOADING MEDIA: Can't find video file!");
           return false;
         }
         await ref.putFile(videoFile, metadata);
-        return true;
       } else {
         imageData = await media.imageData;
         if (imageData == null) {
-          print("Can't find image data!");
+          print("ERROR UPLOADING MEDIA: Can't find image data!");
           return false;
         }
         await ref.putData(imageData, metadata);
       }
     }
-    print("Successfully uploaded media id: ${media.id}");
+    print("SUCCESS UPLOADING MEDIA");
+    if (newID != null) await media.updateOnlineReference(newID, newTs!);
     return true;
   } catch (e) {
-    // if it's not a node nor a snip and failed during upload, we set it back
-    if (!isNode && !isSnip) gCache(copy..merge());
-    print("Error uploading media id: ${media.id}, err: $e");
+    print("ERROR UPLOADING MEDIA: $e");
     return false;
   }
 }
@@ -160,33 +138,18 @@ Future<bool> uploadMessage(FireMessage msg) async {
   }
 }
 
-class P {
-  double scroll;
-  Map<ID, Down4Object> objects;
-  P({double? scroll, Map<ID, Down4Object>? objects})
-      : scroll = scroll ?? 0.0,
-        objects = objects ?? {};
-}
-
-class V {
-  Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
-  final FireNode? node;
-  final ID id;
-  final List<P> pages;
-  int ci;
-
-  V({
-    required this.id,
-    required this.pages,
-    int? ix,
-    this.node,
-    this.chat,
-  }) : ci = ix ?? 0;
-
-  P get cp => pages[ci];
-}
-
 class ViewManager {
+  // view IDs code
+  // Homepage      -> 'home'
+  // GroupPage     -> 'group'
+  // HyperchatPage -> 'hyper'
+  // SearchPage    -> 'search'
+  // SnipPage      -> 'snip'
+  // ChatPage      -> 'c-{nodeID}'
+  // NodePage      -> 'n-{nodeID}'
+  // ForwardPage   -> 'forward'
+  // MoneyPage     -> 'money'
+  // LoadingPage   -> 'loading'
   List<ID> route;
   Map<ID, ViewState?> views;
 
@@ -223,9 +186,7 @@ class ViewManager {
   void popInBetween() {
     final newRoute = [route.first, route.last];
     for (final viewID in route.sublist(1, route.length - 1)) {
-      if (viewID == newRoute.last) {
-        views.remove(viewID);
-      }
+      if (viewID != newRoute.last) views.remove(viewID);
     }
     route = newRoute;
   }
@@ -269,41 +230,6 @@ class ViewState {
   PageState get currentPage => pages[currentIndex];
 }
 
-// view IDs code
-// Homepage      -> 'home'
-// GroupPage     -> 'group'
-// HyperchatPage -> 'hyper'
-// SearchPage    -> 'search'
-// SnipPage      -> 'snip'
-// ChatPage      -> 'c-{nodeID}'
-// NodePage      -> 'n-{nodeID}'
-// ForwardPage   -> 'forward'
-// MoneyPage     -> 'money'
-// LoadingPage   -> 'loading'
-class ViewManager2 {
-  List<V> views;
-  ViewManager2(this.views);
-  V get cv => views.last;
-  V get pv => views[views.length - 2];
-
-  V get home => views.first;
-
-  void push(V v) => views.add(v);
-  V pop() => views.removeLast();
-  void popUntilHome() {
-    final nv = views.length;
-    for (int i = 0; i < nv - 1; i++) {
-      pop();
-    }
-  }
-
-  void popInBetween() {
-    final last = pop();
-    popUntilHome();
-    push(last);
-  }
-}
-
 class Payload {
   final List<Down4Object> forwardables;
   final List<ID> replies;
@@ -334,7 +260,7 @@ class Payload {
     required String? text,
     required this.media,
     required this.isSnip,
-  })  : forwardables = forwards ?? [],
+  })  : forwardables = forwards?.reversed.toList(growable: false) ?? [],
         replies = replies ?? [],
         text = text ?? "";
 }
@@ -445,21 +371,21 @@ Future<void> writeHomePalette(
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false
-
-  bool? selectionIfReload;
   final Palette2? pInState = state[c.id];
-  selectionIfReload = pInState?.selected;
-  bool isSelected = sel ?? selectionIfReload ?? false;
+  final bool? selectionIfReload = pInState?.selected;
+  final bool isSelected = sel ?? selectionIfReload ?? false;
 
   final chatInfo = await c.homeChatInfo();
-  // final lastMsg = await c.lastChatMessage();
   final preview = chatInfo.first == null
       ? null
       : (chatInfo.first?.text ?? "").isNotEmpty
           ? chatInfo.first?.text!
           : "&attachment";
 
-  void Function()? onSelect = onSel == null
+  final node = c;
+  final hide = node is User && !node.isFriend && !await node.hasMessages();
+
+  void Function()? onSelect = onSel == null || hide
       ? null
       : () async {
           await writeHomePalette(c, state, bGen, onSel, sel: !isSelected);
@@ -469,19 +395,12 @@ Future<void> writeHomePalette(
   state[c.id] = Palette2(
       key: Key(c.id),
       node: c,
-      // image: pInState?.image ??
-      //     await global(c.mediaID,
-      //         doFetch: true,
-      //         doMergeIfFetch: true,
-      //         withDataIfFetch: true,
-      //         fetchFromNodes: true),
       selected: isSelected,
       messagePreview: preview,
       imPress: onSelect,
+      show: !hide,
       bodyPress: onSelect,
-      buttonsInfo2: await bGen?.call(c, chatInfo: chatInfo) ?? []);
-
-  print("SUCCESS FULLY WROTE ${c.id} TO STATE = $state");
+      buttonsInfo2: hide ? [] : await bGen?.call(c, chatInfo: chatInfo) ?? []);
 }
 
 void writePalette3<T extends FireNode>(
@@ -515,8 +434,6 @@ void writePalette3<T extends FireNode>(
       bodyPress: onSelect,
       messagePreview: pr,
       buttonsInfo2: bGen?.call(n) ?? []);
-
-  print("SUCCESS FULLY WROTE ${n.id} TO STATE = $state");
 }
 
 class Transition {
@@ -539,14 +456,11 @@ class Transition {
 Transition selectionTransition({
   required List<Palette2> originalList,
   required Map<ID, Palette2> state,
-  required Map<ID, Palette2> hiddenState,
   required double scrollOffset,
 }) {
-  print("STATE = $state");
-  print("HIDDEN STATE = $hiddenState");
+  final hidden = state.values.hidden();
 
   final ogOrder = originalList.asIds();
-  final hidden = List<Palette2>.from(hiddenState.values);
   final selected = originalList.selected();
   final unselected = originalList.notSelected();
 
@@ -571,8 +485,11 @@ Transition selectionTransition({
   // not selected should get a fold transition
   // selected are unselected
   // all are deactivated
+
+  print("unhidding ${unHide.map((e) => e.node.displayName)}");
+
   final pals = <Palette2>{
-    ...unHide,
+    ...unHide.map((e) => e.showing(true)),
     ...selectedPeople.map(
         (e) => e.deactivated().animated(selected: false, fadeButton: true)),
     ...unselectedUserInGroups
@@ -588,7 +505,7 @@ Transition selectionTransition({
 
   print("pals=${pals.map((e) => e.node.displayName).toList()}");
   return Transition(
-      trueTargets: pals.where((p) => !p.fold).asNodes<Personable>(),
+      trueTargets: pals.where((p) => !p.fold && p.show).asNodes<Personable>(),
       preTransition: originalList,
       postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIds())),
       state: state,
@@ -746,52 +663,22 @@ Future<void> writePayments(
   void Function(Down4Payment) openPayment, [
   int limit = 5,
 ]) async {
-  await for (final p in g.wallet.payments) {
-    state[p.id] = Palette2(
-      key: Key(p.id),
-      node: Payment(p.id, payment: p, selfID: g.self.id),
-      // image: null,
-      messagePreview: p.textNote,
-      buttonsInfo2: p.isSpentBy(id: g.self.id)
+  final offset = state.length;
+  await for (final pay in g.wallet.nPayments(limit: limit, offset: offset)) {
+    state[pay.id] = Palette2(
+      key: Key(pay.id),
+      node: Payment(pay.id, payment: pay, selfID: g.self.id),
+      messagePreview: pay.textNote,
+      buttonsInfo2: pay.isSpentBy(id: g.self.id)
           ? [
               ButtonsInfo2(
                   asset: g.fifty,
-                  pressFunc: () => openPayment(p),
+                  pressFunc: () => openPayment(pay),
                   rightMost: true)
             ]
           : [],
     );
   }
-
-  // final loaded = state.keys;
-  // final all = g.boxes.payments.keys;
-  //
-  // List<Down4Payment> paymentsToLoad = [];
-  // for (final id in all) {
-  //   if (paymentsToLoad.length >= 5) break;
-  //   if (!loaded.contains(id)) {
-  //     final jsonEncodedPay = await g.boxes.payments.get(id);
-  //     if (jsonEncodedPay == null) continue;
-  //     final payment = Down4Payment.fromJson(jsonDecode(jsonEncodedPay));
-  //     paymentsToLoad.add(payment);
-  //   }
-  // }
-  //
-  // for (final payment in paymentsToLoad) {
-  //   state[payment.id] = Palette2(
-  //     node: Payment(payment.id, payment: payment, selfID: g.self.id),
-  //     image: null,
-  //     messagePreview: payment.textNote,
-  //     buttonsInfo2: payment.isSpentBy(id: g.self.id)
-  //         ? [
-  //             ButtonsInfo2(
-  //                 asset: g.fifty,
-  //                 pressFunc: () => openPayment(payment),
-  //                 rightMost: true)
-  //           ]
-  //         : [],
-  //   );
-  // }
 }
 
 class EmptyObject extends Down4Object {

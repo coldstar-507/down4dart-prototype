@@ -152,11 +152,13 @@ class _Down4State extends State<Down4> {
     final truePadding = mediaQuery.viewPadding;
     final headerHeight = size.height * 0.056;
     final allPadding = truePadding.top + truePadding.bottom + headerHeight;
+    // print(
+    //     "TRUE PADDING TOP=${truePadding.top}, TRUEPADDING BOT=${truePadding.bottom}");
     // final fakePadding = mediaQuery.padding;
     final sizes = Sizes(
         h: size.height - allPadding,
         w: size.width - truePadding.left - truePadding.right,
-        fullHeight: size.height,
+        fullHeight: size.height, // - truePadding.top - truePadding.bottom,
         headerHeight: headerHeight);
 
     g.loadSizes(sizes);

@@ -262,9 +262,11 @@ class Wallet extends FireObject {
         .where((tx) => tx.confirmations == 0)
         .toList(growable: false);
 
-    final failedIndices = await r.broadcastTxs(txsToSettle);
-    for (final i in failedIndices) {
-      print("Failed to broadcast tx ID: ${payment.txs[i]}");
+    final failures = await r.broadcastTxs(txsToSettle);
+    for (final f in failures) {
+      print(
+        "ERROR Broadcasting tx ID: ${payment.txs[f.first].txID.asHex}, ${f.second}",
+      );
     }
   }
 
@@ -276,7 +278,7 @@ class Wallet extends FireObject {
 
     for (int i = 0; i < confirmations.length; i++) {
       payment.txs[i].confirmations = confirmations[i];
-      setPayment(payment);
+      await setPayment(payment);
     }
   }
 

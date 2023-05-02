@@ -26,9 +26,9 @@ class Down4Payment extends FireObject {
   final List<Down4TX> txs;
   final bool safe;
   final String textNote;
-  final int tsSeconds;
+  final int timeStamp;
   Down4Payment(this.txs, this.safe, {required this.textNote, int? tsSeconds})
-      : tsSeconds = tsSeconds ?? (makeTimestamp() ~/ 1000);
+      : timeStamp = tsSeconds ?? makeTimestamp();
 
   int get independentGets => txs.last.txsOut
       .firstWhere((txOut) => !(txOut.isFee || txOut.isChange))
@@ -60,9 +60,9 @@ class Down4Payment extends FireObject {
   @override
   String get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    final dataPart = sha1(idFold.toUint8List()).toBase58();
-    final tsPart = makePrefix(tsSeconds);
-    return "$tsPart-$dataPart";
+    return sha1(idFold.toUint8List()).toBase58();
+    // final tsPart = makePrefix(timeStamp);
+    // return "$tsPart-$dataPart";
   }
 
   int get lastConfirmations => txs.last.confirmations;
@@ -79,7 +79,7 @@ class Down4Payment extends FireObject {
         ...utf8.encode(textNote), // this needs to be utf8 obviously
         ...VarInt.fromInt(txs.length).data,
         ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
-        ...utf8.encode(tsSeconds.toRadixString(34)),
+        ...utf8.encode(timeStamp.toRadixString(34)),
       ];
 
   factory Down4Payment.fromCompressed(Uint8List buf) {
@@ -167,7 +167,7 @@ class Down4Payment extends FireObject {
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,
         "safe": safe,
-        "ts": tsSeconds,
+        "ts": timeStamp,
         if (textNote.isNotEmpty) "txt": textNote,
       };
 

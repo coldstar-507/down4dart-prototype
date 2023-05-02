@@ -119,7 +119,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
 
   final FireNode node;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
-  final bool selected, fade, fadeButton, fold, squish;
+  final bool selected, fade, fadeButton, fold, squish, show;
   final List<ButtonsInfo2> buttonsInfo2;
   final int containerMS, fadeMS, fadeButtonMS;
   final String? messagePreview;
@@ -139,6 +139,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
     this.squish = true,
     this.fold = false,
     this.fadeButton = false,
+    this.show = true,
     this.fade = false,
     required Key key,
   })  : _image = GestureDetector(
@@ -150,7 +151,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
       key: key!,
       fold: fold,
       squish: squish,
-      // image: image,
+      show: show,
       node: node,
       fade: fade,
       fadeButton: fadeButton,
@@ -158,6 +159,27 @@ class Palette2 extends StatelessWidget implements Down4Object {
       fadeMS: fadeMS,
       messagePreview: messagePreview,
       selected: !selected,
+      imPress: imPress,
+      buttonsInfo2: buttonsInfo2,
+      imLongPress: imLongPress,
+      bodyPress: bodyPress,
+      bodyLongPress: bodyLongPress,
+    );
+  }
+
+  Palette2 showing(bool s) {
+    return Palette2(
+      key: key!,
+      fold: fold,
+      squish: squish,
+      show: s,
+      node: node,
+      fade: fade,
+      fadeButton: fadeButton,
+      fadeButtonMS: fadeButtonMS,
+      fadeMS: fadeMS,
+      messagePreview: messagePreview,
+      selected: selected,
       imPress: imPress,
       buttonsInfo2: buttonsInfo2,
       imLongPress: imLongPress,
@@ -346,15 +368,9 @@ class Palette2 extends StatelessWidget implements Down4Object {
         ),
       );
 
-  // Widget get paletteMedia => image == null
-  //     ? node.defaultNodeImage
-  //     : image!.displayImage(
-  //         displaySize: Size.square(Palette.paletteHeight),
-  //         forceSquare: true,
-  //       );
-
   @override
   Widget build(BuildContext context) {
+    if (!show) return const SizedBox.shrink();
     return AnimatedOpacity(
       opacity: fade ? 0 : 1,
       curve: Curves.easeInOut,
@@ -375,8 +391,8 @@ class Palette2 extends StatelessWidget implements Down4Object {
 }
 
 class Palette {
-  static double get paletteHeight => g.sizes.h * 0.1036;
-  static double get gapSize => g.sizes.h * 0.0159;
+  static double get paletteHeight => g.sizes.h * 0.1136;
+  static double get gapSize => g.sizes.h * 0.0119;
   static double get paletteMargin => g.sizes.w * 0.042;
   static double get blurRadius => 6.0;
   static double get spreadRadius => -7.0;

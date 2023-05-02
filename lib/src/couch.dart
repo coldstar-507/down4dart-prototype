@@ -35,7 +35,6 @@ Future<List<T>> globall<T extends FireObject>(
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
-  bool doHideIfFetch = false,
   Pair<bool, ID?>? mediaInfo,
 }) async {
   if (ids == null) return [];
@@ -44,7 +43,6 @@ Future<List<T>> globall<T extends FireObject>(
           doCache: doCache,
           doFetch: doFetch,
           doMergeIfFetch: doMergeIfFetch,
-          doHideIfFetch: doHideIfFetch,
           mediaInfo: mediaInfo))
       .toList());
   return reqs.whereType<T>().toList();
@@ -66,6 +64,8 @@ Future<void> loadIndexes() async {
   final isSnipMessageIndexConfig = ValueIndexConfiguration(["isSnip"]);
   final rootMessageIndexConfig = ValueIndexConfiguration(["root"]);
 
+  final paymentTimestampIndexConfig = ValueIndexConfiguration(["ts"]);
+
   await nodesDB.createIndex("hiddenIndex", isHiddenNodeIndexConfig);
   await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
 
@@ -76,13 +76,15 @@ Future<void> loadIndexes() async {
   await messagesDB.createIndex("isSavedIndex", isSavedMessageIndexConfig);
   await messagesDB.createIndex("isSnipIndex", isSnipMessageIndexConfig);
   await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
+
+  await paymentsDB.createIndex("timestampIndex", paymentTimestampIndexConfig);
 }
 
 Future<T?> fetch<T extends FireObject>(
   ID id, {
   bool doMerge = false,
   Pair<bool, ID?>? mediaInfo, // fireMedia specific
-  bool doHide = false, // fireNode specific
+  // bool doHide = false, // fireNode specific
 }) async {
   Future<T?> fetchNode() async {
     final snapshot = await _firestore
@@ -90,8 +92,6 @@ Future<T?> fetch<T extends FireObject>(
         .doc(id)
         .get(const firestore.GetOptions(source: firestore.Source.server));
     if (!snapshot.exists) return null;
-    final Map<String, Object?> json = snapshot.data()!.cast();
-    json["isHidden"] = doHide;
     final node = FireNode.fromJson(snapshot.data()!.cast());
     if (doMerge) {
       print("MERGING NODE ID=$id");
@@ -142,7 +142,7 @@ Future<T?> fetch<T extends FireObject>(
         print("MERGING MEDIA ID: $id");
         if (withData && mediaData != null) {
           if (isVideo) {
-            await File(media.id).writeAsBytes(mediaData);
+            await File(media.videoPath).writeAsBytes(mediaData);
           }
           await media.write(imageData: isVideo ? videoThumbnail! : mediaData);
         }
@@ -250,7 +250,6 @@ Future<T?> global<T extends FireObject>(
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
-  bool doHideIfFetch = false,
   Pair<bool, ID?>? mediaInfo,
 }) async {
   if (id == null) return null;
@@ -305,6 +304,43 @@ T fromJson<T extends FireObject>(Map<String, Object?> json) {
 
   throw 'Cannot create FireObject from json for this type: $T';
 }
+
+Future<List<FireMessage>> unsentMessages() async {
+  const raw = """
+        SELECT * FROM _ AS m
+        WHERE m.isSent = 'false' AND m.isSnip = 'false'
+        """;
+  final q = await AsyncQuery.fromN1ql(messagesDB, raw);
+  final e = await q.execute();
+  final r = await e.allResults();
+
+  return r.map((e) {
+    final json = e.toPlainMap()["m"] as Map<String, Object?>;
+    return FireMessage.fromJson(json);
+  }).toList();
+}
+
+// Future<List<User>> hiddenUsers() async {
+//   const raw = """
+//         SELECT * FROM _ AS n
+//         WHERE n.type = 'user' AND n.isFriend = 'false'
+//         """;
+//
+//   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
+//   final r = await q.execute();
+//   final e = await r.allResults();
+//   final trulyHidden = <User>[];
+//   final users = e.map((e) {
+//     final json = e.toPlainMap()["n"] as Map<String, Object?>;
+//     return fromJson<User>(json);
+//   }).toList();
+//
+//   for (final u in users) {
+//
+//   }
+//
+//   return trulyHidden;
+// }
 
 Future<Set<ID>> allGroupIDs() async {
   const rawq = "SELECT group FROM _ WHERE nodes.type in ('hyperchat', 'group')";
@@ -425,7 +461,20 @@ Future<AsyncListenStream<QueryChange<ResultSet>>> savedMediaIDs({
 
 extension WalletManager on Wallet {
   Stream<Down4Payment> get payments async* {
-    const raw = "SELECT * FROM _ AS p ORDER BY META(p).id ASC";
+    const raw = "SELECT * FROM _ AS p ORDER BY p.ts DESC";
+    final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
+    final r = await q.execute();
+    await for (final p in r.asStream()) {
+      yield Down4Payment.fromJson(p.toPlainMap()["p"]);
+    }
+  }
+
+  Stream<Down4Payment> nPayments({required int limit, int offset = 0}) async* {
+    final raw = """
+        SELECT * FROM _ AS p
+        ORDER BY p.ts DESC
+        OFFSET $offset LIMIT $limit
+        """;
     final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
     final r = await q.execute();
     await for (final p in r.asStream()) {

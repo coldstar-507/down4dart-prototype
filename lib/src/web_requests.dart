@@ -96,7 +96,7 @@ Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
 }
 
 // TODO Might need adjustment for big batches
-Future<List<int>> broadcastTxs(List<Down4TX> txs) async {
+Future<List<Pair<int, String>>> broadcastTxs(List<Down4TX> txs) async {
   final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
   List<Future<http.Response>> responses = [];
   for (final tx in txs) {
@@ -104,11 +104,10 @@ Future<List<int>> broadcastTxs(List<Down4TX> txs) async {
     responses.add(http.post(url, body: jsonEncode({"txhex": tx.fullRawHex})));
   }
 
-  var failedBroadcast = <int>[];
+  var failedBroadcast = <Pair<int, String>>[];
   for (int i = 0; i < txs.length; i++) {
     var res = await responses[i];
-    if (res.statusCode != 200) failedBroadcast.add(i);
-    // print("Response: ${jsonDecode(res.body)}");
+    if (res.statusCode != 200) failedBroadcast.add(Pair(i, res.body));
   }
   return failedBroadcast;
 }

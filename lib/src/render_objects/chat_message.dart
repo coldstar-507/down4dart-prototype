@@ -244,11 +244,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       timeStr = "$tsHour:$tsMin";
     }
 
-    if (message.forwarderID == null) {
-      return "    $timeStr";
-    } else {
-      return "${message.forwarderID}    $timeStr";
-    }
+    return "    $timeStr";
   }
 
   static Future<ChatMediaInfo?> generateMediaInfo(FireMessage message) async {
@@ -394,12 +390,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   Widget? get forwarderHeader {
-    if (message.forwarderID == null) return null;
+    if (message.forwardedFrom == null) return null;
     return SizedBox(
         height: headerHeight * 0.8,
         child: Row(children: [
           Text(
-            ">>${message.forwarderID}   ",
+            "   >> ${message.forwardedFrom}   ",
             style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
           ),
         ]));
@@ -494,7 +490,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
               child: child));
     }
 
-    return mediaBody(child: mi.media.display(size: mi.precalculatedMediaSize));
+    return mediaBody(
+      child: mi.media.display(
+        size: mi.precalculatedMediaSize,
+        controller: mi.videoController,
+      ),
+    );
   }
 
   Widget? get text {

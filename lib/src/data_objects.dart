@@ -6,6 +6,7 @@ import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:mime/mime.dart';
+import 'package:flutter/material.dart' show Image;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -90,7 +91,7 @@ class FireMessage extends FireObject {
   final ID? mediaID, onlineMediaID;
   final String? text;
   final Set<ID>? replies, nodes;
-  final String? forwarderID;
+  final String? forwardedFrom;
   final int timestamp;
   final bool isSnip;
   bool _isRead, _isSent, _isSaved;
@@ -103,7 +104,7 @@ class FireMessage extends FireObject {
     bool isSaved = false,
     this.mediaID,
     this.onlineMediaID,
-    this.forwarderID,
+    this.forwardedFrom,
     this.text,
     this.nodes,
     this.replies,
@@ -120,15 +121,23 @@ class FireMessage extends FireObject {
   // Creates a new instance of a messages that will be uploaded
   // removes the replies and local data
   // puts a new timestamp and forwarderID as forwarder and a new ID
-  FireMessage forwarded(ID forwarder, ID root) {
+
+  String get messagePreview => forwardedFrom != null
+      ? ">> forwarded message"
+      : (text ?? "").isEmpty
+          ? "&attachment"
+          : text!;
+
+  FireMessage forwarded(ID newSenderID, ID newRoot) {
     return FireMessage(messagePushId(),
-        root: root,
-        senderID: senderID,
+        root: newRoot,
+        senderID: newSenderID,
         timestamp: u.makeTimestamp(),
-        forwarderID: forwarder,
+        forwardedFrom: forwardedFrom ?? senderID,
         text: text,
         nodes: nodes,
         isSnip: false,
+        mediaID: mediaID,
         onlineMediaID: onlineMediaID);
   }
 
@@ -136,7 +145,7 @@ class FireMessage extends FireObject {
     return FireMessage(decodedJson["id"] as ID,
         root: decodedJson["root"] as ID,
         senderID: decodedJson["senderID"] as ID,
-        forwarderID: decodedJson["forwarderID"] as ID?,
+        forwardedFrom: decodedJson["forwarderID"] as ID?,
         text: decodedJson["text"] as String?,
         isSaved: decodedJson["isSaved"] == "true",
         mediaID: decodedJson["mediaID"] as ID?,
@@ -178,7 +187,7 @@ class FireMessage extends FireObject {
         'isSnip': isSnip.toString(),
         if (toLocal) 'isRead': isRead.toString(),
         if (toLocal) 'isSent': isSent.toString(),
-        if (forwarderID != null) 'forwarderID': forwarderID!,
+        if (forwardedFrom != null) 'forwarderID': forwardedFrom!,
         if (replies != null) 'replies': replies!.join(" "),
         if (nodes != null) 'nodes': nodes!.join(" "),
       };
@@ -228,7 +237,7 @@ abstract class FireNode extends FireObject {
   String? _lastName, _description;
   final Down4Keys? _neuter;
   ID? _mediaID;
-  bool? _isFriend, _isPrivate, _isHidden;
+  bool? _isFriend, _isPrivate; //, _isHidden;
   final Set<ID>? _group, _publics, _privates, _posts, _admins;
   final ID? _ownerID;
 
@@ -246,7 +255,7 @@ abstract class FireNode extends FireObject {
         "name": _name,
         if (_ownerID != null) "ownerID": _ownerID!,
         if (toLocal && _isFriend != null) "isFriend": _isFriend!.toString(),
-        if (toLocal && _isHidden != null) "isHidden": _isHidden!.toString(),
+        // if (toLocal && _isHidden != null) "isHidden": _isHidden!.toString(),
         if (_lastName != null) "lastName": _lastName!,
         if (_mediaID != null) "mediaID": _mediaID!,
         if (_publics != null) "publics": _publics!.join(" "),
@@ -279,7 +288,7 @@ abstract class FireNode extends FireObject {
         _lastName = lastName,
         _isFriend = isFriend,
         _isPrivate = isPrivate,
-        _isHidden = isHidden ?? false,
+        // _isHidden = isHidden ?? false,
         _description = description,
         _neuter = neuter,
         _mediaID = mediaID,
@@ -304,7 +313,7 @@ abstract class FireNode extends FireObject {
     final ownerID = json["ownerID"] as ID?;
     final name = json["name"] as String;
     final isFriend = json["isFriend"] == "true";
-    final isHidden = json["isHidden"] == "true";
+    // final isHidden = json["isHidden"] == "true";
     final isPrivate = json["isPrivate"] == "true";
     final lastName = json["lastName"] as String?;
     final description = json["description"] as String?;
@@ -323,7 +332,7 @@ abstract class FireNode extends FireObject {
             name: name,
             lastName: lastName,
             mediaID: mediaID,
-            isHidden: isHidden,
+            // isHidden: isHidden,
             isFriend: isFriend,
             publics: publics ?? {},
             neuter: neuter!,
@@ -495,7 +504,7 @@ class User extends FireNode with Branchable, Chatable, Personable {
     super.id, {
     required super.activity,
     required super.name,
-    required bool isHidden,
+    // required bool isHidden,
     required bool isFriend,
     required Set<ID> publics,
     required super.description,
@@ -503,7 +512,7 @@ class User extends FireNode with Branchable, Chatable, Personable {
     required super.mediaID,
     required Down4Keys neuter,
   }) : super(
-            isHidden: isHidden,
+            // isHidden: isHidden,
             isFriend: isFriend,
             publics: publics,
             neuter: neuter);
@@ -516,12 +525,23 @@ class User extends FireNode with Branchable, Chatable, Personable {
     await merge(mergeInfo);
   }
 
-  Future<void> updateHiddenStatus(bool newHiddenStatus) async {
-    _isHidden = newHiddenStatus;
-    await merge({"isHidden": _isHidden.toString()});
-  }
+  // Future<void> updateHiddenStatus(bool newHiddenStatus) async {
+  //   _isHidden = newHiddenStatus;
+  //   await merge({"isHidden": _isHidden.toString()});
+  // }
 
-  bool get isHidden => _isHidden!;
+  Future<bool> hasMessages() async {
+    final raw_ = """
+      SELECT META().id FROM _ AS m 
+      WHERE m.root = '$id'
+      LIMIT 1
+      """;
+
+    final q_ = await AsyncQuery.fromN1ql(messagesDB, raw_);
+    final r_ = await q_.execute();
+    final e_ = await r_.allResults();
+    return e_.isNotEmpty;
+  }
 
   bool get isFriend => _isFriend!;
 
@@ -672,7 +692,7 @@ class Payment extends FireNode {
   Database get dbb => throw "Don't merge palette payment";
 
   @override
-  int get activity => _payment.tsSeconds;
+  int get activity => _payment.timeStamp;
 
   @override
   ID? get mediaID => null;
@@ -684,7 +704,7 @@ class Payment extends FireNode {
     required Down4Payment payment,
     required this.selfID,
   })  : _payment = payment,
-        super(activity: payment.tsSeconds, name: payment.id);
+        super(activity: payment.timeStamp, name: payment.id);
 
   @override
   String get displayName => payment.formattedName(selfID);
@@ -784,6 +804,13 @@ class FireMedia extends FireObject {
   int get onlineTimestamp => _onlineTimestamp;
 
   String? get onlineID => _onlineID;
+
+  Image? get displayCachedImage {
+    if (cachedImage != null) return Image.memory(cachedImage!);
+    if (cachePath != null) return Image.file(File(cachePath!));
+    if (cachedUrl != null) return Image.network(cachedUrl!);
+    return null;
+  }
 
   FireMedia(this.id,
       {required this.ownerID,

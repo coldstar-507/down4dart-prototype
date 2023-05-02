@@ -16,21 +16,18 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   ID get id => "forward";
   final ViewState viewState;
   final List<Down4Object> fObjects;
-  final Map<ID, Palette2> hiddenHomeState;
   final void Function() back;
   final void Function(List<Down4Object>, Chatable) openChat;
   final void Function(List<Down4Object>, Transition) hyper;
   final Future<void> Function(Payload, Iterable<Chatable>) forward;
 
   const ForwardingPage({
-    required this.hiddenHomeState,
     required this.viewState,
     required this.openChat,
     required this.hyper,
     required this.fObjects,
     required this.forward,
     required this.back,
-    // required this.hiddenState,
     Key? key,
   }) : super(key: key);
 
@@ -40,11 +37,9 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
 
 class _ForwadingPageState extends State<ForwardingPage>
     with Pager, Backable, Camera, Medias, Sender, Forwarder {
-  // final GlobalKey _forwardKey = GlobalKey();
-  // late Console _console;
   final _tec = TextEditingController();
   @override
-  late final List<Down4Object> fo = widget.fObjects;
+  List<Down4Object> get fo => widget.fObjects;
 
   late ScrollController scroller =
       ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
@@ -65,15 +60,12 @@ class _ForwadingPageState extends State<ForwardingPage>
 
   Iterable<Palette2> get selection => _fList.where((p) => p.selected);
 
-  Map<ID, Palette2> get hiddenState => widget.hiddenHomeState;
-
   ConsoleInput get input => ConsoleInput(tec: _tec, placeHolder: ":)");
 
   Transition hyperTransition() {
     return selectionTransition(
         originalList: _fList.toList(),
         state: _forwardState,
-        hiddenState: hiddenState,
         scrollOffset: widget.viewState.currentPage.scroll);
   }
 

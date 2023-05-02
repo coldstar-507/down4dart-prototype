@@ -102,7 +102,7 @@ class ConsoleButton extends StatelessWidget {
                       ? PinkTheme.inactivatedButtonColor
                       : PinkTheme.buttonColor,
               border: Border.all(
-                  color: Console.contourColor, width: Console.contourWidth)),
+                  color: Console.borderColor, width: Console.borderWidth)),
           child: SizedBox(
             height: Console.buttonHeight,
             child: Center(
@@ -129,6 +129,7 @@ class ConsoleButton extends StatelessWidget {
 class ConsoleInput extends StatelessWidget {
   final FocusNode? focus;
   final TextInputType type;
+  final TextAlign textAlign;
   final bool activated;
   final String placeHolder;
   final String value;
@@ -140,6 +141,7 @@ class ConsoleInput extends StatelessWidget {
   final bool show;
   final BorderRadius? borderRadius;
   const ConsoleInput({
+    this.textAlign = TextAlign.start,
     this.focus,
     this.borderRadius,
     this.onEditingComplete,
@@ -206,21 +208,33 @@ class ConsoleInput extends StatelessWidget {
       keyboardType: type,
       textAlign: TextAlign.center,
       decoration: InputDecoration(
+        // floatingLabelBehavior: FloatingLabelBehavior.always,
         isDense: true,
         isCollapsed: true,
         contentPadding: EdgeInsets.symmetric(vertical: g.sizes.w * 0.012),
         hintText: placeHolder,
         border: InputBorder.none,
-        prefixIcon: Text(prefix),
-        prefixIconConstraints: const BoxConstraints(
-          minHeight: 0,
-          minWidth: 0,
-        ),
-        suffixIcon: Text(suffix),
-        suffixIconConstraints: const BoxConstraints(
-          minHeight: 0,
-          minWidth: 0,
-        ),
+        // prefixIcon: Icon(Icons.keyboard_arrow_right_rounded,
+        //     size: Console.buttonHeight, color: Console.borderColor),
+        // prefixIconConstraints: const BoxConstraints(
+        //   minHeight: 0,
+        //   minWidth: 0,
+        // ),
+        // suffixIcon: // const Icon(Icons.keyboard_arrow_right_rounded),
+        //     Row(
+        //   mainAxisSize: MainAxisSize.min,
+        //   children: [
+        //     // Icon(Icons.search, size: Console.buttonHeight),
+        //     Icon(Icons.qr_code_2,
+        //         size: Console.buttonHeight, color: Console.borderColor),
+        //     // Icon(Icons.image_rounded, size: Console.buttonHeight),
+        //     // Icon(Icons.camera_rounded, size: Console.buttonHeight),
+        //   ],
+        // ),
+        // suffixIconConstraints: const BoxConstraints(
+        //   minHeight: 0,
+        //   minWidth: 0,
+        // ),
       ),
       textDirection: TextDirection.ltr,
       onChanged: inputCallBack,
@@ -241,8 +255,8 @@ class ConsoleInput extends StatelessWidget {
               color: activated ? Colors.white : Colors.grey,
               borderRadius: borderRadius,
               border: Border.all(
-                  width: show ? Console.contourWidth : 0,
-                  color: Console.contourColor)),
+                  width: show ? Console.borderWidth : 0,
+                  color: Console.borderColor)),
           child: ConstrainedBox(
             constraints: BoxConstraints(
                 // this is higher than maxfields in the textInput allows
@@ -266,28 +280,6 @@ class ConsoleMedias2 {
   ConsoleMedias2({required this.images, required this.onSelect});
 }
 
-// class ImagePreview {
-//   final String path;
-//   final double imageAspectRatio;
-//   final bool isReversed;
-//   const ImagePreview({
-//     required this.path,
-//     required this.isReversed,
-//     required this.imageAspectRatio,
-//   });
-// }
-//
-// class VideoPreview {
-//   final BetterPlayer videoPlayer;
-//   final double videoAspectRatio;
-//   final bool isReversed;
-//   VideoPreview({
-//     required this.videoPlayer,
-//     required this.videoAspectRatio,
-//     required this.isReversed,
-//   });
-// }
-
 class Console extends StatelessWidget {
   final List<ConsoleButton>? _topButtons;
   final List<ConsoleButton> _bottomButtons;
@@ -298,9 +290,7 @@ class Console extends StatelessWidget {
   final List<dynamic>? forwardingObjects;
   final List<Palette>? forwardingPalette;
   final bool invertedColors, initializationConsole;
-  final ConsoleMedias2? consoleMedias2;
-  // final ImagePreview? imageForPreview;
-  // final VideoPreview? videoForPreview;
+  final ConsoleMedias2? medias;
   final CameraController? cameraController;
   final MobileScanner? scanner;
 
@@ -322,12 +312,12 @@ class Console extends StatelessWidget {
         final leftBottom = semantics.bottomLeft;
 
         extras.add(Positioned(
-          bottom: leftBottom.dy - contourWidth,
-          left: leftBottom.dx - contourWidth,
+          bottom: leftBottom.dy - borderWidth,
+          left: leftBottom.dx - borderWidth,
           child: Container(
-            width: buttonWidth + contourWidth,
+            width: buttonWidth + borderWidth,
             decoration: BoxDecoration(
-                border: Border.all(width: contourWidth, color: contourColor)),
+                border: Border.all(width: borderWidth, color: borderColor)),
             child: Column(children: b.extraButtons!),
           ),
         ));
@@ -366,16 +356,16 @@ class Console extends StatelessWidget {
         final nButton = b.extraButtons!.length;
 
         return Positioned(
-          left: position.dx - contourWidth,
+          left: position.dx - borderWidth,
           top: position.dy -
               g.sizes.viewPaddingHeight -
-              contourWidth -
+              borderWidth -
               (nButton * (buttonHeight)),
           child: Container(
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-              border: Border.all(width: contourWidth, color: contourColor),
-              color: contourColor,
+              border: Border.all(width: borderWidth, color: borderColor),
+              color: borderColor,
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(Console.consoleRad),
                 topRight: Radius.circular(Console.consoleRad),
@@ -419,11 +409,11 @@ class Console extends StatelessWidget {
       _bottomInputs != null || _topInputs != null || hasGadgets;
 
   static double get consoleGap => g.sizes.w * 0.015;
-  static double get contourWidth => .6;
-  static Color get contourColor => Colors.black45;
+  static double get borderWidth => .6;
+  static Color get borderColor => Colors.black45;
   static double get consoleWidth => g.sizes.w - (2.0 * consoleGap);
-  static double get trueWidth => consoleWidth - (4 * contourWidth);
-  static double get bbWidth => consoleWidth - (2 * contourWidth);
+  static double get trueWidth => consoleWidth - (4 * borderWidth);
+  static double get bbWidth => consoleWidth - (2 * borderWidth);
 
   bool get bottomInputsHasTop => _topInputs != null;
 
@@ -437,7 +427,7 @@ class Console extends StatelessWidget {
       cameraController != null ||
       // forwardingObjects != null ||
       scanner != null ||
-      consoleMedias2 != null;
+      medias != null;
 
   final String? name;
   const Console({
@@ -451,7 +441,7 @@ class Console extends StatelessWidget {
     this.initializationConsole = false,
     this.scanner,
     this.animatedInputs = true,
-    this.consoleMedias2,
+    this.medias,
     List<ConsoleInput>? bottomInputs,
     List<ConsoleInput>? topInputs,
     List<ConsoleButton>? topButtons,
@@ -521,27 +511,27 @@ class Console extends StatelessWidget {
   double get mediaCelSize => trueWidth / mediaPerRow;
 
   Widget consoleMedias() {
-    if (consoleMedias2 == null) return const SizedBox.shrink();
-    final ids = consoleMedias2!.images ? g.savedImageIDs : g.savedVideoIDs;
+    if (medias == null) return const SizedBox.shrink();
+    final ids = medias!.images ? g.savedImageIDs : g.savedVideoIDs;
+    final nRows = (ids.length / mediaPerRow).ceil();
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
           borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
-          color: Console.contourColor,
-          border: Border.all(color: contourColor, width: contourWidth)),
+          color: Console.borderColor,
+          border: Border.all(color: borderColor, width: borderWidth)),
       child: ConstrainedBox(
           constraints: BoxConstraints(
               maxHeight: maximumMediaRows * mediaCelSize, maxWidth: trueWidth),
           child: ListView.builder(
-              itemCount: ids.length,
+              itemCount: nRows,
               itemBuilder: ((context, index) {
                 Widget f(int i) {
                   if (i < ids.length) {
-                    // print("DISPLAYING IMAGE AT $i ID=${g.savedImageIDs[i]}");
                     final cachedMedia = cache<FireMedia>(ids[i]);
                     if (cachedMedia != null) {
                       return GestureDetector(
-                          onTap: () => consoleMedias2!.onSelect(cachedMedia),
+                          onTap: () => medias!.onSelect(cachedMedia),
                           child: (cachedMedia.displayImage(
                               size: Size.square(mediaCelSize),
                               forceSquare: true)));
@@ -553,7 +543,7 @@ class Console extends StatelessWidget {
                             ans.hasData) {
                           return GestureDetector(
                               onTap: () => ans.data != null
-                                  ? consoleMedias2!.onSelect(ans.data!)
+                                  ? medias!.onSelect(ans.data!)
                                   : null,
                               child: (ans.requireData?.displayImage(
                                       size: Size.square(mediaCelSize),
@@ -570,6 +560,7 @@ class Console extends StatelessWidget {
                 }
 
                 return Row(
+                  key: Key(medias!.images.toString() + index.toString()),
                   children: [
                     f((index * 5)),
                     f((index * 5) + 1),
@@ -588,54 +579,63 @@ class Console extends StatelessWidget {
     Widget individualObject(Down4Object obj) {
       if (obj is Palette2) {
         return Flexible(
-            child: Row(
-                textDirection: TextDirection.ltr,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-              SizedBox(
-                  width: Console.buttonHeight,
-                  height: Console.buttonHeight,
-                  child: obj.node.nodeImage(Size.square(Console.buttonHeight))),
-              Expanded(
-                  child: Container(
-                      padding: const EdgeInsets.all(4.0),
-                      color: PinkTheme.nodeColors[obj.node.colorCode],
-                      child: Text(
-                        obj.node.displayName,
-                        overflow: TextOverflow.clip,
-                        maxLines: 1,
-                      )))
-            ])
-            // )
-            );
+            child: Container(
+                height: buttonHeight,
+                decoration: BoxDecoration(
+                    color: PinkTheme.nodeColors[obj.node.colorCode],
+                    border: Border.all(width: borderWidth, color: borderColor)),
+                child: Row(
+                    textDirection: TextDirection.ltr,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                          width: Console.buttonHeight,
+                          height: Console.buttonHeight,
+                          child: obj.node
+                              .nodeImage(Size.square(Console.buttonHeight))),
+                      Expanded(
+                          child: Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Text(
+                                obj.node.displayName,
+                                overflow: TextOverflow.clip,
+                                maxLines: 1,
+                              )))
+                    ])));
       } else if (obj is ChatMessage) {
-        return Flexible(
-            child: Expanded(
+        return Expanded(
+            child: Container(
+                padding: const EdgeInsets.all(4.0),
+                height: buttonHeight,
+                decoration: BoxDecoration(
+                    color: obj.messageColor,
+                    border: Border.all(width: borderWidth, color: borderColor)),
                 child: Text(
                     (obj.message.text ?? "").isEmpty
                         ? "&attachment"
                         : obj.message.text!,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis))
-            //)
-            );
+                    overflow: TextOverflow.ellipsis)));
       }
 
       return const SizedBox.shrink();
     }
 
     return SizedBox(
-        height: buttonHeight + (2 * contourWidth),
-        width: trueWidth + (2 * contourWidth),
-        child: Container(
-            clipBehavior: Clip.hardEdge,
-            decoration: BoxDecoration(
-                border: Border.all(color: contourColor, width: contourWidth)),
-            child: Row(
+        height: buttonHeight + (2 * borderWidth),
+        width: trueWidth + (2 * borderWidth),
+        child:
+            // Container(
+            // clipBehavior: Clip.hardEdge,
+            // decoration: BoxDecoration(
+            //     border: Border.all(color: contourColor, width: borderWidth)),
+            // child:
+            Row(
                 textDirection: TextDirection.ltr,
                 children: forwardingObjects!
                     .map((e) => individualObject(e))
-                    .toList())));
+                    .toList()));
+    // );
   }
 
   Widget consoleCamera() {
@@ -645,8 +645,8 @@ class Console extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
           borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
-          color: contourColor,
-          border: Border.all(color: contourColor, width: contourWidth)),
+          color: borderColor,
+          border: Border.all(color: borderColor, width: borderWidth)),
       child: SizedBox.square(
           dimension: trueWidth,
           child: Transform.scale(
@@ -663,7 +663,7 @@ class Console extends StatelessWidget {
         decoration: BoxDecoration(
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(consoleRad)),
-            border: Border.all(color: contourColor, width: contourWidth)),
+            border: Border.all(color: borderColor, width: borderWidth)),
         child: previewMedia!);
   }
 
@@ -680,7 +680,7 @@ class Console extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
           borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
-          border: Border.all(width: contourWidth, color: contourColor)),
+          border: Border.all(width: borderWidth, color: borderColor)),
       child: Stack(
         children: [
           Center(
@@ -835,9 +835,9 @@ class Console extends StatelessWidget {
         bottom: consoleGap,
       ),
       decoration: BoxDecoration(
-          color: contourColor,
+          color: borderColor,
           borderRadius: BorderRadius.all(Radius.circular(consoleRad)),
-          border: Border.all(width: contourWidth, color: contourColor)),
+          border: Border.all(width: borderWidth, color: borderColor)),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,

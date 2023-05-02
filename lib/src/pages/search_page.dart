@@ -127,7 +127,6 @@ class _AddFriendPageState extends State<AddFriendPage> {
             publics: {},
             activity: makeTimestamp(),
             isFriend: false,
-            isHidden: false,
             description: "");
     widget.onScan(node);
   }

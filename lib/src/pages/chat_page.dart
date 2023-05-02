@@ -27,19 +27,16 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final Future<void> Function([int limit]) loadMore;
   final void Function(Branchable) openNode;
   final void Function(Payload) send;
+  final void Function(List<Down4Object> fo) forward;
 
   const ChatPage({
-    // required this.subNodes,
     required this.viewState,
     required this.loadMore,
-    // required this.ordered,
-    // required this.members,
-    // required this.messages,
     required this.onPageChange,
     required this.back,
     required this.send,
-    // required this.n,
     required this.openNode,
+    required this.forward,
     this.fo,
     Key? key,
   }) : super(key: key);
@@ -211,158 +208,8 @@ class _ChatPageState extends State<ChatPage>
     _tec.clear();
   }
 
-  // Future<void> loadSquaredCameraConsole(CameraController? ctrl, int cam) async {
-  //   if (ctrl == null) {
-  //     try {
-  //       ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
-  //       await ctrl.initialize();
-  //     } catch (e) {
-  //       loadChatConsole();
-  //     }
-  //   }
-  //   _console = squaredCapturingConsole(
-  //     cam: cam,
-  //     uselessInput: _consoleInput,
-  //     goToPreview: (p, ar, ir) {
-  //       ctrl?.dispose();
-  //       loadPreviewConsole(p, ar, ir);
-  //     },
-  //     back: () {
-  //       ctrl?.dispose();
-  //       loadChatConsole();
-  //     },
-  //     onVideoStarted: () => loadSquaredCameraConsole(ctrl, cam),
-  //     nextCam: () => loadSquaredCameraConsole(null, (cam + 1) % 2),
-  //     ctrl: ctrl!,
-  //   );
-  //   setState(() {});
-  // }
-  //
-  // void loadPreviewConsole(String p, double ar, bool ir) {
-  //   _console = squaredPreviewConsole(
-  //     uselessInput: _consoleInput,
-  //     path: p,
-  //     aspectRatio: ar,
-  //     isReversed: ir,
-  //     back: () => loadSquaredCameraConsole(null, ir ? 1 : 0),
-  //     cancel: loadChatConsole,
-  //     accept: () {
-  //       _cameraInput = makeCameraMedia(p, ar, ir);
-  //       loadChatConsole();
-  //     },
-  //   );
-  //   setState(() {});
-  // }
-  //
-  // void loadMediasConsole([
-  //   bool images = true,
-  //   String mode = "Send",
-  //   bool extra = false,
-  // ]) {
-  //   void selectMedia(FireMedia media) {
-  //     if (mode == "Send") {
-  //       send2(mediaInput: media);
-  //       return;
-  //     } else if (mode == "Remove") {
-  //       media.updateSaveStatus(false);
-  //     }
-  //     loadMediasConsole(images, mode, extra);
-  //   }
-  //
-  //   _console = mediaConsole(
-  //       uselessInput: consoleInput,
-  //       selectMedia: selectMedia,
-  //       afterImport: () => loadMediasConsole(images, mode, extra),
-  //       back: loadChatConsole,
-  //       switchMediasType: () => loadMediasConsole(!images, mode, extra),
-  //       switchMediaMode: () => mode == "Send"
-  //           ? loadMediasConsole(images, "Remove", true)
-  //           : loadMediasConsole(images, "Send", true),
-  //       switchExtra: () => loadMediasConsole(images, mode, !extra),
-  //       extra: extra,
-  //       images: images,
-  //       importGroupMedia: null,
-  //       mode: mode);
-  //
-  //   setState(() {});
-  // }
-  //
-  // void loadForwardingConsole([bool extra = false]) {
-  //   _console = forwardingConsole(
-  //       usefulInput: consoleInput,
-  //       fObjects: widget.fo!,
-  //       loadForwardingMediaConsole: loadForwardingMediasConsole,
-  //       forward: send2,
-  //       switchExtra: () => loadForwardingConsole(!extra),
-  //       back: widget.back,
-  //       extra: extra);
-  //
-  //   // final f = fObjects ?? widget.fo;
-  //   // if (f == null) return loadBaseConsole();
-  //   // _console = Console(
-  //   //   bottomInputs: [_consoleInput],
-  //   //   forwardingObjects: f.toList(),
-  //   //   bottomButtons: [
-  //   //     ConsoleButton(name: "Back", onPress: widget.back),
-  //   //     ConsoleButton(
-  //   //       key: mediaForwardModeKey,
-  //   //       name: "Forward",
-  //   //       onPress: () {
-  //   //         if (extra) {
-  //   //           loadForwardingConsole(extra: !extra, fObjects: f);
-  //   //         } else {
-  //   //           final r = widget.messages.values.selected().asIDs().toList();
-  //   //           widget.send(Payload(
-  //   //               media: null, replies: r, forwards: f, text: _tec.value.text));
-  //   //         }
-  //   //       },
-  //   //       onLongPress: () => loadForwardingConsole(extra: !extra, fObjects: f),
-  //   //       isSpecial: true,
-  //   //       showExtra: extra,
-  //   //       extraButtons: [
-  //   //         ConsoleButton(
-  //   //             name: "Medias",
-  //   //             onPress: () => loadForwardingMediasConsole(fObjects: f)),
-  //   //       ],
-  //   //     )
-  //   //   ],
-  //   // );
-  //   setState(() {});
-  // }
-  //
-  // void loadForwardingMediasConsole([bool images = true]) {
-  //   _console = forwardingMediaConsole(
-  //     uselessInput: consoleInput,
-  //     onSelectMedia: (media) => send2(mediaInput: media),
-  //     switchType: () => loadForwardingMediasConsole(!images),
-  //     forwardingObjects: widget.fo!,
-  //     back: loadForwardingConsole,
-  //     images: images,
-  //   );
-  //
-  //   // _console = Console(
-  //   //   bottomInputs: [consoleInput],
-  //   //   consoleMedias2: ConsoleMedias2(
-  //   //       showImages: images,
-  //   //       onSelect: (media) => send2(mediaInput: media, fo: fObjects)),
-  //   //   forwardingObjects: fObjects.toList(),
-  //   //   bottomButtons: [
-  //   //     ConsoleButton(
-  //   //       name: "Back",
-  //   //       onPress: () => loadForwardingConsole(fObjects: fObjects),
-  //   //     ),
-  //   //     ConsoleButton(
-  //   //       name: images ? "Images" : "Videos",
-  //   //       onPress: () =>
-  //   //           loadForwardingMediasConsole(fObjects: fObjects, images: !images),
-  //   //     )
-  //   //   ],
-  //   // );
-  //   setState(() {});
-  // }
-
   @override
-  void loadBaseConsole({bool images = true}) {
+  void loadBaseConsole({bool images = true, bool extra = false}) {
     console = Console(
       bottomInputs: [mainInput],
       topButtons: [
@@ -376,7 +223,21 @@ class _ChatPageState extends State<ChatPage>
         ),
       ],
       bottomButtons: [
-        ConsoleButton(name: "Back", onPress: widget.back),
+        ConsoleButton(
+          name: "Back",
+          onPress: !extra ? widget.back : loadBaseConsole,
+          showExtra: extra,
+          onLongPress: () => loadBaseConsole(extra: !extra),
+          isSpecial: true,
+          extraButtons: [
+            ConsoleButton(
+              name: "Forward",
+              onPress: () => widget.forward(
+                _messages.values.selected().toList(growable: false),
+              ),
+            ),
+          ],
+        ),
         ConsoleButton(
           name: cameraInput == null ? "Camera" : "@Camera",
           onPress: () => loadSquaredCameraConsole(0),
@@ -389,136 +250,6 @@ class _ChatPageState extends State<ChatPage>
     );
     setState(() {});
   }
-
-  // Future<void> loadSquaredCameraConsole({
-  //   CameraController? ctrl,
-  //   int cam = 0,
-  //   String? path,
-  // }) async {
-  //   if (ctrl == null) {
-  //     try {
-  //       ctrl = CameraController(g.cameras[cam], ResolutionPreset.medium);
-  //       await ctrl.initialize();
-  //     } catch (err) {
-  //       loadBaseConsole();
-  //     }
-  //   }
-  //
-  //   Future<void> nextCam() async {
-  //     await ctrl?.dispose();
-  //     return loadSquaredCameraConsole(cam: (cam + 1) % 2);
-  //   }
-  //
-  //   if (path == null) {
-  //     _console = Console(
-  //       bottomInputs: [consoleInput],
-  //       cameraController: ctrl,
-  //       topButtons: [
-  //         ConsoleButton(
-  //           name: "Capture",
-  //           isSpecial: true,
-  //           shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
-  //           onPress: () async {
-  //             final XFile f = await ctrl!.takePicture();
-  //             loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
-  //           },
-  //           onLongPress: () async {
-  //             await ctrl!.startVideoRecording();
-  //             loadSquaredCameraConsole(ctrl: ctrl, cam: cam);
-  //           },
-  //           onLongPressUp: () async {
-  //             final XFile f = await ctrl!.stopVideoRecording();
-  //             loadSquaredCameraConsole(ctrl: ctrl, cam: cam, path: f.path);
-  //           },
-  //         ),
-  //       ],
-  //       bottomButtons: [
-  //         ConsoleButton(
-  //             name: "Back",
-  //             onPress: () {
-  //               ctrl?.dispose();
-  //               loadBaseConsole();
-  //             }),
-  //         ConsoleButton(
-  //           name: cam == 0 ? "Rear" : "Front",
-  //           onPress: nextCam,
-  //           isMode: true,
-  //         ),
-  //       ],
-  //     );
-  //   } else {
-  //     BetterPlayerController? vpc;
-  //     final topBottons = [
-  //       ConsoleButton(
-  //         name: "Accept",
-  //         onPress: () async {
-  //           Uint8List? tn;
-  //           final Uint8List data = File(path).readAsBytesSync();
-  //           final mediaID = u.deterministicMediaID(data, g.self.id);
-  //           final mime = lookupMimeType(path)!;
-  //           bool isVideo = extensionFromMime(mime).isVideoExtension();
-  //           if (isVideo) {
-  //             tn = await VideoThumbnail.thumbnailData(video: path, quality: 90);
-  //           }
-  //           final newMedia = FireMedia(mediaID,
-  //               tinyThumbnail: tinyThumbnail(tn ?? data),
-  //               mime: mime,
-  //               owner: g.self.id,
-  //               timestamp: u.timeStamp(),
-  //               aspectRatio: ctrl!.value.aspectRatio,
-  //               isReversed: cam == 1,
-  //               isSquared: true);
-  //           await newMedia.write(
-  //               videoData: isVideo ? data : null, imageData: tn ?? data);
-  //           _cameraInput = newMedia;
-  //           loadBaseConsole();
-  //         },
-  //       ),
-  //     ];
-  //     final bottomButtons = [
-  //       ConsoleButton(
-  //         name: "Back",
-  //         onPress: () {
-  //           File(path).delete();
-  //           loadSquaredCameraConsole(ctrl: ctrl, cam: cam);
-  //         },
-  //       ),
-  //       ConsoleButton(
-  //           name: "Cancel",
-  //           onPress: () {
-  //             File(path).delete();
-  //             ctrl?.dispose();
-  //             loadBaseConsole();
-  //           }),
-  //     ];
-  //
-  //     print("PATH EXTENSION = ${path.extension()}");
-  //     if (path.extension().isVideoExtension()) {
-  //       vpc = BetterPlayerController(const BetterPlayerConfiguration());
-  //       await vpc.setupDataSource(BetterPlayerDataSource.file(path));
-  //       await vpc.setLooping(true);
-  //       await vpc.play();
-  //       _console = Console(
-  //           bottomInputs: [consoleInput],
-  //           videoForPreview: VideoPreview(
-  //               videoPlayer: BetterPlayer(controller: vpc),
-  //               videoAspectRatio: ctrl!.value.aspectRatio,
-  //               isReversed: cam == 1),
-  //           topButtons: topBottons,
-  //           bottomButtons: bottomButtons);
-  //     } else {
-  //       _console = Console(
-  //           bottomInputs: [consoleInput],
-  //           imageForPreview: ImagePreview(
-  //               path: path,
-  //               isReversed: cam == 1,
-  //               imageAspectRatio: ctrl!.value.aspectRatio),
-  //           topButtons: topBottons,
-  //           bottomButtons: bottomButtons);
-  //     }
-  //   }
-  //   setState(() {});
-  // }
 
   @override
   Widget build(BuildContext context) {
@@ -553,7 +284,7 @@ class _ChatPageState extends State<ChatPage>
     return Andrew(
       pages: pages,
       initialPageIndex: widget.viewState.currentIndex,
-      onPageChange: (ix) => widget.viewState.currentIndex = ix,
+      onPageChange: widget.onPageChange,
     );
   }
 }

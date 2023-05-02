@@ -130,7 +130,7 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
       image: image,
       imageAspectRatio: media?.aspectRatio ?? 1.0,
       displaySize: widget.displaySize ?? Size.square(Palette.paletteHeight),
-      isSquared: true,
+      isScaled: true,
       isReversed: media?.isReversed ?? false);
 
   Image memoryIm(Uint8List d) => Image.memory(d,
@@ -237,7 +237,7 @@ class _FireImageDisplay extends State<FireImageDisplay> {
       image: image,
       imageAspectRatio: media.aspectRatio,
       displaySize: widget.displaySize,
-      isSquared: media.isSquared || widget.forceSquareAnyways,
+      isScaled: media.isSquared || widget.forceSquareAnyways,
       isReversed: media.isReversed);
 
   void loadImage() {
@@ -377,6 +377,25 @@ extension MediaDisplay on FireMedia {
         media: this,
         autoPlay: autoPlay,
         displaySize: size);
+  }
+
+  Widget displaySnip({VideoPlayerController? controller}) {
+    double scale = g.sizes.fullAspectRatio * aspectRatio;
+    if (isVideo) return displayVideo(size: size, controller: controller);
+    return Center(
+      child: Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.rotationY(isReversed ? math.pi : 0),
+        child: Transform.scale(
+          scale: scale > 1 ? scale : 1 / scale,
+          child: SizedBox(
+            height: aspectRatio * g.sizes.w,
+            width: g.sizes.w,
+            child: displayCachedImage,
+          ),
+        ),
+      ),
+    );
   }
 
   // Widget display2({
@@ -1016,19 +1035,20 @@ class _Down4InputState extends State<Down4Input> {
 class Down4ImageTransform extends StatelessWidget {
   final double imageAspectRatio;
   final Size displaySize;
-  final bool isSquared, isReversed;
+  final bool isScaled, isReversed;
   final Widget image;
   const Down4ImageTransform({
     required this.image,
     required this.imageAspectRatio,
     required this.displaySize,
-    required this.isSquared,
+    required this.isScaled,
     required this.isReversed,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final isVegan = (imageAspectRatio > displaySize.aspectRatio);
     // return SizedBox.fromSize(
     //     size: displaySize,
     //     child: Transform(
@@ -1056,9 +1076,9 @@ class Down4ImageTransform extends StatelessWidget {
         transform: Matrix4.rotationY(isReversed ? math.pi : 0),
         child: Transform.scale(
           scaleY:
-              isSquared && imageAspectRatio < 1 ? 1 / imageAspectRatio : null,
-          scaleX: isSquared && imageAspectRatio > 1 ? imageAspectRatio : null,
-          scale: !isSquared || imageAspectRatio == 1 ? 1.0 : null,
+              isScaled && imageAspectRatio < 1 ? 1 / imageAspectRatio : null,
+          scaleX: isScaled && imageAspectRatio > 1 ? imageAspectRatio : null,
+          scale: !isScaled || imageAspectRatio == 1 ? 1.0 : null,
           child: SizedBox.fromSize(size: displaySize, child: image),
           //  Transform.scale(
           //     scale: 1.0,
@@ -1224,7 +1244,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
       child: Down4VideoTransform(
           displaySize: widget.displaySize,
           isReversed: widget.media.isReversed,
-          isSquared: widget.media.isSquared || widget.forceSquareAnyways,
+          isScaled: widget.media.isSquared || widget.forceSquareAnyways,
           video: VideoPlayer(ctrl!),
           videoAspectRatio: widget.media.aspectRatio));
 
@@ -1373,6 +1393,8 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   Iterable<Palette2> whereNodeIs<T extends FireNode>() =>
       where((p) => p.node is T);
 
+  Iterable<Palette2> showing() => where((p) => p.show);
+  Iterable<Palette2> hidden() => where((p) => !p.show);
   Iterable<ID> asIds() => map((e) => e.node.id);
   Iterable<BaseNode> asNodes<BaseNode>() =>
       map((p) => p.node).whereType<BaseNode>();
@@ -1542,14 +1564,14 @@ class Down4VideoTransform extends StatelessWidget {
   final Size displaySize;
   final double videoAspectRatio;
   final VideoPlayer video;
-  final bool isReversed, isSquared;
+  final bool isReversed, isScaled;
 
   const Down4VideoTransform({
     required this.displaySize,
     required this.videoAspectRatio,
     required this.video,
     required this.isReversed,
-    required this.isSquared,
+    required this.isScaled,
     Key? key,
   }) : super(key: key);
 
@@ -1561,12 +1583,12 @@ class Down4VideoTransform extends StatelessWidget {
         alignment: Alignment.center,
         transform: Matrix4.rotationY(isReversed ? math.pi : 0),
         child: Transform.scale(
-          scaleY: isSquared && videoAspectRatio > 1 ? videoAspectRatio : null,
-          scaleX: isSquared && videoAspectRatio < 1 ? videoAspectRatio : null,
-          scale: !isSquared || videoAspectRatio == 1 ? 1.0 : null,
+          scaleY: isScaled && videoAspectRatio > 1 ? videoAspectRatio : null,
+          scaleX: isScaled && videoAspectRatio < 1 ? videoAspectRatio : null,
+          scale: !isScaled || videoAspectRatio == 1 ? 1.0 : null,
           child: Transform.scale(
             scale:
-                isSquared && videoAspectRatio != 1 ? 1 / videoAspectRatio : 1.0,
+                isScaled && videoAspectRatio != 1 ? 1 / videoAspectRatio : 1.0,
             child: SizedBox.fromSize(size: displaySize, child: video),
           ),
         ),
@@ -1670,7 +1692,10 @@ String makeTiny(Uint8List bytes) {
   return base64Encode(d);
 }
 
-Future<void> importConsoleMedias({required bool images}) async {
+Future<void> importConsoleMedias({
+  required bool images,
+  required VoidCallback reload, // will reload console and show the media
+}) async {
   if (images) {
     final results = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -1695,7 +1720,8 @@ Future<void> importConsoleMedias({required bool images}) async {
           ownerID: g.self.id,
           width: size.width,
           height: size.height);
-      media.write(imageData: image.bytes!);
+      await media.write(imageData: image.bytes!);
+      reload();
     }
   } else {
     final videos = await FilePicker.platform.pickFiles(
@@ -1726,8 +1752,9 @@ Future<void> importConsoleMedias({required bool images}) async {
           ownerID: g.self.id,
           width: videoInfo?.width?.toDouble() ?? 1.0,
           height: videoInfo?.height?.toDouble() ?? 1.0);
-      File(media.videoPath).writeAsBytes(video.bytes!);
-      media.write(imageData: tn);
+      await File(media.videoPath).writeAsBytes(video.bytes!);
+      await media.write(imageData: tn);
+      reload();
     }
   }
 }
