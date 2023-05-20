@@ -1,5 +1,6 @@
 import 'dart:math' show max;
 
+import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 // import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../globals.dart';
@@ -21,7 +22,7 @@ class Down4Page {
   final Iterable<Widget>? _iterables;
   final int? iterableLen, trueLen;
   final List<Widget>? stackWidgets;
-  final Console? console;
+  final Console3 console;
   final bool isChatPage, centerStackItems, reversedList, staticList;
   Down4Page({
     required this.title,
@@ -36,7 +37,7 @@ class Down4Page {
     this.iterableLen,
     List<Widget>? list,
     Iterable<Widget>? iterables,
-    this.console,
+    required this.console,
     this.reversedList = true,
     this.centerStackItems = false,
     this.staticList = false,
@@ -51,9 +52,18 @@ class Down4Page {
 class Andrew extends StatefulWidget {
   final List<Down4Page> pages;
   final int initialPageIndex;
+  final void Function()? addFriends;
   final Function(int)? onPageChange;
+  final Widget? backButton;
+
+  static Duration get pageSwitchAnimationDuration =>
+      const Duration(milliseconds: 200);
+  static Duration get pageSwitchOpacityDuration =>
+      const Duration(milliseconds: 160);
 
   const Andrew({
+    this.addFriends,
+    this.backButton,
     required this.pages,
     this.onPageChange,
     this.initialPageIndex = 0,
@@ -94,6 +104,8 @@ class _AndrewState extends State<Andrew> {
     super.dispose();
   }
 
+  bool get isHome => widget.backButton == null;
+
   Down4Page get curPage => widget.pages[curPos];
 
   List<String> get titles {
@@ -110,19 +122,30 @@ class _AndrewState extends State<Andrew> {
 
   Widget get pageHeader => Row(
         textDirection: TextDirection.ltr,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: titles
-            .asMap()
-            .entries
-            .map((e) => AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 600),
-                style: TextStyle(
-                  fontFamily: "Alice",
-                  color: Colors.white.withOpacity(curPos == e.key ? 1 : 0.3),
-                  fontSize: 20,
-                ),
-                child: Text("  ${e.value}  ")))
-            .toList(growable: false),
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          widget.backButton ??
+              GestureDetector(
+                onTap: widget.addFriends,
+                child: Center(child: down4Logo(g.sizes.headerHeight / 2)),
+              ),
+          Row(
+              children: titles
+                  .asMap()
+                  .entries
+                  .map((e) => AnimatedDefaultTextStyle(
+                      duration: Andrew.pageSwitchAnimationDuration,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontFamily: g.theme.font,
+                        color: g.theme.headerTextColor
+                            .withOpacity(curPos == e.key ? 1 : 0.3),
+                        fontSize: 20,
+                      ),
+                      child: Text("  ${e.value}  ")))
+                  .toList(growable: false)),
+          SizedBox(width: g.sizes.headerHeight / 2)
+        ],
       );
 
   Widget get pageBody => Expanded(
@@ -138,10 +161,10 @@ class _AndrewState extends State<Andrew> {
                     .entries
                     .map((page) => AnimatedOpacity(
                         opacity: curPos == page.key ? 1 : 0,
-                        duration: const Duration(milliseconds: 500),
+                        duration: Andrew.pageSwitchOpacityDuration,
                         curve: Curves.easeInOut,
                         child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 600),
+                          duration: Andrew.pageSwitchAnimationDuration,
                           curve: Curves.easeInOut,
                           width: curPos == page.key ? g.sizes.w : 0,
                           child: page.value.staticList
@@ -176,7 +199,7 @@ class _AndrewState extends State<Andrew> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-          color: PinkTheme.backGroundColor,
+          color: g.theme.backGroundColor,
           image: DecorationImage(
               image: MemoryImage(
                   g.background), // AssetImage("assets/images/triangles.png"),
@@ -196,7 +219,7 @@ class _AndrewState extends State<Andrew> {
           appBar: AppBar(
             toolbarHeight: g.sizes.headerHeight,
             title: pageHeader,
-            backgroundColor: PinkTheme.qrColor,
+            backgroundColor: g.theme.headerColor,
           ),
           body: SafeArea(
             child: Stack(
@@ -208,8 +231,7 @@ class _AndrewState extends State<Andrew> {
                     curPage.console ?? const SizedBox.shrink(),
                   ],
                 ),
-                ...curPage.console?.extraTopButtons ?? [],
-                ...curPage.console?.extraBottomButtons ?? [],
+                ...curPage.console.extraButtons,
               ],
             ),
           ),
@@ -218,3 +240,65 @@ class _AndrewState extends State<Andrew> {
     );
   }
 }
+
+// class TestAnimation extends StatefulWidget {
+//
+//   @override
+//   _TestAnimationState createState() => _TestAnimationState();
+// }
+
+// class _TestAnimationState extends State<TestAnimation> with SingleTickerProviderStateMixin {
+//   late AnimationController _animationController;
+//   late List<Animation> _animation;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _animationController =
+//         AnimationController(duration: Duration(seconds: 2), vsync: this);
+//     _animation = widget. IntTween(begin: 100, end: 0).animate(_animationController);
+//     _animation.addListener(() => setState(() {}));
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       home: Scaffold(
+//         body: Center(
+//           child: Row(
+//             children: <Widget>[
+//               Expanded(
+//                 flex: 100,
+//                 child: TouchableOpacity(
+//                   onPress: () {
+//                     if (_animationController.value == 0.0) {
+//                       _animationController.forward();
+//                     } else {
+//                       _animationController.reverse();
+//                     }
+//                   },
+//                   child: const Text("Left"),
+//                 ),
+//               ),
+//               Expanded(
+//                 flex: _animation.value,
+//                 // Uses to hide widget when flex is going to 0
+//                 child: SizedBox(
+//                   width: 0.0,
+//                   child: TouchableOpacity(
+//                     child: const FittedBox( //Add this
+//                       child: Text(
+//                         "Right",
+//                       ),
+//                     ),
+//                     onPress: () {},
+//                   ),
+//                 ),
+//               )
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }

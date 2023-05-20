@@ -1,18 +1,385 @@
 import 'dart:io';
+import 'dart:math';
+import 'dart:ui';
 
 // import 'package:better_player/better_player.dart';
 import 'package:camera/camera.dart';
 import 'package:down4/main.dart';
 import 'package:down4/src/couch.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mime/mime.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:video_player/video_player.dart';
 
 import '../_dart_utils.dart';
 import '../data_objects.dart';
 import '../globals.dart';
 import '../render_objects/_render_utils.dart';
+import '../render_objects/chat_message.dart';
 import '../render_objects/console.dart';
+import '../render_objects/palette.dart';
+import 'chat_page.dart';
+
+class Caret extends CustomPainter {
+  Rect caret;
+  Caret(this.caret);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(caret, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter old) {
+    return true;
+  }
+}
+
+class InputController implements Listenable {
+  String value = "";
+  String _placeHolder;
+  final TextEditingController _tec;
+  // final TextInputConfiguration config;
+
+  void clear() {
+    value = "";
+    height = Console.buttonHeight;
+    caretOffset = Offset.zero;
+    caretPosition = 0;
+    _tec.clear();
+    _notify();
+  }
+
+  String get placeHolder => _placeHolder;
+  set placeHolder(String ph) {
+    _placeHolder = ph;
+    _notify();
+  }
+
+  void _notify() {
+    for (final l in _listeners) {
+      l.call();
+    }
+  }
+
+  double height = Console.buttonHeight;
+  Offset caretOffset = Offset.zero;
+  int caretPosition = 0;
+  InputController({String? placeHolder})
+      : _placeHolder = (placeHolder ?? "").isEmpty ? " " : placeHolder!,
+        _tec = TextEditingController();
+
+  final List<VoidCallback> _listeners = [];
+
+  @override
+  void addListener(VoidCallback listener) {
+    _listeners.add(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    _listeners.remove(listener);
+  }
+
+  void dispose() {
+    _tec.dispose();
+  }
+
+  // @override
+  // void connectionClosed() {
+  //   print("CONNECTION CLOSED");
+  // }
+  //
+  // @override
+  // AutofillScope? get currentAutofillScope => null;
+  //
+  // @override
+  // TextEditingValue? get currentTextEditingValue => null;
+  //
+  // @override
+  // void didChangeInputControl(
+  //     TextInputControl? oldControl, TextInputControl? newControl) {
+  //   print("DID CHANGE INPUT CONTROL");
+  // }
+  //
+  // @override
+  // void insertContent(KeyboardInsertedContent content) {
+  //   print("INSERTING CONTENT");
+  // }
+  //
+  // @override
+  // void insertTextPlaceholder(Size size) {
+  //   print("INSERT TEXT PLACEHOLDER LOL");
+  // }
+  //
+  // @override
+  // void performAction(TextInputAction action) {
+  //   switch (action) {
+  //     case TextInputAction.none:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.unspecified:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.done:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.go:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.search:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.send:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.next:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.previous:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.continueAction:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.join:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.route:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.emergencyCall:
+  //     // TODO: Handle this case.
+  //     case TextInputAction.newline:
+  //     // TODO: Handle this case.
+  //   }
+  //   print("PERFORMING ACTION");
+  // }
+  //
+  // @override
+  // void performPrivateCommand(String action, Map<String, dynamic> data) {
+  //   print("PERFORMING PRIVATE COMMAND");
+  // }
+  //
+  // @override
+  // void performSelector(String selectorName) {
+  //   print("PERFORMING SELECTOR");
+  // }
+  //
+  // @override
+  // void removeTextPlaceholder() {
+  //   print("REMOVED TEXT PLACEHOLDER");
+  // }
+  //
+  // @override
+  // void showAutocorrectionPromptRect(int start, int end) {
+  //   print("SHOWING AUTOCORRECTION PROMPT");
+  // }
+  //
+  // @override
+  // void showToolbar() {
+  //   print("SHOW TOOLBAR");
+  // }
+  //
+  // @override
+  // void updateEditingValue(TextEditingValue value) {
+  //   print("UPDATE EDITING VALUE");
+  // }
+  //
+  // @override
+  // void updateFloatingCursor(RawFloatingCursorPoint point) {
+  //   print("UPDATE FLOATING CURSOR");
+  // }
+}
+
+class MyTextEditor extends StatefulWidget {
+  ConsoleInput2 get widget => ConsoleInput2(this);
+  String get value => ctrl.value;
+  double get height => ctrl.height;
+  bool get hasFocus => fn.hasFocus;
+  void clear() => ctrl.clear();
+
+  final TextInputConfiguration config;
+
+  final AlignmentDirectional alignment;
+  final void Function() onFocusChange;
+  final void Function(String input, double fullHeight) onInput;
+  final double maxWidth;
+  final int maxLines;
+  final FocusNode fn;
+  final InputController ctrl;
+  MyTextEditor({
+    this.alignment = AlignmentDirectional.centerStart,
+    required this.config,
+    required this.ctrl,
+    required this.onInput,
+    required this.onFocusChange,
+    this.maxWidth = 0.6,
+    this.maxLines = 20,
+    FocusNode? fn,
+    Key? key,
+  })  : fn = FocusNode()..addListener(onFocusChange),
+        super(key: key);
+
+  @override
+  State<MyTextEditor> createState() => _MyTextEditorState();
+}
+
+class _MyTextEditorState extends State<MyTextEditor> {
+  String get value => widget.ctrl.value;
+  set value(String v) => widget.ctrl.value = v;
+
+  String get placeHolder => widget.ctrl.placeHolder;
+
+  int get caretOffset => widget.ctrl.caretPosition;
+  set caretOffset(int p) => widget.ctrl.caretPosition = p;
+
+  Offset get caretPosition => widget.ctrl.caretOffset;
+  set caretPosition(Offset p) => widget.ctrl.caretOffset = p;
+
+  Offset get paintingCaretOffset => caretPosition.translate(0, 0);
+  Offset get caretSecondaryOffset => paintingCaretOffset.translate(2, 18);
+  Rect get caret => Rect.fromPoints(paintingCaretOffset, caretSecondaryOffset);
+
+  void calculateCaretFromOffset() {
+    final textPo = TextPosition(offset: caretOffset);
+    caretPosition = textPainter.getOffsetForCaret(textPo, caret);
+    widget.ctrl._tec.selection = TextSelection.collapsed(offset: caretOffset);
+    setState(() {});
+  }
+
+  void calculateCaretPositionFromPosition(Offset pos) {
+    caretOffset = textPainter.getPositionForOffset(pos).offset;
+    calculateCaretFromOffset();
+  }
+
+  late GestureRecognizer detector = TapGestureRecognizer()
+    ..onTapDown = (details) {
+      if (widget.fn.hasFocus) {
+        calculateCaretPositionFromPosition(details.localPosition);
+      } else {
+        // if (widget.isNumberPad) {
+        //   // SystemChannels.textInput.invokeMethod(
+        //   //     'TextInput.show', {"inputType": widget.numberInputConfig()});
+        //   // SystemChannels.textInput.invokeMethod('TextInput.show');
+        // } else {
+        //   // SystemChannels.textInput.invokeMethod('TextInput.show');
+        // }
+        // FocusScope.of(context).requestFocus(widget.fn);
+      }
+    };
+
+  String get beforeCaret => value.substring(0, caretOffset);
+  String get afterCaret => value.substring(caretOffset);
+  //
+  // late bool Function(KeyEvent) onKeyEvent = (ke) {
+  //   print("KEY EVENT");
+  //   if (ke is RawKeyUpEvent) return false;
+  //
+  //   if (ke.character != null) {
+  //     value = "$beforeCaret${ke.character!}$afterCaret";
+  //     caretOffset += 1;
+  //     calculateCaretFromOffset();
+  //
+  //     final fullHeight = inputHeight(text: value);
+  //     widget.ctrl.height = fullHeight;
+  //     widget.onInput(value, fullHeight);
+  //     return true;
+  //   }
+  //
+  //   if (ke.logicalKey.keyId == LogicalKeyboardKey.backspace.keyId &&
+  //       ke is KeyDownEvent) {
+  //     if (caretOffset > 0) {
+  //       final bc = beforeCaret;
+  //       value = "${bc.substring(0, bc.length - 1)}$afterCaret";
+  //       if (caretOffset > 0) caretOffset -= 1;
+  //       calculateCaretFromOffset();
+  //
+  //       final fullHeight = inputHeight(text: value);
+  //       widget.ctrl.height = fullHeight;
+  //       widget.onInput(value, fullHeight);
+  //       return true;
+  //     }
+  //   }
+  //   return false;
+  // };
+
+  late void Function(String) onValue = (val) {
+    final diff = val.length - value.length;
+    print("DIFF = $diff");
+    value = val;
+    caretOffset += diff;
+    calculateCaretFromOffset();
+
+    final fullHeight = inputHeight();
+    widget.ctrl.height = fullHeight;
+    return widget.onInput(val, fullHeight);
+  };
+
+  TextSpan get span => TextSpan(
+      text: value.isEmpty ? placeHolder : value,
+      style: value.isEmpty && placeHolder.isNotEmpty
+          ? g.theme.inputPlaceholderTextStyle
+          : g.theme.inputTextStyle,
+      recognizer: widget.fn.hasFocus ? detector : null);
+
+  TextPainter get textPainter => TextPainter(
+      textDirection: TextDirection.ltr, text: span, maxLines: widget.maxLines)
+    ..layout(maxWidth: (g.sizes.w * widget.maxWidth) - 24);
+
+  double inputHeight() {
+    final tp = textPainter;
+    final textHeight = tp.height;
+    final nLines = tp.computeLineMetrics().length;
+    final oneLineHeight = tp.height / nLines;
+    final paddingHeight = Console.buttonHeight / 2;
+    final inputHeight = Console.buttonHeight - paddingHeight;
+    final greyNoText = inputHeight - oneLineHeight;
+    final trueHeight = greyNoText + paddingHeight + textHeight;
+
+    return trueHeight;
+  }
+
+  void updateTextEditor() {
+    setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ServicesBinding.instance.keyboard.addHandler(onKeyEvent);
+
+    widget.ctrl.addListener(updateTextEditor);
+    widget.fn.addListener(updateTextEditor);
+  }
+
+  @override
+  void dispose() {
+    widget.ctrl.removeListener(updateTextEditor);
+    widget.fn.removeListener(widget.onFocusChange);
+    widget.fn.removeListener(updateTextEditor);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        SizedBox.shrink(
+          child: EditableText(
+            showCursor: false,
+            autocorrect: false,
+            keyboardAppearance: g.theme.keyBoardTheme,
+            keyboardType: widget.config.inputType,
+            maxLines: widget.maxLines,
+            onChanged: onValue,
+            controller: widget.ctrl._tec,
+            focusNode: widget.fn,
+            style: const TextStyle(),
+            cursorColor: Colors.transparent,
+            backgroundCursorColor: Colors.transparent,
+          ),
+        ),
+        RichText(text: span, softWrap: true, maxLines: widget.maxLines),
+        widget.fn.hasFocus
+            ? CustomPaint(painter: Caret(caret))
+            : const SizedBox.shrink(),
+      ],
+    );
+  }
+}
 
 mixin Pager {
   ID get selfID;
@@ -21,11 +388,1037 @@ mixin Pager {
   set console(Console c);
   void setTheState();
   void loadBaseConsole();
+  AnimationController? get aCtrl => null;
+  FocusNode? get focusNode => null;
+  void onFocusChange() {
+    if (!focusNode!.hasFocus) {
+      aCtrl!.reverse();
+    } else {
+      aCtrl!.forward();
+    }
+    loadBaseConsole();
+  }
+
+  Future<void> focusRoutine() async {
+    print("NOT DOING ANYTHING");
+  }
+
+  double inputHeight({maxWidth = 0.5}) {
+    final text = mainInput.tec.value.text;
+    final val = text.isEmpty ? " " : text;
+
+    final tp = TextPainter(
+      text: TextSpan(text: val, style: g.theme.inputTextStyle),
+      textDirection: TextDirection.ltr,
+      maxLines: 8,
+    );
+    tp.layout(maxWidth: (g.sizes.w * maxWidth) - (24 + 2));
+    final textHeight = tp.height;
+    final nLines = tp.computeLineMetrics().length;
+    final oneLineHeight = tp.height / nLines;
+    final paddingHeight = Console.buttonHeight / 2;
+    final inputHeight = Console.buttonHeight - paddingHeight;
+    final greyNoText = inputHeight - oneLineHeight;
+    final trueHeight = greyNoText + paddingHeight + textHeight;
+
+    return trueHeight;
+  }
 }
 
 mixin Backable {
   void back();
 }
+
+class Extra {
+  final GlobalKey key = GlobalKey();
+  bool show = false;
+  final VoidCallback setTheState;
+  Extra({required this.setTheState});
+
+  void flip() {
+    show = !show;
+    setTheState.call();
+  }
+}
+
+mixin Pager2 {
+  int get currentPageIndex => 0;
+
+  List<String> get currentConsolesName => ["base"];
+
+  List<Extra> get extras;
+  set extras(List<Extra> e);
+
+  void turnOffExtras() {
+    for (final e in extras) {
+      if (e.show) e.flip();
+    }
+  }
+
+  void changeConsole(String consoleName) {
+    currentConsolesName[currentPageIndex] = consoleName;
+    turnOffExtras();
+    setTheState();
+  }
+
+  void onPageSwitch() {
+    turnOffExtras();
+    setTheState();
+  }
+
+  void setTheState();
+
+  Console3 get console;
+}
+
+mixin Sender2 {
+  void send({FireMedia? mediaInput});
+
+  final GlobalKey _sendButtonKey = GlobalKey();
+  ConsoleButton get sendButton =>
+      ConsoleButton(name: "SEND", onPress: send, key: _sendButtonKey);
+}
+
+mixin Forwarder2 on Sender2 {
+  // void Function()? get hyper => null;
+
+  // List<String> get forwardingConsoles => [
+  //       "ForwardingConsole",
+  //       "ForwardingMediasConsole",
+  //       "ForwardingCameraConsole",
+  //       "ForwardingPreviewConsole",
+  //     ];
+
+  ConsoleButton get forwardButton =>
+      ConsoleButton(name: "FORWARD", onPress: send);
+
+  List<Down4Object>? get fo;
+
+  Widget individualObject(Down4Object obj) {
+    if (obj is Palette2) {
+      return Row(
+          textDirection: TextDirection.ltr,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              clipBehavior: Clip.hardEdge,
+              decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(5))),
+              child: obj.node
+                  .nodeImage(Size.square(Console.buttonHeight - (2 * 4))),
+            ),
+            Flexible(
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: Center(
+                        child: Text(obj.node.displayName,
+                            style: const TextStyle(color: Colors.white),
+                            overflow: TextOverflow.clip,
+                            maxLines: 1))))
+          ]);
+    } else if (obj is ChatMessage) {
+      return Container(
+          color: obj.messageColor,
+          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+          constraints: BoxConstraints(maxWidth: Console.consoleWidth / 4),
+          child: Center(
+              child: Text(
+                  (obj.message.text ?? "").isEmpty
+                      ? "&attachment"
+                      : obj.message.text!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)));
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  List<Widget> get _foWidgets =>
+      (fo ?? []).map((e) => individualObject(e)).toList();
+
+  Widget get forwardingObjectsWidget => Container(
+        padding: const EdgeInsets.all(4),
+        height: Console.buttonHeight,
+        child: ListView(
+          // shrinkWrap: true,
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.all(0),
+          children: _foWidgets,
+        ),
+      );
+
+// void loadForwardingConsole([bool extra = false]) {
+//   console = Console(
+//     name: "ForwardingConsole",
+//     // bottomInputs: [mainInput],
+//     // forwardingObjects: fo,
+//     bottomButtons: [],
+//     consoleRow: Console3(
+//       ctrl: aCtrl,
+//       maxHeight: Console.buttonHeight,
+//       beginSizes: const [0.25, 0.25, 0.25, 0.25],
+//       endSizes: const [0.0, 0.25, 0.50, 0.25],
+//       widgets: [
+//         Container(
+//           padding: const EdgeInsets.all(4),
+//           height: Console.buttonHeight,
+//           child: ListView(
+//             // shrinkWrap: true,
+//             scrollDirection: Axis.horizontal,
+//             padding: const EdgeInsets.all(0),
+//             children: _foWidgets,
+//           ),
+//         ),
+//         ConsoleButton(name: "MEDIAS", onPress: loadMediasConsole),
+//         mainInput,
+//         ConsoleButton(
+//           name: "FORWARD",
+//           onPress: () => extra ? loadForwardingConsole(!extra) : send(),
+//           onLongPress: () => loadForwardingConsole(!extra),
+//           isSpecial: true,
+//           showExtra: extra,
+//           extraButtons: [
+//             ConsoleButton(
+//               name: cameraInput == null ? "CAMERA" : "@CAMERA",
+//               onPress: loadSquaredCameraConsole,
+//             ),
+//             ...(hyper != null
+//                 ? [ConsoleButton(name: "HYPER", onPress: hyper!)]
+//                 : [])
+//           ],
+//         )
+//       ],
+//     ),
+//     // bottomButtons: [
+//     //   ConsoleButton(name: "BACK", onPress: back),
+//     //   ConsoleButton(name: "MEDIAS", onPress: loadForwardingMediasConsole),
+//     //   ConsoleButton(
+//     //     name: "FORWARD",
+//     //     onPress: () => extra ? loadForwardingConsole(!extra) : send(),
+//     //     onLongPress: () => loadForwardingConsole(!extra),
+//     //     isSpecial: true,
+//     //     showExtra: extra,
+//     //     extraButtons: [
+//     //       ConsoleButton(
+//     //         name: cameraInput == null ? "Camera" : "@Camera",
+//     //         onPress: loadForwardingCameraConsole,
+//     //       ),
+//     //       ...(hyper != null
+//     //           ? [ConsoleButton(name: "Hyper", onPress: hyper!)]
+//     //           : [])
+//     //     ],
+//     //   )
+//     // ],
+//   );
+//
+//   setTheState();
+// }
+
+// void loadForwardingMediasConsole([bool images = true]) {
+//   console = Console(
+//     name: "ForwardingMediasConsole",
+//     // bottomInputs: [mainInput],
+//     medias: ConsoleMedias2(
+//       images: images,
+//       onSelect: (m) => send(mediaInput: m),
+//     ),
+//     // forwardingObjects: fo,
+//     bottomButtons: [
+//       ConsoleButton(name: "BACK", onPress: loadForwardingConsole),
+//       ConsoleButton(
+//           name: images ? "IMAGES" : "VIDEOS",
+//           onPress: () => loadForwardingMediasConsole(!images))
+//     ],
+//   );
+//   setTheState();
+// }
+
+// Future<void> loadForwardingCameraConsole([
+//   CameraController? ctrl,
+//   int cam = 0,
+// ]) async {
+//   if (ctrl == null) {
+//     try {
+//       ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
+//       await ctrl.initialize();
+//     } catch (e) {
+//       loadBaseConsole();
+//     }
+//   }
+//   final bool isReversed = cam == 1;
+//
+//   console = Console(
+//     name: "ForwardingCameraConsole",
+//     // bottomInputs: [mainInput],
+//     cameraController: ctrl,
+//     // forwardingObjects: fo,
+//     bottomButtons: [],
+//     consoleRow: ConsoleRow(
+//       widgets: [
+//         ConsoleButton(name: "BACK", onPress: loadForwardingCameraConsole),
+//         ConsoleButton(
+//             name: cam == 0 ? "REAR" : "FRONT",
+//             onPress: () => loadForwardingCameraConsole(null, (cam + 1) % 2),
+//             isMode: true),
+//         ConsoleButton(
+//           name: "CAPTURE",
+//           isSpecial: true,
+//           shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
+//           onPress: () async {
+//             final XFile f = await ctrl!.takePicture();
+//             final media = makeCameraMedia(
+//                 cachedPath: f.path,
+//                 size: ctrl.value.previewSize!,
+//                 isReversed: isReversed,
+//                 owner: selfID,
+//                 isSquared: true);
+//             loadForwardingPreviewConsole(media);
+//           },
+//           onLongPress: () async {
+//             await ctrl!.startVideoRecording();
+//             loadForwardingCameraConsole(ctrl, cam);
+//           },
+//           onLongPressUp: () async {
+//             final XFile f = await ctrl!.stopVideoRecording();
+//             final media = makeCameraMedia(
+//                 cachedPath: f.path,
+//                 size: ctrl.value.previewSize!,
+//                 isReversed: isReversed,
+//                 owner: selfID,
+//                 isSquared: true);
+//             loadForwardingPreviewConsole(media);
+//           },
+//         ),
+//       ],
+//     ),
+//   );
+//
+//   setTheState();
+// }
+//
+// void loadForwardingPreviewConsole(FireMedia m) async {
+//   final vpc = await _loopingController(m);
+//   console = Console(
+//     name: "ForwardingPreviewConsole",
+//     bottomInputs: [mainInput],
+//     previewMedia: m.display(size: _squaredCamSize, controller: vpc),
+//     forwardingObjects: fo,
+//     bottomButtons: [
+//       ConsoleButton(
+//         name: "Back",
+//         onPress: () {
+//           vpc?.dispose();
+//           loadForwardingCameraConsole(null, m.isReversed ? 1 : 0);
+//         },
+//       ),
+//       ConsoleButton(
+//           name: "Cancel",
+//           onPress: () {
+//             vpc?.dispose();
+//             loadForwardingConsole();
+//           }),
+//       ConsoleButton(
+//           name: "Accept",
+//           onPress: () {
+//             vpc?.dispose();
+//             cameraInput = m;
+//             loadForwardingConsole();
+//           }),
+//     ],
+//   );
+//
+//   setTheState();
+// }
+}
+//
+// class FullInput {
+//   final FocusNode focusNode;
+//   final int maxInputLines;
+//   final double maxInputWidth;
+//   // final InputController tec;
+//   final bool numberPad;
+//   TextAlign textAlign;
+//   double inputHeight;
+//   late final MyTextEditor editor;
+//
+//   String get value => tec.value;
+//
+//   FullInput({
+//     this.numberPad = false,
+//     String? placeHoder,
+//     required void Function(String, double) onInput,
+//     this.textAlign = TextAlign.start,
+//     double? maxInputWidth,
+//     int? maxInputLines,
+//     double? inputHeight,
+//   })  : maxInputWidth = maxInputWidth ?? 0.6,
+//         maxInputLines = maxInputLines ?? 20,
+//         inputHeight = inputHeight ?? Console.buttonHeight,
+//         focusNode = FocusNode() {
+//     editor = MyTextEditor(
+//         input: InputController(placeHolder: placeHoder),
+//         textAlign: textAlign,
+//         numberPad: numberPad,
+//         onInputChange: (s, h) {
+//           inputHeight = h;
+//           onInput.call(s, h);
+//         },
+//         maxWidth: this.maxInputWidth,
+//         maxLines: this.maxInputLines,
+//         fn: focusNode);
+//   }
+//
+//   ConsoleInput2 get widget => ConsoleInput2(editor);
+// }
+
+mixin Input2 on Pager2, WidgetsBindingObserver {
+  List<MyTextEditor> get inputs;
+  set inputs(List<MyTextEditor> ic) => inputs = ic;
+  void onInput(String s, double h) => setTheState();
+
+  MyTextEditor get input => inputs.first;
+
+  Iterable<FocusNode> get focusNodes => inputs.map((e) => e.fn);
+
+  bool get hasFocus => focusNodes.any((element) => element.hasFocus);
+
+  // static void connectInput(InputController ctrl) {
+  //   connection = TextInput.attach(ctrl, ctrl.config);
+  // }
+
+  @override
+  void onPageSwitch() {
+    turnOffExtras();
+    removeFocus();
+    setTheState();
+  }
+
+  void removeFocus() {
+    print("REMOVING FOCUS");
+    for (final input in inputs) {
+      input.fn.unfocus();
+    }
+  }
+
+  void onFocusChange() {
+    print("FOCUS CHANGE");
+    setTheState();
+  }
+
+  BuildContext get context;
+
+  Future<bool> keyboardIsHidden() {
+    return Future.delayed(const Duration(milliseconds: 200),
+        () => MediaQuery.of(context).viewInsets.bottom <= 0);
+  }
+
+  Future<void> focusRoutine() async {
+    turnOffExtras();
+    print("FOCUS ROUTINE");
+    if (hasFocus && await keyboardIsHidden()) {
+      removeFocus();
+      setTheState();
+    }
+  }
+
+  void disposeInputs() {
+    for (final i in inputs) {
+      i.ctrl.dispose();
+    }
+  }
+
+  @override
+  void didChangeMetrics() async {
+    focusRoutine();
+  }
+
+  static TextInputConfiguration get numberPad => TextInputConfiguration(
+      inputType: TextInputType.number,
+      inputAction: TextInputAction.done,
+      keyboardAppearance: g.theme.keyBoardTheme);
+
+  static TextInputConfiguration get multiLine => TextInputConfiguration(
+      inputType: TextInputType.multiline,
+      inputAction: TextInputAction.newline,
+      textCapitalization: TextCapitalization.none,
+      keyboardAppearance: g.theme.keyBoardTheme);
+
+  static TextInputConfiguration get singleLine => TextInputConfiguration(
+      inputType: TextInputType.text,
+      inputAction: TextInputAction.done,
+      textCapitalization: TextCapitalization.none,
+      keyboardAppearance: g.theme.keyBoardTheme);
+
+  // final FocusNode _focusNode = FocusNode();
+  // FocusNode get focusNode => _focusNode;
+  // int get maxInputLines => 20;
+  // double get maxInputWidth => 0.6;
+  // final InputController tec = InputController();
+  // double inputHeight = Console.buttonHeight;
+  // late final MyTextEditor _myTextEditor = MyTextEditor(
+  //     input: tec,
+  //     onInputChange: (s, h) {
+  //       inputHeight = h;
+  //       setTheState();
+  //     },
+  //     maxWidth: maxInputWidth,
+  //     maxLines: maxInputLines,
+  //     fn: _focusNode);
+  // ConsoleInput2 get input => ConsoleInput2(_myTextEditor);
+}
+
+// mixin InputListener2 on Pager2, Input2, WidgetsBindingObserver {
+//   BuildContext get context;
+//
+//   Future<bool> keyboardIsHidden() {
+//     return Future.delayed(const Duration(milliseconds: 200),
+//         () => MediaQuery.of(context).viewInsets.bottom <= 0);
+//   }
+//
+//   Future<void> focusRoutine() async {
+//     print("DOING FOCUS ROUTINE!");
+//     if (focusNode.hasFocus && await keyboardIsHidden()) {
+//       print("REMOVEING FOCUS");
+//       focusNode.unfocus();
+//       setTheState();
+//     }
+//   }
+//
+//   @override
+//   void didChangeMetrics() async {
+//     focusRoutine();
+//   }
+// }
+
+mixin Medias2 on Pager2 {
+  int get _mediasPerRow => 5;
+  int get _nRows => 3;
+  double get _mediaCelSize => Console.trueWidth / _mediasPerRow;
+  double get mediaExtensionHeight => _mediaCelSize * _nRows;
+
+  bool _images =
+      true; // or videos, but will change from bool to allow more types
+
+  void Function(FireMedia)? forNode;
+
+  List<(String, void Function(FireMedia))> get mediasMode;
+
+  int currentMode = 0;
+  (String, void Function(FireMedia)) get curMode => mediasMode[currentMode];
+
+  String get backFromMediasConsoleName => "base";
+
+  ConsoleButton get mediasButton => ConsoleButton(
+      name: "MEDIAS",
+      onPress: () {
+        forNode = null;
+        changeConsole("medias");
+      });
+
+  ConsoleButton get mediasBackButton => ConsoleButton(
+      name: "BACK",
+      onPress: () {
+        forNode = null;
+        changeConsole(backFromMediasConsoleName);
+      });
+
+  ConsoleButton get mediasImportButton => ConsoleButton(
+      name: "IMPORT",
+      onPress: () async {
+        if (forNode != null) {
+          final nodeMedia = await importNodeMedia();
+          if (nodeMedia != null) {
+            forNode!.call(nodeMedia);
+          }
+        } else {
+          await importConsoleMedias(
+              images: _images,
+              reload: () {
+                setTheState();
+              });
+        }
+      });
+
+  ConsoleButton get mediasTypeButton => ConsoleButton(
+      isMode: true,
+      isActivated: forNode == null,
+      isGreyedOut: forNode != null,
+      name: _images ? "IMAGES" : "VIDEOS",
+      onPress: () {
+        _images = !_images;
+        setTheState();
+      });
+
+  ConsoleButton get mediasModeButton => ConsoleButton(
+      name: forNode != null ? "PUT" : curMode.$1,
+      isMode: true,
+      onPress: () {
+        currentMode = (currentMode + 1) % mediasMode.length;
+        setTheState();
+      });
+
+  Widget get mediasExtension {
+    final ids = _images ? g.savedImageIDs : g.savedVideoIDs;
+    final nRows = (ids.length / _mediasPerRow).ceil();
+    return Container(
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+          color: g.theme.consoleBorderColor,
+          border: Border.all(
+              color: g.theme.consoleBorderColor, width: Console.borderWidth)),
+      child: ConstrainedBox(
+          constraints: BoxConstraints(
+              maxHeight: _nRows * _mediaCelSize, maxWidth: Console.trueWidth),
+          child: ListView.builder(
+              itemCount: nRows,
+              itemBuilder: ((context, index) {
+                Widget f(int i) {
+                  if (i < ids.length) {
+                    final cachedMedia = cache<FireMedia>(ids[i]);
+                    if (cachedMedia != null) {
+                      return GestureDetector(
+                          onTap: () => forNode != null
+                              ? forNode!.call(cachedMedia)
+                              : curMode.$2(cachedMedia),
+                          child: (cachedMedia.displayImage(
+                              size: Size.square(_mediaCelSize),
+                              forceSquare: true)));
+                    }
+                    return FutureBuilder(
+                      future: global<FireMedia>(ids[i]),
+                      builder: (ctx, ans) {
+                        if (ans.connectionState == ConnectionState.done &&
+                            ans.hasData) {
+                          return GestureDetector(
+                              onTap: () => ans.data != null
+                                  ? curMode.$2(ans.data!)
+                                  : null,
+                              child: (ans.requireData?.displayImage(
+                                      size: Size.square(_mediaCelSize),
+                                      forceSquare: true)) ??
+                                  SizedBox.square(dimension: _mediaCelSize));
+                        } else {
+                          return SizedBox.square(dimension: _mediaCelSize);
+                        }
+                      },
+                    );
+                  } else {
+                    return SizedBox.square(dimension: _mediaCelSize);
+                  }
+                }
+
+                return Row(
+                  key: Key(_images.toString() + index.toString()),
+                  children: List.generate(
+                    _mediasPerRow,
+                    (j) => f((index * _mediasPerRow) + j),
+                  ),
+                  // [
+                  //   f((index * 5)),
+                  //   f((index * 5) + 1),
+                  //   f((index * 5) + 2),
+                  //   f((index * 5) + 3),
+                  //   f((index * 5) + 4)
+                  // ],
+                );
+              }))),
+    );
+  }
+
+  String get basicMediaRowName => "medias";
+
+  ConsoleRow get basicMediasRow => ConsoleRow(widgets: [
+        mediasBackButton,
+        mediasImportButton,
+        mediasTypeButton,
+        mediasModeButton,
+      ], extension: (
+        mediasExtension,
+        mediaExtensionHeight
+      ), widths: null, inputMaxHeight: null);
+}
+
+mixin Camera2 on Pager2 {
+  Size get _squaredCamSize => Size.square(Console.trueWidth);
+  int _currentCam = 0;
+  CameraController? _cameraController;
+  FireMedia? _tempInput, cameraInput;
+  bool get _isReversed => _currentCam == 1;
+
+  CameraDescription get _cam => g.cameras[_currentCam];
+
+  ConsoleButton get cameraButton => ConsoleButton(
+        name: cameraInput == null ? "CAMERA" : "@CAMERA",
+        onPress: () async {
+          if (_cameraController == null) {
+            _cameraController = CameraController(_cam, ResolutionPreset.high);
+            await _cameraController?.initialize();
+            changeConsole("camera");
+          }
+        },
+      );
+
+  String get backFromCameraConsoleName => "base";
+  ConsoleButton get cameraBackButton => ConsoleButton(
+        name: "BACK",
+        onPress: () {
+          _cameraController?.dispose();
+          _cameraController = null;
+          changeConsole(backFromCameraConsoleName);
+        },
+      );
+
+  ConsoleButton get cameraSwitchButton => ConsoleButton(
+        name: _currentCam == 0 ? "REAR" : "FRONT",
+        onPress: () async {
+          await _cameraController?.dispose();
+          _cameraController = null;
+          _currentCam = (_currentCam + 1) % 2;
+          setTheState();
+        },
+        isMode: true,
+      );
+
+  ConsoleButton get cameraCaptureButton => ConsoleButton(
+        name: "CAPTURE",
+        isSpecial: true,
+        shouldBeDownButIsnt: _cameraController?.value.isRecordingVideo ?? false,
+        onPress: () async {
+          final XFile f = await _cameraController!.takePicture();
+          _tempInput = makeCameraMedia(
+              cachedPath: f.path,
+              size: _cameraController!.value.previewSize!.inverted,
+              isReversed: _isReversed,
+              owner: g.self.id,
+              isSquared: true);
+          setTheState();
+        },
+        onLongPress: () async {
+          await _cameraController!.startVideoRecording();
+          setTheState();
+        },
+        onLongPressUp: () async {
+          final XFile f = await _cameraController!.stopVideoRecording();
+          _tempInput = makeCameraMedia(
+              cachedPath: f.path,
+              size: _cameraController!.value.previewSize!.inverted,
+              isReversed: _isReversed,
+              owner: g.self.id,
+              isSquared: true);
+          setTheState();
+        },
+      );
+
+  ConsoleButton get cameraCancelButton => ConsoleButton(
+      name: "CANCEL",
+      onPress: () {
+        _cameraController?.dispose();
+        _cameraController = null;
+        _tempInput = null;
+        changeConsole("base");
+      });
+
+  ConsoleButton get cameraAcceptButton => ConsoleButton(
+      name: "ACCEPT",
+      onPress: () {
+        cameraInput = _tempInput;
+        _cameraController?.dispose();
+        _cameraController = null;
+        changeConsole("base");
+      });
+
+  Widget get cameraExtension {
+    if (cameraInput != null) {
+      return Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(Console.consoleRad)),
+              border: Border.all(
+                  color: g.theme.consoleBorderColor,
+                  width: Console.borderWidth)),
+          child: cameraInput!.display(size: _squaredCamSize));
+    } else if (_cameraController != null) {
+      return Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+            color: g.theme.consoleBorderColor,
+            border: Border.all(
+                color: g.theme.consoleBorderColor, width: Console.borderWidth)),
+        child: SizedBox.square(
+            dimension: Console.trueWidth,
+            child: Transform.scale(
+                scaleY: _cameraController!.value.aspectRatio,
+                child: CameraPreview(_cameraController!))),
+      );
+    } else {
+      return SizedBox.shrink();
+    }
+  }
+
+  ConsoleRow get basicCameraRow => ConsoleRow(
+          widgets: [
+            cameraBackButton,
+            cameraCancelButton,
+            cameraSwitchButton,
+            cameraCaptureButton,
+            cameraAcceptButton,
+          ],
+          extension: (
+            cameraExtension,
+            g.sizes.w
+          ),
+          widths: cameraInput == null
+              ? [0.34, 0.0, 0.33, 0.33, 0.0]
+              : [0.34, 0.33, 0.0, 0.0, 0.33],
+          inputMaxHeight: null);
+
+  String get basicCameraRowName => "camera";
+}
+
+mixin Compose2 on Pager2, Input2, Sender2, Medias2, Camera2 {
+  String get basicComposeRowName => "compose";
+  ConsoleRow get basicComposeRow => ConsoleRow(
+      inputMaxHeight:
+          input.hasFocus ? inputs.first.ctrl.height : Console.buttonHeight,
+      extension: (mediasExtension, 0.0),
+      widgets: [mediasButton, cameraButton, inputs.first.widget, sendButton],
+      widths: hasFocus ? [0.2, 0.0, 0.6, 0.2] : null);
+}
+
+mixin Money2 {
+  void money();
+  final GlobalKey _moneyButtonKey = GlobalKey();
+  ConsoleButton get moneyButton =>
+      ConsoleButton(key: _moneyButtonKey, name: "MONEY", onPress: money);
+}
+
+mixin Hyper2 {
+  void hyper();
+  final GlobalKey _hyperButtonKey = GlobalKey();
+  ConsoleButton get hyperButton =>
+      ConsoleButton(key: _hyperButtonKey, name: "HYPER", onPress: hyper);
+}
+
+mixin Scanner2 on Pager2 {
+  void onScan(Barcode bc, MobileScannerArguments? args);
+  MobileScanner? _scanner;
+
+  Widget get scanner => _scanner ??= MobileScanner(
+        onDetect: onScan,
+        controller: MobileScannerController(),
+      );
+
+  bool scanning = false;
+
+  ConsoleButton get scanButton => ConsoleButton(
+      name: "SCAN",
+      isMode: scanning,
+      onPress: () {
+        scanning = !scanning;
+        if (!scanning) {
+          _scanner?.controller?.dispose();
+          _scanner = null;
+        }
+        setTheState();
+      });
+
+  void disposeScanner() {
+    _scanner?.controller?.dispose();
+  }
+
+  Widget get scanExtension => Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: const BoxDecoration(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(2.0))),
+        // border: Border.all(
+        //     width: borderWidth, color: g.theme.consoleBorderColor)),
+        child: Stack(children: [
+          Center(
+              child: SizedBox(
+                  height: Console.trueWidth,
+                  width: Console.trueWidth,
+                  child: scanner))
+        ]),
+      );
+}
+
+// abstract class BasicRows
+//     with Pager2, Medias2, Sender2, Forwarder2, Input2, Camera2 {
+//   ({String name, ConsoleRow row}) get basicCameraRow => (
+//         name: "camera",
+//         row: ConsoleRow(
+//             widgets: [
+//               cameraBackButton,
+//               cameraCancelButton,
+//               cameraSwitchButton,
+//               cameraCaptureButton,
+//               cameraAcceptButton,
+//             ],
+//             extension: (
+//               cameraExtension,
+//               g.sizes.w
+//             ),
+//             widths: cameraInput == null
+//                 ? [0.34, 0.0, 0.33, 0.33, 0.0]
+//                 : [0.34, 0.33, 0.0, 0.0, 0.33],
+//             inputMaxHeight: null)
+//       );
+//
+//   ({String name, ConsoleRow row}) get basicMediasRow => (
+//         name: "medias",
+//         row: ConsoleRow(widgets: [
+//           mediasBackButton,
+//           mediasImportButton,
+//           mediasTypeButton,
+//           mediasModeButton,
+//         ], extension: (
+//           mediasExtension,
+//           mediaExtensionHeight
+//         ), widths: null, inputMaxHeight: null)
+//       );
+//
+//   ({String name, ConsoleRow row}) get basicComposingRow => (
+//         name: "compose",
+//         row: ConsoleRow(
+//             inputMaxHeight: inputHeight,
+//             extension: (mediasExtension, 0.0),
+//             widgets: [mediasButton, cameraButton, input, sendButton],
+//             widths: focusNode.hasFocus ? [0.2, 0.0, 0.6, 0.2] : null)
+//       );
+// }
+
+// mixin Transition {
+//   Transition get transition;
+// }
+//
+// mixin Hyper on Transition {
+//   void hyper(Transition t);
+//   final GlobalKey _hyperKey = GlobalKey();
+//   ConsoleButton get hyperButton => ConsoleButton(
+//       key: _hyperKey, name: "HYPER", onPress: () => hyper(transition));
+// }
+//
+// mixin Money on Transition {}
+
+// mixin Chatter on Pager2, Medias2, Camera2 {
+//   void send();
+//   late Console3 newConsole;
+//
+//   void loadConsole({
+//     void Function(FireMedia)? forNode,
+//     bool images = true,
+//   }) {
+//     newConsole = Console3(
+//       consoles: [
+//         {
+//           "base": (
+//             extension: null,
+//             inputMaxHeight: _inputHeight,
+//             widths: _focusNode.hasFocus
+//                 ? [0.20, 0.0, 0.6, 0.2]
+//                 : [0.25, 0.25, 0.25, 0.25],
+//             widgets: [
+//               ConsoleButton(
+//                   name: "MEDIAS",
+//                   onPress: () {
+//                     _currentConsole = "medias";
+//                     setTheState();
+//                   }),
+//               ConsoleButton(
+//                   name: _cameraInput == null ? "CAMERA" : "@CAMERA",
+//                   onPress: () {
+//                     _currentConsole = "camera";
+//                     setTheState();
+//                   }),
+//               ConsoleInput2(_myTextEditor),
+//               ConsoleButton(name: "SEND", onPress: send),
+//             ]
+//           ),
+//           "medias": (
+//             extension: SizedBox.shrink(),
+//             inputMaxHeight: null,
+//             widths: null,
+//             widgets: [
+//               ConsoleButton(
+//                 name: "BACK",
+//                 onPress: () {
+//                   _currentConsole = "base";
+//                   setTheState();
+//                 },
+//               ),
+//               ConsoleButton(
+//                   name: "IMPORT",
+//                   onPress: () async {
+//                     if (forNode != null) {
+//                       final nodeMedia = await importNodeMedia();
+//                       if (nodeMedia != null) {
+//                         forNode.call(nodeMedia);
+//                       }
+//                     } else {
+//                       await importConsoleMedias(
+//                           images: images,
+//                           reload: () {
+//                             setTheState();
+//                           });
+//                     }
+//                   }),
+//               ConsoleButton(
+//                 isMode: true,
+//                 isActivated: forNode == null,
+//                 isGreyedOut: forNode != null,
+//                 name: images ? "IMAGES" : "VIDEOS",
+//                 onPress: () => loadMediasConsole(!images, extra, forNode),
+//               ),
+//               ConsoleButton(
+//                 name: curMode.first,
+//                 isMode: true,
+//                 onPress: () {
+//                   currentMode = (currentMode + 1) % mediasMode.length;
+//                   loadMediasConsole(images, extra, forNode);
+//                 },
+//               ),
+//             ]
+//           )
+//         }
+//       ],
+//       currentConsoleName: _currentConsole,
+//       currentPageIndex: _currentPage,
+//     );
+//   }
+//
+//   void loadConsole() {
+//     console = Console(
+//       bottomButtons: [],
+//       consoleRow: Console3(
+//         widgets: [
+//           ConsoleButton(
+//             name: _cameraInput == null ? "CAMERA" : "@CAMERA",
+//             onPress: () => loadSquaredCameraConsole(0),
+//           ),
+//           ConsoleButton(
+//             name: "MEDIAS",
+//             onPress: () => loadMediasConsole(images),
+//           ),
+//           ConsoleInput2(te),
+//           ConsoleButton(
+//             name: "SEND",
+//             onPress: () {
+//               send();
+//               loadBaseConsole();
+//             },
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+//
+// }
 
 mixin Camera on Pager {
   FireMedia? get cameraInput;
@@ -35,6 +1428,7 @@ mixin Camera on Pager {
   CameraController? cameraController;
 
   Future<void> loadSquaredCameraConsole([int cam = 0]) async {
+    // focusNode?.unfocus();
     if (cameraController == null) {
       try {
         cameraController =
@@ -47,11 +1441,27 @@ mixin Camera on Pager {
 
     final bool isReversed = cam == 1;
     console = Console(
-      bottomInputs: [mainInput],
+      // bottomInputs: [mainInput],
       cameraController: cameraController,
-      topButtons: [
+      topButtons: [],
+      bottomButtons: [
         ConsoleButton(
-          name: "Capture",
+            name: "BACK",
+            onPress: () {
+              cameraController?.dispose();
+              cameraController = null;
+              loadBaseConsole();
+            }),
+        ConsoleButton(
+            name: cam == 0 ? "REAR" : "FRONT",
+            onPress: () async {
+              await cameraController?.dispose();
+              cameraController = null;
+              loadSquaredCameraConsole((cam + 1) % 2);
+            },
+            isMode: true),
+        ConsoleButton(
+          name: "CAPTURE",
           isSpecial: true,
           shouldBeDownButIsnt: cameraController!.value.isRecordingVideo,
           onPress: () async {
@@ -82,23 +1492,56 @@ mixin Camera on Pager {
           },
         ),
       ],
-      bottomButtons: [
-        ConsoleButton(
-            name: "Back",
-            onPress: () {
-              cameraController?.dispose();
-              cameraController = null;
-              loadBaseConsole();
-            }),
-        ConsoleButton(
-            name: cam == 0 ? "Rear" : "Front",
-            onPress: () async {
-              await cameraController?.dispose();
-              cameraController = null;
-              loadSquaredCameraConsole((cam + 1) % 2);
-            },
-            isMode: true),
-      ],
+      // consoleRow: Console3(
+      //   widgets: [
+      //     ConsoleButton(
+      //         name: "BACK",
+      //         onPress: () {
+      //           cameraController?.dispose();
+      //           cameraController = null;
+      //           loadBaseConsole();
+      //         }),
+      //     ConsoleButton(
+      //         name: cam == 0 ? "REAR" : "FRONT",
+      //         onPress: () async {
+      //           await cameraController?.dispose();
+      //           cameraController = null;
+      //           loadSquaredCameraConsole((cam + 1) % 2);
+      //         },
+      //         isMode: true),
+      //     ConsoleButton(
+      //       name: "CAPTURE",
+      //       isSpecial: true,
+      //       shouldBeDownButIsnt: cameraController!.value.isRecordingVideo,
+      //       onPress: () async {
+      //         final XFile f = await cameraController!.takePicture();
+      //         print(
+      //             "CAMERA PREVIEW SIZE = ${cameraController?.value.previewSize}");
+      //         final media = makeCameraMedia(
+      //             cachedPath: f.path,
+      //             size: cameraController!.value.previewSize!.inverted,
+      //             isReversed: isReversed,
+      //             owner: selfID,
+      //             isSquared: true);
+      //         loadPreviewConsole(media);
+      //       },
+      //       onLongPress: () async {
+      //         await cameraController!.startVideoRecording();
+      //         loadSquaredCameraConsole(cam);
+      //       },
+      //       onLongPressUp: () async {
+      //         final XFile f = await cameraController!.stopVideoRecording();
+      //         final media = makeCameraMedia(
+      //             cachedPath: f.path,
+      //             size: cameraController!.value.previewSize!.inverted,
+      //             isReversed: isReversed,
+      //             owner: selfID,
+      //             isSquared: true);
+      //         loadPreviewConsole(media);
+      //       },
+      //     ),
+      //   ],
+      // ),
     );
 
     setTheState();
@@ -133,16 +1576,33 @@ mixin Camera on Pager {
     }
 
     console = Console(
-      bottomInputs: [mainInput],
+      // bottomInputs: [mainInput],
       previewMedia: m.isVideo
           ? videoPlayer()
           : m.displayImage(
               size: _squaredCamSize,
               forceSquare: true,
             ), //, controller: vpc),
-      topButtons: [
+      topButtons: [],
+      bottomButtons: [
         ConsoleButton(
-            name: "Accept",
+          name: "BACK",
+          onPress: () {
+            // vpc?.dispose();
+            videoPreview?.dispose();
+            loadSquaredCameraConsole(m.isReversed ? 1 : 0);
+          },
+        ),
+        ConsoleButton(
+            name: "CANCEL",
+            onPress: () {
+              cameraController?.dispose();
+              cameraController = null;
+              videoPreview?.dispose();
+              loadBaseConsole();
+            }),
+        ConsoleButton(
+            name: "ACCEPT",
             onPress: () {
               // vpc?.dispose();
               cameraController?.dispose();
@@ -152,256 +1612,195 @@ mixin Camera on Pager {
               loadBaseConsole();
             }),
       ],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: () {
-            // vpc?.dispose();
-            videoPreview?.dispose();
-            loadSquaredCameraConsole(m.isReversed ? 1 : 0);
-          },
-        ),
-        ConsoleButton(
-            name: "Cancel",
-            onPress: () {
-              cameraController?.dispose();
-              cameraController = null;
-              videoPreview?.dispose();
-              loadBaseConsole();
-            }),
-      ],
+      // consoleRow: Console3(
+      //   widgets: [
+      //     ConsoleButton(
+      //       name: "BACK",
+      //       onPress: () {
+      //         // vpc?.dispose();
+      //         videoPreview?.dispose();
+      //         loadSquaredCameraConsole(m.isReversed ? 1 : 0);
+      //       },
+      //     ),
+      //     ConsoleButton(
+      //         name: "CANCEL",
+      //         onPress: () {
+      //           cameraController?.dispose();
+      //           cameraController = null;
+      //           videoPreview?.dispose();
+      //           loadBaseConsole();
+      //         }),
+      //     ConsoleButton(
+      //         name: "ACCEPT",
+      //         onPress: () {
+      //           // vpc?.dispose();
+      //           cameraController?.dispose();
+      //           cameraController = null;
+      //           videoPreview?.dispose();
+      //           cameraInput = m;
+      //           loadBaseConsole();
+      //         }),
+      //   ],
+      // ),
     );
     setTheState();
   }
 }
 
-mixin Medias on Pager {
-  List<Pair<String, void Function(FireMedia)>> get mediasMode;
-
-  int currentMode = 0;
-
-  Pair<String, void Function(FireMedia)> get curMode => mediasMode[currentMode];
-
-  void loadMediasConsole([
-    bool images = true,
-    bool extra = false,
-    void Function(FireMedia)? forNode,
-  ]) {
-    console = Console(
-      bottomInputs: [mainInput],
-      medias: ConsoleMedias2(
-        images: images,
-        onSelect: forNode ?? curMode.second,
-      ),
-      topButtons: [
-        ConsoleButton(
-            name: "Import",
-            onPress: () async {
-              if (forNode != null) {
-                final nodeMedia = await importNodeMedia();
-                if (nodeMedia != null) {
-                  forNode.call(nodeMedia);
-                }
-              } else {
-                await importConsoleMedias(
-                    images: images,
-                    reload: () => loadMediasConsole(images, extra, forNode));
-              }
-            }),
-      ],
-      bottomButtons: [
-        ConsoleButton(
-          showExtra: extra,
-          isSpecial: forNode == null ? true : false,
-          name: "Back",
-          onPress: () => extra && forNode == null
-              ? loadMediasConsole(images, !extra, forNode)
-              : loadBaseConsole(),
-          onLongPress: () => forNode == null
-              ? loadMediasConsole(images, !extra, forNode)
-              : null,
-          extraButtons: [
-            ConsoleButton(
-              name: curMode.first,
-              onPress: () {
-                currentMode = (currentMode + 1) % mediasMode.length;
-                loadMediasConsole(images, extra, forNode);
-              },
-              isMode: true,
-            ),
-          ],
-        ),
-        ConsoleButton(
-          isMode: true,
-          isActivated: forNode == null,
-          isGreyedOut: forNode != null,
-          name: images ? "Images" : "Videos",
-          onPress: () => loadMediasConsole(!images, extra, forNode),
-        ),
-      ],
-    );
-
-    setTheState();
-  }
-}
+// mixin Medias on Pager {
+//   List<Pair<String, void Function(FireMedia)>> get mediasMode;
+//
+//   int currentMode = 0;
+//
+//   Pair<String, void Function(FireMedia)> get curMode => mediasMode[currentMode];
+//
+//   void loadMediasConsole([
+//     bool images = true,
+//     bool extra = false,
+//     void Function(FireMedia)? forNode,
+//   ]) {
+//     // focusNode?.unfocus();
+//     console = Console(
+//       // bottomInputs: [mainInput],
+//
+//       // topButtons: [
+//       //   ConsoleButton(
+//       //       name: "Import",
+//       //       onPress: () async {
+//       //         if (forNode != null) {
+//       //           final nodeMedia = await importNodeMedia();
+//       //           if (nodeMedia != null) {
+//       //             forNode.call(nodeMedia);
+//       //           }
+//       //         } else {
+//       //           await importConsoleMedias(
+//       //               images: images,
+//       //               reload: () => loadMediasConsole(images, extra, forNode));
+//       //         }
+//       //       }),
+//       // ],
+//       // bottomButtons: [
+//       //   ConsoleButton(
+//       //     showExtra: extra,
+//       //     isSpecial: forNode == null ? true : false,
+//       //     name: "Back",
+//       //     onPress: () => extra && forNode == null
+//       //         ? loadMediasConsole(images, !extra, forNode)
+//       //         : loadBaseConsole(),
+//       //     onLongPress: () => forNode == null
+//       //         ? loadMediasConsole(images, !extra, forNode)
+//       //         : null,
+//       //     extraButtons: [
+//       //       ConsoleButton(
+//       //         name: curMode.first,
+//       //         onPress: () {
+//       //           currentMode = (currentMode + 1) % mediasMode.length;
+//       //           loadMediasConsole(images, extra, forNode);
+//       //         },
+//       //         isMode: true,
+//       //       ),
+//       //     ],
+//       //   ),
+//       //   ConsoleButton(
+//       //     isMode: true,
+//       //     isActivated: forNode == null,
+//       //     isGreyedOut: forNode != null,
+//       //     name: images ? "Images" : "Videos",
+//       //     onPress: () => loadMediasConsole(!images, extra, forNode),
+//       //   ),
+//       // ],
+//       bottomButtons: [
+//         ConsoleButton(
+//           showExtra: extra,
+//           name: "BACK",
+//           onPress: () {
+//             loadBaseConsole();
+//             focusRoutine();
+//           },
+//         ),
+//         ConsoleButton(
+//             name: "IMPORT",
+//             onPress: () async {
+//               if (forNode != null) {
+//                 final nodeMedia = await importNodeMedia();
+//                 if (nodeMedia != null) {
+//                   forNode.call(nodeMedia);
+//                 }
+//               } else {
+//                 await importConsoleMedias(
+//                     images: images,
+//                     reload: () => loadMediasConsole(images, extra, forNode));
+//               }
+//             }),
+//         ConsoleButton(
+//           isMode: true,
+//           isActivated: forNode == null,
+//           isGreyedOut: forNode != null,
+//           name: images ? "IMAGES" : "VIDEOS",
+//           onPress: () => loadMediasConsole(!images, extra, forNode),
+//         ),
+//         ConsoleButton(
+//           name: curMode.first,
+//           isMode: true,
+//           onPress: () {
+//             currentMode = (currentMode + 1) % mediasMode.length;
+//             loadMediasConsole(images, extra, forNode);
+//           },
+//         ),
+//       ],
+//       medias: ConsoleMedias2(
+//         images: images,
+//         onSelect: forNode ?? curMode.second,
+//       ),
+//       // consoleRow: Console3(
+//       //   widgets: [
+//       //     ConsoleButton(
+//       //       showExtra: extra,
+//       //       name: "BACK",
+//       //       onPress: () {
+//       //         loadBaseConsole();
+//       //         focusRoutine();
+//       //       },
+//       //     ),
+//       //     ConsoleButton(
+//       //         name: "IMPORT",
+//       //         onPress: () async {
+//       //           if (forNode != null) {
+//       //             final nodeMedia = await importNodeMedia();
+//       //             if (nodeMedia != null) {
+//       //               forNode.call(nodeMedia);
+//       //             }
+//       //           } else {
+//       //             await importConsoleMedias(
+//       //                 images: images,
+//       //                 reload: () => loadMediasConsole(images, extra, forNode));
+//       //           }
+//       //         }),
+//       //     ConsoleButton(
+//       //       isMode: true,
+//       //       isActivated: forNode == null,
+//       //       isGreyedOut: forNode != null,
+//       //       name: images ? "IMAGES" : "VIDEOS",
+//       //       onPress: () => loadMediasConsole(!images, extra, forNode),
+//       //     ),
+//       //     ConsoleButton(
+//       //       name: curMode.first,
+//       //       isMode: true,
+//       //       onPress: () {
+//       //         currentMode = (currentMode + 1) % mediasMode.length;
+//       //         loadMediasConsole(images, extra, forNode);
+//       //       },
+//       //     ),
+//       //   ],
+//       // ),
+//     );
+//
+//     setTheState();
+//   }
+// }
 
 mixin Sender {
   Future<void> send({FireMedia? mediaInput});
-}
-
-mixin Forwarder on Backable, Sender, Camera, Medias {
-  List<Down4Object>? get fo;
-  void Function()? get hyper => null;
-
-  List<String> get forwardingConsoles => [
-        "ForwardingConsole",
-        "ForwardingMediasConsole",
-        "ForwardingCameraConsole",
-        "ForwardingPreviewConsole",
-      ];
-
-  void loadForwardingConsole([bool extra = false]) {
-    console = Console(
-      name: "ForwardingConsole",
-      bottomInputs: [mainInput],
-      forwardingObjects: fo,
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: back),
-        ConsoleButton(name: "Medias", onPress: loadForwardingMediasConsole),
-        ConsoleButton(
-          name: "Forward",
-          onPress: () => extra ? loadForwardingConsole(!extra) : send(),
-          onLongPress: () => loadForwardingConsole(!extra),
-          isSpecial: true,
-          showExtra: extra,
-          extraButtons: [
-            ConsoleButton(
-              name: cameraInput == null ? "Camera" : "@Camera",
-              onPress: loadForwardingCameraConsole,
-            ),
-            ...(hyper != null
-                ? [ConsoleButton(name: "Hyper", onPress: hyper!)]
-                : [])
-          ],
-        )
-      ],
-    );
-
-    setTheState();
-  }
-
-  void loadForwardingMediasConsole([bool images = true]) {
-    console = Console(
-      name: "ForwardingMediasConsole",
-      bottomInputs: [mainInput],
-      medias: ConsoleMedias2(
-        images: images,
-        onSelect: (m) => send(mediaInput: m),
-      ),
-      forwardingObjects: fo,
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: loadForwardingConsole),
-        ConsoleButton(
-            name: images ? "Images" : "Videos",
-            onPress: () => loadForwardingMediasConsole(!images))
-      ],
-    );
-    setTheState();
-  }
-
-  Future<void> loadForwardingCameraConsole([
-    CameraController? ctrl,
-    int cam = 0,
-  ]) async {
-    if (ctrl == null) {
-      try {
-        ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
-        await ctrl.initialize();
-      } catch (e) {
-        loadBaseConsole();
-      }
-    }
-    final bool isReversed = cam == 1;
-
-    console = Console(
-      name: "ForwardingCameraConsole",
-      bottomInputs: [mainInput],
-      cameraController: ctrl,
-      forwardingObjects: fo,
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: loadForwardingCameraConsole),
-        ConsoleButton(
-            name: cam == 0 ? "Rear" : "Front",
-            onPress: () => loadForwardingCameraConsole(null, (cam + 1) % 2),
-            isMode: true),
-        ConsoleButton(
-          name: "Capture",
-          isSpecial: true,
-          shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
-          onPress: () async {
-            final XFile f = await ctrl!.takePicture();
-            final media = makeCameraMedia(
-                cachedPath: f.path,
-                size: ctrl.value.previewSize!,
-                isReversed: isReversed,
-                owner: selfID,
-                isSquared: true);
-            loadForwardingPreviewConsole(media);
-          },
-          onLongPress: () async {
-            await ctrl!.startVideoRecording();
-            loadForwardingCameraConsole(ctrl, cam);
-          },
-          onLongPressUp: () async {
-            final XFile f = await ctrl!.stopVideoRecording();
-            final media = makeCameraMedia(
-                cachedPath: f.path,
-                size: ctrl.value.previewSize!,
-                isReversed: isReversed,
-                owner: selfID,
-                isSquared: true);
-            loadForwardingPreviewConsole(media);
-          },
-        ),
-      ],
-    );
-
-    setTheState();
-  }
-
-  void loadForwardingPreviewConsole(FireMedia m) async {
-    final vpc = await _loopingController(m);
-    console = Console(
-      name: "ForwardingPreviewConsole",
-      bottomInputs: [mainInput],
-      previewMedia: m.display(size: _squaredCamSize, controller: vpc),
-      forwardingObjects: fo,
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: () {
-            vpc?.dispose();
-            loadForwardingCameraConsole(null, m.isReversed ? 1 : 0);
-          },
-        ),
-        ConsoleButton(
-            name: "Cancel",
-            onPress: () {
-              vpc?.dispose();
-              loadForwardingConsole();
-            }),
-        ConsoleButton(
-            name: "Accept",
-            onPress: () {
-              vpc?.dispose();
-              cameraInput = m;
-              loadForwardingConsole();
-            }),
-      ],
-    );
-
-    setTheState();
-  }
 }
 
 FireMedia makeCameraMedia({

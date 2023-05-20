@@ -19,6 +19,7 @@ import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
+import '_page_utils.dart';
 
 class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   @override
@@ -47,11 +48,12 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   State<AddFriendPage> createState() => _AddFriendPageState();
 }
 
-class _AddFriendPageState extends State<AddFriendPage> {
-  Console? _console;
-  var tec = TextEditingController();
-  CameraController? _cameraController;
-  MobileScannerController? scanner;
+class _AddFriendPageState extends State<AddFriendPage>
+    with WidgetsBindingObserver, Pager2, Input2, Scanner2 {
+  // Console? _console;
+  // var tec = TextEditingController();
+  // CameraController? _cameraController;
+  // MobileScannerController? scanner;
 
   Future<List<ButtonsInfo2>> bGen(Branchable b) async {
     return [
@@ -65,25 +67,38 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   Map<ID, Palette2> get searchs => widget.viewState.currentPage.objects.cast();
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   // defaultConsole();
+  //   // loadQr();
+  // }
+
+  // @override
+  // void dispose() {
+  //   super.dispose();
+  //   _cameraController?.dispose();
+  // }
+
+  // ConsoleInput get consoleInput {
+  //   return ConsoleInput(
+  //     maxLines: 1,
+  //     tec: tec,
+  //     placeHolder: "@search",
+  //   );
+  // }
+
   @override
   void initState() {
     super.initState();
-    defaultConsole();
-    // loadQr();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    disposeScanner();
     super.dispose();
-    _cameraController?.dispose();
-  }
-
-  ConsoleInput get consoleInput {
-    return ConsoleInput(
-      maxLines: 1,
-      tec: tec,
-      placeHolder: "@search",
-    );
   }
 
   String get qrData => [
@@ -113,7 +128,8 @@ class _AddFriendPageState extends State<AddFriendPage> {
     );
   }
 
-  void scanCallBack(Barcode bc, MobileScannerArguments? args) async {
+  @override
+  void onScan(Barcode bc, MobileScannerArguments? args) async {
     if (bc.rawValue == null) return;
     final data = bc.rawValue!.split("~");
     if (data.length != 5) return;
@@ -131,55 +147,110 @@ class _AddFriendPageState extends State<AddFriendPage> {
     widget.onScan(node);
   }
 
-  void defaultConsole([scanning = false]) {
-    if (scanning) {
-      scanner = MobileScannerController();
-    } else {
-      scanner?.dispose();
-      scanner = null;
-    }
-    _console = Console(
-      scanner: !scanning
-          ? null
-          : MobileScanner(onDetect: scanCallBack, controller: scanner),
-      bottomInputs: [consoleInput],
-      topButtons: [
-        ConsoleButton(
-          name: "Add",
-          onPress: () => widget.add(
-            searchs.values.selected().asNodes<Personable>(),
-          ),
+  ConsoleButton get searchButton => ConsoleButton(
+      name: "SEARCH",
+      onPress: () async {
+        await widget.search(input.value);
+        input.clear();
+        setTheState();
+      });
+
+  ConsoleButton get addButton => ConsoleButton(
+        name: "ADD",
+        onPress: () => widget.add(
+          searchs.values.selected().asNodes<Personable>(),
         ),
-        ConsoleButton(
-            name: "Search",
-            onPress: () async {
-              await widget.search(tec.value.text);
-              tec.clear();
-            }),
-      ],
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: widget.back),
-        ConsoleButton(name: "Scan", onPress: () => defaultConsole(!scanning)),
-        ConsoleButton(
-          name: "Forward",
-          onPress: () => widget.forwardNodes(
-            searchs.values.selected().toList(),
-          ),
-        ),
-      ],
-    );
-    setState(() {});
-  }
+      );
+
+  ConsoleButton get forwardButton => ConsoleButton(
+      name: "FORWARD",
+      onPress: () => widget.forwardNodes(searchs.values.selected().toList()));
+
+  // void defaultConsole([scanning = false]) {
+  //   if (scanning) {
+  //     scanner = MobileScannerController();
+  //   } else {
+  //     scanner?.dispose();
+  //     scanner = null;
+  //   }
+  //   _console = Console(
+  //     scanner: !scanning
+  //         ? null
+  //         : MobileScanner(onDetect: scanCallBack, controller: scanner),
+  //     bottomInputs: [consoleInput],
+  //     topButtons: [
+  //       ConsoleButton(
+  //         name: "Add",
+  //         onPress: () => widget.add(
+  //           searchs.values.selected().asNodes<Personable>(),
+  //         ),
+  //       ),
+  //       ConsoleButton(
+  //           name: "Search",
+  //           onPress: () async {
+  //             await widget.search(tec.value.text);
+  //             tec.clear();
+  //           }),
+  //     ],
+  //     bottomButtons: [
+  //       ConsoleButton(name: "Back", onPress: widget.back),
+  //       ConsoleButton(name: "Scan", onPress: () => defaultConsole(!scanning)),
+  //       ConsoleButton(
+  //         name: "Forward",
+  //         onPress: () => widget.forwardNodes(
+  //           searchs.values.selected().toList(),
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  //   setState(() {});
+  // }
 
   @override
   Widget build(BuildContext context) {
     print("QR DATA LEN = ${qrData.length}");
-    return Andrew(pages: [
+    return Andrew(backButton: backArrow(back: widget.back), pages: [
       Down4Page(
           title: "Search",
-          console: _console!,
+          console: console,
           stackWidgets: [qr],
           list: searchs.values.toList())
     ]);
   }
+
+  @override
+  Console3 get console => Console3(
+          rows: [
+            {
+              "base": ConsoleRow(
+                  widgets: [
+                    scanButton.withExtra(scanExtra, [forwardButton]),
+                    addButton,
+                    input.widget,
+                    searchButton,
+                  ],
+                  extension: scanning ? (scanExtension, g.sizes.w) : null,
+                  widths: input.hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
+                  inputMaxHeight: input.height)
+            }
+          ],
+          currentConsolesName: currentConsolesName,
+          currentPageIndex: currentPageIndex);
+
+  @override
+  late List<Extra> extras = [Extra(setTheState: setTheState)];
+
+  Extra get scanExtra => extras[0];
+
+  @override
+  late List<MyTextEditor> inputs = [
+    MyTextEditor(
+        onInput: onInput,
+        config: Input2.singleLine,
+        ctrl: InputController(placeHolder: "@username ..."),
+        onFocusChange: onFocusChange),
+  ];
+
+  @override
+  void setTheState() => setState(() {});
 }

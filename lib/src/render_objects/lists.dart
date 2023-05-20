@@ -94,8 +94,8 @@ class DynamicList extends StatelessWidget {
           behavior: NoGlow(),
           child: RefreshIndicator(
               onRefresh: onRefresh!,
-              color: PinkTheme.qrColor,
-              backgroundColor: PinkTheme.backGroundColor,
+              color: g.theme.refreshIndicatorColor,
+              backgroundColor: g.theme.backGroundColor,
               child: ListView.builder(
                 // physics: const BouncingScrollPhysics(
                 //   decelerationRate: ScrollDecelerationRate.fast,

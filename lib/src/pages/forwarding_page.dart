@@ -36,7 +36,15 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _ForwadingPageState extends State<ForwardingPage>
-    with Pager, Backable, Camera, Medias, Sender, Forwarder {
+    with
+        WidgetsBindingObserver,
+        Pager2,
+        Input2,
+        Camera2,
+        Medias2,
+        Sender2,
+        Forwarder2,
+        Hyper2 {
   final _tec = TextEditingController();
   @override
   List<Down4Object> get fo => widget.fObjects;
@@ -47,9 +55,28 @@ class _ForwadingPageState extends State<ForwardingPage>
           widget.viewState.pages[0].scroll = scroller.offset;
         });
 
+  // @override
+  // late final aCtrl =
+  //     AnimationController(duration: Console.animationDuration, vsync: this)
+  //       ..addListener(() {
+  //         loadBaseConsole();
+  //       });
+
+  // @override
+  // late FocusNode focusNode = FocusNode()..addListener(onFocusChange);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     scroller.dispose();
+    // focusNode.dispose();
+    // aCtrl?.dispose();
     super.dispose();
   }
 
@@ -60,7 +87,13 @@ class _ForwadingPageState extends State<ForwardingPage>
 
   Iterable<Palette2> get selection => _fList.where((p) => p.selected);
 
-  ConsoleInput get input => ConsoleInput(tec: _tec, placeHolder: ":)");
+  // @override
+  // late ConsoleInput mainInput = ConsoleInput(
+  //     tec: _tec,
+  //     placeHolder: "",
+  //     focus: focusNode,
+  //     maxLines: 8,
+  //     inputCallBack: (_) => loadBaseConsole());
 
   Transition hyperTransition() {
     return selectionTransition(
@@ -70,62 +103,65 @@ class _ForwadingPageState extends State<ForwardingPage>
   }
 
   // @override
-  // VideoPlayerController? videoPreview;
+  // FireMedia? cameraInput;
+  //
+  // bool sendButtonExtra = false;
+  // GlobalKey sendButtonKey = GlobalKey();
 
   @override
-  void initState() {
-    super.initState();
-    loadBaseConsole();
-  }
+  Console3 get console => Console3(
+          rows: [
+            {
+              "base": ConsoleRow(
+                widths: hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
+                inputMaxHeight: hasFocus ? input.height : Console.buttonHeight,
+                extension: null,
+                widgets: [
+                  forwardingObjectsWidget,
+                  mediasButton,
+                  input.widget,
+                  sendButton.withExtra(sendExtra, [cameraButton, hyperButton]),
+                ],
+              ),
+              basicCameraRowName: basicCameraRow,
+              basicMediaRowName: basicMediasRow,
+            }
+          ],
+          currentConsolesName: currentConsolesName,
+          currentPageIndex: widget.viewState.currentIndex);
+  //
+  // @override
+  // late Console console;
+
+  // @override
+  // void back() => widget.back();
+
+  // @override
+  // void loadBaseConsole() {
+  //   // loadForwardingConsole();
+  // }
 
   @override
-  void Function()? get hyper => () => widget.hyper(fo, hyperTransition());
-
-  @override
-  Widget build(BuildContext context) {
-    final ps = _fList.toList(growable: false);
-    return Andrew(pages: [
-      Down4Page(
-          staticList: true,
-          trueLen: ps.length,
-          title: "Forward",
-          console: console,
-          list: ps,
-          scrollController: scroller),
-    ]);
-  }
-
-  @override
-  FireMedia? cameraInput;
-
-  @override
-  late Console console;
-
-  @override
-  void back() => widget.back();
-
-  @override
-  void loadBaseConsole() {
-    loadForwardingConsole();
-  }
-
-  @override
-  ConsoleInput get mainInput => input;
-
-  @override
-  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
-        Pair("Send", (m) async {
-          await m.use();
-          send(mediaInput: m);
-        }),
-        Pair("Remove", (m) {
-          m.updateSaveStatus(false);
-          loadMediasConsole(!m.isVideo, true);
-        }),
+  List<(String, void Function(FireMedia))> get mediasMode => [
+        (
+          "SEND",
+          (m) async {
+            await m.use();
+            send(mediaInput: m);
+          }
+        ),
+        (
+          "REMOVE",
+          (m) {
+            m.updateSaveStatus(false);
+            setState(() {});
+            // loadMediasConsole(!m.isVideo, true);
+          }
+        ),
       ];
 
-  @override
-  ID get selfID => g.self.id;
+  // @override
+  // ID get selfID => g.self.id;
 
   @override
   Future<void> send({FireMedia? mediaInput}) async {
@@ -142,4 +178,56 @@ class _ForwadingPageState extends State<ForwardingPage>
   void setTheState() {
     setState(() {});
   }
+
+  // @override
+  // VideoPlayerController? videoPreview;
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   loadBaseConsole();
+  // }
+
+  @override
+  void hyper() => widget.hyper(fo, hyperTransition());
+
+  @override
+  Widget build(BuildContext context) {
+    final ps = _fList.toList(growable: false);
+    return Andrew(backButton: backArrow(back: widget.back), pages: [
+      Down4Page(
+          staticList: true,
+          trueLen: ps.length,
+          title: "Forward",
+          console: console,
+          list: ps,
+          scrollController: scroller),
+    ]);
+  }
+
+  @override
+  final List<String> currentConsolesName = ["base"];
+
+  @override
+  int get currentPageIndex => widget.viewState.currentIndex;
+
+  @override
+  String get backFromCameraConsoleName => "base";
+
+  @override
+  String get backFromMediasConsoleName => "base";
+
+  @override
+  late List<MyTextEditor> inputs = [
+    MyTextEditor(
+        onInput: onInput,
+        onFocusChange: onFocusChange,
+        config: Input2.multiLine,
+        ctrl: InputController()),
+  ];
+
+  @override
+  late List<Extra> extras = [Extra(setTheState: setTheState)];
+
+  Extra get sendExtra => extras[0];
 }

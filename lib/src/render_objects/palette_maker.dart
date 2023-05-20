@@ -78,7 +78,7 @@ class UserPaletteMaker extends StatelessWidget {
             child: Container(
               clipBehavior: Clip.hardEdge,
               decoration: const BoxDecoration(
-                color: PinkTheme.headerColor,
+                // color: PinkTheme.headerColor,
                 borderRadius: BorderRadius.only(
                   topRight: Radius.circular(4.0),
                   bottomRight: Radius.circular(4.0),
@@ -148,7 +148,7 @@ class UserMakerPalette extends StatelessWidget {
   Widget get body => Expanded(
         child: Container(
           decoration: BoxDecoration(
-            color: PinkTheme.nodeColors[NodesColor.self],
+            color: g.theme.nodeColors[NodesColor.self],
             borderRadius: const BorderRadius.horizontal(
               right: Radius.circular(4.0),
             ),
@@ -224,6 +224,165 @@ class UserMakerPalette extends StatelessWidget {
   }
 }
 
+// class PaletteMaker extends StatelessWidget {
+//   final void Function(String)? nameCallBack;
+//   final void Function() imagePress;
+//   final String name, id;
+//   final String hintText;
+//   final FireMedia? image;
+//   final void Function(ID)? go;
+//   final NodesColor colorCode;
+//   final Nodes type;
+//   final Nodes? parentType;
+//   final TextEditingController tec;
+//   final bool fold;
+//   const PaletteMaker({
+//     required this.fold,
+//     required this.colorCode,
+//     required this.tec,
+//     required this.id,
+//     required this.name,
+//     this.nameCallBack,
+//     required this.imagePress,
+//     this.image,
+//     required this.hintText,
+//     this.go,
+//     this.type = Nodes.user,
+//     this.parentType,
+//     Key? key,
+//   }) : super(key: key);
+//
+//   Widget mainContainer({required Widget child}) => AnimatedOpacity(
+//       opacity: fold ? 0 : 1,
+//       duration: const Duration(milliseconds: 600),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 600),
+//         height: fold ? 0 : Palette.paletteHeight,
+//         margin: EdgeInsets.only(
+//           left: Palette.paletteMargin,
+//           right: Palette.paletteMargin,
+//           bottom: fold ? 0 : Palette.gapSize,
+//         ),
+//         clipBehavior: Clip.hardEdge,
+//         decoration: BoxDecoration(
+//             boxShadow: [
+//               BoxShadow(
+//                   color: Palette.shadowColor,
+//                   blurRadius: Palette.blurRadius,
+//                   spreadRadius: Palette.spreadRadius,
+//                   offset: Palette.shadowOffset,
+//                   blurStyle: BlurStyle.normal)
+//             ],
+//             borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+//             border: Border.all(width: 2.0, color: Colors.transparent)),
+//         child: child,
+//       ));
+//
+//   Widget customRow({required List<Widget> children}) => Container(
+//         clipBehavior: Clip.hardEdge,
+//         decoration: BoxDecoration(
+//           color: g.theme.nodeColors[colorCode],
+//           borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+//         ),
+//         child: Row(
+//           crossAxisAlignment: CrossAxisAlignment.stretch,
+//           textDirection: TextDirection.ltr,
+//           children: children,
+//         ),
+//       );
+//
+//   Widget get _defaultImage {
+//     switch (type) {
+//       case Nodes.user:
+//         return g.ph;
+//
+//       case Nodes.hyperchat:
+//         return g.ph;
+//
+//       case Nodes.group:
+//         return g.ph;
+//
+//       case Nodes.self:
+//         return g.ph;
+//
+//       case Nodes.root:
+//         return g.ph;
+//
+//       case Nodes.market:
+//         return g.ph;
+//
+//       case Nodes.checkpoint:
+//         return g.ph;
+//
+//       case Nodes.journal:
+//         return g.ph;
+//
+//       case Nodes.item:
+//         return g.ph;
+//
+//       case Nodes.event:
+//         return g.ph;
+//
+//       case Nodes.ticket:
+//         return g.ph;
+//
+//       case Nodes.payment:
+//         throw 'We are not going to be paletteMaking payments';
+//     }
+//   }
+//
+//   Widget get paletteImage => GestureDetector(
+//         onTap: imagePress,
+//         child: SizedBox(
+//           width: Palette.paletteHeight, // borderWidth x2
+//           child: image != null
+//               ? image!.display(
+//                   size: Size.square(Palette.paletteHeight), forceSquare: true)
+//               : _defaultImage,
+//         ),
+//       );
+//
+//   Widget get paletteBody => Expanded(
+//         child: Container(
+//           padding: const EdgeInsets.only(left: 10.0, top: 10.0),
+//           child: Down4Input(
+//             tec: tec,
+//             inputCallBack: nameCallBack,
+//             placeHolder: hintText,
+//             padding: EdgeInsets.only(bottom: Palette.paletteHeight / 2),
+//           ),
+//         ),
+//       );
+//
+//   Widget get paletteAction => GestureDetector(
+//       onTap: () {
+//         if (name.isNotEmpty && image != null) {
+//           go?.call(id);
+//         }
+//       },
+//       child: Container(
+//           padding: const EdgeInsets.all(2.0),
+//           width: Palette.paletteHeight - 4,
+//           height: Palette.paletteHeight - 4,
+//           child: go != null
+//               ? Image.asset('assets/images/filled.png')
+//               : const SizedBox.shrink()));
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Column(
+//       children: [
+//         mainContainer(
+//           child: customRow(
+//             children: [paletteImage, paletteBody, paletteAction],
+//           ),
+//         ),
+//         const SizedBox(height: 0)
+//       ],
+//     );
+//   }
+// }
+
 class PaletteMaker extends StatelessWidget {
   final void Function(String)? nameCallBack;
   final void Function() imagePress;
@@ -252,44 +411,119 @@ class PaletteMaker extends StatelessWidget {
     Key? key,
   }) : super(key: key);
 
-  Widget mainContainer({required Widget child}) => AnimatedOpacity(
-      opacity: fold ? 0 : 1,
-      duration: const Duration(milliseconds: 600),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 600),
-        height: fold ? 0 : Palette.paletteHeight,
-        margin: EdgeInsets.only(
-          left: Palette.paletteMargin,
-          right: Palette.paletteMargin,
-          bottom: fold ? 0 : Palette.gapSize,
-        ),
+  // Widget get body => Expanded(
+  //   child: GestureDetector(
+  //     onTap: bodyPress,
+  //     behavior: HitTestBehavior.opaque,
+  //     onLongPress: bodyLongPress,
+  //     child: Padding(
+  //       padding: const EdgeInsets.only(left: 8, bottom: 8, top: 1),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.stretch,
+  //         children: [
+  //           Text(node.displayName,
+  //               maxLines: 1,
+  //               overflow: TextOverflow.clip,
+  //               style: TextStyle(
+  //                   overflow: TextOverflow.ellipsis,
+  //                   fontSize: 16,
+  //                   color: g.theme.paletteTextColor,
+  //                   fontWeight:
+  //                   selected ? FontWeight.bold : FontWeight.normal)),
+  //           Text(node.displayID,
+  //               maxLines: 1,
+  //               overflow: TextOverflow.clip,
+  //               style: TextStyle(
+  //                   fontSize: 8,
+  //                   color: g.theme.idColor,
+  //                   fontStyle: FontStyle.italic,
+  //                   fontWeight:
+  //                   selected ? FontWeight.bold : FontWeight.normal)),
+  //           const Spacer(),
+  //           messagePreview != null
+  //               ? Text(messagePreview!,
+  //               overflow: TextOverflow.ellipsis,
+  //               maxLines: 1,
+  //               style: TextStyle(
+  //                   fontSize: 13,
+  //                   color: g.theme.paletteTextColor,
+  //                   fontWeight: !selected
+  //                       ? FontWeight.normal
+  //                       : FontWeight.bold))
+  //               : const SizedBox.shrink()
+  //         ],
+  //       ),
+  //     ),
+  //   ),
+  // );
+  //
+  Widget imageContainer({required Widget image}) {
+    return Container(
         clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                  color: Palette.shadowColor,
-                  blurRadius: Palette.blurRadius,
-                  spreadRadius: Palette.spreadRadius,
-                  offset: Palette.shadowOffset,
-                  blurStyle: BlurStyle.normal)
-            ],
-            borderRadius: const BorderRadius.all(Radius.circular(6.0)),
-            border: Border.all(width: 2.0, color: Colors.transparent)),
-        child: child,
-      ));
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.all(Radius.circular(5)),
+        ),
+        child: image);
+  }
 
-  Widget customRow({required List<Widget> children}) => Container(
-        clipBehavior: Clip.hardEdge,
+  Widget mainContainer({required Widget child}) {
+    return Container(
+      height: Palette2.fullHeight,
+      // width: squish ? 0 : null,
+      // clipBehavior: Clip.hardEdge,
+      color: g.theme.backGroundColor,
+      padding: EdgeInsets.all(Palette2.padding / 2),
+      child: Container(
         decoration: BoxDecoration(
-          color: PinkTheme.nodeColors[colorCode],
-          borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+          borderRadius: const BorderRadius.all(Radius.circular(5)),
+          color: g.theme.backGroundColor,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          textDirection: TextDirection.ltr,
-          children: children,
-        ),
-      );
+        padding: EdgeInsets.all(Palette2.padding / 2),
+        child: child,
+      ),
+    );
+  }
+
+  ///////////
+
+  // Widget mainContainer({required Widget child}) => AnimatedOpacity(
+  //     opacity: fold ? 0 : 1,
+  //     duration: const Duration(milliseconds: 600),
+  //     child: AnimatedContainer(
+  //       duration: const Duration(milliseconds: 600),
+  //       height: fold ? 0 : Palette.paletteHeight,
+  //       margin: EdgeInsets.only(
+  //         left: Palette.paletteMargin,
+  //         right: Palette.paletteMargin,
+  //         bottom: fold ? 0 : Palette.gapSize,
+  //       ),
+  //       clipBehavior: Clip.hardEdge,
+  //       decoration: BoxDecoration(
+  //           boxShadow: [
+  //             BoxShadow(
+  //                 color: Palette.shadowColor,
+  //                 blurRadius: Palette.blurRadius,
+  //                 spreadRadius: Palette.spreadRadius,
+  //                 offset: Palette.shadowOffset,
+  //                 blurStyle: BlurStyle.normal)
+  //           ],
+  //           borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+  //           border: Border.all(width: 2.0, color: Colors.transparent)),
+  //       child: child,
+  //     ));
+  //
+  // Widget customRow({required List<Widget> children}) => Container(
+  //   clipBehavior: Clip.hardEdge,
+  //   decoration: BoxDecoration(
+  //     color: g.theme.nodeColors[colorCode],
+  //     borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+  //   ),
+  //   child: Row(
+  //     crossAxisAlignment: CrossAxisAlignment.stretch,
+  //     textDirection: TextDirection.ltr,
+  //     children: children,
+  //   ),
+  // );
 
   Widget get _defaultImage {
     switch (type) {
@@ -333,18 +567,16 @@ class PaletteMaker extends StatelessWidget {
 
   Widget get paletteImage => GestureDetector(
         onTap: imagePress,
-        child: SizedBox(
-          width: Palette.paletteHeight, // borderWidth x2
-          child: image != null
-              ? image!.display(
-                  size: Size.square(Palette.paletteHeight), forceSquare: true)
-              : _defaultImage,
-        ),
+        child: image != null
+            ? image!.display(
+                size: Size.square(Palette2.fullHeight - (2 * Palette2.padding)),
+                forceSquare: true)
+            : _defaultImage,
       );
 
   Widget get paletteBody => Expanded(
         child: Container(
-          padding: const EdgeInsets.only(left: 10.0, top: 10.0),
+          padding: const EdgeInsets.only(left: 8, bottom: 8, top: 1),
           child: Down4Input(
             tec: tec,
             inputCallBack: nameCallBack,
@@ -370,15 +602,23 @@ class PaletteMaker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return mainContainer(
+        child: Row(
       children: [
-        mainContainer(
-          child: customRow(
-            children: [paletteImage, paletteBody, paletteAction],
-          ),
-        ),
-        const SizedBox(height: 0)
+        imageContainer(image: paletteImage),
+        paletteBody,
       ],
-    );
+    ));
+
+    // return Column(
+    //   children: [
+    //     mainContainer(
+    //       child: customRow(
+    //         children: [paletteImage, paletteBody, paletteAction],
+    //       ),
+    //     ),
+    //     const SizedBox(height: 0)
+    //   ],
+    // );
   }
 }

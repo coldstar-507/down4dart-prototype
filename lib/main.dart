@@ -1,6 +1,7 @@
 import 'package:cbl_flutter/cbl_flutter.dart';
 import 'package:cbl/cbl.dart';
 import 'package:down4/src/couch.dart';
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -96,6 +97,12 @@ Future<void> main() async {
     // TODO kIsWeb
   }
 
+  // initialized textInputClient
+  // {
+  //   await SystemChannels.textInput.invokeMethod(
+  //       "TextInput.setClient", [3, const TextInputConfiguration().toJson()]);
+  // }
+
   // Initializing couchdb
   {
     await CouchbaseLiteFlutter.init();
@@ -121,6 +128,10 @@ Future<void> main() async {
     final d3 = await rootBundle.load("assets/images/Dollar_Sign_3.png");
     final ph = await rootBundle.load("assets/images/place_holder.png");
     final bg = await rootBundle.load("assets/images/triangles.png");
+
+    final lg = await rootBundle.load("assets/images/down4_inverted_white.png");
+    g.lg = Image.memory(lg.buffer.asUint8List(),
+        fit: BoxFit.cover, gaplessPlayback: true);
 
     g.d1 = Image.memory(d1.buffer.asUint8List(),
         fit: BoxFit.cover, gaplessPlayback: true);
@@ -160,7 +171,7 @@ Future<void> main() async {
 
   runApp(
     MaterialApp(
-      theme: ThemeData(fontFamily: "Alice"),
+      theme: ThemeData(fontFamily: g.theme.font),
       home: const Material(child: Down4()),
     ),
   );

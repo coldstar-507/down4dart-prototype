@@ -5,6 +5,7 @@ import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:video_player/video_player.dart';
+// import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 
 import '../_dart_utils.dart';
 import '../globals.dart';
@@ -46,42 +47,78 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _ChatPageState extends State<ChatPage>
-    with Pager, Backable, Camera, Medias, Sender, Forwarder {
-  GlobalKey mediaModeKey = GlobalKey();
-  GlobalKey mediaForwardModeKey = GlobalKey();
+    with
+        WidgetsBindingObserver,
+        Pager2,
+        // Backable,
+        Input2,
+        Camera2,
+        Medias2,
+        Sender2,
+        Forwarder2
+// Sender,
+// Forwarder,
+// SingleTickerProviderStateMixin,
+
+{
+  // Future<bool> keyboardIsHidden() {
+  //   return Future.delayed(const Duration(milliseconds: 200),
+  //       () => MediaQuery.of(context).viewInsets.bottom <= 0);
+  // }
+
+  // @override
+  // Future<void> focusRoutine() async {
+  //   print("DOING FOCUS ROUTINE!");
+  //   if (hasFocus && await keyboardIsHidden()) {
+  //     print("REMOVEING FOCUS");
+  //     removeFocus();
+  //     // focusNode.unfocus();
+  //     showForwardButtonExtra = false;
+  //     showMediaButtonExtra = false;
+  //     setState(() {});
+  //   }
+  // }
+
+  // @override
+  // void didChangeMetrics() async {
+  //   focusRoutine();
+  // }
+
+  // GlobalKey mediaModeKey = GlobalKey();
+  // GlobalKey mediaForwardModeKey = GlobalKey();
 
   Chatable get node => widget.viewState.node as Chatable;
   List<ID> get orderedChats => widget.viewState.chat?.first ?? [];
 
-  // @override
-  // VideoPlayerController? videoPreview;
-
   @override
-  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
-        Pair("Send", (m) async {
-          await m.use();
-          send(mediaInput: m);
-        }),
-        Pair("Remove", (m) {
-          m.updateSaveStatus(false);
-          loadMediasConsole(!m.isVideo, true);
-        }),
+  List<(String, void Function(FireMedia))> get mediasMode => [
+        (
+          "SEND",
+          (m) async {
+            await m.use();
+            send(mediaInput: m);
+          }
+        ),
+        (
+          "REMOVE",
+          (m) {
+            m.updateSaveStatus(false);
+            setState(() {});
+            // loadBaseConsole();
+            // loadMediasConsole(!m.isVideo, true);
+          }
+        ),
       ];
-  @override
-  ID get selfID => g.self.id;
-  @override
-  FireMedia? cameraInput;
+  // @override
+  // ID get selfID => g.self.id;
   @override
   List<Down4Object>? get fo => widget.fo;
   @override
-  void back() => widget.back();
-  @override
   void setTheState() => setState(() {});
-  @override
-  late Console console;
-  @override
-  late ConsoleInput mainInput = consoleInput;
-  final _tec = TextEditingController();
+
+  // @override
+  // late Console console;
+  // final _tec = TextEditingController();
 
   late ScrollController scroller0 =
       ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
@@ -96,6 +133,13 @@ class _ChatPageState extends State<ChatPage>
         }))
       : null;
 
+  // @override
+  // late final aCtrl =
+  //     AnimationController(duration: Console.animationDuration, vsync: this)
+  //       ..addListener(() {
+  //         loadBaseConsole();
+  //       });
+
   Map<ID, ChatMessage> get _messages =>
       widget.viewState.pages[0].objects.cast();
   Map<ID, Palette2> get _group => widget.viewState.pages[1].objects.cast();
@@ -107,71 +151,80 @@ class _ChatPageState extends State<ChatPage>
   @override
   void initState() {
     super.initState();
-    if (fo != null) {
-      loadForwardingConsole();
-    } else {
-      loadBaseConsole();
-    }
+    WidgetsBinding.instance.addObserver(this);
+    // console = theConsole;
+    // if (fo != null) {
+    //   loadForwardingConsole();
+    // } else {
+    //   loadBaseConsole();
+    // }
   }
 
   @override
   void dispose() {
     scroller0.dispose();
     scroller1?.dispose();
+    // aCtrl?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didUpdateWidget(ChatPage cp) {
     super.didUpdateWidget(cp);
-    if (forwardingConsoles.contains(console.name) && fo == null) {
-      loadBaseConsole();
-    }
+    print("UPDATED WIDGET");
+    // if (forwardingConsoles.contains(console.name) && fo == null) {
+    //   loadBaseConsole();
+    // }
   }
 
-  ConsoleInput get consoleInput {
-    return ConsoleInput(
-      maxLines: 7,
-      tec: _tec,
-      placeHolder: ":)",
-    );
-  }
+  // @override
+  // late ConsoleInput mainInput = ConsoleInput(
+  //     maxLines: 8,
+  //     tec: _tec,
+  //     focus: focusNode,
+  //     placeHolder: "",
+  //     inputCallBack: (_) {
+  //       loadBaseConsole();
+  //     });
 
-  void loadSavingConsole() {
-    console = Console(
-      bottomInputs: [mainInput],
-      topButtons: [
-        ConsoleButton(
-            name: "To Saved Messages",
-            onPress: () async {
-              for (var chat in _messages.values.selected()) {
-                chat.message.updateSavedStatus(true);
-              }
-              // g.self.save();
-              unselectSelectedMessage();
-              loadBaseConsole();
-            })
-      ],
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: loadBaseConsole),
-        ConsoleButton(
-            name: "To Medias",
-            onPress: () {
-              final selectedMedias = _messages.values
-                  .selected()
-                  .where((chat) => chat.hasMedia)
-                  .map((chat) => chat.mediaInfo!.media);
-              for (final media in selectedMedias) {
-                media.updateSaveStatus(true);
-              }
-              // g.self.save();
-              unselectSelectedMessage();
-              loadBaseConsole();
-            }),
-      ],
-    );
-    setState(() {});
-  }
+  // void loadSavingConsole() {
+  //   console = Console(
+  //     // bottomInputs: [mainInput],
+  //     topButtons: [],
+  //     bottomButtons: [],
+  //     consoleRow: Console3(
+  //       widgets: [
+  //         ConsoleButton(name: "Back", onPress: loadBaseConsole),
+  //         ConsoleButton(
+  //             name: "To Messages",
+  //             onPress: () async {
+  //               for (var chat in _messages.values.selected()) {
+  //                 chat.message.updateSavedStatus(true);
+  //               }
+  //               // g.self.save();
+  //               unselectSelectedMessage();
+  //               loadBaseConsole();
+  //             }),
+  //         ConsoleButton(
+  //             name: "To Medias",
+  //             onPress: () {
+  //               final selectedMedias = _messages.values
+  //                   .selected()
+  //                   .where((chat) => chat.hasMedia)
+  //                   .map((chat) => chat.mediaInfo!.media);
+  //               for (final media in selectedMedias) {
+  //                 media.updateSaveStatus(true);
+  //               }
+  //               // g.self.save();
+  //               unselectSelectedMessage();
+  //               loadBaseConsole();
+  //             }),
+  //       ],
+  //     ),
+  //   );
+  //   setState(() {});
+  // }
 
   void unselectSelectedMessage() {
     for (final key in _messages.keys) {
@@ -189,14 +242,13 @@ class _ChatPageState extends State<ChatPage>
   @override
   Future<void> send({FireMedia? mediaInput}) async {
     final media = cameraInput ?? mediaInput;
-    final text = _tec.value.text;
-    if (text == "" && media != null && fo != null) return;
+    if (input.value == "" && media != null && fo != null) return;
 
     final r = _messages.values.selected().asIDs().toList();
 
     final p = Payload(
         media: media,
-        text: _tec.value.text,
+        text: input.value,
         forwards: fo,
         replies: r,
         isSnip: false);
@@ -204,52 +256,240 @@ class _ChatPageState extends State<ChatPage>
     widget.send(p);
 
     unselectSelectedMessage();
+    input.clear();
     cameraInput = null;
-    _tec.clear();
+    turnOffExtras();
+    setTheState();
   }
 
   @override
-  void loadBaseConsole({bool images = true, bool extra = false}) {
-    console = Console(
-      bottomInputs: [mainInput],
-      topButtons: [
-        ConsoleButton(name: "Save", onPress: loadSavingConsole),
-        ConsoleButton(
-          name: "Send",
-          onPress: () {
-            send();
-            loadBaseConsole();
-          },
-        ),
-      ],
-      bottomButtons: [
-        ConsoleButton(
-          name: "Back",
-          onPress: !extra ? widget.back : loadBaseConsole,
-          showExtra: extra,
-          onLongPress: () => loadBaseConsole(extra: !extra),
-          isSpecial: true,
-          extraButtons: [
-            ConsoleButton(
-              name: "Forward",
-              onPress: () => widget.forward(
-                _messages.values.selected().toList(growable: false),
-              ),
-            ),
-          ],
-        ),
-        ConsoleButton(
-          name: cameraInput == null ? "Camera" : "@Camera",
-          onPress: () => loadSquaredCameraConsole(0),
-        ),
-        ConsoleButton(
-          name: "Medias",
-          onPress: () => loadMediasConsole(images),
-        ),
-      ],
-    );
-    setState(() {});
+  late List<Extra> extras = [
+    Extra(setTheState: setTheState),
+    Extra(setTheState: setTheState),
+  ];
+
+  Extra get mediaButtonExtra => extras[0];
+  // Extra get mediaButtonExtra => extras[0];
+
+  List<double> get baseConsoleWidth {
+    if (forwarding) {
+      if (hasFocus) {
+        return [0.0, 0.2, 0.0, 0.6, 0.2];
+      } else {
+        return [0.25, 0.25, 0.0, 0.25, 0.25];
+      }
+    } else {
+      if (hasFocus) {
+        return [0.0, 0.2, 0.0, 0.6, 0.2];
+      } else {
+        return [0.0, 0.25, 0.25, 0.25, 0.25];
+      }
+    }
   }
+
+  bool get forwarding => (fo ?? []).isNotEmpty;
+
+  // @override
+  // void changeConsole(String consoleName) {
+  //   currentConsolesName[currentPageIndex] = consoleName;
+  //   showMediaButtonExtra = false;
+  //   showMediaButtonExtra = false;
+  //   setState(() {});
+  // }
+
+  // final GlobalKey _doubleCameraKey = GlobalKey();
+  // final GlobalKey _mediasButtonKey = GlobalKey();
+
+  @override
+  Console3 get console {
+    return Console3(
+      rows: [
+        {
+          "base": ConsoleRow(
+            widgets: [
+              forwardingObjectsWidget,
+              mediasButton.withExtra(mediaButtonExtra, [
+                forwarding
+                    ? cameraButton
+                    : ConsoleButton(
+                        name: "FORWARD",
+                        onPress: () => widget
+                            .forward(_messages.values.selected().toList())),
+                ConsoleButton(
+                    name: "SAVE", onPress: () => changeConsole("saving"))
+              ]),
+              cameraButton,
+              inputs.single.widget,
+              sendButton,
+            ],
+            extension: null,
+            widths: baseConsoleWidth, // goes to default even size
+            inputMaxHeight: hasFocus ? input.ctrl.height : Console.buttonHeight,
+          ),
+          // "forward": ConsoleRow(
+          //   inputMaxHeight: inputHeight,
+          //   extension: null,
+          //   widgets: [
+          //     forwardingObjectsWidget,
+          //     mediasButton,
+          //     input,
+          //     forwardButton.withExtra(
+          //       buttons: [cameraButton],
+          //       showExtra: showForwardButtonExtra,
+          //       onLongPress: () {
+          //         setState(() {
+          //           showForwardButtonExtra = !showForwardButtonExtra;
+          //         });
+          //       },
+          //     ),
+          //   ],
+          //   widths: focusNode.hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
+          // ),
+          basicMediaRowName: basicMediasRow,
+          basicCameraRowName: basicCameraRow,
+          "saving": ConsoleRow(
+            extension: null,
+            inputMaxHeight: null,
+            widths: null,
+            widgets: [
+              ConsoleButton(name: "BACK", onPress: () => changeConsole("base")),
+              ConsoleButton(
+                  name: "TO_MESSAGES",
+                  onPress: () async {
+                    for (var chat in _messages.values.selected()) {
+                      chat.message.updateSavedStatus(true);
+                    }
+                    // g.self.save();
+                    unselectSelectedMessage();
+                    changeConsole("base");
+                  }),
+              ConsoleButton(
+                  name: "TO_MEDIAS",
+                  onPress: () {
+                    final selectedMedias = _messages.values
+                        .selected()
+                        .where((chat) => chat.hasMedia)
+                        .map((chat) => chat.mediaInfo!.media);
+                    for (final media in selectedMedias) {
+                      media.updateSaveStatus(true);
+                    }
+                    // g.self.save();
+                    unselectSelectedMessage();
+                    changeConsole("base");
+                  }),
+            ],
+          )
+        },
+        {
+          "base2": ConsoleRow(
+            widths: null,
+            inputMaxHeight: null,
+            extension: null,
+            widgets: [
+              ConsoleButton(
+                  name: "FORWARD",
+                  onPress: () {
+                    widget.forward(_group.values.selected().toList());
+                  }),
+              ConsoleButton(
+                  name: "HYPER",
+                  onPress: () {
+                    // TODO
+                    print("TODO");
+                  }),
+              ConsoleButton(
+                  name: "MONEY",
+                  onPress: () {
+                    // TODO
+                    print("TODO");
+                  }),
+              ConsoleButton(
+                  name: "ADD",
+                  onPress: () {
+                    // TODO
+                    print("TODO");
+                  }),
+            ],
+          )
+        }
+      ],
+      currentConsolesName: currentConsolesName,
+      currentPageIndex: widget.viewState.currentIndex,
+    );
+  }
+
+  // @override
+  // void loadConsole() {}
+
+  // InputController input = InputController();
+  // double fullHeight = Console.buttonHeight;
+  // late MyTextEditor te = MyTextEditor(
+  //     onInputChange: (input, height) {
+  //       input = input;
+  //       fullHeight = height;
+  //       loadBaseConsole();
+  //     },
+  //     input: input,
+  //     maxWidth: 0.7,
+  //     maxLines: 8,
+  //     fn: focusNode!);
+
+  // @override
+  // void loadBaseConsole({bool images = true, bool extra = false}) {
+  //   if (fo != null) {
+  //     loadForwardingConsole();
+  //   } else {
+  //     console = Console(
+  //       // bottomInputs: [mainInput],
+  //       // topButtons: [
+  //       //   ConsoleButton(name: "Save", onPress: loadSavingConsole),
+  //       // ],
+  //       bottomButtons: [
+  //         // ConsoleButton(
+  //         //   name: "BACK",
+  //         //   onPress: !extra ? widget.back : loadBaseConsole,
+  //         //   showExtra: extra,
+  //         //   onLongPress: () => loadBaseConsole(extra: !extra),
+  //         //   isSpecial: true,
+  //         //   extraButtons: [
+  //         //     ConsoleButton(name: "SAVE", onPress: loadSavingConsole),
+  //         //     ConsoleButton(
+  //         //       name: "FORWARD",
+  //         //       onPress: () => widget.forward(
+  //         //         _messages.values.selected().toList(growable: false),
+  //         //       ),
+  //         //     ),
+  //         //   ],
+  //         // ),
+  //       ],
+  //       consoleRow: Console3(
+  //         beginSizes: const [0.25, 0.25, 0.25, 0.25],
+  //         endSizes: const [0.0, 0.15, 0.70, 0.15],
+  //         ctrl: aCtrl,
+  //         maxHeight: focusNode!.hasFocus ? fullHeight : null,
+  //         widgets: [
+  //           ConsoleButton(
+  //             name: cameraInput == null ? "CAMERA" : "@CAMERA",
+  //             onPress: () => loadSquaredCameraConsole(0),
+  //           ),
+  //           ConsoleButton(
+  //             name: "MEDIAS",
+  //             onPress: () => loadMediasConsole(images),
+  //           ),
+  //           ConsoleInput2(te),
+  //           ConsoleButton(
+  //             name: "SEND",
+  //             onPress: () {
+  //               send();
+  //               loadBaseConsole();
+  //             },
+  //           ),
+  //         ],
+  //       ),
+  //     );
+  //   }
+  //   setState(() {});
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -282,11 +522,37 @@ class _ChatPageState extends State<ChatPage>
           ];
 
     return Andrew(
+      backButton: backArrow(back: widget.back),
       pages: pages,
       initialPageIndex: widget.viewState.currentIndex,
-      onPageChange: widget.onPageChange,
+      onPageChange: (ix) {
+        widget.onPageChange(ix);
+        onPageSwitch();
+      },
     );
   }
+
+  @override
+  List<String> currentConsolesName = ["base", "base2"];
+
+  @override
+  int get currentPageIndex => widget.viewState.currentIndex;
+
+  @override
+  String get backFromCameraConsoleName => "base";
+
+  @override
+  String get backFromMediasConsoleName => "base";
+
+  @override
+  late List<MyTextEditor> inputs = [
+    MyTextEditor(
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.multiLine,
+      ctrl: InputController(),
+    ),
+  ];
 }
 
 // Future<void> squaredCamera(

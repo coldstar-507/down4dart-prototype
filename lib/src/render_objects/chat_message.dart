@@ -189,12 +189,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     }
   }
 
-  static TextStyle get textStyle =>
-      const TextStyle(fontFamily: "Alice", color: Colors.black);
-
-  static TextStyle get globalDateStyle => const TextStyle(
-      fontFamily: "Alice", fontSize: 10, color: Colors.black45, height: 0.8);
-
   static double get maxMessageWidth => g.sizes.w * 0.76;
 
   static double get textPadding => 12.0;
@@ -205,7 +199,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       maxMessageWidth - textPadding - messageBorder;
 
   Color get messageColor =>
-      myMessage ? PinkTheme.myBubblesColor : PinkTheme.buttonColor;
+      myMessage ? g.theme.myBubblesColor : g.theme.otherBubblesColor;
 
   Down4TextBubble? get bubble => !hasText
       ? null
@@ -213,6 +207,18 @@ class ChatMessage extends StatelessWidget implements Down4Object {
           text: message.text!,
           dateText: timeString(message),
           inheritedWidth: hasMedia ? maxTextWidth : null);
+
+  double get bodyHeight {
+    final double bubbleHeight = bubble?.calcHeight ?? 0.0;
+    final double mediaHeight = mediaInfo?.precalculatedMediaSize.height ?? 0.0;
+    // final double repliesHeight = (repliesInfo?.length ?? 0.0) * headerHeight;
+    final double palettesHeight = (nodes?.length ?? 0.0) * nodeHeight;
+    if (bubbleHeight > 0) {
+      return bubbleHeight + mediaHeight + palettesHeight + textPadding;
+    } else {
+      return mediaHeight + palettesHeight;
+    }
+  }
 
   double? get bubbleWidth => !hasText ? null : bubble!.calcWidth + textPadding;
 
@@ -328,9 +334,9 @@ class ChatMessage extends StatelessWidget implements Down4Object {
           children: [
             Container(
               width: 2,
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(6.0)),
-                color: Colors.black54,
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+                color: g.theme.chatRepilesTextStyle.color,
               ),
             ),
             Expanded(
@@ -340,7 +346,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
                   replyData.senderID,
-                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                  style: g.theme.chatRepilesTextStyle,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -350,7 +356,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
               flex: 3,
               child: Text(
                 replyData.body,
-                style: const TextStyle(fontSize: 11, color: Colors.black54),
+                style: g.theme.chatRepilesTextStyle,
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -384,7 +390,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
           const Spacer(),
           Text(
             "-${message.senderID}   ",
-            style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
+            style: TextStyle(color: g.theme.messageSenderColor, fontSize: 13),
           ),
         ]));
   }
@@ -395,25 +401,29 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         height: headerHeight * 0.8,
         child: Row(children: [
           Text(
-            "   >> ${message.forwardedFrom}   ",
-            style: const TextStyle(color: PinkTheme.qrColor, fontSize: 13),
+            "   >> ${message.forwardedFrom}",
+            style: TextStyle(
+              color: g.theme.messageForwarderColor,
+              fontSize: 13,
+            ),
           ),
         ]));
   }
 
+  double get nodeHeight => Palette2.paletteHeight / golden;
+
   Widget? get messagePalettes {
     if (!hasPalettes && (message.nodes ?? {}).isEmpty) return null;
-    double mpHeight() => Palette.paletteHeight / golden;
     Widget unloadedPalette(ID id) {
       return Container(
         key: GlobalKey(),
-        height: mpHeight(),
+        height: nodeHeight,
         color: Colors.black54,
         child: Row(
           children: [
             Image.asset("assets/images/down4_inverted.png",
-                cacheHeight: (mpHeight() * 2).toInt(),
-                cacheWidth: (mpHeight() * 2).toInt()),
+                cacheHeight: (nodeHeight * 2).toInt(),
+                cacheWidth: (nodeHeight * 2).toInt()),
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 12.0, left: 12.0),
@@ -426,25 +436,33 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     Widget loadedPalette(FireNode n) {
       return Container(
         key: GlobalKey(),
-        height: mpHeight(),
-        color: n.id == g.self.id
-            ? PinkTheme.nodeColors[NodesColor.self]
-            : PinkTheme.nodeColors[n.colorCode],
+        height: nodeHeight,
+        color: Colors.white10,
+        // n.id == g.self.id
+        //     ? g.theme.nodeColors[NodesColor.self]
+        //     : g.theme.nodeColors[n.colorCode],
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            n.nodeImage(Size.square(mpHeight())),
+            n.nodeImage(Size.square(nodeHeight)),
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 6.0, left: 6.0),
                     child: Text(n.displayName,
-                        maxLines: 1, textAlign: TextAlign.start))),
+                        maxLines: 1,
+                        textAlign: TextAlign.start,
+                        style: TextStyle(color: g.theme.paletteTextColor)))),
             GestureDetector(
                 onTap: () => openNode?.call(n),
                 child: Center(
                     child: Padding(
-                  padding: const EdgeInsets.all(6.0),
-                  child: openNode == null ? const SizedBox.shrink() : g.fifty,
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: openNode == null
+                      ? const SizedBox.shrink()
+                      : Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: g.theme.noMessageArrowColor,
+                        ),
                 )))
           ],
         ),
@@ -506,8 +524,9 @@ class ChatMessage extends StatelessWidget implements Down4Object {
             padding: const EdgeInsets.all(6.0),
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-                color:
-                    myMessage ? PinkTheme.myBubblesColor : PinkTheme.bodyColor,
+                color: myMessage
+                    ? g.theme.myBubblesColor
+                    : g.theme.otherBubblesColor,
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(hasMedia ? 0 : 4),
                   bottom: Radius.circular(hasPalettes ? 0 : 4),
@@ -524,7 +543,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
           borderRadius: const BorderRadius.all(Radius.circular(6.0)),
           boxShadow: [
             BoxShadow(
-              color: !selected ? Colors.black54 : Colors.transparent,
+              color: Colors.transparent,
               blurRadius: !selected ? 4.0 : 0.0,
               spreadRadius: -6.0,
               offset:
@@ -552,16 +571,34 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                           const BorderRadius.all(Radius.circular(6.0)),
                       border: Border.all(
                         width: 2.0,
-                        color: selected ? Colors.black : Colors.transparent,
+                        color: selected
+                            ? g.theme.messageSelectionBorderColor
+                            : Colors.transparent,
                       )),
-                  child: Column(
-                      textDirection: TextDirection.ltr,
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        media ?? const SizedBox.shrink(),
-                        text ?? const SizedBox.shrink(),
-                        messagePalettes ?? const SizedBox.shrink()
-                      ]))),
+                  child: Stack(
+                    children: [
+                      Column(
+                          textDirection: TextDirection.ltr,
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            media ?? const SizedBox.shrink(),
+                            text ?? const SizedBox.shrink(),
+                            messagePalettes ?? const SizedBox.shrink()
+                          ]),
+                      // GestureDetector(
+                      //   onTap: () => select?.call(message.id),
+                      //   child: SizedBox(
+                      //     width: bubbleWidth ?? maxMessageWidth,
+                      //     height: bodyHeight,
+                      //     child: Container(
+                      //       color: selected
+                      //           ? g.theme.messageSelectionOverlayColor
+                      //           : Colors.transparent,
+                      //     ),
+                      //   ),
+                      // ),
+                    ],
+                  ))),
           header2 ?? const SizedBox.shrink(),
         ],
       ),

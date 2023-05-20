@@ -94,7 +94,7 @@ class BasicActionButton2 extends StatelessWidget {
 // }
 
 class ButtonsInfo2 {
-  final Image asset;
+  final Widget asset;
   final void Function() pressFunc;
   final void Function()? longPressFunc;
   final bool rightMost;
@@ -113,6 +113,17 @@ class ButtonsInfo2 {
 }
 
 class Palette2 extends StatelessWidget implements Down4Object {
+  static double get padding => 10;
+  static double get paletteRadius => fullHeight / 2;
+  static double get paletteHeight => (g.sizes.h * 0.1212);
+  static double get gapSize => g.sizes.h * 0.0119;
+  static double get paletteMargin => g.sizes.w * 0.042;
+  static double get blurRadius => 6.0;
+  static double get spreadRadius => -7.0;
+  static double get fullHeight => paletteHeight + gapSize;
+  static Offset get shadowOffset => const Offset(6.0, 6.0);
+  static Color get shadowColor => Colors.black.withOpacity(0.66);
+
   @override
   ID get id => node.id;
   final Widget _image;
@@ -142,8 +153,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
     this.show = true,
     this.fade = false,
     required Key key,
-  })  : _image = GestureDetector(
-            onTap: imPress, onLongPress: imLongPress, child: node.nodeImage()),
+  })  : _image = node.nodeImage(Size.square(fullHeight - (2 * padding))),
         super(key: key);
 
   Palette2 select() {
@@ -265,6 +275,307 @@ class Palette2 extends StatelessWidget implements Down4Object {
         children: buttonsInfo2.map((bi) => BasicActionButton2(bi: bi)).toList(),
       ));
 
+  // Widget animatedContainer2({required Widget child}) => AnimatedContainer(
+  //       duration: Duration(milliseconds: containerMS),
+  //       height: fold ? 0 : Palette.paletteHeight,
+  //       // width: squish ? 0 : null,
+  //       clipBehavior: Clip.hardEdge,
+  //       curve: Curves.easeInOut,
+  //       margin: EdgeInsets.symmetric(horizontal: Palette.paletteMargin),
+  //       decoration: BoxDecoration(
+  //         boxShadow: [
+  //           BoxShadow(
+  //             color: squish && !selected && !fold
+  //                 ? Palette.shadowColor
+  //                 : Colors.transparent,
+  //             blurRadius:
+  //                 squish && !selected && !fold ? Palette.blurRadius : 0.0,
+  //             spreadRadius: Palette.spreadRadius,
+  //             offset: squish && !selected && !fold
+  //                 ? Palette.shadowOffset
+  //                 : const Offset(0, 0),
+  //             blurStyle: BlurStyle.normal,
+  //           ),
+  //         ],
+  //       ),
+  //       child: child,
+  //     );
+  //
+  // Widget mainContainer({required Widget child}) => Container(
+  //       decoration: BoxDecoration(
+  //         borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+  //         border: Border.all(
+  //           width: 2.0,
+  //           color: selected ? g.theme.paletteBorderColor : Colors.transparent,
+  //         ),
+  //       ),
+  //       child: child,
+  //     );
+
+  Widget mainContainer({required Widget child}) {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: containerMS),
+      height: fold ? 0 : fullHeight,
+      // width: squish ? 0 : null,
+      clipBehavior: Clip.hardEdge,
+      curve: Curves.easeInOut,
+      color: g.theme.backGroundColor,
+      padding: EdgeInsets.all(padding / 2),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.all(Radius.circular(5)),
+          color: selected ? Colors.white10 : g.theme.backGroundColor,
+        ),
+        padding: EdgeInsets.all(padding / 2),
+        child: child,
+      ),
+    );
+  }
+
+  Widget imageContainer({required Widget image}) {
+    return GestureDetector(
+        onTap: imPress,
+        onLongPress: imLongPress,
+        child: Container(
+            clipBehavior: Clip.hardEdge,
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(5)),
+            ),
+            child: image));
+  }
+
+  // Widget row({required List<Widget> children}) => Container(
+  //       clipBehavior: Clip.hardEdge,
+  //       decoration: BoxDecoration(
+  //         color: g.theme.backGroundColor, // g.theme.nodeColors[node.colorCode],
+  //         borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+  //       ),
+  //       child: Row(
+  //         crossAxisAlignment: CrossAxisAlignment.stretch,
+  //         textDirection: TextDirection.ltr,
+  //         children: children,
+  //       ),
+  //     );
+
+  Widget get body => Expanded(
+        child: GestureDetector(
+          onTap: bodyPress,
+          behavior: HitTestBehavior.opaque,
+          onLongPress: bodyLongPress,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8, top: 1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(node.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    style: TextStyle(
+                        overflow: TextOverflow.ellipsis,
+                        fontSize: 16,
+                        color: g.theme.paletteTextColor,
+                        fontWeight:
+                            selected ? FontWeight.bold : FontWeight.normal)),
+                Text(node.displayID,
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    style: TextStyle(
+                        fontSize: 8,
+                        color: g.theme.idColor,
+                        fontStyle: FontStyle.italic,
+                        fontWeight:
+                            selected ? FontWeight.bold : FontWeight.normal)),
+                const Spacer(),
+                messagePreview != null
+                    ? Text(messagePreview!,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: g.theme.paletteTextColor,
+                            fontWeight: !selected
+                                ? FontWeight.normal
+                                : FontWeight.bold))
+                    : const SizedBox.shrink()
+              ],
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (!show) return const SizedBox.shrink();
+    return AnimatedOpacity(
+      opacity: fade ? 0 : 1,
+      curve: Curves.easeInOut,
+      duration: Duration(milliseconds: fadeMS),
+      child: mainContainer(
+        child: Row(
+          children: [
+            imageContainer(image: _image),
+            body,
+            buttons,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class Palette3 extends StatelessWidget implements Down4Object {
+  @override
+  ID get id => node.id;
+  final Widget _image;
+
+  final FireNode node;
+  final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
+  final bool selected, fade, fadeButton, fold, squish, show;
+  final List<ButtonsInfo2> buttonsInfo2;
+  final int containerMS, fadeMS, fadeButtonMS;
+  final String? messagePreview;
+
+  Palette3({
+    required this.node,
+    this.fadeMS = 100,
+    this.containerMS = 600,
+    this.fadeButtonMS = 100,
+    this.messagePreview,
+    this.buttonsInfo2 = const [],
+    this.imPress,
+    this.bodyPress,
+    this.imLongPress,
+    this.bodyLongPress,
+    this.selected = false,
+    this.squish = true,
+    this.fold = false,
+    this.fadeButton = false,
+    this.show = true,
+    this.fade = false,
+    required Key key,
+  })  : _image = GestureDetector(
+            onTap: imPress, onLongPress: imLongPress, child: node.nodeImage()),
+        super(key: key);
+
+  Palette3 select() {
+    return Palette3(
+      key: key!,
+      fold: fold,
+      squish: squish,
+      show: show,
+      node: node,
+      fade: fade,
+      fadeButton: fadeButton,
+      fadeButtonMS: fadeButtonMS,
+      fadeMS: fadeMS,
+      messagePreview: messagePreview,
+      selected: !selected,
+      imPress: imPress,
+      buttonsInfo2: buttonsInfo2,
+      imLongPress: imLongPress,
+      bodyPress: bodyPress,
+      bodyLongPress: bodyLongPress,
+    );
+  }
+
+  Palette3 showing(bool s) {
+    return Palette3(
+      key: key!,
+      fold: fold,
+      squish: squish,
+      show: s,
+      node: node,
+      fade: fade,
+      fadeButton: fadeButton,
+      fadeButtonMS: fadeButtonMS,
+      fadeMS: fadeMS,
+      messagePreview: messagePreview,
+      selected: selected,
+      imPress: imPress,
+      buttonsInfo2: buttonsInfo2,
+      imLongPress: imLongPress,
+      bodyPress: bodyPress,
+      bodyLongPress: bodyLongPress,
+    );
+  }
+
+  Palette3 animated({
+    bool? squish,
+    bool? alignedRight,
+    bool? fold,
+    bool? fade,
+    bool? selected,
+    bool? fadeButton,
+    int? containerMS,
+    int? fadeMS,
+    int? fadeButtonMS,
+  }) {
+    return Palette3(
+      key: key!,
+      fadeButton: fadeButton ?? this.fadeButton,
+      squish: squish ?? this.squish,
+      fold: fold ?? this.fold,
+      node: node,
+      // image: image,
+      messagePreview: messagePreview,
+      selected: selected ?? this.selected,
+      imPress: imPress,
+      buttonsInfo2: buttonsInfo2,
+      imLongPress: imLongPress,
+      bodyPress: bodyPress,
+      bodyLongPress: bodyLongPress,
+      fade: fade ?? this.fade,
+      containerMS: containerMS ?? this.containerMS,
+      fadeMS: fadeMS ?? this.fadeMS,
+      fadeButtonMS: fadeButtonMS ?? this.fadeButtonMS,
+    );
+  }
+
+  Palette3 deactivated() {
+    return Palette3(
+        key: key!,
+        squish: squish,
+        fold: fold,
+        messagePreview: messagePreview,
+        node: node,
+        buttonsInfo2: buttonsInfo2
+            .map((button) => button.thatDoesNothing())
+            .toList(growable: false));
+  }
+
+  Palette3 withoutButton() {
+    return Palette3(
+        squish: squish, fold: fold, node: node, key: key!); //, image: image);
+  }
+
+  Palette3 copy() {
+    return Palette3(
+        key: key!,
+        fold: fold,
+        squish: squish,
+        node: node,
+        fade: fade,
+        // image: image,
+        fadeButton: fadeButton,
+        fadeButtonMS: fadeButtonMS,
+        fadeMS: fadeMS,
+        messagePreview: messagePreview,
+        selected: selected,
+        imPress: imPress,
+        buttonsInfo2: buttonsInfo2,
+        imLongPress: imLongPress,
+        bodyPress: bodyPress,
+        bodyLongPress: bodyLongPress);
+  }
+
+  Widget get buttons => AnimatedOpacity(
+      opacity: fadeButton ? 0 : 1,
+      curve: Curves.easeInOut,
+      duration: Duration(milliseconds: fadeButtonMS),
+      child: Row(
+        children: buttonsInfo2.map((bi) => BasicActionButton2(bi: bi)).toList(),
+      ));
+
   Widget animatedContainer2({required Widget child}) => AnimatedContainer(
         duration: Duration(milliseconds: containerMS),
         height: fold ? 0 : Palette.paletteHeight,
@@ -296,7 +607,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
           borderRadius: const BorderRadius.all(Radius.circular(6.0)),
           border: Border.all(
             width: 2.0,
-            color: selected ? PinkTheme.black : Colors.transparent,
+            color: selected ? g.theme.paletteBorderColor : Colors.transparent,
           ),
         ),
         child: child,
@@ -305,7 +616,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
   Widget row({required List<Widget> children}) => Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: PinkTheme.nodeColors[node.colorCode],
+          color: g.theme.nodeColors[node.colorCode],
           borderRadius: const BorderRadius.all(Radius.circular(4.0)),
         ),
         child: Row(
@@ -324,8 +635,8 @@ class Palette2 extends StatelessWidget implements Down4Object {
               border: Border(
                 left: BorderSide(
                   color: selected
-                      ? PinkTheme.black
-                      : PinkTheme.nodeColors[node.colorCode]!,
+                      ? g.theme.paletteBorderColor
+                      : g.theme.nodeColors[node.colorCode]!,
                   width: 1.0,
                 ),
               ),
@@ -341,6 +652,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
                     style: TextStyle(
                         overflow: TextOverflow.ellipsis,
                         fontSize: 14,
+                        color: g.theme.paletteTextColor,
                         fontWeight:
                             selected ? FontWeight.bold : FontWeight.normal)),
                 Text(node.displayID,
@@ -348,6 +660,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
                     overflow: TextOverflow.clip,
                     style: TextStyle(
                         fontSize: 8,
+                        color: g.theme.paletteTextColor,
                         fontStyle: FontStyle.italic,
                         fontWeight:
                             selected ? FontWeight.bold : FontWeight.normal)),
@@ -358,6 +671,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
                         maxLines: 1,
                         style: TextStyle(
                             fontSize: 12,
+                            color: g.theme.paletteTextColor,
                             fontWeight: !selected
                                 ? FontWeight.normal
                                 : FontWeight.bold))
@@ -396,7 +710,7 @@ class Palette {
   static double get paletteMargin => g.sizes.w * 0.042;
   static double get blurRadius => 6.0;
   static double get spreadRadius => -7.0;
-  static double get fullHeight => paletteHeight + gapSize;
+  static double get fullHeight => Palette2.fullHeight;
   static Offset get shadowOffset => const Offset(6.0, 6.0);
   static Color get shadowColor => Colors.black.withOpacity(0.66);
   // final FireNode node;

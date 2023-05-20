@@ -50,9 +50,14 @@ class SnipViewPage extends StatelessWidget implements Down4PageWidget {
           width: g.sizes.w,
           child: Console(
             invertedColors: true,
+            // consoleRow: Console3(
+            //   widgets: [
+            //
+            //   ],
+            // ),
             bottomButtons: [
-              ConsoleButton(name: "Back", onPress: back),
-              ConsoleButton(name: "Next", onPress: next),
+              ConsoleButton(name: "BACK", onPress: back),
+              ConsoleButton(name: "NEXT", onPress: next),
             ],
           ),
         ),

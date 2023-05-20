@@ -44,14 +44,22 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _GroupPageState extends State<GroupPage>
-    with Pager, Backable, Medias, Camera, Sender {
-  @override
-  late Console console;
+    with
+        WidgetsBindingObserver,
+        Pager2,
+        // Backable,
+        Input2,
+        Medias2,
+        Camera2,
+        Sender2,
+        Compose2 {
+  // @override
+  // late Console console;
   late List<Widget> _items = [...widget.homePalettes];
-  final _tec = TextEditingController();
+  // final _tec = TextEditingController();
   final _tec2 = TextEditingController();
   bool _private = true;
-  late final double offset = Palette.fullHeight * (widget.nHidden + 1);
+  late final double offset = Palette2.fullHeight * (widget.nHidden + 1);
   late final _scrollController = ScrollController(
     initialScrollOffset: widget.initialOffset,
   );
@@ -60,36 +68,63 @@ class _GroupPageState extends State<GroupPage>
   String _groupName = "";
 
   // @override
-  // VideoPlayerController? videoPreview;
+  // late final aCtrl =
+  //     AnimationController(duration: Console.animationDuration, vsync: this)
+  //       ..addListener(() {
+  //         loadBaseConsole();
+  //       });
+
+  // @override
+  // late FocusNode focusNode = FocusNode()..addListener(onFocusChange);
 
   @override
-  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
-        Pair("Send", (m) async {
-          await m.use();
-          send(mediaInput: m);
-        }),
-        Pair("Remove", (m) {
-          m.updateSaveStatus(false);
-          loadMediasConsole(!m.isVideo, true);
-        }),
+  List<(String, void Function(FireMedia))> get mediasMode => [
+        (
+          "SEND",
+          (m) async {
+            await m.use();
+            send(mediaInput: m);
+          }
+        ),
+        (
+          "REMOVE",
+          (m) {
+            m.updateSaveStatus(false);
+            setState(() {});
+          }
+        ),
       ];
 
-  @override
-  ID get selfID => g.self.id;
-  @override
-  FireMedia? cameraInput;
-  @override
-  void back() => widget.back();
+  // @override
+  // ID get selfID => g.self.id;
+  // @override
+  // FireMedia? cameraInput;
+  // @override
+  // void back() => widget.back();
   @override
   void setTheState() => setState(() {});
-  @override
-  ConsoleInput get mainInput => ConsoleInput(placeHolder: ":)", tec: _tec);
+
+  // @override
+  // late ConsoleInput mainInput = ConsoleInput(
+  //     placeHolder: "",
+  //     tec: _tec,
+  //     focus: focusNode,
+  //     maxLines: 8,
+  //     inputCallBack: (_) => loadBaseConsole());
 
   @override
   void initState() {
     super.initState();
-    loadBaseConsole();
+    WidgetsBinding.instance.addObserver(this);
+
+    // loadBaseConsole();
     animatedTransition();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> animatedTransition() async {
@@ -105,29 +140,32 @@ class _GroupPageState extends State<GroupPage>
         }));
   }
 
+  void forGroupNode(FireMedia m) {
+    _groupImage = m;
+    reloadItems();
+  }
+
   PaletteMaker groupMaker({required bool fold}) {
     return PaletteMaker(
-      fold: fold,
-      colorCode: NodesColor.group,
-      tec: _tec2,
-      id: "",
-      name: _groupName,
-      hintText: "Group Name",
-      image: _groupImage,
-      nameCallBack: (name) => setState(() => _groupName = name),
-      type: Nodes.group,
-      imagePress: () => loadMediasConsole(true, false, (m) {
-        print("GO MAN");
-        _groupImage = m;
-        reloadItems();
-      }),
-    );
+        fold: fold,
+        colorCode: NodesColor.group,
+        tec: _tec2,
+        id: "",
+        name: _groupName,
+        hintText: "Group Name",
+        image: _groupImage,
+        nameCallBack: (name) => setState(() => _groupName = name),
+        type: Nodes.group,
+        imagePress: () {
+          forNode = forGroupNode;
+          changeConsole(basicMediaRowName);
+        });
   }
 
   @override
   Future<void> send({FireMedia? mediaInput}) async {
     final media = mediaInput ?? cameraInput;
-    final text = _tec.value.text;
+    final text = input.value;
     if (_groupImage == null || _groupName.isEmpty) return;
     if (text.isEmpty && media == null) return;
 
@@ -221,35 +259,59 @@ class _GroupPageState extends State<GroupPage>
     // TODO
   }
 
-  @override
-  void loadBaseConsole({bool images = true}) {
-    console = Console(
-      // mediasInfo: consoleMedias(images: images, show: false),
-      bottomInputs: [mainInput],
-      topButtons: [
-        ConsoleButton(
-          isMode: true,
-          isActivated: false,
-          isGreyedOut: true,
-          name: _private ? "Private" : "Public",
-          onPress: () {
-            _private = !_private;
-            loadBaseConsole();
-          },
-        ),
-        ConsoleButton(name: "Send", onPress: send),
-      ],
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: widget.back),
-        ConsoleButton(
-          name: cameraInput == null ? "Camera" : "@Camera",
-          onPress: loadSquaredCameraConsole,
-        ),
-        ConsoleButton(name: "Medias", onPress: loadMediasConsole),
-      ],
-    );
-    setState(() {});
-  }
+  // @override
+  // void loadBaseConsole({bool images = true}) {
+  //   console = Console(
+  //     // mediasInfo: consoleMedias(images: images, show: false),
+  //     bottomInputs: [],
+  //     topButtons: [
+  //       ConsoleButton(
+  //         isMode: true,
+  //         isActivated: false,
+  //         isGreyedOut: true,
+  //         name: _private ? "Private" : "Public",
+  //         onPress: () {
+  //           _private = !_private;
+  //           loadBaseConsole();
+  //         },
+  //       ),
+  //     ],
+  //     bottomButtons: [
+  //       ConsoleButton(name: "Back", onPress: widget.back),
+  //       ConsoleButton(
+  //         name: cameraInput == null ? "Camera" : "@Camera",
+  //         onPress: loadSquaredCameraConsole,
+  //       ),
+  //       ConsoleButton(name: "Medias", onPress: loadMediasConsole),
+  //     ],
+  //     // consoleRow: Console3(
+  //     //   beginSizes: const [0.25, 0.25, 0.25, 0.25],
+  //     //   endSizes: const [0.0, 0.25, 0.50, 0.25],
+  //     //   ctrl: aCtrl,
+  //     //   maxHeight: Console.buttonHeight,        widgets: [
+  //     //     // ConsoleButton(name: "Back", onPress: widget.back),
+  //     //     ConsoleButton(
+  //     //       name: cameraInput == null ? "CAMERA" : "@CAMERA",
+  //     //       onPress: loadSquaredCameraConsole,
+  //     //     ),
+  //     //     // ConsoleButton(
+  //     //     //   isMode: true,
+  //     //     //   isActivated: false,
+  //     //     //   isGreyedOut: true,
+  //     //     //   name: _private ? "PRIVATE" : "PUBLIC",
+  //     //     //   onPress: () {
+  //     //     //     _private = !_private;
+  //     //     //     loadBaseConsole();
+  //     //     //   },
+  //     //     // ),
+  //     //     ConsoleButton(name: "MEDIAS", onPress: loadMediasConsole),
+  //     //     mainInput,
+  //     //     ConsoleButton(name: "SEND", onPress: send),
+  //     //   ],
+  //     // ),
+  //   );
+  //   setState(() {});
+  // }
 
   // Future<void> loadSquaredCameraConsole({
   //   CameraController? ctrl,
@@ -387,15 +449,17 @@ class _GroupPageState extends State<GroupPage>
   //   setState(() {});
   // }
 
-  @override
-  void dispose() async {
-    cameraInput?.delete();
-    super.dispose();
-  }
+  // @override
+  // void dispose() async {
+  //   // focusNode.dispose();
+  //   // aCtrl!.dispose();
+  //   // cameraInput?.delete();
+  //   super.dispose();
+  // }
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(pages: [
+    return Andrew(backButton: backArrow(back: widget.back), pages: [
       Down4Page(
         scrollController: _scrollController,
         staticList: true,
@@ -406,4 +470,40 @@ class _GroupPageState extends State<GroupPage>
       ),
     ]);
   }
+
+  @override
+  Console3 get console => Console3(
+          rows: [
+            {
+              basicComposeRowName: basicComposeRow,
+              basicMediaRowName: basicMediasRow,
+              basicCameraRowName: basicCameraRow,
+            }
+          ],
+          currentConsolesName: currentConsolesName,
+          currentPageIndex: currentPageIndex);
+
+  @override
+  late List<String> currentConsolesName = [basicComposeRowName];
+
+  @override
+  int get currentPageIndex => 0;
+
+  @override
+  String get backFromCameraConsoleName => basicComposeRowName;
+
+  @override
+  String get backFromMediasConsoleName => basicComposeRowName;
+
+  @override
+  late List<MyTextEditor> inputs = [
+    MyTextEditor(
+        onInput: onInput,
+        onFocusChange: onFocusChange,
+        config: Input2.multiLine,
+        ctrl: InputController()),
+  ];
+
+  @override
+  late List<Extra> extras = [];
 }

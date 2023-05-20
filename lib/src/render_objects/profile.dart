@@ -33,8 +33,8 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           right: theGap,
           top: theGap - Palette.gapSize,
           bottom: theGap),
-      decoration: BoxDecoration(
-          boxShadow: const [
+      decoration: const BoxDecoration(
+          boxShadow: [
             BoxShadow(
                 color: Colors.black54,
                 blurRadius: 6.0,
@@ -43,17 +43,17 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
                 blurStyle: BlurStyle.normal)
           ],
           borderRadius: const BorderRadius.all(Radius.circular(16.0)),
-          color: PinkTheme.nodeColors[node_.colorCode]),
+          color: Colors.white10), // g.theme.nodeColors[node_.colorCode]),
       child: Column(
         children: [
           node.nodeImage(Size.square(squareImageSize)),
           const SizedBox(height: 8.0),
           Down4Text(
               text: node.displayName,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 22.0,
                   fontWeight: FontWeight.bold,
-                  fontFamily: "Alice",
+                  fontFamily: g.theme.font,
                   color: Colors.black)),
           // Text(node.name,
           //     style:

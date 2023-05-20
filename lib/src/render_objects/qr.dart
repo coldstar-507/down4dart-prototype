@@ -6,6 +6,7 @@ import 'package:qr/qr.dart';
 import '../themes.dart';
 import '../_dart_utils.dart' show golden;
 import 'chat_message.dart' show ChatMessage;
+import '../globals.dart';
 
 class QrPainter extends CustomPainter {
   final double strokeWidth;
@@ -18,7 +19,7 @@ class QrPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     var paint = Paint()
-      ..color = PinkTheme.qrColor
+      ..color = g.theme.qrColor
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke;
 
@@ -57,7 +58,7 @@ class Down4Qr2 {
 
     final strokeWidth = dimension / qrImage.moduleCount;
     var paint = Paint()
-      ..color = PinkTheme.qrColor
+      ..color = g.theme.qrColor
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke;
 
@@ -121,7 +122,6 @@ class _Down4QrState extends State<Down4Qr> {
 
   @override
   Widget build(BuildContext context) {
-    print("Building QRCODE from Down4Qr");
     return RepaintBoundary(
       child: CustomPaint(
         painter: QrPainter(points: points, strokeWidth: strokeWidth),

@@ -2,11 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../themes.dart';
 import '../globals.dart';
 import '../data_objects.dart' show ID;
-import '../render_objects/_render_utils.dart'
-    show down4Logo, Down4PageWidget;
+import '../render_objects/_render_utils.dart' show down4Logo, Down4PageWidget;
 
 class LoadingPage2 extends StatefulWidget implements Down4PageWidget {
   @override
@@ -40,14 +38,14 @@ class _LoadingPage2State extends State<LoadingPage2>
               child: child,
             );
           },
-          child: down4Logo(0.82 * g.sizes.w),
+          child: down4Logo(0.30 * g.sizes.w),
         ),
       );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: PinkTheme.backGroundColor,
+      color: g.theme.backGroundColor,
       child: Align(
         alignment: AlignmentDirectional.center,
         child: rotatingLogo,

@@ -35,7 +35,7 @@ Future<List<T>> globall<T extends FireObject>(
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
-  Pair<bool, ID?>? mediaInfo,
+  ({bool withData, ID? onlineID})? mediaInfo,
 }) async {
   if (ids == null) return [];
   final reqs = await Future.wait(ids
@@ -83,7 +83,7 @@ Future<void> loadIndexes() async {
 Future<T?> fetch<T extends FireObject>(
   ID id, {
   bool doMerge = false,
-  Pair<bool, ID?>? mediaInfo, // fireMedia specific
+  ({bool withData, ID? onlineID})? mediaInfo, // fireMedia specific
   // bool doHide = false, // fireNode specific
 }) async {
   Future<T?> fetchNode() async {
@@ -97,7 +97,7 @@ Future<T?> fetch<T extends FireObject>(
       print("MERGING NODE ID=$id");
       await node.merge();
     }
-    print("===RETRIEVED NODE ID=$id FROM FETCH===");
+    // print("===RETRIEVED NODE ID=$id FROM FETCH===");
     return node as T;
   }
 
@@ -111,13 +111,13 @@ Future<T?> fetch<T extends FireObject>(
       print("MERGING MESSAGE ID: $id");
       message.merge();
     }
-    print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
+    // print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
     return message;
   }
 
   Future<FireMedia?> fetchMedia() async {
-    final onlineID = mediaInfo!.second;
-    final withData = mediaInfo.first;
+    final onlineID = mediaInfo!.onlineID;
+    final withData = mediaInfo.withData;
     final fromNodes = onlineID == null;
     final ref = fromNodes ? _nodeStore.ref(id) : _messageStore.ref(onlineID);
     try {
@@ -147,7 +147,7 @@ Future<T?> fetch<T extends FireObject>(
           await media.write(imageData: isVideo ? videoThumbnail! : mediaData);
         }
       }
-      print("===RETRIEVED MEDIA ID=$id FROM FETCH===");
+      // print("===RETRIEVED MEDIA ID=$id FROM FETCH===");
       return media;
     } catch (e) {
       print("Error downloading media id: $id from storage, err: $e");
@@ -232,14 +232,14 @@ Future<T?> local<T extends FireObject>(ID id) async {
   final doc = await gdb<T>().document(id);
   if (doc == null) return null;
   final element = fromJson<T>(doc.toPlainMap().cast());
-  print("===RETRIEVED $T WITH ID=$id FROM LOCAL===");
+  // print("===RETRIEVED $T WITH ID=$id FROM LOCAL===");
   return element;
 }
 
 T? cache<T extends FireObject>(ID? id) {
   final element = id == null ? null : _globalCache[id] as T?;
   if (element != null) {
-    print("===RETRIEVED $T WITH ID=$id FROM CACHE===");
+    // print("===RETRIEVED $T WITH ID=$id FROM CACHE===");
     return element;
   }
   return null;
@@ -250,7 +250,7 @@ Future<T?> global<T extends FireObject>(
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
-  Pair<bool, ID?>? mediaInfo,
+  ({bool withData, ID? onlineID})? mediaInfo,
 }) async {
   if (id == null) return null;
   final cached = cache<T>(id);

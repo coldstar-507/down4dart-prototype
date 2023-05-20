@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:cbl/cbl.dart';
 import 'package:down4/src/bsv/_bsv_utils.dart';
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import 'couch.dart';
@@ -181,7 +183,9 @@ class _HomeState extends State<Home> {
 
     final homeIDs = allHomeNodes.asIDs().toSet();
     await globall<FireMedia>(allHomeNodes.map((e) => e.mediaID).whereType(),
-        doFetch: true, doMergeIfFetch: true, mediaInfo: const Pair(true, null));
+        doFetch: true,
+        doMergeIfFetch: true,
+        mediaInfo: (withData: true, onlineID: null));
 
     List<User> hiddenUsers = [];
     for (final u in users) {
@@ -209,26 +213,31 @@ class _HomeState extends State<Home> {
     final nodeMediasToFetch =
         fetchedNodes.map((e) => e.mediaID).whereType<ID>();
     await globall<FireMedia>(nodeMediasToFetch,
-        doFetch: true, doMergeIfFetch: true, mediaInfo: const Pair(true, null));
+        doFetch: true,
+        doMergeIfFetch: true,
+        mediaInfo: (withData: true, onlineID: null));
   }
 
   Future<List<ButtonsInfo2>> bGen(Chatable n,
-      {Pair<FireMessage?, Iterable<ID>>? chatInfo}) async {
-    final ci = chatInfo ?? await n.homeChatInfo();
-    final lastMsg = ci.first;
-    final snips = ci.second;
+      {(FireMessage?, Iterable<ID>, bool)? chatInfo}) async {
+    final (lastMsg, snips, hasUnread) = chatInfo ?? await n.homeChatInfo();
     if (snips.isNotEmpty) {
       return [
         ButtonsInfo2(
-            asset: g.red,
-            pressFunc: () async => setPage(await snipView(n)),
-            longPressFunc: () => n is Personable ? setPage(nodePage(n)) : null,
-            rightMost: true)
+          asset: Icon(Icons.arrow_forward_ios_rounded,
+              color: g.theme.snipArrowColor), //  g.red,
+          pressFunc: () async => setPage(await snipView(n)),
+          longPressFunc: () => n is Personable ? setPage(nodePage(n)) : null,
+          rightMost: true,
+        )
       ];
     } else {
       return [
         ButtonsInfo2(
-            asset: lastMsg?.isRead ?? true ? g.fifty : g.black,
+            asset: Icon(Icons.arrow_forward_ios_rounded,
+                color: !hasUnread
+                    ? g.theme.noMessageArrowColor
+                    : g.theme.messageArrowColor),
             pressFunc: () => setPage(chatPage(n, isPush: true)),
             longPressFunc: () =>
                 n is Personable ? setPage(nodePage(n, isPush: true)) : null,
@@ -240,7 +249,8 @@ class _HomeState extends State<Home> {
   List<ButtonsInfo2> bGen2(FireNode n) {
     return [
       ButtonsInfo2(
-          asset: g.fifty,
+          asset: Icon(Icons.arrow_forward_ios_rounded,
+              color: g.theme.noMessageArrowColor), // g.fifty,
           pressFunc: () => setPage(nodePage(n, isPush: true)),
           rightMost: true)
     ];
@@ -315,24 +325,18 @@ class _HomeState extends State<Home> {
           await global<FireMedia>(node.mediaID,
               doFetch: true,
               doMergeIfFetch: true,
-              mediaInfo: Pair(false, msg.onlineMediaID));
+              mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
         } else {
           await global<FireMedia>(node.mediaID,
               doFetch: true,
               doMergeIfFetch: true,
-              mediaInfo: Pair(true, msg.onlineMediaID));
+              mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
         }
         // get the node media
         await global<FireMedia>(node.mediaID,
             doFetch: true,
             doMergeIfFetch: true,
-            mediaInfo: const Pair(true, null));
-
-        // get the msgMedia
-        await global<FireMedia>(msg.mediaID,
-            doFetch: true,
-            doMergeIfFetch: true,
-            mediaInfo: Pair(true, msg.onlineMediaID));
+            mediaInfo: (withData: true, onlineID: null));
 
         await msg.merge();
 
@@ -453,10 +457,9 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> broadcastMessage(Chatable t, FireMessage msg) async {
-    final media = await global<FireMedia>(msg.mediaID);
-
     final uploads = <Future<bool>>[];
     uploads.add(uploadMessage(msg));
+    final media = await global<FireMedia>(msg.mediaID);
     if (media != null) uploads.add(uploadMedia(media, isSnip: msg.isSnip));
 
     final upSuccess = await Future.wait(uploads).then((u) => u.every((b) => b));
@@ -496,12 +499,11 @@ class _HomeState extends State<Home> {
 
     for (final t in targets) {
       t.updateActivity();
-      final ourMsg = p.makeMsg(root: t.id, onlineMediaID: p.media?.onlineID)
-        ?..cache();
+      final bool doSave = !p.isSnip || t.id == g.self.id;
+      final ourMsg = p.makeMsg(root: t.id)?..cache();
 
       // we save the message if it's not a snip. We ignore the fact that
       // it's a snip and save it anyways if target is self
-      final bool doSave = !p.isSnip || t.id == g.self.id;
 
       if (doSave) await ourMsg?.merge();
       // this way we can send snips to ourself
@@ -527,13 +529,13 @@ class _HomeState extends State<Home> {
         // we mark read every new forwarded messages, no exceptions
         // final fMedia = m.mediaInfo?.media;
         final fMsg = m.message.forwarded(g.self.id, t.id)
-          ..cache()
-          ..markRead();
+          ..markRead()
+          ..cache();
 
         if (t.id != g.self.id) {
           awaitingProcess.add(() => broadcastMessage(t, fMsg));
         } else if (doSave) {
-          await ourMsg?.markSent();
+          await fMsg.markSent();
         }
 
         await writeHomePalette(t, _home, bGen, rfHome);
@@ -770,7 +772,8 @@ class _HomeState extends State<Home> {
     List<ButtonsInfo2> fbGen(Chatable c) {
       return [
         ButtonsInfo2(
-            asset: g.fifty,
+            asset: Icon(Icons.arrow_forward_ios_rounded,
+                color: g.theme.noMessageArrowColor),
             rightMost: true,
             pressFunc: () => setPage(chatPage(c, fo: fo, isPush: true)))
       ];
@@ -945,13 +948,14 @@ class _HomeState extends State<Home> {
         viewState: currentView,
         search: (strIDs) async {
           final ids = strIDs.split(" ").toSet();
-          final inHome = _home.those(ids).noNull().whereNodeIs<Personable>();
-          final toFetch = ids.difference(inHome.asIds().toSet());
-
-          final fetchedNodes = await r.fetchNodes(toFetch);
-          for (final fn in fetchedNodes) {
-            fn.second?.cache();
-            writePalette3(fn.first..cache(), searchs(), bGen2, rf);
+          // TODO r.fetchNodes currently broken, Q: is globall good enough?
+          // final inHome = _home.those(ids).noNull().whereNodeIs<Personable>();
+          // final toFetch = ids.difference(inHome.asIds().toSet());
+          // final fetchedNodes = await r.fetchNodes(toFetch);
+          final nodes = await globall<FireNode>(ids);
+          for (final node in nodes) {
+            // fn.second?.cache();
+            writePalette3(node..cache(), searchs(), bGen2, rf);
           }
           rf();
         },
@@ -1238,7 +1242,9 @@ class _HomeState extends State<Home> {
     s!.markRead();
 
     final m = await global<FireMedia>(s.mediaID,
-        doCache: false, doFetch: true, mediaInfo: Pair(false, s.onlineMediaID));
+        doCache: false,
+        doFetch: true,
+        mediaInfo: (withData: false, onlineID: s.onlineMediaID));
 
     if (m == null) return snipView(node);
 

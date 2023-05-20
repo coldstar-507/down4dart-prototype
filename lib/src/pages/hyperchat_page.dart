@@ -37,58 +37,155 @@ class HyperchatPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _HyperchatPageState extends State<HyperchatPage>
-    with Pager, Backable, Camera, Medias, Sender, Forwarder {
-  final _tec = TextEditingController();
+    with
+        WidgetsBindingObserver,
+        Pager2,
+        // Backable,
+        Camera2,
+        Medias2,
+        Input2,
+        Sender2,
+        Forwarder2,
+        Compose2
+// Forwarder,
+// SingleTickerProviderStateMixin
+{
+  // late final _tec = TextEditingController(); //..addListener(onTec);
+  //
+  // @override
+  // late final aCtrl =
+  //     AnimationController(duration: Console.animationDuration, vsync: this)
+  //       ..addListener(() {
+  //         if (fo == null) {
+  //           loadBaseConsole();
+  //         } else {
+  //           // loadForwardingConsole();
+  //         }
+  //       });
+
+  // @override
+  // late FocusNode focusNode = FocusNode()..addListener(onFocusChange);
+
+  // @override
+  // ID get selfID => g.self.id;
 
   @override
-  ID get selfID => g.self.id;
-
-  @override
-  List<Pair<String, void Function(FireMedia)>> get mediasMode => [
-        Pair("Send", (m) async {
-          await m.use();
-          send(mediaInput: m);
-        }),
-        Pair("Remove", (m) {
-          m.updateSaveStatus(false);
-          loadMediasConsole(!m.isVideo, true);
-        }),
+  List<(String, void Function(FireMedia))> get mediasMode => [
+        (
+          "SEND",
+          (m) async {
+            await m.use();
+            send(mediaInput: m);
+          }
+        ),
+        (
+          "REMOVE",
+          (m) {
+            m.updateSaveStatus(false);
+            setState(() {});
+            // loadMediasConsole(!m.isVideo, true);
+          }
+        ),
       ];
 
   // @override
   // VideoPlayerController? videoPreview;
 
-  @override
-  ConsoleInput get mainInput {
-    return ConsoleInput(placeHolder: ":)", tec: _tec, maxLines: 6);
-  }
+  // void onTec() {
+  //   print("TEC IS CHANGING BABY");
+  //   loadBaseConsole();
+  // }
 
-  @override
-  late Console console;
-  @override
-  FireMedia? cameraInput;
-  @override
-  void back() => widget.back();
+  // @override
+  // late ConsoleInput mainInput = ConsoleInput(
+  //   // prefix: "   ",
+  //   placeHolder: "",
+  //   tec: _tec,
+  //   inputCallBack: (_) => loadBaseConsole(),
+  //   maxLines: 8,
+  //   focus: focusNode,
+  // );
+
+  // void loadInput({int maxlines = 8}) {
+  //   mainInput = ConsoleInput(
+  //     prefix: "   ",
+  //     placeHolder: "",
+  //     tec: _tec,
+  //     maxLines: maxlines,
+  //     focus: _focusNode,
+  //   );
+  // }
+
+  // @override
+  // late Console console;
+  // @override
+  // FireMedia? cameraInput;
+  // @override
+  // void back() => widget.back();
   @override
   List<Down4Object>? get fo => widget.fo;
   @override
   void setTheState() => setState(() {});
 
   late List<Palette2> _palettes = widget.transition.preTransition;
-  late final double offset = widget.transition.nHidden * Palette.fullHeight;
+  late final double offset = widget.transition.nHidden * Palette2.fullHeight;
   late ScrollController scroller =
       ScrollController(initialScrollOffset: widget.transition.scroll);
 
   @override
   void initState() {
     super.initState();
-    if (widget.fo != null) {
-      loadForwardingConsole();
-    } else {
-      loadBaseConsole();
-    }
+    WidgetsBinding.instance.addObserver(this);
+
+    // if (widget.fo != null) {
+    //   // loadForwardingConsole();
+    // } else {
+    //   loadBaseConsole();
+    // }
     animatedTransition();
   }
+
+  @override
+  void dispose() {
+    // focusNode.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+
+    super.dispose();
+  }
+
+  bool get forwarding => (fo ?? []).isNotEmpty;
+
+  // bool extraMediaButton = false;
+
+  // final GlobalKey mediasButtonKey = GlobalKey();
+
+  ConsoleRow get theRow => forwarding
+      ? ConsoleRow(
+          widgets: [
+            forwardingObjectsWidget,
+            mediasButton.withExtra(mediasExtra, [cameraButton]),
+            input.widget,
+            sendButton,
+          ],
+          extension: null,
+          widths: hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
+          inputMaxHeight: hasFocus ? input.height : Console.buttonHeight,
+        )
+      : basicComposeRow;
+
+  // bool showExtraMediaButton = false;
+
+  @override
+  Console3 get console => Console3(
+          rows: [
+            {
+              "base": theRow,
+              basicCameraRowName: basicCameraRow,
+              basicMediaRowName: basicMediasRow,
+            }
+          ],
+          currentConsolesName: currentConsolesName,
+          currentPageIndex: currentPageIndex);
 
   Future<void> animatedTransition() async {
     Future(() => setState(() {
@@ -103,7 +200,7 @@ class _HyperchatPageState extends State<HyperchatPage>
   @override
   Future<void> send({FireMedia? mediaInput}) async {
     final media = mediaInput ?? cameraInput;
-    final text = _tec.value.text;
+    final text = input.value;
     if (text.isEmpty && media == null) return;
 
     final p = Payload(
@@ -118,11 +215,11 @@ class _HyperchatPageState extends State<HyperchatPage>
     widget.makeHyperchat(p, group);
   }
 
-  void ping() {
-    if (_tec.value.text.isEmpty) return;
-    widget.ping(_tec.value.text);
-    _tec.clear();
-  }
+  // void ping() {
+  //   if (_tec.value.text.isEmpty) return;
+  //   widget.ping(_tec.value.text);
+  //   _tec.clear();
+  // }
 
   // void loadMediaConsole([
   //   bool images = true,
@@ -173,24 +270,48 @@ class _HyperchatPageState extends State<HyperchatPage>
     // TODO
   }
 
-  @override
-  void loadBaseConsole({bool images = true}) {
-    console = Console(
-      bottomInputs: [mainInput],
-      topButtons: [
-        ConsoleButton(name: "Ping", onPress: ping),
-        ConsoleButton(name: "Send", onPress: send),
-      ],
-      bottomButtons: [
-        ConsoleButton(name: "Back", onPress: widget.back),
-        ConsoleButton(
-            name: cameraInput == null ? "Camera" : "@Camera",
-            onPress: () => loadSquaredCameraConsole(0)),
-        ConsoleButton(name: "Medias", onPress: loadMediasConsole),
-      ],
-    );
-    setState(() {});
-  }
+  // @override
+  // void loadBaseConsole({bool images = true}) {
+  //   if (fo == null) {
+  //     loadNormalConsole();
+  //   } else {
+  //     // loadForwardingConsole();
+  //   }
+  // }
+
+  // void loadNormalConsole() {
+  //   print("RELOADING RELOADING");
+  //
+  //   console = Console(
+  //     // bottomInputs: [mainInput],
+  //     topButtons: [
+  //       ConsoleButton(name: "Ping", onPress: ping),
+  //       ConsoleButton(name: "Send", onPress: send),
+  //     ],
+  //     bottomButtons: [
+  //       ConsoleButton(name: "Back", onPress: widget.back),
+  //       ConsoleButton(
+  //           name: cameraInput == null ? "Camera" : "@Camera",
+  //           onPress: () => loadSquaredCameraConsole(0)),
+  //       ConsoleButton(name: "Medias", onPress: loadMediasConsole),
+  //     ],
+  //     // consoleRow: Console3(
+  //     //   maxHeight: Console.buttonHeight,
+  //     //   ctrl: aCtrl,
+  //     //   beginSizes: const [0.25, 0.25, 0.25, 0.25],
+  //     //   endSizes: const [0.0, 0.20, 0.60, 0.20],
+  //     //   widgets: [
+  //     //     ConsoleButton(
+  //     //         name: cameraInput == null ? "CAMERA" : "@CAMERA",
+  //     //         onPress: () => loadSquaredCameraConsole(0)),
+  //     //     ConsoleButton(name: "MEDIAS", onPress: loadMediasConsole),
+  //     //     mainInput,
+  //     //     ConsoleButton(name: "SEND", onPress: send),
+  //     //   ],
+  //     // ),
+  //   );
+  //   setState(() {});
+  // }
 
   // Future<void> loadSquaredCameraConsole([
   //   CameraController? ctrl,
@@ -403,7 +524,7 @@ class _HyperchatPageState extends State<HyperchatPage>
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(pages: [
+    return Andrew(backButton: backArrow(back: widget.back), pages: [
       Down4Page(
           scrollController: scroller,
           staticList: true,
@@ -413,4 +534,32 @@ class _HyperchatPageState extends State<HyperchatPage>
           list: _palettes),
     ]);
   }
+
+  @override
+  String get backFromCameraConsoleName => "base";
+
+  @override
+  String get backFromMediasConsoleName => "base";
+
+  @override
+  List<String> currentConsolesName = ["base"];
+
+  @override
+  int get currentPageIndex => 0;
+
+  @override
+  late List<MyTextEditor> inputs = [
+    MyTextEditor(
+        onInput: onInput,
+        onFocusChange: onFocusChange,
+        config: Input2.multiLine,
+        ctrl: InputController()),
+  ];
+
+  Extra get mediasExtra => extras[0];
+
+  @override
+  late List<Extra> extras = [
+    Extra(setTheState: setTheState),
+  ];
 }

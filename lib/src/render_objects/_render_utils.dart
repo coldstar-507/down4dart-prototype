@@ -114,13 +114,13 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
 
   void loadImage() {
     if (media?.cachePath != null) {
-      print("Will render file image");
+      // print("Will render file image");
       realImage = fileIm(media!.cachePath!);
     } else if (media?.cachedImage != null) {
-      print("Will render memory image");
+      // print("Will render memory image");
       realImage = memoryIm(media!.cachedImage!);
     } else if (media?.cachedUrl != null) {
-      print("Will render network image");
+      // print("Will render network image");
       realImage = netIm(media!.cachedUrl!);
     }
     setState(() {});
@@ -160,7 +160,7 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
   void loadThatBoy() async {
     loadImage();
     media ??= await global<FireMedia>(widget.node.mediaID,
-        doFetch: true, mediaInfo: const Pair(false, null));
+        doFetch: true, mediaInfo: (withData: false, onlineID: null));
     if (media == null) return;
     loadImage();
 
@@ -600,12 +600,25 @@ extension MediaDisplay on FireMedia {
 //   }
 // }
 
-Image down4Logo(double dimension) {
-  return Image.asset(
-    "assets/images/down4_inverted.png",
-    height: dimension,
-    width: dimension,
-  );
+Widget down4Logo(double dimension) {
+  return SizedBox.square(dimension: dimension, child: g.lg);
+
+  // return Image.asset(
+  //   "assets/images/down4_inverted_white.png",
+  //   height: dimension,
+  //   width: dimension,
+  // );
+}
+
+Widget backArrow({required void Function() back}) {
+  return Center(
+      child: SizedBox.fromSize(
+          size: Size.square(g.sizes.headerHeight / 2),
+          child: FittedBox(
+              child: GestureDetector(
+                  onTap: back,
+                  behavior: HitTestBehavior.opaque,
+                  child: const Icon(Icons.arrow_back_ios_new_rounded)))));
 }
 
 abstract class Down4PageWidget extends Widget {
@@ -716,8 +729,8 @@ class Down4TextBubble extends StatelessWidget {
     this.inheritedWidth,
     Key? key,
   }) : super(key: key) {
-    final ts = TextSpan(text: text, style: ChatMessage.textStyle);
-    final ds = TextSpan(text: dateText, style: ChatMessage.globalDateStyle);
+    final ts = TextSpan(text: text, style: g.theme.chatBubbleTextStyle);
+    final ds = TextSpan(text: dateText, style: g.theme.chatBubbleDateTextStyle);
 
     textPainter = TextPainter(
         text: ts,
@@ -826,8 +839,18 @@ class _Down4InputState extends State<Down4Input> {
       key: k,
       keyboardType: widget.type,
       textAlignVertical: widget.textAlignVertical,
+      style: TextStyle(
+          overflow: TextOverflow.ellipsis,
+          fontSize: 16,
+          color: g.theme.paletteTextColor,
+          fontWeight: FontWeight.normal),
       textAlign: widget.textAlign,
       decoration: InputDecoration(
+        hintStyle: TextStyle(
+            overflow: TextOverflow.ellipsis,
+            fontSize: 16,
+            color: g.theme.paletteTextColor,
+            fontWeight: FontWeight.normal),
         contentPadding: widget.padding,
         hintText: widget.placeHolder,
         border: InputBorder.none,
@@ -1532,6 +1555,7 @@ class _TouchableOpacityState extends State<TouchableOpacity> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) => setState(() => isDown = true),
       onTapUp: (_) => setState(() => isDown = false),
       onTapCancel: () => setState(() => isDown = false),

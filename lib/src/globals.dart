@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:cbl/cbl.dart';
 import 'package:down4/src/_dart_utils.dart';
+import 'package:down4/src/pages/_page_utils.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'render_objects/palette.dart';
@@ -17,6 +19,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'render_objects/_render_utils.dart';
 import 'render_objects/chat_message.dart';
 
+import 'themes.dart';
 import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
@@ -78,11 +81,14 @@ Future<bool> uploadMedia(
   bool isNode = false,
   bool isSnip = false,
 }) async {
+  final bool mediaShouldBeUpdated = !media.onlineTimestamp.shouldBeUpdated;
+  print("""
+          MEDIA SHOULD BE UPDATED = $mediaShouldBeUpdated
+          MEDIA IS NODE = $isNode
+          NO NEED TO UPDATE MEDIA = ${!mediaShouldBeUpdated && !isNode}
+        """);
   // if the media doesn't need update and is a message media, we are good
-  if (!media.onlineTimestamp.shouldBeUpdated && !isNode) {
-    print("NO NEED TO UPLOAD mediaID: ${media.id}");
-    return true;
-  }
+  if (!media.onlineTimestamp.shouldBeUpdated && !isNode) return true;
   print("UPLOADING mediaID: ${media.id}");
   // if it's a message media and needs an update, we update it
   ID? newID;
@@ -129,7 +135,48 @@ Future<bool> uploadMedia(
 Future<bool> uploadMessage(FireMessage msg) async {
   final msgRef = db.child("Messages").child(msg.id);
   try {
-    await msgRef.set(msg.toJson(toLocal: false));
+    List<Future<dynamic>> uploads = [];
+
+    final mediaCopy = (await global<FireMedia>(msg.mediaID))?.copy();
+    final msgCopy = msg.copy();
+    if (mediaCopy?.onlineTimestamp.shouldBeUpdated ?? false) {
+      // upload info, onlineTimestamp and ID
+      final ID newID = messagePushId();
+      final int newTS = makeTimestamp();
+      // update the message with the onlineMediaID
+      await msg.setOnlineMediaID(newID);
+      // update the media
+      await mediaCopy!.updateOnlineReference(newID, newTS);
+
+      final ref = _st.ref(mediaCopy.onlineID!);
+      final metadata = mediaCopy.toJson(toLocal: false);
+      final setMetadata = SettableMetadata(customMetadata: metadata);
+
+      if (mediaCopy.cachePath != null) {
+        uploads.add(ref.putFile(File(mediaCopy.cachePath!), setMetadata));
+      } else if (mediaCopy.isVideo && mediaCopy.videoFile != null) {
+        uploads.add(ref.putFile(mediaCopy.videoFile!, setMetadata));
+      } else if ((await mediaCopy.imageData) != null) {
+        uploads.add(ref.putData((await mediaCopy.imageData)!, setMetadata));
+      } else {
+        print("NO MEDIA TO UPLOAD BRO");
+      }
+    }
+    // add the messageUpload
+    uploads.add(msgRef.set(msgCopy.toJson(toLocal: false)));
+    // await the uploads, a failure will throw
+    await Future.wait(uploads);
+
+    // we merge if the message is NOT a snip OR root is self
+    final doSave = !msg.isSnip || msg.root == g.self.id;
+    if (doSave) {
+      await Future.wait(
+        [msgCopy.merge(), mediaCopy?.merge() ?? Future.value(1)],
+      );
+    }
+    msgCopy.cache();
+    mediaCopy?.cache();
+
     print("Success uploading message id: ${msg.id}");
     return true;
   } catch (e) {
@@ -239,7 +286,7 @@ class Payload {
 
   Set<ID> get nodesRef => forwardables.whereType<Palette2>().asIds().toSet();
 
-  FireMessage? makeMsg({required ID root, required ID? onlineMediaID}) {
+  FireMessage? makeMsg({required ID root}) {
     if (text.isEmpty && media == null && nodesRef.isEmpty) return null;
     return FireMessage(messagePushId(),
         root: root,
@@ -247,7 +294,7 @@ class Payload {
         timestamp: makeTimestamp(),
         isSnip: isSnip,
         mediaID: media?.id,
-        onlineMediaID: onlineMediaID,
+        onlineMediaID: media?.onlineID,
         isSent: root == g.self.id,
         text: text,
         replies: replies.isEmpty ? null : replies.toSet(),
@@ -287,6 +334,7 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
+  Down4Theme theme = BlackTheme(); //PinkTheme();
   late String appDirPath;
   late Self self;
   late Wallet wallet;
@@ -294,7 +342,7 @@ class Singletons {
   late ExchangeRate exchangeRate;
   List<ID> savedImageIDs = [];
   List<ID> savedVideoIDs = [];
-  late Image fifty, black, red, ph, d1, d2, d3;
+  late Image fifty, black, red, ph, d1, d2, d3, lg;
   late Uint8List background;
   late List<CameraDescription> cameras;
 
@@ -307,6 +355,11 @@ class Singletons {
       return true;
     }
   }
+
+  // List<TextInputConnection> connections = [];
+  // TextInputConnection get multiLine => connections[0];
+  // TextInputConnection get singleLine => connections[1];
+  // TextInputConnection get numberPad => connections[2];
 
   void loadExchangeRate(ExchangeRate er) => exchangeRate = er;
 
@@ -363,7 +416,7 @@ Future<void> writeHomePalette(
   Chatable c,
   Map<ID, Palette2> state,
   Future<List<ButtonsInfo2>> Function(Chatable n,
-          {Pair<FireMessage?, Iterable<ID>>? chatInfo})?
+          {(FireMessage?, Iterable<ID>, bool)? chatInfo})?
       bGen,
   void Function()? onSel, {
   bool? sel,
@@ -376,11 +429,7 @@ Future<void> writeHomePalette(
   final bool isSelected = sel ?? selectionIfReload ?? false;
 
   final chatInfo = await c.homeChatInfo();
-  final preview = chatInfo.first == null
-      ? null
-      : (chatInfo.first?.text ?? "").isNotEmpty
-          ? chatInfo.first?.text!
-          : "&attachment";
+  final (lastMsg, _, _) = chatInfo;
 
   final node = c;
   final hide = node is User && !node.isFriend && !await node.hasMessages();
@@ -396,7 +445,7 @@ Future<void> writeHomePalette(
       key: Key(c.id),
       node: c,
       selected: isSelected,
-      messagePreview: preview,
+      messagePreview: lastMsg?.messagePreview,
       imPress: onSelect,
       show: !hide,
       bodyPress: onSelect,
@@ -672,7 +721,8 @@ Future<void> writePayments(
       buttonsInfo2: pay.isSpentBy(id: g.self.id)
           ? [
               ButtonsInfo2(
-                  asset: g.fifty,
+                  asset: Icon(Icons.arrow_forward_ios_rounded,
+                      color: g.theme.noMessageArrowColor),
                   pressFunc: () => openPayment(pay),
                   rightMost: true)
             ]
@@ -694,10 +744,12 @@ final topButtonsKey = [
   GlobalKey(),
 ];
 
-final bottomButtonsKey = [
-  GlobalKey(),
-  GlobalKey(),
-  GlobalKey(),
-  GlobalKey(),
-  GlobalKey(),
-];
+final bottomButtonsKey = List.generate(1000, (index) => GlobalKey());
+//
+// final bottomButtonsKey = [
+//   GlobalKey(),
+//   GlobalKey(),
+//   GlobalKey(),
+//   GlobalKey(),
+//   GlobalKey(),
+// ];

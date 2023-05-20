@@ -88,13 +88,16 @@ class FireMessage extends FireObject {
   @override
   final ID id;
   final ID senderID, root;
-  final ID? mediaID, onlineMediaID;
+  final ID? mediaID;
   final String? text;
   final Set<ID>? replies, nodes;
   final String? forwardedFrom;
   final int timestamp;
   final bool isSnip;
   bool _isRead, _isSent, _isSaved;
+  ID? _onlineMediaID;
+
+  ID? get onlineMediaID => _onlineMediaID;
 
   FireMessage(
     this.id, {
@@ -103,7 +106,7 @@ class FireMessage extends FireObject {
     required this.timestamp,
     bool isSaved = false,
     this.mediaID,
-    this.onlineMediaID,
+    ID? onlineMediaID,
     this.forwardedFrom,
     this.text,
     this.nodes,
@@ -111,7 +114,8 @@ class FireMessage extends FireObject {
     required this.isSnip,
     bool isRead = false,
     bool isSent = false,
-  })  : _isRead = isRead,
+  })  : _onlineMediaID = onlineMediaID,
+        _isRead = isRead,
         _isSent = isSent,
         _isSaved = isSaved;
 
@@ -128,6 +132,8 @@ class FireMessage extends FireObject {
           ? "&attachment"
           : text!;
 
+  FireMessage copy() => FireMessage.fromJson(toJson(toLocal: true));
+
   FireMessage forwarded(ID newSenderID, ID newRoot) {
     return FireMessage(messagePushId(),
         root: newRoot,
@@ -138,7 +144,7 @@ class FireMessage extends FireObject {
         nodes: nodes,
         isSnip: false,
         mediaID: mediaID,
-        onlineMediaID: onlineMediaID);
+        onlineMediaID: _onlineMediaID);
   }
 
   factory FireMessage.fromJson(Map<String, Object?> decodedJson) {
@@ -156,6 +162,11 @@ class FireMessage extends FireObject {
         isSent: decodedJson["isSent"] == "true",
         nodes: (decodedJson["nodes"] as String?)?.split(" ").toSet(),
         replies: (decodedJson["replies"] as String?)?.split(" ").toSet());
+  }
+
+  Future<void> setOnlineMediaID(ID onlineMediaID) async {
+    _onlineMediaID = onlineMediaID;
+    await merge({"onlineMediaID": _onlineMediaID});
   }
 
   Future<void> markRead() async {
@@ -183,7 +194,7 @@ class FireMessage extends FireObject {
         'senderID': senderID,
         'timestamp': timestamp.toString(),
         if (mediaID != null) 'mediaID': mediaID!,
-        if (onlineMediaID != null) 'onlineMediaID': onlineMediaID!,
+        if (_onlineMediaID != null) 'onlineMediaID': _onlineMediaID!,
         'isSnip': isSnip.toString(),
         if (toLocal) 'isRead': isRead.toString(),
         if (toLocal) 'isSent': isSent.toString(),
@@ -298,6 +309,8 @@ abstract class FireNode extends FireObject {
         _admins = admins,
         _posts = posts,
         _publics = publics;
+
+  FireMessage copy() => FireMessage.fromJson(toJson(toLocal: true));
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? u.makeTimestamp();
@@ -450,10 +463,29 @@ mixin Chatable on FireNode {
     return FireMessage.fromJson(json);
   }
 
-  Future<Pair<FireMessage?, Iterable<ID>>> homeChatInfo() async {
-    final lastChat = lastChatMessage();
-    final unreadSnips = unreadSnipIDs();
-    return Pair(await lastChat, await unreadSnips);
+  Future<bool> lastChatFromOtherIsUnread() async {
+    final raw = """
+            SELECT * FROM _
+            WHERE root = '$id'
+              AND isSnip = 'false'
+              AND isRead = 'false'
+              AND senderID != '${g.self.id}'
+            ORDER BY META().id DESC LIMIT 1
+            """;
+    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
+    final r = await q.execute();
+    final a = await r.allResults();
+
+    return a.isNotEmpty;
+  }
+
+  Future<(FireMessage?, Iterable<ID>, bool)> homeChatInfo() async {
+    final val = await Future.wait([
+      lastChatMessage(),
+      unreadSnipIDs(),
+      lastChatFromOtherIsUnread(),
+    ]);
+    return (val[0] as FireMessage?, val[1] as Iterable<ID>, val[2] as bool);
   }
 }
 
@@ -837,6 +869,13 @@ class FireMedia extends FireObject {
 
   FireMedia copy() {
     return FireMedia.fromJson(toJson(toLocal: true));
+  }
+
+  FireMedia updated({required ID onlineID, required int onlineTS}) {
+    final json = toJson(toLocal: true);
+    json["onlineID"] = onlineID;
+    json["onlineTimestamp"] = onlineTS.toString();
+    return FireMedia.fromJson(json);
   }
 
   // special function upon user intialization
