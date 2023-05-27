@@ -43,9 +43,9 @@ class _ForwadingPageState extends State<ForwardingPage>
         Camera2,
         Medias2,
         Sender2,
-        Forwarder2,
+        ForwardSender2,
         Hyper2 {
-  final _tec = TextEditingController();
+  // final _tec = TextEditingController();
   @override
   List<Down4Object> get fo => widget.fObjects;
 
@@ -119,7 +119,7 @@ class _ForwadingPageState extends State<ForwardingPage>
                 widgets: [
                   forwardingObjectsWidget,
                   mediasButton,
-                  input.widget,
+                  input.consoleInput,
                   sendButton.withExtra(sendExtra, [cameraButton, hyperButton]),
                 ],
               ),
@@ -169,7 +169,7 @@ class _ForwadingPageState extends State<ForwardingPage>
         media: mediaInput ?? cameraInput,
         replies: [],
         forwards: fo,
-        text: _tec.value.text,
+        text: input.value,
         isSnip: false);
     widget.forward(p, selection.asNodes<Chatable>());
   }
@@ -194,15 +194,18 @@ class _ForwadingPageState extends State<ForwardingPage>
   @override
   Widget build(BuildContext context) {
     final ps = _fList.toList(growable: false);
-    return Andrew(backButton: backArrow(back: widget.back), pages: [
-      Down4Page(
-          staticList: true,
-          trueLen: ps.length,
-          title: "Forward",
-          console: console,
-          list: ps,
-          scrollController: scroller),
-    ]);
+    return Andrew(
+      backFunction: widget.back,
+      pages: [
+        Down4Page(
+            staticList: true,
+            trueLen: ps.length,
+            title: "Forward",
+            console: console,
+            list: ps,
+            scrollController: scroller),
+      ],
+    );
   }
 
   @override

@@ -220,7 +220,7 @@ class _HomeState extends State<Home> {
 
   Future<List<ButtonsInfo2>> bGen(Chatable n,
       {(FireMessage?, Iterable<ID>, bool)? chatInfo}) async {
-    final (lastMsg, snips, hasUnread) = chatInfo ?? await n.homeChatInfo();
+    final (_, snips, hasUnread) = chatInfo ?? await n.homeChatInfo();
     if (snips.isNotEmpty) {
       return [
         ButtonsInfo2(
@@ -320,14 +320,16 @@ class _HomeState extends State<Home> {
             doFetch: true, doMergeIfFetch: true);
         if (node == null) return;
 
-        // if is snip from a user that isn't a friend, we don't predownload
+        FireMedia? msgMedia;
+
+        // if is snip from a user that isn't a friend, we don't pre-download
         if (msg.isSnip && node is User && !node.isFriend) {
-          await global<FireMedia>(node.mediaID,
+          msgMedia = await global<FireMedia>(msg.mediaID,
               doFetch: true,
               doMergeIfFetch: true,
               mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
         } else {
-          await global<FireMedia>(node.mediaID,
+          msgMedia = await global<FireMedia>(msg.mediaID,
               doFetch: true,
               doMergeIfFetch: true,
               mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
@@ -338,8 +340,13 @@ class _HomeState extends State<Home> {
             doMergeIfFetch: true,
             mediaInfo: (withData: true, onlineID: null));
 
+        // msg medias references are dynamic and always get updated
+        // this is because messages are not kept for ever on server
+        if (msg.onlineMediaID != null && msg.onlineMediaTimestamp != null) {
+          await msgMedia?.updateOnlineReference(
+              msg.onlineMediaID!, msg.onlineMediaTimestamp!);
+        }
         await msg.merge();
-
         await writeHomePalette(node..updateActivity(), _home, bGen, rfHome);
 
         if (page is HomePage) setPage(homePage());
@@ -457,14 +464,15 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> broadcastMessage(Chatable t, FireMessage msg) async {
-    final uploads = <Future<bool>>[];
-    uploads.add(uploadMessage(msg));
-    final media = await global<FireMedia>(msg.mediaID);
-    if (media != null) uploads.add(uploadMedia(media, isSnip: msg.isSnip));
+    final successfulUpload = await uploadMessage(msg);
+    // final uploads = <Future<bool>>[];
+    // uploads.add(uploadMessage(msg));
+    // final media = await global<FireMedia>(msg.mediaID);
+    // if (media != null) uploads.add(uploadMedia(media, isSnip: msg.isSnip));
 
-    final upSuccess = await Future.wait(uploads).then((u) => u.every((b) => b));
+    // final upSuccess = await Future.wait(uploads).then((u) => u.every((b) => b));
 
-    if (upSuccess) {
+    if (successfulUpload) {
       final broadcastSuccess = await generateRequest(msg, t).process();
       if (broadcastSuccess && !msg.isSnip) {
         await msg.markSent();
@@ -476,7 +484,8 @@ class _HomeState extends State<Home> {
   }
 
   Future<void> metaSend(Payload p, Iterable<Chatable> targets) async {
-    final messagesToForward = p.forwardables.whereType<ChatMessage>();
+    final messagesToForward =
+        p.forwardables.whereType<ChatMessage>().map((cm) => cm.message);
 
     List<Future<void> Function()> awaitingProcess = [];
     // Here, we will iterate over each target and each messages we are sending
@@ -497,58 +506,78 @@ class _HomeState extends State<Home> {
     // If it's a snip, we can know because there's the media cached path
     // If it's not a snip, it should be pre-written
 
+    p.media?.cache();
+    await p.media?.merge();
     for (final t in targets) {
+      List<FireMessage> msgs = [];
       t.updateActivity();
-      final bool doSave = !p.isSnip || t.id == g.self.id;
-      final ourMsg = p.makeMsg(root: t.id)?..cache();
-
-      // we save the message if it's not a snip. We ignore the fact that
-      // it's a snip and save it anyways if target is self
-
-      if (doSave) await ourMsg?.merge();
-      // this way we can send snips to ourself
-      final dontMarkRead = p.isSnip && t.id == g.self.id;
-      if (!dontMarkRead) await ourMsg?.markRead();
-
-      if (t.id != g.self.id && ourMsg != null) {
-        awaitingProcess.add(() => broadcastMessage(t, ourMsg));
-      } else if (doSave && ourMsg != null) {
-        await ourMsg.markSent();
+      final ourMsg = p.makeMsg(root: t.id);
+      if (ourMsg != null) {
+        final bool doMarkRead = !(ourMsg.isSnip && t.id == g.self.id);
+        if (doMarkRead) await ourMsg.markRead();
+        msgs.add(ourMsg);
       }
 
-      // if (ourMsg != null) {
-      //   if (t.id != g.self.id) {
-      //     u.add(uploadMessage(ourMsg));
-      //     final req = generateRequest(ourMsg, t);
-      //     awatingProcess.add(() => broadcastMessage(req, t, ourMsg));
-      //   }
-      // }
+      final fMsgs = messagesToForward.map((m) => m.forwarded(g.self.id, t.id));
+      for (final fMsg in fMsgs) {
+        await fMsg.markRead();
+      }
 
-      for (final m in messagesToForward) {
-        // markRead will save the message locally
-        // we mark read every new forwarded messages, no exceptions
-        // final fMedia = m.mediaInfo?.media;
-        final fMsg = m.message.forwarded(g.self.id, t.id)
-          ..markRead()
-          ..cache();
-
-        if (t.id != g.self.id) {
-          awaitingProcess.add(() => broadcastMessage(t, fMsg));
-        } else if (doSave) {
-          await fMsg.markSent();
+      for (final m in msgs.followedBy(fMsgs)) {
+        m.cache();
+        if (t.id == g.self.id) {
+          await m.markSent();
+        } else {
+          awaitingProcess.add(() => broadcastMessage(t, m));
         }
-
-        await writeHomePalette(t, _home, bGen, rfHome);
-
-        // we don't send the message if the receipient is us
-        // if (t.id != g.self.id) {
-        //   u.add(uploadMessage(fMsg));
-        //   if (fMedia != null) u.add(uploadMedia(fMedia));
-        //   final req = generateRequest(fMsg, t);
-        //   awatingProcess.add(() => broadcastMessage(req, t, fMsg));
-        // }
       }
+      await writeHomePalette(t, _home, bGen, rfHome);
     }
+
+    // for (final t in targets) {
+    //   t.updateActivity();
+    //   final ourMsg = p.makeMsg(root: t.id)?..cache();
+    //   final allMsgs = await ourMsg?.merge();
+    //   // this way we can send snips to ourself
+    //   final dontMarkRead = p.isSnip && t.id == g.self.id;
+    //   if (!dontMarkRead) await ourMsg?.markRead();
+    //
+    //   if (t.id != g.self.id && ourMsg != null) {
+    //     awaitingProcess.add(() => broadcastMessage(t, ourMsg));
+    //   } else if (ourMsg != null) {
+    //     await ourMsg.markSent();
+    //   }
+    //
+    //   // if (ourMsg != null) {
+    //   //   if (t.id != g.self.id) {
+    //   //     u.add(uploadMessage(ourMsg));
+    //   //     final req = generateRequest(ourMsg, t);
+    //   //     awatingProcess.add(() => broadcastMessage(req, t, ourMsg));
+    //   //   }
+    //   // }
+    //
+    //   for (final m in messagesToForward) {
+    //     final fMsg = m.message.forwarded(g.self.id, t.id)
+    //       ..markRead()
+    //       ..cache();
+    //
+    //     if (t.id != g.self.id) {
+    //       awaitingProcess.add(() => broadcastMessage(t, fMsg));
+    //     } else {
+    //       await fMsg.markSent();
+    //     }
+    //
+    //     await writeHomePalette(t, _home, bGen, rfHome);
+    //
+    //     // we don't send the message if the receipient is us
+    //     // if (t.id != g.self.id) {
+    //     //   u.add(uploadMessage(fMsg));
+    //     //   if (fMedia != null) u.add(uploadMedia(fMedia));
+    //     //   final req = generateRequest(fMsg, t);
+    //     //   awatingProcess.add(() => broadcastMessage(req, t, fMsg));
+    //     // }
+    //   }
+    // }
 
     Future(() async {
       for (final ap in awaitingProcess) {
@@ -595,8 +624,8 @@ class _HomeState extends State<Home> {
         activity: makeTimestamp(),
         group: grp,
         mediaID: hcMedia.id);
-    final uploads = [uploadMedia(hcMedia, isNode: true), uploadNode(hyper)];
-    final success = (await Future.wait(uploads)).every((u) => u);
+
+    final success = await uploadNode(hyper);
 
     if (!success) {
       hcMedia.delete();
@@ -617,8 +646,7 @@ class _HomeState extends State<Home> {
 
   Future<void> makeGroup(Group group, FireMedia m, Payload p) async {
     setPage(loadingPage());
-    final uploads = [uploadMedia(m, isNode: true), uploadNode(group)];
-    final success = (await Future.wait(uploads)).every((u) => u);
+    final success = await uploadNode(group);
 
     if (success) {
       await group.merge();
@@ -626,7 +654,6 @@ class _HomeState extends State<Home> {
       m.cache();
       group.cache();
       await metaSend(p, [group]);
-      // await writeHomePalette(group, _homePalettes, bGen, rfHome);
       await unselectHomeSelection();
       viewManager.popUntilHome();
       setPage(chatPage(group, isPush: true));
@@ -683,7 +710,8 @@ class _HomeState extends State<Home> {
         isReversed: isReversed,
         text: text,
         width: size.width,
-        height: size.height);
+        height: size.height)
+      ..cache();
     // payload could potentially have forwards in a snip...
     final payload = Payload(
         isSnip: true, replies: null, forwards: null, text: null, media: media);
@@ -749,6 +777,7 @@ class _HomeState extends State<Home> {
       ping: (text) => ping(text, home.selected().asNodes<Chatable>()),
       snip: () => setPage(snipPage()),
       search: () => setPage(searchPage(isPush: true)),
+      themes: () => setPage(themePage()),
       delete: () async {
         for (final p in List<Palette2>.from(home)) {
           if (p.selected && p.id != g.self.id) {
@@ -833,6 +862,10 @@ class _HomeState extends State<Home> {
       back: () => back(withPop: false),
       payment: payment,
     );
+  }
+
+  ru.Down4PageWidget themePage() {
+    return ThemePage(() => back(withPop: false), null);
   }
 
   ru.Down4PageWidget moneyPage({
@@ -966,7 +999,7 @@ class _HomeState extends State<Home> {
         openNode: (node) => setPage(nodePage(node, isPush: true)),
         add: (selectedPals) async {
           for (final n in selectedPals) {
-            if (n is User) n.updateFriendStatus(true);
+            if (n is User) await n.updateFriendStatus(true);
             writePalette3(n, searchs(), bGen2, rf, sel: false);
             writeHomePalette(n, _home, bGen, rfHome);
           }
@@ -1112,6 +1145,8 @@ class _HomeState extends State<Home> {
       }
     }
 
+    void rf() => setPage(chatPage(c));
+
     Future<void> loadMore([int i = 20]) async {
       await writeMessages(
           limit: i,
@@ -1211,24 +1246,50 @@ class _HomeState extends State<Home> {
     }
 
     return ChatPage(
-        forward: (fo) => setPage(forwardPage(fo, isPush: true)),
-        onPageChange: (ix) {
-          refreshChat(stopVid: true);
-          chat().currentIndex = ix;
-        },
-        loadMore: loadMore,
-        viewState: viewManager.at(chatID()),
-        fo: fo,
-        openNode: opn,
-        send: (payload) async {
-          await metaSend(payload, [c]);
-          // poping the forwarding page
-          if (forwarding()) viewManager.popInBetween();
-          setPage(chatPage(c,
-              isReload: true,
-              rewriteMsgWithNodes: payload.forwardables.isNotEmpty));
-        }, // TODO, will need future nodes
-        back: () => back(withPop: true, f: fo));
+      forward: (fo) => setPage(forwardPage(fo, isPush: true)),
+      onPageChange: (ix) {
+        refreshChat(stopVid: true);
+        chat().currentIndex = ix;
+      },
+      loadMore: loadMore,
+      viewState: viewManager.at(chatID()),
+      fo: fo,
+      openNode: opn,
+      send: (payload) async {
+        await metaSend(payload, [c]);
+        // poping the forwarding page
+        if (forwarding()) viewManager.popInBetween();
+        setPage(chatPage(c,
+            isReload: true,
+            rewriteMsgWithNodes: payload.forwardables.isNotEmpty));
+      }, // TODO, will need future nodes
+      back: () => back(withPop: true, f: fo),
+      add: () async {
+        for (final n in members().values.selected().asNodes<Personable>()) {
+          if (n is User) await n.updateFriendStatus(true);
+          writePalette3(n, members(), bGen2, rf, sel: false);
+          writeHomePalette(n, _home, bGen, rfHome);
+        }
+        rf();
+        localPalettesRoutine();
+      },
+      money: () {
+        return setPage(moneyPage(
+            isPush: true,
+            transition: selectionTransition(
+                originalList: members().values.toList().reversed.toList(),
+                state: members(),
+                scrollOffset: chat().pages[1].scroll)));
+      },
+      hyper: () {
+        return setPage(hyperchatPage(
+            fo,
+            selectionTransition(
+                originalList: members().values.toList().reversed.toList(),
+                state: members(),
+                scrollOffset: chat().pages[1].scroll)));
+      },
+    );
   }
 
   Future<ru.Down4PageWidget> snipView(Chatable node, [List<ID>? l]) async {
@@ -1247,6 +1308,9 @@ class _HomeState extends State<Home> {
         mediaInfo: (withData: false, onlineID: s.onlineMediaID));
 
     if (m == null) return snipView(node);
+    // this will preload it in memory if it's there
+    // allowing it to be precached
+    await m.imageData;
 
     // final scale = m.aspectRatio * g.sizes.fullAspectRatio;
     // Widget displayMediaBody(Widget child) => Center(
@@ -1274,7 +1338,13 @@ class _HomeState extends State<Home> {
       await vpc.play();
       displayBody = (media) async => media.displaySnip(controller: vpc);
     } else {
-      displayBody = (media) async => media.displaySnip();
+      displayBody = (media) async {
+        final image = media.displayCachedImage;
+        if (image != null) {
+          await precacheImage(image.image, context);
+        }
+        return media.displaySnip();
+      };
     }
 
     void back_() async {

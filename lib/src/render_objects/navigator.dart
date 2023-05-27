@@ -52,9 +52,9 @@ class Down4Page {
 class Andrew extends StatefulWidget {
   final List<Down4Page> pages;
   final int initialPageIndex;
-  final void Function()? addFriends;
+  final void Function()? addFriends, themes;
   final Function(int)? onPageChange;
-  final Widget? backButton;
+  final void Function()? backFunction;
 
   static Duration get pageSwitchAnimationDuration =>
       const Duration(milliseconds: 200);
@@ -62,8 +62,9 @@ class Andrew extends StatefulWidget {
       const Duration(milliseconds: 160);
 
   const Andrew({
+    this.themes,
     this.addFriends,
-    this.backButton,
+    this.backFunction,
     required this.pages,
     this.onPageChange,
     this.initialPageIndex = 0,
@@ -104,7 +105,7 @@ class _AndrewState extends State<Andrew> {
     super.dispose();
   }
 
-  bool get isHome => widget.backButton == null;
+  bool get isHome => widget.backFunction == null;
 
   Down4Page get curPage => widget.pages[curPos];
 
@@ -120,32 +121,38 @@ class _AndrewState extends State<Andrew> {
     // }).toList(growable: false);
   }
 
-  Widget get pageHeader => Row(
-        textDirection: TextDirection.ltr,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          widget.backButton ??
-              GestureDetector(
-                onTap: widget.addFriends,
-                child: Center(child: down4Logo(g.sizes.headerHeight / 2)),
+  Widget get pageHeader => SizedBox(
+        height: g.sizes.headerHeight,
+        child: Row(
+          textDirection: TextDirection.ltr,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox.square(
+              dimension: g.sizes.headerHeight,
+              child: GestureDetector(
+                onHorizontalDragUpdate: (_) {},
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.backFunction ?? widget.addFriends,
+                onLongPress: widget.themes,
+                child: widget.backFunction != null
+                    ? backArrow()
+                    : down4Logo(g.sizes.headerHeight / 2),
               ),
-          Row(
-              children: titles
-                  .asMap()
-                  .entries
-                  .map((e) => AnimatedDefaultTextStyle(
-                      duration: Andrew.pageSwitchAnimationDuration,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontFamily: g.theme.font,
-                        color: g.theme.headerTextColor
-                            .withOpacity(curPos == e.key ? 1 : 0.3),
-                        fontSize: 20,
-                      ),
-                      child: Text("  ${e.value}  ")))
-                  .toList(growable: false)),
-          SizedBox(width: g.sizes.headerHeight / 2)
-        ],
+            ),
+            Row(
+                children: titles
+                    .asMap()
+                    .entries
+                    .map((e) => AnimatedDefaultTextStyle(
+                        duration: Andrew.pageSwitchAnimationDuration,
+                        style:
+                            g.theme.headerTextStyle(activated: curPos == e.key),
+                        child: Text("  ${e.value}  ")))
+                    .toList(growable: false)),
+            SizedBox.square(dimension: g.sizes.headerHeight),
+          ],
+        ),
       );
 
   Widget get pageBody => Expanded(

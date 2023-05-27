@@ -107,15 +107,18 @@ class _NodePageState extends State<NodePage> with Pager2 {
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(backButton: backArrow(back: widget.back), pages: [
-      Down4Page(
-        scrollController: scroller,
-        reversedList: false,
-        title: node.displayName,
-        console: console,
-        list: [ProfileWidget(node: node)],
-      ),
-    ]);
+    return Andrew(
+      backFunction: widget.back,
+      pages: [
+        Down4Page(
+          scrollController: scroller,
+          reversedList: false,
+          title: node.displayName,
+          console: console,
+          list: [ProfileWidget(node: node)],
+        ),
+      ],
+    );
 
     return _view ?? const SizedBox.shrink();
   }
@@ -149,5 +152,5 @@ class _NodePageState extends State<NodePage> with Pager2 {
   void setTheState() => setState(() {});
 
   @override
-  late  List<Extra> extras = [];
+  late List<Extra> extras = [];
 }

@@ -24,13 +24,16 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final ViewState viewState;
   final List<Down4Object>? fo;
   final void Function(int) onPageChange;
-  final void Function() back;
+  final void Function() back, add, money, hyper;
   final Future<void> Function([int limit]) loadMore;
   final void Function(Branchable) openNode;
   final void Function(Payload) send;
   final void Function(List<Down4Object> fo) forward;
 
   const ChatPage({
+    required this.add,
+    required this.money,
+    required this.hyper,
     required this.viewState,
     required this.loadMore,
     required this.onPageChange,
@@ -50,11 +53,15 @@ class _ChatPageState extends State<ChatPage>
     with
         WidgetsBindingObserver,
         Pager2,
-        // Backable,
         Input2,
         Camera2,
         Medias2,
         Sender2,
+        Add2,
+        Hyper2,
+        Money2,
+        ForwardSender2,
+        Saver2,
         Forwarder2
 // Sender,
 // Forwarder,
@@ -309,17 +316,11 @@ class _ChatPageState extends State<ChatPage>
             widgets: [
               forwardingObjectsWidget,
               mediasButton.withExtra(mediaButtonExtra, [
-                forwarding
-                    ? cameraButton
-                    : ConsoleButton(
-                        name: "FORWARD",
-                        onPress: () => widget
-                            .forward(_messages.values.selected().toList())),
-                ConsoleButton(
-                    name: "SAVE", onPress: () => changeConsole("saving"))
+                forwarding ? cameraButton : forwardButton,
+                saveButton,
               ]),
               cameraButton,
-              inputs.single.widget,
+              inputs.single.consoleInput,
               sendButton,
             ],
             extension: null,
@@ -347,69 +348,14 @@ class _ChatPageState extends State<ChatPage>
           // ),
           basicMediaRowName: basicMediasRow,
           basicCameraRowName: basicCameraRow,
-          "saving": ConsoleRow(
-            extension: null,
-            inputMaxHeight: null,
-            widths: null,
-            widgets: [
-              ConsoleButton(name: "BACK", onPress: () => changeConsole("base")),
-              ConsoleButton(
-                  name: "TO_MESSAGES",
-                  onPress: () async {
-                    for (var chat in _messages.values.selected()) {
-                      chat.message.updateSavedStatus(true);
-                    }
-                    // g.self.save();
-                    unselectSelectedMessage();
-                    changeConsole("base");
-                  }),
-              ConsoleButton(
-                  name: "TO_MEDIAS",
-                  onPress: () {
-                    final selectedMedias = _messages.values
-                        .selected()
-                        .where((chat) => chat.hasMedia)
-                        .map((chat) => chat.mediaInfo!.media);
-                    for (final media in selectedMedias) {
-                      media.updateSaveStatus(true);
-                    }
-                    // g.self.save();
-                    unselectSelectedMessage();
-                    changeConsole("base");
-                  }),
-            ],
-          )
+          basicSavingRowName: basicSavingRow,
         },
         {
           "base2": ConsoleRow(
             widths: null,
             inputMaxHeight: null,
             extension: null,
-            widgets: [
-              ConsoleButton(
-                  name: "FORWARD",
-                  onPress: () {
-                    widget.forward(_group.values.selected().toList());
-                  }),
-              ConsoleButton(
-                  name: "HYPER",
-                  onPress: () {
-                    // TODO
-                    print("TODO");
-                  }),
-              ConsoleButton(
-                  name: "MONEY",
-                  onPress: () {
-                    // TODO
-                    print("TODO");
-                  }),
-              ConsoleButton(
-                  name: "ADD",
-                  onPress: () {
-                    // TODO
-                    print("TODO");
-                  }),
-            ],
+            widgets: [forwardButton, hyperButton, moneyButton, addButton],
           )
         }
       ],
@@ -522,7 +468,7 @@ class _ChatPageState extends State<ChatPage>
           ];
 
     return Andrew(
-      backButton: backArrow(back: widget.back),
+      backFunction: widget.back,
       pages: pages,
       initialPageIndex: widget.viewState.currentIndex,
       onPageChange: (ix) {
@@ -548,11 +494,52 @@ class _ChatPageState extends State<ChatPage>
   late List<MyTextEditor> inputs = [
     MyTextEditor(
       onInput: onInput,
+      // isAnimated: node is Groupable,
       onFocusChange: onFocusChange,
       config: Input2.multiLine,
       ctrl: InputController(),
     ),
   ];
+
+  @override
+  void forward() {
+    if (currentPageIndex == 0) {
+      widget.forward(_messages.values.selected().toList(growable: false));
+    } else {
+      widget.forward(_group.values.selected().toList(growable: false));
+    }
+  }
+
+  @override
+  void saveToMedias() {
+    final selectedMedias = _messages.values
+        .selected()
+        .where((chat) => chat.hasMedia)
+        .map((chat) => chat.mediaInfo!.media);
+    for (final media in selectedMedias) {
+      media.updateSaveStatus(true);
+    }
+    unselectSelectedMessage();
+    changeConsole("base");
+  }
+
+  @override
+  void saveToMessages() {
+    for (var chat in _messages.values.selected()) {
+      chat.message.updateSavedStatus(true);
+    }
+    unselectSelectedMessage();
+    changeConsole("base");
+  }
+
+  @override
+  void add() => widget.add();
+
+  @override
+  void hyper() => widget.hyper();
+
+  @override
+  void money() => widget.money();
 }
 
 // Future<void> squaredCamera(

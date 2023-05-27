@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../globals.dart';
 
 import '../data_objects.dart';
+import '../pages/_page_utils.dart';
 import '../themes.dart';
 
 import 'palette.dart';
@@ -384,16 +385,16 @@ class UserMakerPalette extends StatelessWidget {
 // }
 
 class PaletteMaker extends StatelessWidget {
-  final void Function(String)? nameCallBack;
+  // final void Function(String)? nameCallBack;
   final void Function() imagePress;
   final String name, id;
-  final String hintText;
+  // final String hintText;
   final FireMedia? image;
   final void Function(ID)? go;
   final NodesColor colorCode;
   final Nodes type;
   final Nodes? parentType;
-  final TextEditingController tec;
+  final MyTextEditor tec;
   final bool fold;
   const PaletteMaker({
     required this.fold,
@@ -401,10 +402,10 @@ class PaletteMaker extends StatelessWidget {
     required this.tec,
     required this.id,
     required this.name,
-    this.nameCallBack,
+    // this.nameCallBack,
     required this.imagePress,
     this.image,
-    required this.hintText,
+    // required this.hintText,
     this.go,
     this.type = Nodes.user,
     this.parentType,
@@ -562,6 +563,8 @@ class PaletteMaker extends StatelessWidget {
 
       case Nodes.payment:
         throw 'We are not going to be paletteMaking payments';
+      case Nodes.theme:
+        return down4Logo(Palette2.fullHeight - Palette2.padding);
     }
   }
 
@@ -576,14 +579,15 @@ class PaletteMaker extends StatelessWidget {
 
   Widget get paletteBody => Expanded(
         child: Container(
-          padding: const EdgeInsets.only(left: 8, bottom: 8, top: 1),
-          child: Down4Input(
-            tec: tec,
-            inputCallBack: nameCallBack,
-            placeHolder: hintText,
-            padding: EdgeInsets.only(bottom: Palette.paletteHeight / 2),
-          ),
-        ),
+            padding: const EdgeInsets.only(left: 8, bottom: 8, top: 1),
+            child: tec.basicInput
+            // Down4Input(
+            //   tec: tec,
+            //   inputCallBack: nameCallBack,
+            //   placeHolder: hintText,
+            //   padding: EdgeInsets.only(bottom: Palette.paletteHeight / 2),
+            // ),
+            ),
       );
 
   Widget get paletteAction => GestureDetector(

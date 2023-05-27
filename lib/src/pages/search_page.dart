@@ -209,13 +209,16 @@ class _AddFriendPageState extends State<AddFriendPage>
   @override
   Widget build(BuildContext context) {
     print("QR DATA LEN = ${qrData.length}");
-    return Andrew(backButton: backArrow(back: widget.back), pages: [
-      Down4Page(
-          title: "Search",
-          console: console,
-          stackWidgets: [qr],
-          list: searchs.values.toList())
-    ]);
+    return Andrew(
+      backFunction: widget.back,
+      pages: [
+        Down4Page(
+            title: "Search",
+            console: console,
+            stackWidgets: [qr],
+            list: searchs.values.toList())
+      ],
+    );
   }
 
   @override
@@ -226,12 +229,12 @@ class _AddFriendPageState extends State<AddFriendPage>
                   widgets: [
                     scanButton.withExtra(scanExtra, [forwardButton]),
                     addButton,
-                    input.widget,
+                    input.consoleInput,
                     searchButton,
                   ],
                   extension: scanning ? (scanExtension, g.sizes.w) : null,
                   widths: input.hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
-                  inputMaxHeight: input.height)
+                  inputMaxHeight: input.hasFocus ? input.height : null)
             }
           ],
           currentConsolesName: currentConsolesName,

@@ -22,13 +22,14 @@ import '_render_utils.dart';
 
 class ConsoleButton extends StatelessWidget {
   final Extra? extra;
-  final String name;
+  final String? name;
+  final Icon? icon;
   final List<ConsoleButton>? extraButtons;
   final bool isSpecial, isMode, shouldBeDownButIsnt, isActivated, isGreyedOut;
   final void Function() onPress;
   final void Function()? onLongPress;
   final void Function()? onLongPressUp;
-  final bool invertColors;
+  final bool isInverted;
   final BorderRadius? border;
 
   const ConsoleButton({
@@ -36,7 +37,8 @@ class ConsoleButton extends StatelessWidget {
     // this.width,
     // this.maxWidth,
     this.extra,
-    this.invertColors = false,
+    this.icon,
+    this.isInverted = false,
     required this.name,
     required this.onPress,
     this.extraButtons,
@@ -59,7 +61,7 @@ class ConsoleButton extends StatelessWidget {
         onPress: onPress,
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
-        invertColors: true,
+        isInverted: true,
         isGreyedOut: isGreyedOut,
         extraButtons: extraButtons,
         // showExtra: showExtra,
@@ -77,7 +79,7 @@ class ConsoleButton extends StatelessWidget {
         onPress: onPress,
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
-        invertColors: true,
+        isInverted: true,
         isGreyedOut: isGreyedOut,
         extraButtons: extraButtons,
         // showExtra: showExtra,
@@ -96,7 +98,7 @@ class ConsoleButton extends StatelessWidget {
         onPress: onPress,
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
-        invertColors: invertColors,
+        isInverted: isInverted,
         isGreyedOut: isGreyedOut,
         extraButtons: buttons,
         shouldBeDownButIsnt: shouldBeDownButIsnt,
@@ -116,7 +118,7 @@ class ConsoleButton extends StatelessWidget {
         onPress: onPress,
         onLongPress: onLongPress,
         onLongPressUp: onLongPressUp,
-        invertColors: invertColors,
+        isInverted: isInverted,
         border: border,
         isGreyedOut: isGreyedOut,
         extraButtons: extraButtons,
@@ -148,6 +150,9 @@ class ConsoleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (icon == null && name == null) {
+      throw 'ConsoleButton error: Either icon or name must not be null';
+    }
     return Align(
       alignment: AlignmentDirectional.bottomCenter,
       child: TouchableOpacity(
@@ -155,21 +160,23 @@ class ConsoleButton extends StatelessWidget {
         onPress: pressButton,
         onLongPress: longPressButton,
         onLongPressUp: isActivated ? onLongPressUp : () {},
-        child: SizedBox(
-          height: Console.buttonHeight,
-          child: Center(
-            child: Text(
-              name,
-              maxLines: 1,
-              style: TextStyle(
-                fontSize: 12,
-                overflow: TextOverflow.fade,
-                color: g.theme.buttonTextColor,
-                decoration: isSpecial ? TextDecoration.underline : null,
-                decorationStyle: TextDecorationStyle.solid,
-                fontStyle: isMode ? FontStyle.italic : FontStyle.normal,
-                fontWeight: FontWeight.bold,
-              ),
+        child: ColoredBox(
+          color: g.theme
+              .buttonColor(isActivated: isActivated, isInverted: isInverted),
+          child: SizedBox(
+            height: Console.buttonHeight,
+            child: Center(
+              child: icon ??
+                  Text(
+                    name!,
+                    maxLines: 1,
+                    style: g.theme.consoleButtonTextStyle(
+                      isMode: isMode,
+                      isSpecial: isSpecial,
+                      isInverted: isInverted,
+                      isActivated: isActivated,
+                    ),
+                  ),
             ),
           ),
         ),
@@ -384,15 +391,59 @@ class ConsoleInput2 extends StatelessWidget {
                     borderRadius: const BorderRadius.all(Radius.circular(15))),
                 child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Align(alignment: ed.alignment, child: ed)))));
+                    child: Align(
+                        alignment: ed.centered
+                            ? AlignmentDirectional.center
+                            : AlignmentDirectional.topStart,
+                        child: ed)))));
+  }
+}
+
+class BasicInput extends StatelessWidget {
+  final MyTextEditor ed;
+  const BasicInput(this.ed, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTap: !ed.fn.hasFocus
+            ? () => FocusScope.of(context).requestFocus(ed.fn)
+            : null,
+        child: Align(alignment: AlignmentDirectional.topStart, child: ed));
+  }
+}
+
+class SnipInput extends StatelessWidget {
+  final MyTextEditor ed;
+  const SnipInput(this.ed, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTap: !ed.fn.hasFocus
+            ? () => FocusScope.of(context).requestFocus(ed.fn)
+            : null,
+        child: Center(
+            child: Container(
+                width: g.sizes.w,
+                color: Colors.black38,
+                height: ed.height,
+                child: Align(
+                  alignment: AlignmentDirectional.center,
+                  child: ed,
+                ))));
   }
 }
 
 class ConsoleText extends StatelessWidget {
   final String text;
+  final TextStyle? style;
+  final AlignmentDirectional align;
   final TextAlign textAlign;
   const ConsoleText({
+    required this.align,
     required this.text,
+    this.style,
     this.textAlign = TextAlign.center,
     Key? key,
   }) : super(key: key);
@@ -400,13 +451,12 @@ class ConsoleText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: g.theme.buttonColor,
-      child: Center(
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: g.theme.consoleTextStyle,
-        ),
+      color: g.theme.buttonColor(isActivated: true, isInverted: false),
+      alignment: align,
+      child: Text(
+        text,
+        style: style ?? g.theme.consoleTextStyle,
+        textAlign: textAlign,
       ),
     );
   }
@@ -727,7 +777,7 @@ class Console extends StatelessWidget {
             child: Container(
                 height: buttonHeight,
                 decoration: BoxDecoration(
-                    color: g.theme.nodeColors[obj.node.colorCode],
+                    color: obj.node.color,
                     border: Border.all(
                         width: borderWidth, color: g.theme.consoleBorderColor)),
                 child: Row(
@@ -1071,7 +1121,6 @@ class Console3 extends StatelessWidget {
   double? get currentExtensionHeight =>
       rows[currentPageIndex][currentConsoleName]?.extension?.$2;
 
-
   double get extraButtonsRad => 2.0;
 
   List<Widget> get extraButtons {
@@ -1260,95 +1309,89 @@ class Console3 extends StatelessWidget {
 
     // the row that embeds the columns
     // ci is the index
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedContainer(
-          duration: Console.animationDuration,
-          height: currentExtensionHeight ?? 0,
-          // constraints: BoxConstraints(
-          //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
-          child: currentExtension ?? const SizedBox.shrink(),
-        ),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.start,
-          mainAxisSize: MainAxisSize.max,
-          children: rows.indexed.map((c) {
-            final ci = c.$1;
-            final cInfo = c.$2;
-            return Column(
-                children: cInfo
-                    .map((name, c) {
-                      double currentHeight;
-                      if (currentConsolesName.contains(name)) {
-                        currentHeight = Console.buttonHeight;
-                      } else {
-                        currentHeight = 0;
-                      }
+    return GestureDetector(
+      onHorizontalDragUpdate: (_) {},
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedOpacity(
+            opacity: currentExtension == null ? 0 : 1,
+            duration: Console.animationDuration,
+            child: AnimatedContainer(
+              duration: Console.animationDuration,
+              height: currentExtensionHeight ?? 0,
+              // constraints: BoxConstraints(
+              //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
+              child: currentExtension ?? const SizedBox.shrink(),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.start,
+            mainAxisSize: MainAxisSize.max,
+            children: rows.indexed.map((c) {
+              final ci = c.$1;
+              final cInfo = c.$2;
+              return Column(
+                  children: cInfo
+                      .map((name, c) {
+                        double currentHeight;
+                        if (currentConsolesName.contains(name)) {
+                          currentHeight = Console.buttonHeight;
+                        } else {
+                          currentHeight = 0;
+                        }
 
-                      final defaultWidth = 1 / c.widgets.length;
-                      final inputHeight = c.inputMaxHeight;
+                        final defaultWidth = 1 / c.widgets.length;
+                        final inputHeight = c.inputMaxHeight;
 
-                      final row = Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: c.widgets.indexed.map((e) {
-                          final i = e.$1;
-                          final w = e.$2;
+                        final row = Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: c.widgets.indexed.map((e) {
+                            final i = e.$1;
+                            final w = e.$2;
 
-                          double width;
-                          if (ci != currentPageIndex) {
-                            width = 0;
-                          } else {
-                            width = (c.widths?[i] ?? defaultWidth) * g.sizes.w;
-                          }
+                            double width;
+                            if (ci != currentPageIndex) {
+                              width = 0;
+                            } else {
+                              width =
+                                  (c.widths?[i] ?? defaultWidth) * g.sizes.w;
+                            }
 
-                          Widget w_;
-                          if (w is ConsoleButton) {
-                            w_ = AnimatedOpacity(
-                              duration: Andrew.pageSwitchOpacityDuration,
-                              opacity: ci == currentPageIndex ? 1 : 0,
-                              child: AnimatedContainer(
-                                duration: Andrew.pageSwitchAnimationDuration,
-                                width: width,
-                                child: AnimatedContainer(
-                                    duration: Console.animationDuration,
-                                    // width: width,
-                                    height: currentHeight,
-                                    child: w),
-                              ),
-                            );
-                          } else {
-                            w_ = AnimatedOpacity(
+                            double height;
+                            if (w is ConsoleButton) {
+                              height = currentHeight;
+                            } else {
+                              height = currentHeight == 0
+                                  ? currentHeight
+                                  : inputHeight ?? Console.buttonHeight;
+                            }
+
+                            final Widget w_ = AnimatedOpacity(
                                 duration: Andrew.pageSwitchOpacityDuration,
                                 opacity: ci == currentPageIndex ? 1 : 0,
                                 child: AnimatedContainer(
                                     duration:
                                         Andrew.pageSwitchAnimationDuration,
                                     width: width,
-                                    child: AnimatedContainer(
-                                        duration: Console.animationDuration,
-                                        height: currentHeight == 0
-                                            ? currentHeight
-                                            : inputHeight ??
-                                                Console.buttonHeight,
-                                        // width: width,
-                                        child: w)));
-                          }
+                                    height: height,
+                                    child: w));
 
-                          return w_;
-                        }).toList(),
-                      );
+                            return w_;
+                          }).toList(),
+                        );
 
-                      return MapEntry(name, row);
-                    })
-                    .values
-                    .toList());
-            // return MapEntry(i, SizedBox(width: sizes[i], child: value));
-          }).toList(),
-        )
-      ],
+                        return MapEntry(name, row);
+                      })
+                      .values
+                      .toList());
+              // return MapEntry(i, SizedBox(width: sizes[i], child: value));
+            }).toList(),
+          )
+        ],
+      ),
     );
   }
 }

@@ -57,7 +57,7 @@ class _GroupPageState extends State<GroupPage>
   // late Console console;
   late List<Widget> _items = [...widget.homePalettes];
   // final _tec = TextEditingController();
-  final _tec2 = TextEditingController();
+  // final _tec2 = TextEditingController();
   bool _private = true;
   late final double offset = Palette2.fullHeight * (widget.nHidden + 1);
   late final _scrollController = ScrollController(
@@ -149,12 +149,12 @@ class _GroupPageState extends State<GroupPage>
     return PaletteMaker(
         fold: fold,
         colorCode: NodesColor.group,
-        tec: _tec2,
+        tec: groupInput,
         id: "",
         name: _groupName,
-        hintText: "Group Name",
+        // hintText: "Group Name",
         image: _groupImage,
-        nameCallBack: (name) => setState(() => _groupName = name),
+        // nameCallBack: (name) => setState(() => _groupName = name),
         type: Nodes.group,
         imagePress: () {
           forNode = forGroupNode;
@@ -459,16 +459,19 @@ class _GroupPageState extends State<GroupPage>
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(backButton: backArrow(back: widget.back), pages: [
-      Down4Page(
-        scrollController: _scrollController,
-        staticList: true,
-        trueLen: widget.people.length + 1,
-        title: "Group",
-        list: _items,
-        console: console,
-      ),
-    ]);
+    return Andrew(
+      backFunction: widget.back,
+      pages: [
+        Down4Page(
+          scrollController: _scrollController,
+          staticList: true,
+          trueLen: widget.people.length + 1,
+          title: "Group",
+          list: _items,
+          console: console,
+        ),
+      ],
+    );
   }
 
   @override
@@ -502,7 +505,22 @@ class _GroupPageState extends State<GroupPage>
         onFocusChange: onFocusChange,
         config: Input2.multiLine,
         ctrl: InputController()),
+    MyTextEditor(
+        onInput: (s, h) {
+          _groupName = s;
+          onInput(s, h);
+        },
+        style: g.theme.paletteNameStyle(selected: false),
+        placeholderStyle: g.theme.palettePlaceholderTextStyle,
+        onFocusChange: onFocusChange,
+        maxWidth: g.sizes.w * (1 / golden),
+        // alignment: AlignmentDirectional.topStart,
+        textPadding: 0,
+        config: Input2.singleLine,
+        ctrl: InputController(placeHolder: "Group Name...")),
   ];
+
+  MyTextEditor get groupInput => inputs[1];
 
   @override
   late List<Extra> extras = [];

@@ -370,32 +370,19 @@ class Palette2 extends StatelessWidget implements Down4Object {
                 Text(node.displayName,
                     maxLines: 1,
                     overflow: TextOverflow.clip,
-                    style: TextStyle(
-                        overflow: TextOverflow.ellipsis,
-                        fontSize: 16,
-                        color: g.theme.paletteTextColor,
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal)),
+                    style: g.theme.paletteNameStyle(selected: selected)),
                 Text(node.displayID,
                     maxLines: 1,
                     overflow: TextOverflow.clip,
-                    style: TextStyle(
-                        fontSize: 8,
-                        color: g.theme.idColor,
-                        fontStyle: FontStyle.italic,
-                        fontWeight:
-                            selected ? FontWeight.bold : FontWeight.normal)),
+                    style: g.theme.paletteIDTextStyle(
+                        selected: selected, color: node.color)),
                 const Spacer(),
                 messagePreview != null
                     ? Text(messagePreview!,
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: g.theme.paletteTextColor,
-                            fontWeight: !selected
-                                ? FontWeight.normal
-                                : FontWeight.bold))
+                        style:
+                            g.theme.palettePreviewTextStyle(selected: selected))
                     : const SizedBox.shrink()
               ],
             ),
@@ -616,7 +603,7 @@ class Palette3 extends StatelessWidget implements Down4Object {
   Widget row({required List<Widget> children}) => Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: g.theme.nodeColors[node.colorCode],
+          color: node.color,
           borderRadius: const BorderRadius.all(Radius.circular(4.0)),
         ),
         child: Row(
@@ -634,9 +621,7 @@ class Palette3 extends StatelessWidget implements Down4Object {
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(
-                  color: selected
-                      ? g.theme.paletteBorderColor
-                      : g.theme.nodeColors[node.colorCode]!,
+                  color: selected ? g.theme.paletteBorderColor : node.color,
                   width: 1.0,
                 ),
               ),

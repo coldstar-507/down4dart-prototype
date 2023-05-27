@@ -4,9 +4,10 @@ import 'dart:ui' show Size;
 
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
+import 'package:down4/src/themes.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:mime/mime.dart';
-import 'package:flutter/material.dart' show Image;
+import 'package:flutter/material.dart' show Color, Image;
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -95,9 +96,11 @@ class FireMessage extends FireObject {
   final int timestamp;
   final bool isSnip;
   bool _isRead, _isSent, _isSaved;
+  int? _onlineMediaTimestamp;
   ID? _onlineMediaID;
 
   ID? get onlineMediaID => _onlineMediaID;
+  int? get onlineMediaTimestamp => _onlineMediaTimestamp;
 
   FireMessage(
     this.id, {
@@ -107,6 +110,7 @@ class FireMessage extends FireObject {
     bool isSaved = false,
     this.mediaID,
     ID? onlineMediaID,
+    int? onlineMediaTimestamp,
     this.forwardedFrom,
     this.text,
     this.nodes,
@@ -114,7 +118,8 @@ class FireMessage extends FireObject {
     required this.isSnip,
     bool isRead = false,
     bool isSent = false,
-  })  : _onlineMediaID = onlineMediaID,
+  })  : _onlineMediaTimestamp = onlineMediaTimestamp,
+        _onlineMediaID = onlineMediaID,
         _isRead = isRead,
         _isSent = isSent,
         _isSaved = isSaved;
@@ -148,6 +153,7 @@ class FireMessage extends FireObject {
   }
 
   factory FireMessage.fromJson(Map<String, Object?> decodedJson) {
+    final omts = decodedJson["onlineMediaTimestamp"] as String?;
     return FireMessage(decodedJson["id"] as ID,
         root: decodedJson["root"] as ID,
         senderID: decodedJson["senderID"] as ID,
@@ -156,6 +162,7 @@ class FireMessage extends FireObject {
         isSaved: decodedJson["isSaved"] == "true",
         mediaID: decodedJson["mediaID"] as ID?,
         isSnip: decodedJson["isSnip"] == "true",
+        onlineMediaTimestamp: omts != null ? int.parse(omts) : null,
         onlineMediaID: decodedJson["onlineMediaID"] as ID?,
         timestamp: int.parse(decodedJson["timestamp"] as String),
         isRead: decodedJson["isRead"] == "true",
@@ -164,9 +171,12 @@ class FireMessage extends FireObject {
         replies: (decodedJson["replies"] as String?)?.split(" ").toSet());
   }
 
-  Future<void> setOnlineMediaID(ID onlineMediaID) async {
+  Future<void> setOnlineMediaInfo(ID onlineMediaID, int timestamp) async {
     _onlineMediaID = onlineMediaID;
-    await merge({"onlineMediaID": _onlineMediaID});
+    await merge({
+      "onlineMediaID": _onlineMediaID,
+      "onlineMediaTimestamp": _onlineMediaTimestamp,
+    });
   }
 
   Future<void> markRead() async {
@@ -195,6 +205,8 @@ class FireMessage extends FireObject {
         'timestamp': timestamp.toString(),
         if (mediaID != null) 'mediaID': mediaID!,
         if (_onlineMediaID != null) 'onlineMediaID': _onlineMediaID!,
+        if (_onlineMediaTimestamp != null)
+          'onlineMediaTimestamp': _onlineMediaTimestamp!.toString(),
         'isSnip': isSnip.toString(),
         if (toLocal) 'isRead': isRead.toString(),
         if (toLocal) 'isSent': isSent.toString(),
@@ -217,6 +229,7 @@ enum Nodes {
   ticket,
   payment,
   self,
+  theme,
 }
 
 enum NodesColor {
@@ -253,7 +266,8 @@ abstract class FireNode extends FireObject {
   final ID? _ownerID;
 
   ID? get mediaID;
-  NodesColor get colorCode;
+  Color get color;
+  // NodesColor get colorCode;
   Nodes get type;
   String get displayID;
   String get displayName;
@@ -402,6 +416,9 @@ abstract class FireNode extends FireObject {
       case Nodes.payment:
         break;
       // return Payment(payment: Down4Payment.fromYouKnow(decodedJson["pay"]));
+      case Nodes.theme:
+        // TODO: Handle this case.
+        break;
     }
     throw '$type is not an avaiblable FireNode type';
   }
@@ -581,8 +598,8 @@ class User extends FireNode with Branchable, Chatable, Personable {
   Iterable<ID> get children => _publics!;
 
   @override
-  NodesColor get colorCode =>
-      isFriend ? NodesColor.friend : NodesColor.nonFriend;
+  Color get color =>
+      g.theme.nodeColors[isFriend ? NodesColor.friend : NodesColor.nonFriend]!;
 
   @override
   String? get description => _description;
@@ -621,7 +638,7 @@ class Self extends FireNode with Branchable, Chatable, Personable, Editable {
             privates: privates);
 
   @override
-  NodesColor get colorCode => NodesColor.self;
+  Color get color => g.theme.nodeColors[NodesColor.self]!;
 
   @override
   Iterable<ID> get children => _publics!;
@@ -678,7 +695,7 @@ class Group extends FireNode with Chatable, Groupable, Editable {
   bool get isPrivate => _isPrivate!;
 
   @override
-  NodesColor get colorCode => NodesColor.group;
+  Color get color => g.theme.nodeColors[NodesColor.group]!;
 
   @override
   String get displayName => _name;
@@ -704,7 +721,7 @@ class Hyperchat extends FireNode with Chatable, Groupable {
   }) : super(group: group, name: firstWord, lastName: secondWord);
 
   @override
-  NodesColor get colorCode => NodesColor.hyperchat;
+  Color get color => g.theme.nodeColors[NodesColor.hyperchat]!;
 
   @override
   String get displayName => "$_name $_lastName";
@@ -748,14 +765,34 @@ class Payment extends FireNode {
       "Confirmations: ${_payment.lastConfirmations > 100 ? "100+" : _payment.lastConfirmations}";
 
   @override
-  NodesColor get colorCode => _payment.lastConfirmations == 0
-      ? NodesColor.unsafeTx
+  Color get color => _payment.lastConfirmations == 0
+      ? g.theme.nodeColors[NodesColor.unsafeTx]!
       : _payment.lastConfirmations < 6
-          ? NodesColor.mediumTx
-          : NodesColor.safeTx;
+          ? g.theme.nodeColors[NodesColor.mediumTx]!
+          : g.theme.nodeColors[NodesColor.safeTx]!;
 
   @override
   Nodes get type => Nodes.payment;
+}
+
+class NodeTheme extends FireNode {
+  final Down4Theme theme;
+  NodeTheme(this.theme) : super(theme.font, activity: 0, name: theme.name);
+
+  @override
+  Color get color => theme.qrColor;
+
+  @override
+  String get displayID => "font : ${theme.font}";
+
+  @override
+  String get displayName => _name;
+
+  @override
+  ID? get mediaID => null;
+
+  @override
+  Nodes get type => Nodes.theme;
 }
 
 class FireMedia extends FireObject {
@@ -931,6 +968,7 @@ class FireMedia extends FireObject {
         ownerID: decodedJson["ownerID"] as String,
         timestamp: int.parse(decodedJson["timestamp"] as String),
         mime: decodedJson["mime"] as String,
+        cachePath: decodedJson["cachePath"] as String?,
         onlineID: decodedJson["onlineID"] as String?,
         lastUse: int.parse(decodedJson["lastUse"] as String? ?? "0"),
         tinyThumbnail: decodedJson["tinyThumbnail"] as String?,
@@ -956,6 +994,7 @@ class FireMedia extends FireObject {
         if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
         "onlineTimestamp": onlineTimestamp.toString(),
         if (text != null) "text": text!,
+        if (cachePath != null) "cachePath": cachePath!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
         "isLocked": isLocked.toString(),

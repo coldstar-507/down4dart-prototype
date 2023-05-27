@@ -388,10 +388,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         height: headerHeight * 0.8,
         child: Row(children: [
           const Spacer(),
-          Text(
-            "-${message.senderID}   ",
-            style: TextStyle(color: g.theme.messageSenderColor, fontSize: 13),
-          ),
+          Text("-${message.senderID}   ",
+              style: g.theme.messageSenderTextStyle),
         ]));
   }
 
@@ -402,10 +400,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         child: Row(children: [
           Text(
             "   >> ${message.forwardedFrom}",
-            style: TextStyle(
-              color: g.theme.messageForwarderColor,
-              fontSize: 13,
-            ),
+            style: g.theme.messageForwarderTextStyle,
           ),
         ]));
   }

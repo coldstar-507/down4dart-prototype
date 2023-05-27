@@ -601,7 +601,11 @@ extension MediaDisplay on FireMedia {
 // }
 
 Widget down4Logo(double dimension) {
-  return SizedBox.square(dimension: dimension, child: g.lg);
+  return Center(
+      child: SizedBox.square(
+    dimension: dimension,
+    child: FittedBox(child: g.lg),
+  ));
 
   // return Image.asset(
   //   "assets/images/down4_inverted_white.png",
@@ -610,15 +614,15 @@ Widget down4Logo(double dimension) {
   // );
 }
 
-Widget backArrow({required void Function() back}) {
+Widget backArrow() {
   return Center(
-      child: SizedBox.fromSize(
-          size: Size.square(g.sizes.headerHeight / 2),
-          child: FittedBox(
-              child: GestureDetector(
-                  onTap: back,
-                  behavior: HitTestBehavior.opaque,
-                  child: const Icon(Icons.arrow_back_ios_new_rounded)))));
+    child: SizedBox.fromSize(
+      size: Size.square(g.sizes.headerHeight / 2),
+      child: const FittedBox(
+        child: Icon(Icons.arrow_back_ios_new_rounded),
+      ),
+    ),
+  );
 }
 
 abstract class Down4PageWidget extends Widget {
@@ -1511,6 +1515,8 @@ extension ImageOfNodes on FireNode {
           fit: BoxFit.cover,
           cacheHeight: s?.height.toInt() ?? Palette.paletteHeight.toInt(),
           cacheWidth: s?.width.toInt() ?? Palette.paletteHeight.toInt());
+    } else if (n is NodeTheme) {
+      return g.lg;
     }
     throw 'stop breaking my app';
   }

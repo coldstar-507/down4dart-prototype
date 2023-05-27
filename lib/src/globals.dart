@@ -47,10 +47,33 @@ Future<bool> uploadPayment(Down4Payment pay) async {
   }
 }
 
-Future<bool> uploadNode(FireNode node) async {
-  final body = node.toJson(toLocal: false);
+Future<bool> uploadNodeMedia(FireMedia media) async {
   try {
-    await _fs.collection("Nodes").doc(node.id).set(body);
+    final mediaData = await media.imageData;
+    if (mediaData == null) {
+      print("No image data for node image id ${media.id}, returning success");
+      return true;
+    }
+    final mediaMetadata = media.toJson(toLocal: false);
+    await _st_node
+        .ref(media.id)
+        .putData(mediaData, SettableMetadata(customMetadata: mediaMetadata));
+    return true;
+  } catch (e) {
+    print("ERROR uploading node media id: ${media.id}");
+    return false;
+  }
+}
+
+Future<bool> uploadNode(FireNode node) async {
+  final nodeMedia = await global<FireMedia>(node.mediaID);
+  final body = node.toJson(toLocal: false);
+  List<Future<dynamic>> uploads = [];
+  try {
+    if (nodeMedia != null) uploads.add(uploadNodeMedia(nodeMedia));
+    uploads.add(_fs.collection("Nodes").doc(node.id).set(body));
+    await Future.wait(uploads);
+    print("Success uploading node: ${node.id} ${node.displayName}");
     return true;
   } catch (e) {
     print("Failure uploading node: $e");
@@ -76,106 +99,111 @@ Future<Down4Payment?> downloadPayment(ID paymentID) async {
   }
 }
 
-Future<bool> uploadMedia(
-  FireMedia media, {
-  bool isNode = false,
-  bool isSnip = false,
-}) async {
-  final bool mediaShouldBeUpdated = !media.onlineTimestamp.shouldBeUpdated;
-  print("""
-          MEDIA SHOULD BE UPDATED = $mediaShouldBeUpdated
-          MEDIA IS NODE = $isNode
-          NO NEED TO UPDATE MEDIA = ${!mediaShouldBeUpdated && !isNode}
-        """);
-  // if the media doesn't need update and is a message media, we are good
-  if (!media.onlineTimestamp.shouldBeUpdated && !isNode) return true;
-  print("UPLOADING mediaID: ${media.id}");
-  // if it's a message media and needs an update, we update it
-  ID? newID;
-  int? newTs;
-  if (!isNode) {
-    // we refresh onlineID and onlineTimestamp
-    newID = messagePushId();
-    newTs = makeTimestamp();
-  }
-  final ref = isNode ? _st_node.ref(media.id) : _st.ref(newID);
-  File? cachedFile, videoFile;
-  Uint8List? imageData;
-  try {
-    final jsonMetadata = media.toJson(toLocal: false);
-    final metadata = SettableMetadata(customMetadata: jsonMetadata);
-    if ((cachedFile = await media.cachedFile) != null) {
-      await ref.putFile(cachedFile!, metadata);
-    } else {
-      if (media.isVideo) {
-        videoFile = media.videoFile;
-        if (videoFile == null) {
-          print("ERROR UPLOADING MEDIA: Can't find video file!");
-          return false;
-        }
-        await ref.putFile(videoFile, metadata);
-      } else {
-        imageData = await media.imageData;
-        if (imageData == null) {
-          print("ERROR UPLOADING MEDIA: Can't find image data!");
-          return false;
-        }
-        await ref.putData(imageData, metadata);
-      }
-    }
-    print("SUCCESS UPLOADING MEDIA");
-    if (newID != null) await media.updateOnlineReference(newID, newTs!);
-    return true;
-  } catch (e) {
-    print("ERROR UPLOADING MEDIA: $e");
-    return false;
-  }
-}
+// Future<bool> uploadMedia(
+//   FireMedia media, {
+//   bool isNode = false,
+//   bool isSnip = false,
+// }) async {
+//   final bool mediaShouldBeUpdated = !media.onlineTimestamp.shouldBeUpdated;
+//   print("""
+//           MEDIA SHOULD BE UPDATED = $mediaShouldBeUpdated
+//           MEDIA IS NODE = $isNode
+//           NO NEED TO UPDATE MEDIA = ${!mediaShouldBeUpdated && !isNode}
+//         """);
+//   // if the media doesn't need update and is a message media, we are good
+//   if (!media.onlineTimestamp.shouldBeUpdated && !isNode) return true;
+//   print("UPLOADING mediaID: ${media.id}");
+//   // if it's a message media and needs an update, we update it
+//   ID? newID;
+//   int? newTs;
+//   if (!isNode) {
+//     // we refresh onlineID and onlineTimestamp
+//     newID = messagePushId();
+//     newTs = makeTimestamp();
+//   }
+//   final ref = isNode ? _st_node.ref(media.id) : _st.ref(newID);
+//   File? cachedFile, videoFile;
+//   Uint8List? imageData;
+//   try {
+//     final jsonMetadata = media.toJson(toLocal: false);
+//     final metadata = SettableMetadata(customMetadata: jsonMetadata);
+//     if ((cachedFile = await media.cachedFile) != null) {
+//       await ref.putFile(cachedFile!, metadata);
+//     } else {
+//       if (media.isVideo) {
+//         videoFile = media.videoFile;
+//         if (videoFile == null) {
+//           print("ERROR UPLOADING MEDIA: Can't find video file!");
+//           return false;
+//         }
+//         await ref.putFile(videoFile, metadata);
+//       } else {
+//         imageData = await media.imageData;
+//         if (imageData == null) {
+//           print("ERROR UPLOADING MEDIA: Can't find image data!");
+//           return false;
+//         }
+//         await ref.putData(imageData, metadata);
+//       }
+//     }
+//     print("SUCCESS UPLOADING MEDIA");
+//     if (newID != null) await media.updateOnlineReference(newID, newTs!);
+//     return true;
+//   } catch (e) {
+//     print("ERROR UPLOADING MEDIA: $e");
+//     return false;
+//   }
+// }
 
 Future<bool> uploadMessage(FireMessage msg) async {
   final msgRef = db.child("Messages").child(msg.id);
   try {
     List<Future<dynamic>> uploads = [];
 
-    final mediaCopy = (await global<FireMedia>(msg.mediaID))?.copy();
-    final msgCopy = msg.copy();
-    if (mediaCopy?.onlineTimestamp.shouldBeUpdated ?? false) {
-      // upload info, onlineTimestamp and ID
-      final ID newID = messagePushId();
-      final int newTS = makeTimestamp();
-      // update the message with the onlineMediaID
-      await msg.setOnlineMediaID(newID);
-      // update the media
-      await mediaCopy!.updateOnlineReference(newID, newTS);
+    final media = await global<FireMedia>(msg.mediaID);
+    // final msgCopy = msg.copy();
+    print("MEDIA ONLINE TIMESTAMP = ${media?.onlineTimestamp}");
+    int? freshTS;
+    ID? freshOnlineID;
+    if (media?.onlineTimestamp.shouldBeUpdated ?? false) {
+      print("(RE)-uploading media!");
+      freshOnlineID = messagePushId();
+      freshTS = makeTimestamp();
 
-      final ref = _st.ref(mediaCopy.onlineID!);
-      final metadata = mediaCopy.toJson(toLocal: false);
-      final setMetadata = SettableMetadata(customMetadata: metadata);
+      final jsonMedia = media!.toJson(toLocal: false);
+      jsonMedia["onlineID"] = freshOnlineID;
+      jsonMedia["onlineTimestamp"] = freshTS.toString();
 
-      if (mediaCopy.cachePath != null) {
-        uploads.add(ref.putFile(File(mediaCopy.cachePath!), setMetadata));
-      } else if (mediaCopy.isVideo && mediaCopy.videoFile != null) {
-        uploads.add(ref.putFile(mediaCopy.videoFile!, setMetadata));
-      } else if ((await mediaCopy.imageData) != null) {
-        uploads.add(ref.putData((await mediaCopy.imageData)!, setMetadata));
+      final ref = _st.ref(freshOnlineID);
+      final setMetadata = SettableMetadata(customMetadata: jsonMedia);
+
+      if (media.cachePath != null) {
+        uploads.add(ref.putFile(File(media.cachePath!), setMetadata));
+      } else if (media.isVideo && media.videoFile != null) {
+        uploads.add(ref.putFile(media.videoFile!, setMetadata));
+      } else if ((await media.imageData) != null) {
+        uploads.add(ref.putData((await media.imageData)!, setMetadata));
       } else {
         print("NO MEDIA TO UPLOAD BRO");
       }
+    } else {
+      print("NO NEED TO UPDATE MEDIA");
     }
+
+    final msgJson = msg.toJson(toLocal: false);
+    if (freshOnlineID != null && freshTS != null) {
+      msgJson["onlineMediaID"] = freshOnlineID;
+      msgJson["onlineMediaTimestamp"] = freshTS.toString();
+    }
+
     // add the messageUpload
-    uploads.add(msgRef.set(msgCopy.toJson(toLocal: false)));
+    uploads.add(msgRef.set(msgJson));
     // await the uploads, a failure will throw
     await Future.wait(uploads);
 
-    // we merge if the message is NOT a snip OR root is self
-    final doSave = !msg.isSnip || msg.root == g.self.id;
-    if (doSave) {
-      await Future.wait(
-        [msgCopy.merge(), mediaCopy?.merge() ?? Future.value(1)],
-      );
+    if (media != null && freshTS != null && freshOnlineID != null) {
+      await media.updateOnlineReference(freshOnlineID, freshTS);
     }
-    msgCopy.cache();
-    mediaCopy?.cache();
 
     print("Success uploading message id: ${msg.id}");
     return true;
@@ -295,7 +323,7 @@ class Payload {
         isSnip: isSnip,
         mediaID: media?.id,
         onlineMediaID: media?.onlineID,
-        isSent: root == g.self.id,
+        onlineMediaTimestamp: media?.onlineTimestamp,
         text: text,
         replies: replies.isEmpty ? null : replies.toSet(),
         nodes: nodesRef.isEmpty ? null : nodesRef.toSet());
@@ -404,6 +432,15 @@ class Singletons {
       ..merge();
     self = selfNode;
   }
+
+  Icon get snipArrow =>
+      Icon(Icons.arrow_forward_ios_rounded, color: theme.snipArrowColor);
+
+  Icon get noMessageArrow =>
+      Icon(Icons.arrow_forward_ios_rounded, color: theme.noMessageArrowColor);
+
+  Icon get messageArrow =>
+      Icon(Icons.arrow_forward_ios_rounded, color: theme.messageArrowColor);
 }
 
 void unselectedSelectedPalettes(Map<ID, Palette2> state) {

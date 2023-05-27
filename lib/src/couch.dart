@@ -119,6 +119,7 @@ Future<T?> fetch<T extends FireObject>(
     final onlineID = mediaInfo!.onlineID;
     final withData = mediaInfo.withData;
     final fromNodes = onlineID == null;
+    print("FETCHING MEDIA ID = ${onlineID ?? id} from nodes = $fromNodes");
     final ref = fromNodes ? _nodeStore.ref(id) : _messageStore.ref(onlineID);
     try {
       final futureFullMetadata = ref.getMetadata();
@@ -306,9 +307,10 @@ T fromJson<T extends FireObject>(Map<String, Object?> json) {
 }
 
 Future<List<FireMessage>> unsentMessages() async {
-  const raw = """
+  final raw = """
         SELECT * FROM _ AS m
         WHERE m.isSent = 'false' AND m.isSnip = 'false'
+          AND m.senderID = '${g.self.id}'
         """;
   final q = await AsyncQuery.fromN1ql(messagesDB, raw);
   final e = await q.execute();

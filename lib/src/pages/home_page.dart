@@ -25,9 +25,10 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
       openChat; // TODO what is this?
   final void Function(Payload, Iterable<Chatable>) send;
   final void Function(List<Palette2>) forward;
-  final void Function() hyperchat;
+  final void Function() hyperchat, themes;
   final void Function() group, money, search, delete, snip;
   const HomePage({
+    required this.themes,
     required this.homeState,
     required this.hyperchat,
     required this.group,
@@ -198,15 +199,19 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(addFriends: widget.search, pages: [
-      Down4Page(
-          scrollController: scroller,
-          staticList: true,
-          title: "Down4",
-          trueLen: palettes.length,
-          list: palettes.values.toList().formatted(),
-          console: console)
-    ]);
+    return Andrew(
+      addFriends: widget.search,
+      themes: widget.themes,
+      pages: [
+        Down4Page(
+            scrollController: scroller,
+            staticList: true,
+            title: "Down4",
+            trueLen: palettes.length,
+            list: palettes.values.toList().formatted(),
+            console: console)
+      ],
+    );
   }
 
   // @override
@@ -251,7 +256,12 @@ class _HomePageState extends State<HomePage>
                 inputMaxHeight: null,
               ),
               "compose": ConsoleRow(
-                widgets: [closeButton, mediasButton, input.widget, sendButton],
+                widgets: [
+                  closeButton,
+                  mediasButton,
+                  input.consoleInput,
+                  sendButton
+                ],
                 extension: null,
                 widths: hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
                 inputMaxHeight: hasFocus ? input.height : Console.buttonHeight,
@@ -277,7 +287,6 @@ class _HomePageState extends State<HomePage>
           (m) {
             m.updateSaveStatus(false);
             setTheState();
-            // loadMediasConsole(!m.isVideo, true);
           }
         ),
       ];
@@ -308,9 +317,6 @@ class _HomePageState extends State<HomePage>
   int get currentPageIndex => 0;
 
   @override
-  List<Down4Object>? get fo => null;
-
-  @override
   void hyper() => widget.hyperchat();
 
   @override
@@ -333,4 +339,9 @@ class _HomePageState extends State<HomePage>
     Extra(setTheState: setTheState),
     Extra(setTheState: setTheState),
   ];
+
+  @override
+  void forward() {
+    widget.forward(palettes.values.toList());
+  }
 }

@@ -1,11 +1,91 @@
+import 'package:down4/src/themes.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 
 import '../globals.dart';
 
+import '../render_objects/_render_utils.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
+import '_page_utils.dart';
+
+class ThemePage extends StatefulWidget implements Down4PageWidget {
+  final void Function() back;
+  const ThemePage(this.back, Key? key) : super(key: key);
+
+  @override
+  State<ThemePage> createState() => _ThemePageState();
+
+  @override
+  ID get id => "themes";
+}
+
+class _ThemePageState extends State<ThemePage> with Pager2 {
+  @override
+  List<Extra> extras = [];
+
+  void swapTheme(Down4Theme theme) {
+    g.theme = theme;
+    setState(() {});
+  }
+
+  List<ButtonsInfo2> bGen(NodeTheme t) {
+    return [
+      ButtonsInfo2(
+          asset: g.noMessageArrow,
+          pressFunc: () => swapTheme(t.theme),
+          rightMost: true)
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    for (final t in themes) {
+      writePalette3(NodeTheme(t), _palettes, bGen, setTheState);
+    }
+  }
+
+  Map<String, Palette2> _palettes = {};
+
+  List<Down4Theme> themes = [BlackTheme(), PinkTheme()];
+
+  ConsoleButton get purchaseButton =>
+      ConsoleButton(name: "PURCHASE", onPress: () {});
+
+  ConsoleButton get giftButton => ConsoleButton(name: "GIFT", onPress: () {});
+
+  @override
+  Console3 get console => Console3(
+          rows: [
+            {
+              "base": ConsoleRow(
+                  widgets: [purchaseButton, giftButton],
+                  extension: null,
+                  widths: null,
+                  inputMaxHeight: null)
+            }
+          ],
+          currentConsolesName: currentConsolesName,
+          currentPageIndex: currentPageIndex);
+
+  @override
+  void setTheState() {
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Andrew(backFunction: widget.back, pages: [
+      Down4Page(
+        list: _palettes.values.toList(),
+        title: "Themes",
+        console: console,
+      )
+    ]);
+  }
+}
 
 // class WelcomePage extends StatelessWidget {
 //   final void Function() _understood;

@@ -66,6 +66,9 @@ class _Down4State extends State<Down4> {
     required String lastName,
     required FireMedia media,
   }) async {
+    _view = const LoadingPage2();
+    setState(() {});
+
     void onFailure(String msg) => createUser(errorMessage: msg);
 
     // exception, recalculate the media information with the proper ID
@@ -79,9 +82,6 @@ class _Down4State extends State<Down4> {
     }
     goodMedia.writeFromCachedPath();
 
-    _view = const LoadingPage2();
-    setState(() {});
-
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
       print("error getting firebase messaging token");
@@ -94,7 +94,7 @@ class _Down4State extends State<Down4> {
     g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
-    final successfulMediaUpload = await uploadMedia(goodMedia, isNode: true);
+    final successfulMediaUpload = await uploadNodeMedia(goodMedia);
     if (!successfulMediaUpload) {
       print("Unsuccessful media upload");
       return onFailure("Check internet connection!");

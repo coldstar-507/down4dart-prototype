@@ -241,23 +241,29 @@ class _UserMakerPageState extends State<UserMakerPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        onInput: (s, h) => _calls.add(r.usernameIsValid(id = s)),
-        onFocusChange: onFocusChange,
-        config: Input2.singleLine,
-        ctrl: InputController(placeHolder: "username"),
-        alignment: AlignmentDirectional.center),
+      onInput: (s, h) => _calls.add(r.usernameIsValid(id = s)),
+      onFocusChange: onFocusChange,
+      config: Input2.singleLine,
+      ctrl: InputController(placeHolder: "username"),
+      centered: true,
+      // alignment: AlignmentDirectional.center,
+    ),
     MyTextEditor(
-        onInput: onInput,
-        onFocusChange: onFocusChange,
-        config: Input2.singleLine,
-        ctrl: InputController(placeHolder: "First Name"),
-        alignment: AlignmentDirectional.center),
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.singleLine,
+      ctrl: InputController(placeHolder: "First Name"),
+      centered: true,
+      // alignment: AlignmentDirectional.center,
+    ),
     MyTextEditor(
-        onInput: onInput,
-        onFocusChange: onFocusChange,
-        config: Input2.singleLine,
-        ctrl: InputController(placeHolder: "(Last Name)"),
-        alignment: AlignmentDirectional.center),
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.singleLine,
+      ctrl: InputController(placeHolder: "(Last Name)"),
+      centered: true,
+      // alignment: AlignmentDirectional.center,
+    ),
   ];
 
   MyTextEditor get usernameInput => inputs[0];
@@ -272,9 +278,9 @@ class _UserMakerPageState extends State<UserMakerPage>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               imagePicker,
-              usernameInput.widget,
-              nameInput.widget,
-              lastNameInput.widget,
+              usernameInput.consoleInput,
+              nameInput.consoleInput,
+              lastNameInput.consoleInput,
             ],
           ),
         ),

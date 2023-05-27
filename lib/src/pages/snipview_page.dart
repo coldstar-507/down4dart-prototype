@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import '../globals.dart';
 import '../data_objects.dart' show ID;
 import '../render_objects/console.dart';
+import '_page_utils.dart';
 import '../render_objects/_render_utils.dart' show Down4PageWidget;
 
-class SnipViewPage extends StatelessWidget implements Down4PageWidget {
+class SnipViewPage extends StatelessWidget
+    with Pager2
+    implements Down4PageWidget {
   @override
   ID get id => "snipview";
 
@@ -48,20 +51,43 @@ class SnipViewPage extends StatelessWidget implements Down4PageWidget {
         left: 0,
         child: SizedBox(
           width: g.sizes.w,
-          child: Console(
-            invertedColors: true,
-            // consoleRow: Console3(
-            //   widgets: [
-            //
-            //   ],
-            // ),
-            bottomButtons: [
-              ConsoleButton(name: "BACK", onPress: back),
-              ConsoleButton(name: "NEXT", onPress: next),
-            ],
-          ),
+          child: console,
+          // Console3(
+          //   // consoleRow: Console3(
+          //   //   widgets: [
+          //   //
+          //   //   ],
+          //   // ),
+          //   bottomButtons: [],
+          // ),
         ),
       ),
     ]);
+  }
+
+  @override
+  final List<Extra> extras = const [];
+
+  @override
+  Console3 get console => Console3(
+          rows: [
+            {
+              "base": ConsoleRow(widgets: [
+                ConsoleButton(name: "BACK", onPress: back, isInverted: true),
+                ConsoleButton(name: "NEXT", onPress: next, isInverted: true),
+              ], extension: null, widths: null, inputMaxHeight: null)
+            }
+          ],
+          currentConsolesName: currentConsolesName,
+          currentPageIndex: currentPageIndex);
+
+  @override
+  void setTheState() {
+    return;
+  }
+
+  @override
+  set extras(List<Extra> e) {
+    return;
   }
 }

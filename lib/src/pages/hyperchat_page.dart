@@ -45,7 +45,7 @@ class _HyperchatPageState extends State<HyperchatPage>
         Medias2,
         Input2,
         Sender2,
-        Forwarder2,
+        ForwardSender2,
         Compose2
 // Forwarder,
 // SingleTickerProviderStateMixin
@@ -164,7 +164,7 @@ class _HyperchatPageState extends State<HyperchatPage>
           widgets: [
             forwardingObjectsWidget,
             mediasButton.withExtra(mediasExtra, [cameraButton]),
-            input.widget,
+            input.consoleInput,
             sendButton,
           ],
           extension: null,
@@ -524,15 +524,18 @@ class _HyperchatPageState extends State<HyperchatPage>
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(backButton: backArrow(back: widget.back), pages: [
-      Down4Page(
-          scrollController: scroller,
-          staticList: true,
-          trueLen: widget.transition.trueTargets.length,
-          title: "Hyperchat",
-          console: console,
-          list: _palettes),
-    ]);
+    return Andrew(
+      backFunction: widget.back,
+      pages: [
+        Down4Page(
+            scrollController: scroller,
+            staticList: true,
+            trueLen: widget.transition.trueTargets.length,
+            title: "Hyperchat",
+            console: console,
+            list: _palettes),
+      ],
+    );
   }
 
   @override
