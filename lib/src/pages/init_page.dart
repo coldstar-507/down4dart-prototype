@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -51,9 +52,9 @@ class _UserMakerPageState extends State<UserMakerPage>
   //   }
   // }
 
-  String id = "";
-  String firstName = "";
-  String lastName = "";
+  String get id => idInput.value;
+  String get firstName => firstNameInput.value;
+  String get lastName => lastNameInput.value;
   // @override
   // late Console console;
   // @override
@@ -94,6 +95,7 @@ class _UserMakerPageState extends State<UserMakerPage>
     timer = Timer.periodic(const Duration(milliseconds: 444), (timer) async {
       print("TIMER CALL");
       if (_calls.isNotEmpty) {
+        print("USERNAME CALL");
         _isValidUsername = await _calls.last;
       }
     });
@@ -239,9 +241,21 @@ class _UserMakerPageState extends State<UserMakerPage>
           currentPageIndex: currentPageIndex);
 
   @override
+  ConsoleButton get cameraButton => ConsoleButton(
+        name: "CAMERA",
+        onPress: () async {
+          if (cameraController == null) {
+            cameraController = CameraController(cam, ResolutionPreset.high);
+            await cameraController?.initialize();
+            changeConsole("camera");
+          }
+        },
+      );
+
+  @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-      onInput: (s, h) => _calls.add(r.usernameIsValid(id = s)),
+      onInput: (s, h) => _calls.add(r.usernameIsValid(s)),
       onFocusChange: onFocusChange,
       config: Input2.singleLine,
       ctrl: InputController(placeHolder: "username"),
@@ -266,8 +280,8 @@ class _UserMakerPageState extends State<UserMakerPage>
     ),
   ];
 
-  MyTextEditor get usernameInput => inputs[0];
-  MyTextEditor get nameInput => inputs[1];
+  MyTextEditor get idInput => inputs[0];
+  MyTextEditor get firstNameInput => inputs[1];
   MyTextEditor get lastNameInput => inputs[2];
 
   Widget get full => Container(
@@ -278,9 +292,12 @@ class _UserMakerPageState extends State<UserMakerPage>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               imagePicker,
-              usernameInput.consoleInput,
-              nameInput.consoleInput,
-              lastNameInput.consoleInput,
+              const SizedBox(height: 20),
+              idInput.initInput,
+              const SizedBox(height: 20),
+              firstNameInput.initInput,
+              const SizedBox(height: 20),
+              lastNameInput.initInput,
             ],
           ),
         ),
@@ -383,6 +400,37 @@ class _UserMakerPageState extends State<UserMakerPage>
   // }
 
   @override
+  ConsoleButton get cameraCaptureButton => ConsoleButton(
+        name: "CAPTURE",
+        isSpecial: true,
+        shouldBeDownButIsnt: cameraController?.value.isRecordingVideo ?? false,
+        onPress: () async {
+          final XFile f = await cameraController!.takePicture();
+          tempInput = makeCameraMedia(
+              cachedPath: f.path,
+              size: cameraController!.value.previewSize!.inverted,
+              isReversed: isReversed,
+              owner: "willBeReplaced",
+              isSquared: true);
+          setTheState();
+        },
+        onLongPress: () async {
+          await cameraController!.startVideoRecording();
+          setTheState();
+        },
+        onLongPressUp: () async {
+          final XFile f = await cameraController!.stopVideoRecording();
+          tempInput = makeCameraMedia(
+              cachedPath: f.path,
+              size: cameraController!.value.previewSize!.inverted,
+              isReversed: isReversed,
+              owner: "willBeReplaced",
+              isSquared: true);
+          setTheState();
+        },
+      );
+
+  @override
   Widget build(BuildContext context) {
     // final columnWidgets = [
     //   UserMakerPalette(
@@ -421,7 +469,9 @@ class _UserMakerPageState extends State<UserMakerPage>
       Down4Page(
         title: "Initialization",
         console: console,
-        list: [full],
+        staticList: true,
+        stackWidgets: [full],
+        // list: [full],
       )
     ]);
   }
@@ -431,4 +481,7 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   @override
   late List<Extra> extras = [];
+
+  @override
+  List<String> currentConsolesName = ["base"];
 }

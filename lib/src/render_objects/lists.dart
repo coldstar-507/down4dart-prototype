@@ -145,10 +145,10 @@ class StaticList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gapSize = g.sizes.h * 0.02;
-    print("list len = ${list.length}");
-    final spacerSize = ((7 - (trueLen ?? 100)) * Palette.fullHeight) + 1;
-    print("spacer size = $spacerSize");
+    // final gapSize = 0; // g.sizes.h * 0.02;
+    // print("list len = ${list.length}");
+    // final spacerSize = ((7 - (trueLen ?? 100)) * Palette.fullHeight) + 1;
+    // print("spacer size = $spacerSize");
 
     // return ScrollConfiguration(
     //   behavior: NoGlow(),
@@ -179,7 +179,7 @@ class StaticList extends StatelessWidget {
         child: SingleChildScrollView(
           reverse: reversed,
           controller: scrollController,
-          padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
+          padding: EdgeInsets.only(top: topPadding ?? 0.0), //Palette.gapSize),
           child: Column(children: list
               //     [
               //   SizedBox(

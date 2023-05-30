@@ -324,6 +324,33 @@ class ConsoleInput extends StatelessWidget {
   }
 }
 
+class InitInput2 extends StatelessWidget {
+  final MyTextEditor ed;
+  const InitInput2(this.ed, {Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+        onTap: !ed.fn.hasFocus
+            ? () {
+                FocusScope.of(context).requestFocus(ed.fn);
+              }
+            : null,
+        child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            height: Console.buttonHeight,
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+                    color: g.theme.inputColor,
+                    borderRadius: BorderRadius.all(
+                        Radius.circular(Console.buttonHeight / 2))),
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Align(
+                        alignment: AlignmentDirectional.center, child: ed)))));
+  }
+}
+
 class ConsoleInput2 extends StatelessWidget {
   final MyTextEditor ed;
   const ConsoleInput2(this.ed, {Key? key}) : super(key: key);
@@ -857,12 +884,12 @@ class Console extends StatelessWidget {
         child: previewMedia!);
   }
 
-  Widget get rotatingLogo {
-    return AnimatedRotation(
-        turns: math.pi * 2,
-        duration: const Duration(seconds: 2),
-        child: down4Logo(trueWidth));
-  }
+  // Widget get rotatingLogo {
+  //   return AnimatedRotation(
+  //       turns: math.pi * 2,
+  //       duration: const Duration(seconds: 2),
+  //       child: down4Logo(trueWidth));
+  // }
 
   Widget consoleScanner() {
     if (scanner == null) return const SizedBox.shrink();
@@ -1309,88 +1336,91 @@ class Console3 extends StatelessWidget {
 
     // the row that embeds the columns
     // ci is the index
-    return GestureDetector(
-      onHorizontalDragUpdate: (_) {},
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedOpacity(
-            opacity: currentExtension == null ? 0 : 1,
-            duration: Console.animationDuration,
-            child: AnimatedContainer(
+    return ColoredBox(
+      color: g.theme.buttonColor(isActivated: true, isInverted: false),
+      child: GestureDetector(
+        onHorizontalDragUpdate: (_) {},
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedOpacity(
+              opacity: currentExtension == null ? 0 : 1,
               duration: Console.animationDuration,
-              height: currentExtensionHeight ?? 0,
-              // constraints: BoxConstraints(
-              //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
-              child: currentExtension ?? const SizedBox.shrink(),
+              child: AnimatedContainer(
+                duration: Console.animationDuration,
+                height: currentExtensionHeight ?? 0,
+                // constraints: BoxConstraints(
+                //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
+                child: currentExtension ?? const SizedBox.shrink(),
+              ),
             ),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.start,
-            mainAxisSize: MainAxisSize.max,
-            children: rows.indexed.map((c) {
-              final ci = c.$1;
-              final cInfo = c.$2;
-              return Column(
-                  children: cInfo
-                      .map((name, c) {
-                        double currentHeight;
-                        if (currentConsolesName.contains(name)) {
-                          currentHeight = Console.buttonHeight;
-                        } else {
-                          currentHeight = 0;
-                        }
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisSize: MainAxisSize.max,
+              children: rows.indexed.map((c) {
+                final ci = c.$1;
+                final cInfo = c.$2;
+                return Column(
+                    children: cInfo
+                        .map((name, c) {
+                          double currentHeight;
+                          if (currentConsolesName.contains(name)) {
+                            currentHeight = Console.buttonHeight;
+                          } else {
+                            currentHeight = 0;
+                          }
 
-                        final defaultWidth = 1 / c.widgets.length;
-                        final inputHeight = c.inputMaxHeight;
+                          final defaultWidth = 1 / c.widgets.length;
+                          final inputHeight = c.inputMaxHeight;
 
-                        final row = Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: c.widgets.indexed.map((e) {
-                            final i = e.$1;
-                            final w = e.$2;
+                          final row = Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: c.widgets.indexed.map((e) {
+                              final i = e.$1;
+                              final w = e.$2;
 
-                            double width;
-                            if (ci != currentPageIndex) {
-                              width = 0;
-                            } else {
-                              width =
-                                  (c.widths?[i] ?? defaultWidth) * g.sizes.w;
-                            }
+                              double width;
+                              if (ci != currentPageIndex) {
+                                width = 0;
+                              } else {
+                                width =
+                                    (c.widths?[i] ?? defaultWidth) * g.sizes.w;
+                              }
 
-                            double height;
-                            if (w is ConsoleButton) {
-                              height = currentHeight;
-                            } else {
-                              height = currentHeight == 0
-                                  ? currentHeight
-                                  : inputHeight ?? Console.buttonHeight;
-                            }
+                              double height;
+                              if (w is ConsoleButton) {
+                                height = currentHeight;
+                              } else {
+                                height = currentHeight == 0
+                                    ? currentHeight
+                                    : inputHeight ?? Console.buttonHeight;
+                              }
 
-                            final Widget w_ = AnimatedOpacity(
-                                duration: Andrew.pageSwitchOpacityDuration,
-                                opacity: ci == currentPageIndex ? 1 : 0,
-                                child: AnimatedContainer(
-                                    duration:
-                                        Andrew.pageSwitchAnimationDuration,
-                                    width: width,
-                                    height: height,
-                                    child: w));
+                              final Widget w_ = AnimatedOpacity(
+                                  duration: Andrew.pageSwitchOpacityDuration,
+                                  opacity: ci == currentPageIndex ? 1 : 0,
+                                  child: AnimatedContainer(
+                                      duration:
+                                          Andrew.pageSwitchAnimationDuration,
+                                      width: width,
+                                      height: height,
+                                      child: w));
 
-                            return w_;
-                          }).toList(),
-                        );
+                              return w_;
+                            }).toList(),
+                          );
 
-                        return MapEntry(name, row);
-                      })
-                      .values
-                      .toList());
-              // return MapEntry(i, SizedBox(width: sizes[i], child: value));
-            }).toList(),
-          )
-        ],
+                          return MapEntry(name, row);
+                        })
+                        .values
+                        .toList());
+                // return MapEntry(i, SizedBox(width: sizes[i], child: value));
+              }).toList(),
+            )
+          ],
+        ),
       ),
     );
   }

@@ -11,8 +11,9 @@ import '../render_objects/navigator.dart';
 import '_page_utils.dart';
 
 class ThemePage extends StatefulWidget implements Down4PageWidget {
-  final void Function() back;
-  const ThemePage(this.back, Key? key) : super(key: key);
+  final void Function() back, onSwap;
+  const ThemePage({required this.back, required this.onSwap, Key? key})
+      : super(key: key);
 
   @override
   State<ThemePage> createState() => _ThemePageState();
@@ -27,6 +28,10 @@ class _ThemePageState extends State<ThemePage> with Pager2 {
 
   void swapTheme(Down4Theme theme) {
     g.theme = theme;
+    for (final t in themes) {
+      writePalette3(NodeTheme(t), _palettes, bGen, setTheState);
+    }
+    widget.onSwap.call();
     setState(() {});
   }
 
@@ -85,6 +90,9 @@ class _ThemePageState extends State<ThemePage> with Pager2 {
       )
     ]);
   }
+
+  @override
+  List<String> currentConsolesName = ["base"];
 }
 
 // class WelcomePage extends StatelessWidget {

@@ -389,6 +389,12 @@ class _HomeState extends State<Home> {
     });
   }
 
+  void rewriteHomePalettes() {
+    for (final p in _home.values) {
+      writeHomePalette(p.node as Chatable, _home, bGen, rfHome);
+    }
+  }
+
   // =============================== UTILS ============================== //
 
   Future<void> updateExchangeRate() async {
@@ -865,7 +871,10 @@ class _HomeState extends State<Home> {
   }
 
   ru.Down4PageWidget themePage() {
-    return ThemePage(() => back(withPop: false), null);
+    return ThemePage(
+      onSwap: rewriteHomePalettes,
+      back: () => back(withPop: false),
+    );
   }
 
   ru.Down4PageWidget moneyPage({
@@ -985,7 +994,9 @@ class _HomeState extends State<Home> {
           // final inHome = _home.those(ids).noNull().whereNodeIs<Personable>();
           // final toFetch = ids.difference(inHome.asIds().toSet());
           // final fetchedNodes = await r.fetchNodes(toFetch);
-          final nodes = await globall<FireNode>(ids);
+          final nodes = await nodesFetchWithCachedMedias(ids,
+              doMerge: false, doFetch: true);
+          // final nodes = await globall<FireNode>(ids);
           for (final node in nodes) {
             // fn.second?.cache();
             writePalette3(node..cache(), searchs(), bGen2, rf);

@@ -89,6 +89,9 @@ class _AddFriendPageState extends State<AddFriendPage>
   // }
 
   @override
+  List<String> currentConsolesName = ["base"];
+
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);

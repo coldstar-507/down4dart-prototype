@@ -217,7 +217,7 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   }
 
   @override
-  List<String> get currentConsolesName => ["base"];
+  List<String> currentConsolesName = ["base"];
 
   @override
   int get currentPageIndex => 0;
@@ -870,10 +870,13 @@ class _MoneyPageState extends State<MoneyPage>
     final children_ = children();
     return (
       Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.center,
-          children: children_),
-      singleRowHeight() * children_.length,
+          children: [
+            SizedBox(height: 1 / 4 * Console.buttonHeight),
+            ...children_,
+          ]),
+      (singleRowHeight() * children_.length) + (1 / 4 * Console.buttonHeight),
     );
   }
 

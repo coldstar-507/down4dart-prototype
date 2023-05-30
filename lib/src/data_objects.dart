@@ -826,7 +826,7 @@ class FireMedia extends FireObject {
 
   Future<VideoPlayerController?> get videoController async {
     if (!isVideo) throw 'Media needs to be a video';
-    final f = (await cachedFile) ?? videoFile;
+    final f = (cachedFile) ?? videoFile;
     if (f != null) return VideoPlayerController.file(f);
     final url_ = await url;
     if (url_ != null) return VideoPlayerController.network(url_);
@@ -835,9 +835,9 @@ class FireMedia extends FireObject {
 
   String get videoPath => "${g.appDirPath}/$id";
 
-  Future<File?> get cachedFile async {
+  File? get cachedFile {
     if (cachePath == null) return null;
-    if (!await File(cachePath!).exists()) return null;
+    if (!File(cachePath!).existsSync()) return null;
     return File(cachePath!);
   }
 
@@ -994,7 +994,7 @@ class FireMedia extends FireObject {
         if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
         "onlineTimestamp": onlineTimestamp.toString(),
         if (text != null) "text": text!,
-        if (cachePath != null) "cachePath": cachePath!,
+        // if (cachePath != null) "cachePath": cachePath!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
         "isLocked": isLocked.toString(),

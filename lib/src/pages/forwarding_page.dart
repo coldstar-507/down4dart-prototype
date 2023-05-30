@@ -209,7 +209,7 @@ class _ForwadingPageState extends State<ForwardingPage>
   }
 
   @override
-  final List<String> currentConsolesName = ["base"];
+  List<String> currentConsolesName = ["base"];
 
   @override
   int get currentPageIndex => widget.viewState.currentIndex;
@@ -233,4 +233,5 @@ class _ForwadingPageState extends State<ForwardingPage>
   late List<Extra> extras = [Extra(setTheState: setTheState)];
 
   Extra get sendExtra => extras[0];
+
 }

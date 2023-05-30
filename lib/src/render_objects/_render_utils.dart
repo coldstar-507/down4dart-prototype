@@ -13,6 +13,7 @@ import '../couch.dart' show cache, global;
 import 'package:image/image.dart' as IMG;
 
 // import 'package:better_player/better_player.dart';
+import '../themes.dart';
 import 'palette.dart';
 
 import '../data_objects.dart';
@@ -113,7 +114,7 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
   Image? realImage;
 
   void loadImage() {
-    if (media?.cachePath != null) {
+    if (media?.cachedFile != null) {
       // print("Will render file image");
       realImage = fileIm(media!.cachePath!);
     } else if (media?.cachedImage != null) {
@@ -192,13 +193,13 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
       children: [
         SizedBox.fromSize(
           size: widget.displaySize ?? Size.square(Palette.paletteHeight),
-          child: transformedImage(image),
+          child: widget.node.iconPlaceHolder ?? transformedImage(image),
         ),
         SizedBox.fromSize(
           size: widget.displaySize ?? Size.square(Palette.paletteHeight),
           child: AnimatedOpacity(
               curve: Curves.easeInExpo,
-              duration: const Duration(seconds: 1),
+              duration: const Duration(milliseconds: 400),
               opacity: realImage == null ? 0 : 1,
               child: realImage != null
                   ? transformedImage(realImage!)
@@ -600,11 +601,11 @@ extension MediaDisplay on FireMedia {
 //   }
 // }
 
-Widget down4Logo(double dimension) {
+Widget down4Logo(double dimension, Color color) {
   return Center(
       child: SizedBox.square(
     dimension: dimension,
-    child: FittedBox(child: g.lg),
+    child: FittedBox(child: Icon(Down4Icon.down4Inverted, color: color)),
   ));
 
   // return Image.asset(
@@ -618,8 +619,9 @@ Widget backArrow() {
   return Center(
     child: SizedBox.fromSize(
       size: Size.square(g.sizes.headerHeight / 2),
-      child: const FittedBox(
-        child: Icon(Icons.arrow_back_ios_new_rounded),
+      child: FittedBox(
+        child: Icon(Icons.arrow_back_ios_new_rounded,
+            color: g.theme.backArrowColor),
       ),
     ),
   );
@@ -1245,7 +1247,7 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
         child: AnimatedRotation(
       duration: const Duration(seconds: 1),
       turns: turns,
-      child: down4Logo(dimension),
+      child: down4Logo(dimension, g.theme.messageSelectionBorderColor),
     ));
   }
 
@@ -1263,8 +1265,11 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
               : widget.displaySize.width / 4,
           child: GestureDetector(
               onTap: onTap,
-              child:
-                  Image.asset("assets/images/filled.png", fit: BoxFit.cover))));
+              child: FittedBox(
+                  child: Icon(Icons.play_arrow,
+                      color: g.theme.messageSelectionBorderColor))
+              // Image.asset("assets/images/filled.png", fit: BoxFit.cover)
+              )));
 
   Widget video() => GestureDetector(
       onTap: _pauseOrPlay,
@@ -1484,6 +1489,17 @@ extension ImageOfNodes on FireNode {
 //       return nodeImage;
 //     }
 //   }
+
+  Widget? get iconPlaceHolder {
+    final node = this;
+    if (this is NodeTheme) {
+      return down4Logo(
+        Palette2.paletteHeight,
+        g.theme.down4IconForPaletteColor,
+      );
+    }
+    return null;
+  }
 
   Image defaultNodeImage([Size? s]) {
     final n = this;

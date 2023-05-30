@@ -31,9 +31,18 @@ final _fs = FirebaseFirestore.instance;
 final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
 final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-Future<List<FireNode>> nodesFetchWithCachedMedias(Iterable<ID> nodeIDs) async {
-  final nodes = await globall<FireNode>(nodeIDs);
-  await globall<FireMedia>(nodes.map((e) => e.mediaID).whereType());
+Future<List<FireNode>> nodesFetchWithCachedMedias(
+  Iterable<ID> nodeIDs, {
+  required bool doFetch,
+  required bool doMerge,
+}) async {
+  final nodes = await globall<FireNode>(nodeIDs,
+      doFetch: doFetch, doMergeIfFetch: doMerge);
+  print(nodes);
+  await globall<FireMedia>(nodes.map((e) => e.mediaID).whereType(),
+      doFetch: doFetch,
+      doMergeIfFetch: doMerge,
+      mediaInfo: (withData: true, onlineID: null));
   return nodes;
 }
 
@@ -693,7 +702,8 @@ Future<ChatMessage?> getChatMessage({
   // the palettes showing properly
   Future.microtask(() async {
     if ((msg.nodes ?? {}).isNotEmpty) {
-      final nodes = await nodesFetchWithCachedMedias(msg.nodes!);
+      final nodes = await nodesFetchWithCachedMedias(msg.nodes!,
+          doFetch: true, doMerge: false);
       if (nodes.isNotEmpty) {
         state[msg.id] = state[msg.id]!.withNodes(nodes);
         refreshCallback();

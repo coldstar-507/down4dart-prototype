@@ -564,7 +564,8 @@ class PaletteMaker extends StatelessWidget {
       case Nodes.payment:
         throw 'We are not going to be paletteMaking payments';
       case Nodes.theme:
-        return down4Logo(Palette2.fullHeight - Palette2.padding);
+        return down4Logo(Palette2.fullHeight - Palette2.padding,
+            g.theme.down4IconForPaletteColor);
     }
   }
 

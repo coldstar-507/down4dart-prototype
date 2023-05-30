@@ -29,7 +29,7 @@ class Caret extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(caret, Paint()..color = Colors.white);
+    canvas.drawRect(caret, Paint()..color = g.theme.inputTextStyle.color!);
   }
 
   @override
@@ -185,6 +185,7 @@ class InputController implements Listenable {
 }
 
 class MyTextEditor extends StatefulWidget {
+  InitInput2 get initInput => InitInput2(this);
   ConsoleInput2 get consoleInput => ConsoleInput2(this);
   Widget get basicInput => BasicInput(this);
   Widget get snipInput => SnipInput(this);
@@ -593,7 +594,8 @@ class Extra {
 mixin Pager2 {
   int get currentPageIndex => 0;
 
-  List<String> get currentConsolesName => ["base"];
+  List<String> get currentConsolesName;
+  set currentConsolesName(List<String> currentConsolesName);
 
   Icon get closeButtonIcon =>
       Icon(Icons.keyboard_arrow_down, color: g.theme.buttonTextColor);
@@ -653,7 +655,8 @@ mixin ForwardSender2 on Sender2 {
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: Center(
                         child: Text(obj.node.displayName,
-                            style: const TextStyle(color: Colors.white),
+                            style: g.theme
+                                .palettePreviewTextStyle(selected: false),
                             overflow: TextOverflow.clip,
                             maxLines: 1))))
           ]);
@@ -667,6 +670,7 @@ mixin ForwardSender2 on Sender2 {
                   (obj.message.text ?? "").isEmpty
                       ? "&attachment"
                       : obj.message.text!,
+                  style: g.theme.chatBubbleTextStyle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis)));
     }
@@ -1201,29 +1205,30 @@ mixin Medias2 on Pager2 {
 mixin Camera2 on Pager2 {
   Size get _squaredCamSize => Size.square(Console.trueWidth);
   int _currentCam = 0;
-  CameraController? _cameraController;
-  FireMedia? _tempInput, cameraInput;
-  bool get _isReversed => _currentCam == 1;
+  CameraController? cameraController;
+  FireMedia? tempInput, cameraInput;
+  bool get isReversed => _currentCam == 1;
 
-  CameraDescription get _cam => g.cameras[_currentCam];
+  CameraDescription get cam => g.cameras[_currentCam];
 
   ConsoleButton get cameraButton => ConsoleButton(
         name: cameraInput == null ? "CAMERA" : "@CAMERA",
         onPress: () async {
-          if (_cameraController == null) {
-            _cameraController = CameraController(_cam, ResolutionPreset.high);
-            await _cameraController?.initialize();
+          if (cameraController == null) {
+            cameraController = CameraController(cam, ResolutionPreset.high);
+            await cameraController?.initialize();
             changeConsole("camera");
           }
         },
       );
 
   String get backFromCameraConsoleName => "base";
-  ConsoleButton get cameraBackButton => ConsoleButton(
-        name: "BACK",
-        onPress: () {
-          _cameraController?.dispose();
-          _cameraController = null;
+  ConsoleButton get cameraCloseButton => ConsoleButton(
+        name: "CLOSE",
+        onPress: () async {
+          tempInput = null;
+          await cameraController?.dispose();
+          cameraController = null;
           changeConsole(backFromCameraConsoleName);
         },
       );
@@ -1231,10 +1236,10 @@ mixin Camera2 on Pager2 {
   ConsoleButton get cameraSwitchButton => ConsoleButton(
         name: _currentCam == 0 ? "REAR" : "FRONT",
         onPress: () async {
-          await _cameraController?.dispose();
-          _cameraController = null;
+          await cameraController?.dispose();
+          cameraController = null;
           _currentCam = (_currentCam + 1) % 2;
-          setTheState();
+          cameraButton.onPress.call();
         },
         isMode: true,
       );
@@ -1242,27 +1247,27 @@ mixin Camera2 on Pager2 {
   ConsoleButton get cameraCaptureButton => ConsoleButton(
         name: "CAPTURE",
         isSpecial: true,
-        shouldBeDownButIsnt: _cameraController?.value.isRecordingVideo ?? false,
+        shouldBeDownButIsnt: cameraController?.value.isRecordingVideo ?? false,
         onPress: () async {
-          final XFile f = await _cameraController!.takePicture();
-          _tempInput = makeCameraMedia(
+          final XFile f = await cameraController!.takePicture();
+          tempInput = makeCameraMedia(
               cachedPath: f.path,
-              size: _cameraController!.value.previewSize!.inverted,
-              isReversed: _isReversed,
+              size: cameraController!.value.previewSize!.inverted,
+              isReversed: isReversed,
               owner: g.self.id,
               isSquared: true);
           setTheState();
         },
         onLongPress: () async {
-          await _cameraController!.startVideoRecording();
+          await cameraController!.startVideoRecording();
           setTheState();
         },
         onLongPressUp: () async {
-          final XFile f = await _cameraController!.stopVideoRecording();
-          _tempInput = makeCameraMedia(
+          final XFile f = await cameraController!.stopVideoRecording();
+          tempInput = makeCameraMedia(
               cachedPath: f.path,
-              size: _cameraController!.value.previewSize!.inverted,
-              isReversed: _isReversed,
+              size: cameraController!.value.previewSize!.inverted,
+              isReversed: isReversed,
               owner: g.self.id,
               isSquared: true);
           setTheState();
@@ -1272,23 +1277,24 @@ mixin Camera2 on Pager2 {
   ConsoleButton get cameraCancelButton => ConsoleButton(
       name: "CANCEL",
       onPress: () {
-        _cameraController?.dispose();
-        _cameraController = null;
-        _tempInput = null;
+        cameraController?.dispose();
+        cameraController = null;
+        tempInput = null;
         changeConsole("base");
       });
 
   ConsoleButton get cameraAcceptButton => ConsoleButton(
       name: "ACCEPT",
       onPress: () {
-        cameraInput = _tempInput;
-        _cameraController?.dispose();
-        _cameraController = null;
+        cameraInput = tempInput?.copy();
+        cameraController?.dispose();
+        cameraController = null;
+        tempInput = null;
         changeConsole("base");
       });
 
   Widget get cameraExtension {
-    if (cameraInput != null) {
+    if (tempInput != null) {
       return Container(
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
@@ -1297,8 +1303,8 @@ mixin Camera2 on Pager2 {
               border: Border.all(
                   color: g.theme.consoleBorderColor,
                   width: Console.borderWidth)),
-          child: cameraInput!.display(size: _squaredCamSize));
-    } else if (_cameraController != null) {
+          child: tempInput!.display(size: _squaredCamSize));
+    } else if (cameraController != null) {
       return Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
@@ -1310,29 +1316,37 @@ mixin Camera2 on Pager2 {
         child: SizedBox.square(
             dimension: Console.trueWidth,
             child: Transform.scale(
-                scaleY: _cameraController!.value.aspectRatio,
-                child: CameraPreview(_cameraController!))),
+                scaleY: cameraController!.value.aspectRatio,
+                child: CameraPreview(cameraController!))),
       );
     } else {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
   }
+
+  ConsoleButton get cameraBackButton => ConsoleButton(
+      name: "BACK",
+      onPress: () {
+        tempInput = null;
+        setTheState();
+      });
 
   ConsoleRow get basicCameraRow => ConsoleRow(
           widgets: [
             cameraBackButton,
+            cameraCloseButton,
             cameraCancelButton,
             cameraSwitchButton,
-            cameraCaptureButton,
             cameraAcceptButton,
+            cameraCaptureButton,
           ],
           extension: (
             cameraExtension,
             g.sizes.w
           ),
-          widths: cameraInput == null
-              ? [0.34, 0.0, 0.33, 0.33, 0.0]
-              : [0.34, 0.33, 0.0, 0.0, 0.33],
+          widths: tempInput == null
+              ? [0.0, 0.34, 0.0, 0.33, 0.0, 0.33]
+              : [0.34, 0.0, 0.33, 0.0, 0.33, 0.0],
           inputMaxHeight: null);
 
   String get basicCameraRowName => "camera";

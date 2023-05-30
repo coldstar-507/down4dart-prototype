@@ -66,9 +66,6 @@ class SnipViewPage extends StatelessWidget
   }
 
   @override
-  final List<Extra> extras = const [];
-
-  @override
   Console3 get console => Console3(
           rows: [
             {
@@ -82,12 +79,16 @@ class SnipViewPage extends StatelessWidget
           currentPageIndex: currentPageIndex);
 
   @override
-  void setTheState() {
-    return;
-  }
+  void setTheState() {}
 
   @override
-  set extras(List<Extra> e) {
-    return;
-  }
+  set extras(List<Extra> e) {}
+
+  @override
+  final List<Extra> extras = const [];
+
+  @override
+  List<String> get currentConsolesName => ["base"];
+  @override
+  set currentConsolesName(List<String> j) {}
 }

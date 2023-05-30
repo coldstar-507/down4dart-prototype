@@ -137,7 +137,8 @@ class _AndrewState extends State<Andrew> {
                 onLongPress: widget.themes,
                 child: widget.backFunction != null
                     ? backArrow()
-                    : down4Logo(g.sizes.headerHeight / 2),
+                    : g.theme.down4Icon(g.theme
+                        .backArrowColor), // down4Logo(g.sizes.headerHeight / 2),
               ),
             ),
             Row(
@@ -156,61 +157,60 @@ class _AndrewState extends State<Andrew> {
       );
 
   Widget get pageBody => Expanded(
-        child: Stack(
-            alignment: widget.pages[curPos].centerStackItems
-                ? AlignmentDirectional.center
-                : AlignmentDirectional.topStart,
-            children: [
-              ...widget.pages[curPos].stackWidgets ?? [],
-              Row(
-                children: widget.pages
-                    .asMap()
-                    .entries
-                    .map((page) => AnimatedOpacity(
-                        opacity: curPos == page.key ? 1 : 0,
-                        duration: Andrew.pageSwitchOpacityDuration,
-                        curve: Curves.easeInOut,
-                        child: AnimatedContainer(
-                          duration: Andrew.pageSwitchAnimationDuration,
-                          curve: Curves.easeInOut,
-                          width: curPos == page.key ? g.sizes.w : 0,
-                          child: page.value.staticList
-                              ? StaticList(
-                                  trueLen: page.value.trueLen,
-                                  reversed: page.value.reversedList,
-                                  scrollController: page.value.scrollController,
-                                  topPadding: page.value.isChatPage ? 4 : null,
-                                  list: page.value.list)
-                              : page.value.stream != null
-                                  ? FutureList(stream: page.value.stream!)
-                                  : DynamicList(
-                                      onRefresh: page.value.onRefresh,
-                                      reversed: page.value.reversedList,
-                                      asMap: page.value.asMap,
-                                      orderedKeys: page.value.orderedKeys,
-                                      scrollController:
-                                          page.value.scrollController,
-                                      topPadding:
-                                          page.value.isChatPage ? 4 : null,
-                                      iterables: page.value.iterables,
-                                      iterableLen: page.value.iterableLen,
-                                      list: page.value.list),
-                        )))
-                    .toList(growable: false),
-              ),
-              // ),
-            ]),
+        child:
+            // Stack(
+            //     alignment: widget.pages[curPos].centerStackItems
+            //         ? AlignmentDirectional.center
+            //         : AlignmentDirectional.topStart,
+            //     children: [
+            //       ...widget.pages[curPos].stackWidgets ?? [],
+            Row(
+          children: widget.pages
+              .asMap()
+              .entries
+              .map((page) => AnimatedOpacity(
+                  opacity: curPos == page.key ? 1 : 0,
+                  duration: Andrew.pageSwitchOpacityDuration,
+                  curve: Curves.easeInOut,
+                  child: AnimatedContainer(
+                    duration: Andrew.pageSwitchAnimationDuration,
+                    curve: Curves.easeInOut,
+                    width: curPos == page.key ? g.sizes.w : 0,
+                    child: page.value.staticList
+                        ? StaticList(
+                            trueLen: page.value.trueLen,
+                            reversed: page.value.reversedList,
+                            scrollController: page.value.scrollController,
+                            topPadding: page.value.isChatPage ? 4 : null,
+                            list: page.value.list)
+                        : page.value.stream != null
+                            ? FutureList(stream: page.value.stream!)
+                            : DynamicList(
+                                onRefresh: page.value.onRefresh,
+                                reversed: page.value.reversedList,
+                                asMap: page.value.asMap,
+                                orderedKeys: page.value.orderedKeys,
+                                scrollController: page.value.scrollController,
+                                topPadding: page.value.isChatPage ? 4 : null,
+                                iterables: page.value.iterables,
+                                iterableLen: page.value.iterableLen,
+                                list: page.value.list),
+                  )))
+              .toList(growable: false),
+        ),
+        // ),
+        // ]
+        // ),
       );
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-          color: g.theme.backGroundColor,
-          image: DecorationImage(
-              image: MemoryImage(
-                  g.background), // AssetImage("assets/images/triangles.png"),
-              fit: BoxFit.cover)),
+        color: g.theme.backGroundColor,
+        // image: DecorationImage(
+        //     image: MemoryImage(g.background), fit: BoxFit.cover),
+      ),
       child: GestureDetector(
         onHorizontalDragUpdate: (DragUpdateDetails details) {
           if ((details.primaryDelta ?? 0) > 0) {

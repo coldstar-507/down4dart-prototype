@@ -38,7 +38,8 @@ class _LoadingPage2State extends State<LoadingPage2>
               child: child,
             );
           },
-          child: down4Logo(0.30 * g.sizes.w),
+          child: down4Logo(
+              0.30 * g.sizes.w, g.theme.down4IconForLoadingScreenColor),
         ),
       );
 

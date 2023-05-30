@@ -317,18 +317,25 @@ class Palette2 extends StatelessWidget implements Down4Object {
       duration: Duration(milliseconds: containerMS),
       height: fold ? 0 : fullHeight,
       // width: squish ? 0 : null,
-      clipBehavior: Clip.hardEdge,
+      // clipBehavior: Clip.hardEdge,
       curve: Curves.easeInOut,
-      color: g.theme.backGroundColor,
       padding: EdgeInsets.all(padding / 2),
       child: Container(
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(5)),
-          color: selected ? Colors.white10 : g.theme.backGroundColor,
-        ),
         padding: EdgeInsets.all(padding / 2),
+        decoration: BoxDecoration(
+            borderRadius: const BorderRadius.all(Radius.circular(5)),
+            color: selected
+                ? g.theme.paletteSelectionOverlayColor
+                : g.theme.paletteColor),
+        // child: Container(
+        //   decoration: BoxDecoration(
+        // borderRadius: const BorderRadius.all(Radius.circular(5)),
+        // color: selected ? g.theme.paletteSelectionOverlayColor : null,
+        // ),
+        // padding: EdgeInsets.all(padding / 2),
         child: child,
       ),
+      // ),
     );
   }
 
