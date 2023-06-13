@@ -29,6 +29,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function(Branchable) openNode;
   final void Function(Payload) send;
   final void Function(List<Down4Object> fo) forward;
+  final FireMessage? reactingTo;
+  final Future<void> Function(ID, FireMessage) react;
 
   const ChatPage({
     required this.add,
@@ -41,6 +43,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
     required this.send,
     required this.openNode,
     required this.forward,
+    required this.react,
+    this.reactingTo,
     this.fo,
     Key? key,
   }) : super(key: key);
@@ -177,8 +181,17 @@ class _ChatPageState extends State<ChatPage>
   }
 
   @override
-  void didUpdateWidget(ChatPage cp) {
-    super.didUpdateWidget(cp);
+  void didUpdateWidget(ChatPage old) {
+    super.didUpdateWidget(old);
+    if (widget.reactingTo != null) {
+      forMediaMode = (
+        "REACT",
+        (FireMedia m) => widget.react(m.id, widget.reactingTo!),
+      );
+
+      changeConsole(basicMediaRowName);
+    }
+
     print("UPDATED WIDGET");
     // if (forwardingConsoles.contains(console.name) && fo == null) {
     //   loadBaseConsole();
@@ -348,6 +361,7 @@ class _ChatPageState extends State<ChatPage>
           // ),
           basicMediaRowName: basicMediasRow,
           basicCameraRowName: basicCameraRow,
+          cameraConfirmationRowName: cameraConfirmationRow,
           basicSavingRowName: basicSavingRow,
         },
         {
@@ -494,10 +508,8 @@ class _ChatPageState extends State<ChatPage>
   late List<MyTextEditor> inputs = [
     MyTextEditor(
       onInput: onInput,
-      // isAnimated: node is Groupable,
       onFocusChange: onFocusChange,
       config: Input2.multiLine,
-      ctrl: InputController(),
     ),
   ];
 

@@ -121,7 +121,7 @@ class Wallet extends FireObject {
     // except for here possibly? must be fucking rare tho
     if (d4Keys == null) return null;
     var d4out = Down4TXOUT(
-      isFee: true,
+      type: UtxoType.fee,
       sats: down4Fees,
       scriptPubKey: p2pkh(d4Keys.rawAddress),
     );
@@ -131,6 +131,7 @@ class Wallet extends FireObject {
       final userKeys = people[i].neuter.derive(txSecret);
       if (userKeys == null) return null;
       var uOut = Down4TXOUT(
+        type: UtxoType.gets,
         sats: payPerPerson,
         scriptPubKey: p2pkh(userKeys.rawAddress),
         receiver: people[i].id,
@@ -144,7 +145,7 @@ class Wallet extends FireObject {
       final selfKeys = _keys.derive(txSecret);
       if (selfKeys == null) return null;
       var changeOut = Down4TXOUT(
-          isChange: true,
+          type: UtxoType.change,
           sats: change,
           scriptPubKey: p2pkh(selfKeys.rawAddress),
           receiver: selfID);
@@ -218,7 +219,7 @@ class Wallet extends FireObject {
     final down4Keys = DOWN4_NEUTER.derive(txSecret);
     if (down4Keys == null) return null;
     var down4Out = Down4TXOUT(
-      isFee: true,
+      type: UtxoType.fee,
       sats: down4Fees,
       scriptPubKey: p2pkh(down4Keys.rawAddress),
     );
@@ -226,6 +227,7 @@ class Wallet extends FireObject {
     final selfKeys = _keys.derive(txSecret);
     if (selfKeys == null) return null;
     var selfOut = Down4TXOUT(
+      type: UtxoType.gets,
       receiver: selfID,
       sats: encaissement,
       scriptPubKey: p2pkh(selfKeys.rawAddress),

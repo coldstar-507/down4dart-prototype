@@ -23,6 +23,14 @@ class SnipViewPage extends StatelessWidget
     Key? key,
   }) : super(key: key);
 
+  double get boxHeight {
+    final tp = TextPainter(
+      text: TextSpan(text: text ?? "", style: g.theme.snipInputTextStyle),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: g.sizes.w);
+    return tp.height;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
@@ -31,17 +39,13 @@ class SnipViewPage extends StatelessWidget
           ? Center(
               child: Container(
                 width: g.sizes.w,
-                decoration: const BoxDecoration(
-                  color: Colors.black38,
-                ),
-                constraints: BoxConstraints(
-                  minHeight: 16,
-                  maxHeight: g.sizes.fullHeight,
-                ),
+                height: boxHeight + 4,
+                alignment: AlignmentDirectional.center,
+                decoration: BoxDecoration(color: g.theme.snipRibbon),
                 child: Text(
                   text!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white),
+                  style: g.theme.snipInputTextStyle,
                 ),
               ),
             )

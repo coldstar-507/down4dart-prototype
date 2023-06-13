@@ -17,6 +17,11 @@ import 'package:flutter/material.dart';
 ///
 ///
 
+Map<ID, Down4Theme> themesRegistry = {
+  BlackTheme().name: BlackTheme(),
+  PinkTheme().name: PinkTheme(),
+};
+
 class Down4Icon {
   Down4Icon._();
 
@@ -34,6 +39,13 @@ abstract class Down4Theme {
 
   String get name;
   String get font;
+
+  Color get bottomNavigationBarColor;
+  Brightness get bottonNavigationIconBrightness;
+  Brightness get topStatusIconBrightness;
+
+  Color get chatReactionCounterColor;
+  TextStyle get chatReactionCounterTextStyle;
 
   Color get down4IconForLoadingScreenColor;
   Color get down4IconForPaletteColor;
@@ -53,6 +65,10 @@ abstract class Down4Theme {
 
   // Color get bubbleTextColor;
   // Color get bubbleTimestampTextColor;
+
+  TextStyle headerTextStyle2(Color c);
+
+  Color get headerTextColor;
 
   Color get _unactivatedButtonColor;
   Color get _buttonColor;
@@ -78,6 +94,8 @@ abstract class Down4Theme {
   // Color get buttonTextColor;
 
   Color get qrColor;
+
+  TextStyle get snipInputTextStyle;
   Color get snipRibbon;
 
   TextStyle paletteNameStyle({required bool selected, Color? color});
@@ -151,11 +169,21 @@ class BlackTheme extends Down4Theme {
 
   @override
   TextStyle get chatBubbleTextStyle =>
-      TextStyle(fontFamily: font, color: Colors.black);
+      TextStyle(fontFamily: font, color: Colors.black, fontSize: 16);
 
   @override
   TextStyle get chatBubbleDateTextStyle => TextStyle(
-      fontFamily: font, fontSize: 10, color: Colors.black45, height: 0.8);
+      fontFamily: font, fontSize: 12, color: Colors.black45, height: 0.8);
+
+  @override
+  TextStyle get chatReactionCounterTextStyle => TextStyle(
+      fontSize: 10,
+      fontFamily: font,
+      color: Colors.white,
+      fontWeight: FontWeight.bold);
+
+  @override
+  get chatReactionCounterColor => Colors.black;
 
   @override
   TextStyle get inputTextStyle =>
@@ -226,9 +254,6 @@ class BlackTheme extends Down4Theme {
 
   @override
   Color get qrColor => Colors.white;
-
-  @override
-  Color get snipRibbon => const Color.fromARGB(153, 255, 241, 242);
 
   @override
   Map<NodesColor, Color> get nodeColors => {
@@ -307,6 +332,13 @@ class BlackTheme extends Down4Theme {
       fontSize: 20);
 
   @override
+  TextStyle headerTextStyle2(Color c) => TextStyle(
+      fontWeight: FontWeight.bold, fontFamily: font, color: c, fontSize: 20);
+
+  @override
+  Color get headerTextColor => Colors.white;
+
+  @override
   TextStyle consoleButtonTextStyle({
     required bool isMode,
     required bool isSpecial,
@@ -346,11 +378,11 @@ class BlackTheme extends Down4Theme {
 
   @override
   TextStyle get messageForwarderTextStyle =>
-      const TextStyle(color: Colors.white60, fontSize: 13);
+      TextStyle(color: Colors.white60, fontSize: 13, fontFamily: font);
 
   @override
   TextStyle get messageSenderTextStyle =>
-      const TextStyle(color: Colors.white60, fontSize: 13);
+      TextStyle(color: Colors.white60, fontSize: 13, fontFamily: font);
 
   @override
   TextStyle get palettePlaceholderTextStyle => const TextStyle(
@@ -370,6 +402,21 @@ class BlackTheme extends Down4Theme {
 
   @override
   Color get down4IconForLoadingScreenColor => Colors.white;
+
+  @override
+  TextStyle get snipInputTextStyle => const TextStyle(color: Colors.white);
+
+  @override
+  Color get snipRibbon => Colors.black54;
+
+  @override
+  Color get bottomNavigationBarColor => Colors.black;
+
+  @override
+  Brightness get bottonNavigationIconBrightness => Brightness.light;
+
+  @override
+  Brightness get topStatusIconBrightness => Brightness.light;
 }
 
 class PinkTheme extends Down4Theme {
@@ -397,7 +444,7 @@ class PinkTheme extends Down4Theme {
 
   @override
   TextStyle get chatBubbleTextStyle =>
-      TextStyle(fontFamily: font, color: Colors.black);
+      TextStyle(fontFamily: font, color: Colors.black, fontSize: 16);
 
   @override
   TextStyle get chatBubbleDateTextStyle => TextStyle(
@@ -455,9 +502,6 @@ class PinkTheme extends Down4Theme {
 
   @override
   Color get qrColor => const Color.fromARGB(255, 56, 3, 17);
-
-  @override
-  Color get snipRibbon => const Color.fromARGB(153, 255, 241, 242);
 
   // @override
   // Color get bubbleTextColor => Colors.black;
@@ -607,11 +651,11 @@ class PinkTheme extends Down4Theme {
 
   @override
   TextStyle get messageForwarderTextStyle =>
-      TextStyle(color: qrColor, fontSize: 13);
+      TextStyle(color: qrColor, fontSize: 13, fontFamily: font);
 
   @override
   TextStyle get messageSenderTextStyle =>
-      TextStyle(color: qrColor, fontSize: 13);
+      TextStyle(color: qrColor, fontSize: 13, fontFamily: font);
 
   @override
   TextStyle get palettePlaceholderTextStyle => const TextStyle(
@@ -634,4 +678,37 @@ class PinkTheme extends Down4Theme {
 
   @override
   Color get down4IconForLoadingScreenColor => qrColor;
+
+  @override
+  TextStyle get chatReactionCounterTextStyle => TextStyle(
+      fontSize: 10,
+      fontFamily: font,
+      color: qrColor.withOpacity(0.7),
+      fontWeight: FontWeight.bold);
+
+  @override
+  get chatReactionCounterColor => _darkerPink;
+
+  @override
+  TextStyle headerTextStyle2(Color c) => TextStyle(
+      fontWeight: FontWeight.bold, fontFamily: font, color: c, fontSize: 20);
+
+  @override
+  Color get headerTextColor => backGroundColor;
+
+  @override
+  TextStyle get snipInputTextStyle =>
+      TextStyle(fontFamily: font, color: qrColor);
+
+  @override
+  Color get snipRibbon => _palePink.withOpacity(0.7);
+
+  @override
+  Color get bottomNavigationBarColor => backGroundColor;
+
+  @override
+  Brightness get bottonNavigationIconBrightness => Brightness.dark;
+
+  @override
+  Brightness get topStatusIconBrightness => Brightness.light;
 }

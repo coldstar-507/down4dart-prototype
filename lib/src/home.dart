@@ -5,6 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:cbl/cbl.dart';
 import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/pages/_page_utils.dart';
+import 'package:down4/src/web_requests.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +38,8 @@ import 'render_objects/chat_message.dart';
 import 'render_objects/_render_utils.dart' as ru;
 import 'render_objects/console.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart' as fs;
+
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
 
@@ -68,6 +71,9 @@ class _HomeState extends State<Home> {
   Map<ID, Palette2> get _home => homeView.pages[0].objects.cast();
   Iterable<Palette2> get home => _home.values.showing();
   List<Palette2> get formattedHome => home.toList().formatted();
+  Map<ID, ChatMessage>? chatMessages(ID nodeID) {
+    return viewManager.views["chat-$nodeID"]?.pages[0].objects.cast();
+  }
 
   void setPage(ru.Down4PageWidget p) {
     page = p;
@@ -256,6 +262,7 @@ class _HomeState extends State<Home> {
     ];
   }
 
+
   void connectToMessages() {
     var msgQueue = db.child("Users").child(g.self.id).child("M");
 
@@ -297,60 +304,182 @@ class _HomeState extends State<Home> {
       //     setPage(homePage());
       //   });
       // }
-      if (eventPayload.first == "p") {
-        // PAYMENT!
-        final paymentID = eventPayload[1];
-        final payment = await downloadPayment(paymentID);
-        if (payment == null) return;
-        await g.wallet.parsePayment(g.self.id, payment);
-        if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
-        return;
-      } else if (eventPayload.first == "m") {
-        // MESSAGE!
-        final msgID = eventPayload[1];
-        // get the message, we wait until we get the maybe associated media
-        // before merging, the reason for that is merging would trigger
-        // reload chat if we are in the chat, but we want to have the media
-        // before reloading the chat
-        final msg = await global<FireMessage>(msgID, doFetch: true);
-        if (msg == null) return;
+      switch (eventPayload.first) {
+        case "p": // PAYMENT
+          print("RECEIVED A PAYMENT");
+          final paymentID = eventPayload[1];
+          final payment = await downloadPayment(paymentID);
+          if (payment == null) return;
+          await g.wallet.parsePayment(g.self.id, payment);
+          if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
+          return;
+        case "m": // MESSAGE
+          print("RECEIVED A MESSAGE");
+          final msgID = eventPayload[1];
+          // get the message, we wait until we get the maybe associated media
+          // before merging, the reason for that is merging would trigger
+          // reload chat if we are in the chat, but we want to have the media
+          // before reloading the chat
+          final msg = await global<FireMessage>(msgID, doFetch: true);
+          if (msg == null) return;
 
-        // get the node
-        final node = await global<Chatable>(msg.root,
-            doFetch: true, doMergeIfFetch: true);
-        if (node == null) return;
+          // get the rootNode
+          final rootNode = await global<Chatable>(msg.root,
+              doFetch: true, doMergeIfFetch: true);
+          if (rootNode == null) return;
 
-        FireMedia? msgMedia;
+          User? senderNode = await global<User>(msg.senderID);
+          FireMedia? msgMedia;
 
-        // if is snip from a user that isn't a friend, we don't pre-download
-        if (msg.isSnip && node is User && !node.isFriend) {
-          msgMedia = await global<FireMedia>(msg.mediaID,
+          if (senderNode != null && senderNode.isFriend) {
+            msgMedia = await global<FireMedia>(msg.mediaID,
+                doFetch: true,
+                doMergeIfFetch: true,
+                mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
+          }
+
+          // if is snip from a user that isn't a friend, we don't pre-download
+          // if (msg.isSnip && rootNode is User && !rootNode.isFriend) {
+          //   msgMedia = await global<FireMedia>(msg.mediaID,
+          //       doFetch: true,
+          //       doMergeIfFetch: true,
+          //       mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
+          // } else {
+          //   msgMedia = await global<FireMedia>(msg.mediaID,
+          //       doFetch: true,
+          //       doMergeIfFetch: true,
+          //       mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
+          // }
+          // get the rootNode media
+          await global<FireMedia>(rootNode.mediaID,
               doFetch: true,
               doMergeIfFetch: true,
-              mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
-        } else {
-          msgMedia = await global<FireMedia>(msg.mediaID,
+              mediaInfo: (withData: true, onlineID: null));
+
+          // msg medias references are dynamic and always get updated
+          // this is because messages are not kept for ever on server
+          if (msg.onlineMediaID != null) {
+            await msgMedia?.updateOnlineReference(
+                msg.onlineMediaID!, msg.onlineMediaTimestamp);
+          }
+          await msg.merge();
+          await writeHomePalette(
+              rootNode..updateActivity(), _home, bGen, rfHome);
+
+          if (page is HomePage) setPage(homePage());
+          return;
+        case "r": // REACTION
+          print("RECEIVED A REACTION");
+          final reactionID = eventPayload[1];
+          final reaction = await global<ChatReaction>(reactionID,
+              doFetch: true, doMergeIfFetch: true);
+          if (reaction != null) {
+            final m = await global<FireMedia>(
+              reaction.mediaID,
               doFetch: true,
               doMergeIfFetch: true,
-              mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
-        }
-        // get the node media
-        await global<FireMedia>(node.mediaID,
-            doFetch: true,
-            doMergeIfFetch: true,
-            mediaInfo: (withData: true, onlineID: null));
-
-        // msg medias references are dynamic and always get updated
-        // this is because messages are not kept for ever on server
-        if (msg.onlineMediaID != null && msg.onlineMediaTimestamp != null) {
-          await msgMedia?.updateOnlineReference(
-              msg.onlineMediaID!, msg.onlineMediaTimestamp!);
-        }
-        await msg.merge();
-        await writeHomePalette(node..updateActivity(), _home, bGen, rfHome);
-
-        if (page is HomePage) setPage(homePage());
+              mediaInfo: (onlineID: reaction.onlineMediaID, withData: true),
+            );
+            if (reaction.onlineMediaID != null && m != null) {
+              await m.updateOnlineReference(
+                  reaction.onlineMediaID!, reaction.onlineMediaTimestamp);
+            }
+            reloadReactions(reaction.root, reaction.messageID, () {
+              reloadChatWithID(reaction.root);
+            });
+          }
+          return;
+        case "i": // INCREMENT REACTION
+          print("RECEIVED A INCREMENT REACTION");
+          final chatReactionID = eventPayload[1];
+          final reactor = eventPayload[2];
+          final chatReaction = await global<ChatReaction>(chatReactionID,
+              doFetch: true, doMergeIfFetch: true);
+          if (chatReaction != null) {
+            await chatReaction.addReactor(reactor);
+            reloadReactions(chatReaction.root, chatReaction.messageID, () {
+              reloadChatWithID(chatReaction.root);
+            });
+          }
+          return;
       }
+
+      // if (eventPayload.first == "p") {
+      //   // PAYMENT!
+      //   final paymentID = eventPayload[1];
+      //   final payment = await downloadPayment(paymentID);
+      //   if (payment == null) return;
+      //   await g.wallet.parsePayment(g.self.id, payment);
+      //   if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
+      //   return;
+      // } else if (eventPayload.first == "m") {
+      //   // MESSAGE!
+      //   final msgID = eventPayload[1];
+      //   // get the message, we wait until we get the maybe associated media
+      //   // before merging, the reason for that is merging would trigger
+      //   // reload chat if we are in the chat, but we want to have the media
+      //   // before reloading the chat
+      //   final msg = await global<FireMessage>(msgID, doFetch: true);
+      //   if (msg == null) return;
+      //
+      //   // get the rootNode
+      //   final rootNode = await global<Chatable>(msg.root,
+      //       doFetch: true, doMergeIfFetch: true);
+      //   if (rootNode == null) return;
+      //
+      //   FireMedia? msgMedia;
+      //
+      //   // if is snip from a user that isn't a friend, we don't pre-download
+      //   if (msg.isSnip && rootNode is User && !rootNode.isFriend) {
+      //     msgMedia = await global<FireMedia>(msg.mediaID,
+      //         doFetch: true,
+      //         doMergeIfFetch: true,
+      //         mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
+      //   } else {
+      //     msgMedia = await global<FireMedia>(msg.mediaID,
+      //         doFetch: true,
+      //         doMergeIfFetch: true,
+      //         mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
+      //   }
+      //   // get the rootNode media
+      //   await global<FireMedia>(rootNode.mediaID,
+      //       doFetch: true,
+      //       doMergeIfFetch: true,
+      //       mediaInfo: (withData: true, onlineID: null));
+      //
+      //   // msg medias references are dynamic and always get updated
+      //   // this is because messages are not kept for ever on server
+      //   if (msg.onlineMediaID != null) {
+      //     await msgMedia?.updateOnlineReference(
+      //         msg.onlineMediaID!, msg.onlineMediaTimestamp);
+      //   }
+      //   await msg.merge();
+      //   await writeHomePalette(rootNode..updateActivity(), _home, bGen, rfHome);
+      //
+      //   if (page is HomePage) setPage(homePage());
+      // } else if (eventPayload.first == "r") {
+      //   // chat reaction
+      //   final reactionID = eventPayload[1];
+      //   final reaction = await global<ChatReaction>(reactionID,
+      //       doFetch: true, doMergeIfFetch: true);
+      //   if (reaction != null) {
+      //     reloadReactions(reaction.root, reaction.messageID, () {
+      //       reloadChatWithID(reaction.root);
+      //     });
+      //   }
+      // } else if (eventPayload.first == "i") {
+      //   // chat reaction increment
+      //   final reactionID = eventPayload[1];
+      //   final reactor = eventPayload[2];
+      //   final reaction = await global<ChatReaction>(reactionID,
+      //       doFetch: true, doMergeIfFetch: true);
+      //   if (reaction != null) {
+      //     await reaction.addReactor(reactor);
+      //     reloadReactions(reaction.root, reaction.messageID, () {
+      //       reloadChatWithID(reaction.root);
+      //     });
+      //   }
+      // }
       // else if (eventPayload.first == "s") {
       // final String mediaID = eventPayload[1];
       // final String root = eventPayload[2];
@@ -371,7 +500,7 @@ class _HomeState extends State<Home> {
       //       fetch: true, merge: true, mediaData: true, nodesMedia: true);
       //   nodeMedia?.addReference(nodeRoot.id);
       // }
-      // final p = Palette2<Chatable>(node: nodeRoot, image: nodeMedia);
+      // final p = Palette2<Chatable>(rootNode: nodeRoot, image: nodeMedia);
       // await writeHomePalette(p, _homePalettes, bGen, rfHome);
       //
       // if (cv.id == 'home') setPage(homePage());
@@ -396,6 +525,12 @@ class _HomeState extends State<Home> {
   }
 
   // =============================== UTILS ============================== //
+
+  void reloadChatWithID(ID chatableNodeID) {
+    if (currentView.id == "chat-$chatableNodeID") {
+      setPage(chatPage(currentView.node as Chatable));
+    }
+  }
 
   Future<void> updateExchangeRate() async {
     final lastUpdate = g.exchangeRate.lastUpdate;
@@ -443,6 +578,87 @@ class _HomeState extends State<Home> {
       final root = await global<Chatable>(u.root);
       if (root == null) continue;
       await broadcastMessage(root, u);
+    }
+  }
+
+  Future<void> reloadReactions(
+      ID nodeID, ID messageID, VoidCallback refreshChat) async {
+    final state = chatMessages(nodeID);
+    print("state is null? $state");
+    final msgRef = state?[messageID];
+    print("msg ref is null? $msgRef");
+    if (msgRef != null) {
+      state![messageID] = msgRef.withReactions(await msgRef.message.reactions);
+      refreshChat();
+    } else {
+      print("MESSAGE REF IS NULL");
+    }
+  }
+
+  Future<void> incrementReaction(
+      Chatable c, ChatReaction cr, VoidCallback refreshChat) async {
+    if (cr.reactors.contains(g.self.id)) return;
+
+    await cr.addReactor(g.self.id);
+    reloadReactions(cr.root, cr.messageID, refreshChat);
+
+    r.PushRequest(
+            sender: g.self.id,
+            targets: c.targets(selfID: g.self.id),
+            data: "i%${cr.id}%${g.self.id}")
+        .process();
+  }
+
+  Future<void> react(Chatable node, ID mediaID, FireMessage message,
+      VoidCallback refreshChat) async {
+    final cr = ChatReaction(messagePushId(),
+        mediaID: mediaID,
+        root: node.id,
+        messageID: message.id,
+        reactors: {g.self.id},
+        senderID: g.self.id)
+      ..cache();
+    await cr.merge();
+    await reloadReactions(node.id, message.id, refreshChat);
+
+    List<ID> pushReceipients;
+    ID notifReceipient = message.senderID;
+    String header, bodyPrefix;
+
+    final nodeRef = node;
+    if (nodeRef is Groupable) {
+      pushReceipients = List.from(nodeRef.group)..remove(g.self.id);
+      header = node.displayName;
+      bodyPrefix = "${g.self.firstName} ";
+    } else {
+      pushReceipients = [nodeRef.id];
+      bodyPrefix = "";
+      header = nodeRef.displayName;
+    }
+
+    if (node.id == g.self.id) {
+      await cr.markSent();
+      await reloadReactions(node.id, message.id, refreshChat);
+    } else {
+      final successfulUpload = await uploadMessage(cr);
+      if (successfulUpload) {
+        final pushReq = r.PushRequest(
+            sender: g.self.id, targets: pushReceipients, data: "r%${cr.id}");
+        final notifReq = r.NotificationRequest(
+          sender: g.self.id,
+          targets: [notifReceipient],
+          header: header,
+          body: "${bodyPrefix}reacted to your message!",
+        );
+
+        final p = await Future.wait([pushReq.process(), notifReq.process()]);
+
+        final successfulSent = p.every((element) => element);
+        if (successfulSent) {
+          await cr.markSent();
+          await reloadReactions(node.id, message.id, refreshChat);
+        }
+      }
     }
   }
 
@@ -1118,6 +1334,7 @@ class _HomeState extends State<Home> {
     bool rewriteMsgWithNodes = false,
     FireMessage? msgRe,
     List<Down4Object>? fo,
+    FireMessage? reactingTo,
   }) {
     ID chatID() => "chat-${c.id}";
     ViewState chat() => viewManager.at(chatID());
@@ -1158,12 +1375,21 @@ class _HomeState extends State<Home> {
 
     void rf() => setPage(chatPage(c));
 
+    Future<void> increment(ChatReaction cr) async {
+      return incrementReaction(c, cr, rf);
+    }
+
+    Future<void> reactToMsg(FireMessage msg) async =>
+        setPage(chatPage(c, reactingTo: msg));
+
     Future<void> loadMore([int i = 20]) async {
       await writeMessages(
           limit: i,
           ch: c,
           ordered: orderedMsgsIDs(),
           state: messages(),
+          react: reactToMsg,
+          increment: increment,
           withNodes: msgsWithNodes(),
           videos: msgsWithVideos(),
           refresh: refreshChat,
@@ -1173,21 +1399,24 @@ class _HomeState extends State<Home> {
 
     void reloadChat() {
       Future(() async {
-        // is a reload, load all new messages
+        // is a reload, load all NEW messages, hence the break;
         final pg = page;
         if (pg is! ChatPage || pg.viewState.node?.id != c.id) return;
-        final loaded = messages().keys;
+        final loaded = messages().keys.toList()..sort((a, b) => b.compareTo(a));
+
         List<ID> toLoad = [];
         for (final id in orderedMsgsIDs()) {
-          if (!loaded.contains(id)) {
-            toLoad.add(id);
-          } else {
+          if (id == loaded.last) {
             break;
+          } else if (!loaded.contains(id)) {
+            toLoad.add(id);
           }
         }
         await writeMessages(
             limit: toLoad.length,
             ch: c,
+            react: reactToMsg,
+            increment: increment,
             ordered: orderedMsgsIDs(),
             videos: msgsWithVideos(),
             withNodes: msgsWithNodes(),
@@ -1217,14 +1446,17 @@ class _HomeState extends State<Home> {
         writeGroupNodesIfGroup();
         // write the messages
         await writeMessages(
-            limit: 20,
-            ordered: currentMessages,
-            ch: c,
-            state: messages(),
-            videos: msgsWithVideos(),
-            withNodes: msgsWithNodes(),
-            refresh: refreshChat,
-            openNode: openNode());
+          limit: 20,
+          ordered: currentMessages,
+          ch: c,
+          increment: increment,
+          state: messages(),
+          videos: msgsWithVideos(),
+          withNodes: msgsWithNodes(),
+          refresh: refreshChat,
+          openNode: openNode(),
+          react: reactToMsg,
+        );
 
         refreshChat();
       });
@@ -1265,6 +1497,8 @@ class _HomeState extends State<Home> {
       loadMore: loadMore,
       viewState: viewManager.at(chatID()),
       fo: fo,
+      reactingTo: reactingTo,
+      react: (ID mediaID, FireMessage msg) => react(c, mediaID, msg, rf),
       openNode: opn,
       send: (payload) async {
         await metaSend(payload, [c]);
@@ -1305,23 +1539,41 @@ class _HomeState extends State<Home> {
 
   Future<ru.Down4PageWidget> snipView(Chatable node, [List<ID>? l]) async {
     final unreadSnips = l ?? (await node.unreadSnipIDs()).toList();
+    VideoPlayerController? vpc;
+
+    void back_() async {
+      vpc?.dispose();
+      await writeHomePalette(node, _home, bGen, rfHome);
+      back(withPop: false);
+    }
+
+    void next_() async {
+      vpc?.dispose();
+      if (unreadSnips.sublist(1).isEmpty) {
+        back_();
+      } else {
+        setPage(await snipView(node, unreadSnips.sublist(1)));
+      }
+    }
+
     print("Unread snips=$unreadSnips");
     if (unreadSnips.isEmpty) {
       await writeHomePalette(node, _home, bGen, rfHome);
       setPage(homePage());
     }
     final s = await global<FireMessage>(unreadSnips.first, doCache: false);
-    s!.markRead();
+    await s!.markRead();
 
     final m = await global<FireMedia>(s.mediaID,
         doCache: false,
         doFetch: true,
-        mediaInfo: (withData: false, onlineID: s.onlineMediaID));
+        mediaInfo: (withData: true, onlineID: s.onlineMediaID));
+    print("media JSON: \n${m?.toJson()}");
 
     if (m == null) return snipView(node);
     // this will preload it in memory if it's there
     // allowing it to be precached
-    await m.imageData;
+    // if (!await m.cachedAndReady) return snipView(node);
 
     // final scale = m.aspectRatio * g.sizes.fullAspectRatio;
     // Widget displayMediaBody(Widget child) => Center(
@@ -1338,7 +1590,6 @@ class _HomeState extends State<Home> {
     //       ),
     //     );
 
-    VideoPlayerController? vpc;
     Future<Widget> Function(FireMedia m) displayBody;
 
     if (m.isVideo) {
@@ -1356,21 +1607,6 @@ class _HomeState extends State<Home> {
         }
         return media.displaySnip();
       };
-    }
-
-    void back_() async {
-      vpc?.dispose();
-      await writeHomePalette(node, _home, bGen, rfHome);
-      back(withPop: false);
-    }
-
-    void next_() async {
-      vpc?.dispose();
-      if (unreadSnips.sublist(1).isEmpty) {
-        back_();
-      } else {
-        setPage(await snipView(node, unreadSnips.sublist(1)));
-      }
     }
 
     print("FULL SIZE = ${g.sizes.fullSize}");

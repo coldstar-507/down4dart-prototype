@@ -1,8 +1,23 @@
-void main() async {
-  print(0.23456.toStringAsFixed(4));
+abstract class David {
+  String a = "a";
+  String b = "b";
 
-  // await Future.wait([
-  //   Future.delayed(Duration(seconds: 2), () => print("LOL")),
-  //   Future.delayed(Duration(seconds: 2), () => print("CACA")),
-  // ]);
+  Map toJson() => {
+        "a": a,
+        "b": b,
+      };
+}
+
+class Jeff extends David {
+  String j = "j";
+
+  @override
+  Map toJson() => {
+        ...super.toJson(),
+        "j": j,
+      };
+}
+
+void main() async {
+  print(["1", "2", "5", "4", "3"]..sort((a, b) => b.compareTo(a)));
 }

@@ -19,6 +19,8 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
   "cc": "0000000000000000000000000000000000000000000000000000000000000000",
 });
 
+enum UtxoType { fee, change, gets, tip, tax }
+
 class Down4Payment extends FireObject {
   @override
   Database get dbb => paymentsDB;
@@ -30,10 +32,8 @@ class Down4Payment extends FireObject {
   Down4Payment(this.txs, this.safe, {required this.textNote, int? tsSeconds})
       : timeStamp = tsSeconds ?? makeTimestamp();
 
-  int get independentGets => txs.last.txsOut
-      .firstWhere((txOut) => !(txOut.isFee || txOut.isChange))
-      .sats
-      .asInt;
+  int get independentGets =>
+      txs.last.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
 
   bool isSpentBy({required ID id}) {
     return txs.last.txsIn.any((element) => element.spender == id);
@@ -415,8 +415,9 @@ class Down4TXOUT extends FireObject {
 
   final List<int> scriptPubKey;
   final VarInt scriptPubKeyLen;
-  final bool isChange;
-  final bool isFee;
+  final UtxoType type;
+  // final bool isChange;
+  // final bool isFee;
   ID? receiver;
   int? outIndex;
   List<int>? secret;
@@ -426,8 +427,7 @@ class Down4TXOUT extends FireObject {
   Down4TXOUT({
     required this.sats,
     required this.scriptPubKey,
-    this.isChange = false,
-    this.isFee = false,
+    required this.type,
     this.receiver,
     this.secret,
     this.txid,
@@ -442,17 +442,18 @@ class Down4TXOUT extends FireObject {
         outIndex: decodedJson["oi"],
         txid: TXID.fromHex(decodedJson["id"]),
         sats: Sats(decodedJson["s"]),
-        isChange:
-            decodedJson["ic"] ?? false, // TODO the ?? false should be removed
-        isFee:
-            decodedJson["if"] ?? false, // TODO the ?? false should be removed
+        type: UtxoType.values.byName(decodedJson["t"]),
+        // isChange:
+        //     decodedJson["ic"] ?? false, // TODO the ?? false should be removed
+        // isFee:
+        //     decodedJson["if"] ?? false, // TODO the ?? false should be removed
         scriptPubKey: hex.decode(decodedJson["sc"]),
       );
 
   @override
   String get id => down4UtxoID(txid!, FourByteInt(outIndex!));
 
-  bool get isGets => !(isFee || isChange);
+  bool get isGets => type == UtxoType.gets;
 
   @override
   int get hashCode {
@@ -475,11 +476,7 @@ class Down4TXOUT extends FireObject {
         ...receiver == null
             ? [0x00]
             : [receiver!.length, ...utf8.encode(receiver!)],
-        isFee
-            ? 0x00
-            : isChange
-                ? 0x01
-                : 0x02
+        type.index,
       ];
 
   static Pair<Down4TXOUT, int> fromCompressed(Uint8List d4) {
@@ -504,24 +501,20 @@ class Down4TXOUT extends FireObject {
     }
 
     final flag = d4[curOffset + 1 + receiverLen];
-    // final isGets = flag == 0x02;
-    final isChange = flag == 0x01;
-    final isFee = flag == 0x00;
+    final type = UtxoType.values[flag];
 
     final txout = Down4TXOUT(
         sats: Sats(satInt),
         scriptPubKey: script,
         receiver: receiver,
-        isChange: isChange,
-        isFee: isFee);
+        type: type);
 
     return Pair(txout, curOffset + 1 + receiverLen + 1);
   }
 
   @override
   Map<String, Object> toJson({bool toLocal = true}) => {
-        "if": isFee,
-        "ic": isChange,
+        "t": type.name,
         if (receiver != null) "rc": receiver!,
         "st": secret!,
         "oi": outIndex!,

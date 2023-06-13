@@ -48,6 +48,7 @@ dependencies:
   file_picker: ^5.2.2
   english_words: ^4.0.0
   video_player: ^2.6.1
+  amplify_api: ^1.1.1
   # better_player:
   #   git:
   #     url: https://github.com/tintran-dev/betterplayer.git #^0.0.83

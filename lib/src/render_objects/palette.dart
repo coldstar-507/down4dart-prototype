@@ -119,6 +119,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
   static double get gapSize => g.sizes.h * 0.0119;
   static double get paletteMargin => g.sizes.w * 0.042;
   static double get blurRadius => 6.0;
+  static Size get imageSize => Size.square(fullHeight - (padding * 2));
   static double get spreadRadius => -7.0;
   static double get fullHeight => paletteHeight + gapSize;
   static Offset get shadowOffset => const Offset(6.0, 6.0);
@@ -313,27 +314,35 @@ class Palette2 extends StatelessWidget implements Down4Object {
   //     );
 
   Widget mainContainer({required Widget child}) {
-    return AnimatedContainer(
-      duration: Duration(milliseconds: containerMS),
-      height: fold ? 0 : fullHeight,
-      // width: squish ? 0 : null,
-      // clipBehavior: Clip.hardEdge,
-      curve: Curves.easeInOut,
-      padding: EdgeInsets.all(padding / 2),
-      child: Container(
+    return ColoredBox(
+      color: g.theme.backGroundColor,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: containerMS),
+        height: fold ? 0 : fullHeight,
+        // width: squish ? 0 : null,
+        // clipBehavior: Clip.hardEdge,
+        curve: Curves.easeInOut,
         padding: EdgeInsets.all(padding / 2),
-        decoration: BoxDecoration(
-            borderRadius: const BorderRadius.all(Radius.circular(5)),
-            color: selected
-                ? g.theme.paletteSelectionOverlayColor
-                : g.theme.paletteColor),
-        // child: Container(
-        //   decoration: BoxDecoration(
-        // borderRadius: const BorderRadius.all(Radius.circular(5)),
-        // color: selected ? g.theme.paletteSelectionOverlayColor : null,
-        // ),
-        // padding: EdgeInsets.all(padding / 2),
-        child: child,
+        child: Container(
+          decoration: BoxDecoration(
+              borderRadius: const BorderRadius.all(Radius.circular(5)),
+              color: g.theme.paletteColor),
+          child: Container(
+            padding: EdgeInsets.all(padding / 2),
+            decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.circular(5)),
+                color: selected
+                    ? g.theme.paletteSelectionOverlayColor
+                    : Colors.transparent),
+            // child: Container(
+            //   decoration: BoxDecoration(
+            // borderRadius: const BorderRadius.all(Radius.circular(5)),
+            // color: selected ? g.theme.paletteSelectionOverlayColor : null,
+            // ),
+            // padding: EdgeInsets.all(padding / 2),
+            child: child,
+          ),
+        ),
       ),
       // ),
     );

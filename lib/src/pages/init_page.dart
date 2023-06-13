@@ -235,6 +235,7 @@ class _UserMakerPageState extends State<UserMakerPage>
                   widths: null,
                   inputMaxHeight: null),
               basicCameraRowName: basicCameraRow,
+              cameraConfirmationRowName: cameraConfirmationRow,
             }
           ],
           currentConsolesName: currentConsolesName,
@@ -258,25 +259,22 @@ class _UserMakerPageState extends State<UserMakerPage>
       onInput: (s, h) => _calls.add(r.usernameIsValid(s)),
       onFocusChange: onFocusChange,
       config: Input2.singleLine,
-      ctrl: InputController(placeHolder: "username"),
+      placeHolder: "username",
       centered: true,
-      // alignment: AlignmentDirectional.center,
     ),
     MyTextEditor(
       onInput: onInput,
       onFocusChange: onFocusChange,
       config: Input2.singleLine,
-      ctrl: InputController(placeHolder: "First Name"),
+      placeHolder: "First Name",
       centered: true,
-      // alignment: AlignmentDirectional.center,
     ),
     MyTextEditor(
       onInput: onInput,
       onFocusChange: onFocusChange,
       config: Input2.singleLine,
-      ctrl: InputController(placeHolder: "(Last Name)"),
+      placeHolder: "(Last Name)",
       centered: true,
-      // alignment: AlignmentDirectional.center,
     ),
   ];
 

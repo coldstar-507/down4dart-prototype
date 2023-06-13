@@ -240,7 +240,15 @@ class Down4Keys {
   }
 }
 
+// fee -> private
+// tax -> public
+// is that gucci?
+enum UtxoType { gets, change, fee, tip, tax }
+
 void main() {
+  print(UtxoType.fee.index);
+  print(UtxoType.values[UtxoType.fee.index]);
+
   // final seed1 = safeSeed(32);
   // final seed2 = safeSeed(32);
 

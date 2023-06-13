@@ -26,23 +26,34 @@ typedef ID = String;
 
 abstract class Down4Object {
   ID get id;
+
+  @override
+  bool operator ==(Object other) => other is Down4Object && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 abstract class FireObject extends Down4Object {
   Database get dbb;
+  // @override
+  // final ID id;
+  // FireObject(this.id);
 
   void cache() => gCache(this);
 
   Future<void> delete() async {
-    dbb.purgeDocumentById(id);
+    print("Deleting $runtimeType from dbb: ${dbb.name}");
+    unCache(id);
+    await dbb.purgeDocumentById(id);
     final ref = this;
     if (ref is FireMedia && ref.isVideo) {
-      final f = await ref.videoFile;
+      final f = ref.videoFile;
       f?.delete();
     }
   }
 
-  Map<String, Object> toJson({bool toLocal = false});
+  Map<String, dynamic> toJson({bool toLocal = false});
 
   Future<void> merge([Map<String, Object?>? values]) async {
     print("DBB NAME=${dbb.name}");
@@ -82,50 +93,175 @@ abstract class FireObject extends Down4Object {
   // }
 }
 
-class FireMessage extends FireObject {
+abstract class FireSendable extends FireObject {
+  @override
+  final ID id;
+  final ID root, senderID;
+  final ID? mediaID;
+  int? _onlineMediaTimestamp;
+  ID? _onlineMediaID;
+  bool _isSent;
+
+  FireSendable(
+    this.id, {
+    required this.root,
+    required this.senderID,
+    this.mediaID,
+    int? onlineMediaTimestamp,
+    ID? onlineMediaID,
+    bool? isSent,
+  })  : _isSent = isSent ?? false,
+        _onlineMediaTimestamp = onlineMediaTimestamp,
+        _onlineMediaID = onlineMediaID;
+
+  bool get isSent => _isSent;
+  int get onlineMediaTimestamp => _onlineMediaTimestamp ?? 0;
+  ID? get onlineMediaID => _onlineMediaID;
+
+  Future<void> markSent() => merge({"isSent": (_isSent = true).toString()});
+
+  // Future<void> setOnlineMediaInfo(ID onlineMediaID, int timestamp) async {
+  //   if (timestamp > onlineMediaTimestamp) {
+  //     _onlineMediaID = onlineMediaID;
+  //     _onlineMediaTimestamp = timestamp;
+  //     await merge({
+  //       "onlineMediaID": _onlineMediaID,
+  //       "onlineMediaTimestamp": _onlineMediaTimestamp,
+  //     });
+  //   }
+  // }
+
+  @override
+  Map<String, String> toJson({bool toLocal = false}) => {
+        "id": id,
+        "root": root,
+        "senderID": senderID,
+        "isSent": isSent.toString(),
+        if (mediaID != null) "mediaID": mediaID!,
+        if (_onlineMediaID != null) "onlineMediaID": _onlineMediaID!,
+        if (_onlineMediaTimestamp != null)
+          "onlineMediaTimestamp": _onlineMediaTimestamp!.toString(),
+      };
+}
+
+class ChatReaction extends FireSendable {
+  @override
+  ID get mediaID => super.mediaID!;
+
+  final ID messageID;
+  final Set<ID> reactors;
+
+  int get reactionCount => reactors.length;
+
+  ChatReaction(
+    super.id, {
+    required super.root,
+    required super.senderID,
+    super.onlineMediaID,
+    super.onlineMediaTimestamp,
+    super.isSent,
+    required ID mediaID,
+    required this.messageID,
+    required this.reactors,
+  }) : super(mediaID: mediaID);
+
+  @override
+  Database get dbb => reactionsDB;
+
+  factory ChatReaction.fromJson(Map<String, Object?> json) {
+    final onlineMediaTimestamp = json["onlineMediaTimestamp"] as String?;
+    final isSent = json["isSent"] as String?;
+    final reactors = json["reactors"] as String?;
+    return ChatReaction(
+      json["id"] as ID,
+      root: json["root"] as ID,
+      senderID: json["senderID"] as ID,
+      mediaID: json["mediaID"] as ID,
+      messageID: json["messageID"] as ID,
+      onlineMediaID: json["onlineMediaID"] as ID?,
+      onlineMediaTimestamp: int.tryParse(onlineMediaTimestamp ?? ""),
+      isSent: bool.tryParse(isSent ?? ""),
+      reactors: reactors?.split(" ").toSet() ?? {},
+    );
+  }
+
+  Future<void> addReactor(ID reactor) async {
+    reactors.add(reactor);
+    await merge({"reactors": reactors.join(" ")});
+  }
+
+  @override
+  Map<String, String> toJson({bool toLocal = false}) => {
+        ...super.toJson(toLocal: toLocal),
+        "messageID": messageID,
+        if (toLocal) "reactors": reactors.join(" "),
+      };
+}
+
+class FireMessage extends FireSendable {
   @override
   Database get dbb => messagesDB;
 
-  @override
-  final ID id;
-  final ID senderID, root;
-  final ID? mediaID;
+  // @override
+  // final ID id;
+  // final ID senderID, root;
+  // final ID? mediaID;
   final String? text;
   final Set<ID>? replies, nodes;
   final String? forwardedFrom;
   final int timestamp;
   final bool isSnip;
-  bool _isRead, _isSent, _isSaved;
-  int? _onlineMediaTimestamp;
-  ID? _onlineMediaID;
+  bool _isRead, _isSaved;
+  // int? _onlineMediaTimestamp;
+  // ID? _onlineMediaID;
 
-  ID? get onlineMediaID => _onlineMediaID;
-  int? get onlineMediaTimestamp => _onlineMediaTimestamp;
+  // ID? get onlineMediaID => _onlineMediaID;
+  // int? get onlineMediaTimestamp => _onlineMediaTimestamp;
 
-  FireMessage(
-    this.id, {
-    required this.root,
-    required this.senderID,
-    required this.timestamp,
-    bool isSaved = false,
-    this.mediaID,
-    ID? onlineMediaID,
-    int? onlineMediaTimestamp,
-    this.forwardedFrom,
-    this.text,
-    this.nodes,
-    this.replies,
-    required this.isSnip,
-    bool isRead = false,
-    bool isSent = false,
-  })  : _onlineMediaTimestamp = onlineMediaTimestamp,
-        _onlineMediaID = onlineMediaID,
+  @override
+  Map<String, String> toJson({bool toLocal = false}) => {
+        ...super.toJson(toLocal: toLocal),
+        // 'id': id,
+        // 'root': root,
+        if (text != null) 'text': text!,
+        // 'senderID': senderID,
+        'timestamp': timestamp.toString(),
+        // if (mediaID != null) 'mediaID': mediaID!,
+        // if (_onlineMediaID != null) 'onlineMediaID': _onlineMediaID!,
+        // if (_onlineMediaTimestamp != null)
+        //   'onlineMediaTimestamp': _onlineMediaTimestamp!.toString(),
+        'isSnip': isSnip.toString(),
+        if (toLocal) 'isRead': isRead.toString(),
+        if (toLocal) 'isSent': isSent.toString(),
+        if (forwardedFrom != null) 'forwarderID': forwardedFrom!,
+        if (replies != null) 'replies': replies!.join(" "),
+        if (nodes != null) 'nodes': nodes!.join(" "),
+      };
+
+  FireMessage(super.id,
+      {required super.root,
+      required super.senderID,
+      required this.timestamp,
+      bool isSaved = false,
+      super.mediaID,
+      super.onlineMediaID,
+      super.onlineMediaTimestamp,
+      this.forwardedFrom,
+      this.text,
+      this.nodes,
+      this.replies,
+      required this.isSnip,
+      bool isRead = false,
+      bool isSent = false})
+      :
+        // _onlineMediaTimestamp = onlineMediaTimestamp,
+        // _onlineMediaID = onlineMediaID,
         _isRead = isRead,
-        _isSent = isSent,
-        _isSaved = isSaved;
+        _isSaved = isSaved,
+        super(isSent: isSent);
 
   bool get isRead => _isRead;
-  bool get isSent => _isSent;
+  // bool get isSent => _isSent;
 
   // Creates a new instance of a messages that will be uploaded
   // removes the replies and local data
@@ -137,7 +273,19 @@ class FireMessage extends FireObject {
           ? "&attachment"
           : text!;
 
-  FireMessage copy() => FireMessage.fromJson(toJson(toLocal: true));
+  // FireMessage copy() => FireMessage.fromJson(toJson(toLocal: true));
+
+  Future<List<ChatReaction>> get reactions async {
+    final raw = "SELECT * FROM _ WHERE messageID = '$id'";
+    final q = await AsyncQuery.fromN1ql(reactionsDB, raw);
+    final e = await q.execute();
+    final r = await e.allResults();
+    return r.map((e) {
+      final json = e.toPlainMap()["_"] as Map<String, Object?>;
+      print("CHAT REACTION JSON = $json");
+      return ChatReaction.fromJson(json);
+    }).toList();
+  }
 
   FireMessage forwarded(ID newSenderID, ID newRoot) {
     return FireMessage(messagePushId(),
@@ -171,49 +319,22 @@ class FireMessage extends FireObject {
         replies: (decodedJson["replies"] as String?)?.split(" ").toSet());
   }
 
-  Future<void> setOnlineMediaInfo(ID onlineMediaID, int timestamp) async {
-    _onlineMediaID = onlineMediaID;
-    await merge({
-      "onlineMediaID": _onlineMediaID,
-      "onlineMediaTimestamp": _onlineMediaTimestamp,
-    });
-  }
-
   Future<void> markRead() async {
     if (isRead) return;
     _isRead = true;
     await merge({"isRead": "true"});
   }
 
-  Future<void> markSent() async {
-    if (isSent) return;
-    _isSent = true;
-    await merge({"isSent": "true"});
-  }
+  // Future<void> markSent() async {
+  //   if (isSent) return;
+  //   _isSent = true;
+  //   await merge({"isSent": "true"});
+  // }
 
   Future<void> updateSavedStatus(bool isSaved) async {
     _isSaved = isSaved;
     await merge({"isSaved": _isSaved.toString()});
   }
-
-  @override
-  Map<String, String> toJson({bool toLocal = false}) => {
-        'id': id,
-        'root': root,
-        if (text != null) 'text': text!,
-        'senderID': senderID,
-        'timestamp': timestamp.toString(),
-        if (mediaID != null) 'mediaID': mediaID!,
-        if (_onlineMediaID != null) 'onlineMediaID': _onlineMediaID!,
-        if (_onlineMediaTimestamp != null)
-          'onlineMediaTimestamp': _onlineMediaTimestamp!.toString(),
-        'isSnip': isSnip.toString(),
-        if (toLocal) 'isRead': isRead.toString(),
-        if (toLocal) 'isSent': isSent.toString(),
-        if (forwardedFrom != null) 'forwarderID': forwardedFrom!,
-        if (replies != null) 'replies': replies!.join(" "),
-        if (nodes != null) 'nodes': nodes!.join(" "),
-      };
 }
 
 enum Nodes {
@@ -275,8 +396,8 @@ abstract class FireNode extends FireObject {
 
   @override
   Map<String, String> toJson({bool toLocal = true}) => {
-        "type": type.name,
         "id": id,
+        "type": type.name,
         "name": _name,
         if (_ownerID != null) "ownerID": _ownerID!,
         if (toLocal && _isFriend != null) "isFriend": _isFriend!.toString(),
@@ -429,6 +550,15 @@ mixin Branchable on FireNode {
 }
 
 mixin Chatable on FireNode {
+  List<ID> targets({required ID selfID}) {
+    final ref = this;
+    if (ref is Groupable) {
+      return List<ID>.from(ref.group)..remove(selfID);
+    } else {
+      return [ref.id];
+    }
+  }
+
   Future<Pair<Iterable<ID>, AsyncListenStream<QueryChange<ResultSet>>>>
       getTheChat() async {
     final raw = """
@@ -780,7 +910,7 @@ class NodeTheme extends FireNode {
   NodeTheme(this.theme) : super(theme.font, activity: 0, name: theme.name);
 
   @override
-  Color get color => theme.qrColor;
+  Color get color => g.theme.paletteTextColor;
 
   @override
   String get displayID => "font : ${theme.font}";
@@ -801,6 +931,7 @@ class FireMedia extends FireObject {
 
   @override
   final ID id;
+
   final bool isReversed, isLocked, isPaidToView, isPaidToOwn, isSquared;
   String? cachePath, cachedUrl;
   String? tinyThumbnail;
@@ -814,7 +945,7 @@ class FireMedia extends FireObject {
   // final double aspectRatio;
   final String? text;
   final int timestamp;
-  Uint8List? cachedImage;
+  Uint8List? cachedMemory;
 
   Size get size => Size(width, height);
 
@@ -847,6 +978,7 @@ class FireMedia extends FireObject {
   }
 
   Future<String?> get url async {
+    if (cachedUrl != null) return cachedUrl;
     if (!onlineTimestamp.isExpired && onlineID != null) {
       // online time stamp is not expired, online id isn't null
       // good chances we will find the message media URL
@@ -865,18 +997,25 @@ class FireMedia extends FireObject {
     }
   }
 
-  Future<Uint8List?> get imageData async {
+  Future<Uint8List?> get localImageData async {
     final blob = (await dbb.document(id))?.blob("image");
-    return cachedImage = await blob?.content();
+    return cachedMemory = await blob?.content();
   }
 
   int get onlineTimestamp => _onlineTimestamp;
 
   String? get onlineID => _onlineID;
 
+  Future<bool> get cachedAndReady async {
+    if (cachedFile != null) return true;
+    if (await localImageData != null) return true;
+    if (await url != null) return true;
+    return false;
+  }
+
   Image? get displayCachedImage {
-    if (cachedImage != null) return Image.memory(cachedImage!);
-    if (cachePath != null) return Image.file(File(cachePath!));
+    if (cachedMemory != null) return Image.memory(cachedMemory!);
+    if (cachedFile != null) return Image.file(cachedFile!);
     if (cachedUrl != null) return Image.network(cachedUrl!);
     return null;
   }
@@ -904,9 +1043,9 @@ class FireMedia extends FireObject {
         _onlineID = onlineID,
         _onlineTimestamp = onlineTimestamp;
 
-  FireMedia copy() {
-    return FireMedia.fromJson(toJson(toLocal: true));
-  }
+  // FireMedia copy() {
+  //   return FireMedia.fromJson(toJson(toLocal: true));
+  // }
 
   FireMedia updated({required ID onlineID, required int onlineTS}) {
     final json = toJson(toLocal: true);
@@ -941,7 +1080,7 @@ class FireMedia extends FireObject {
     _onlineTimestamp = newStamp;
     await merge({
       "onlineTimestamp": _onlineTimestamp.toString(),
-      "onlineId": newOnlineId,
+      "onlineID": newOnlineId,
     });
   }
 
@@ -1008,6 +1147,36 @@ class FireMedia extends FireObject {
       };
 }
 
+class FireTheme extends FireObject {
+  String _themeName;
+  FireTheme(ID themeName) : _themeName = themeName;
+
+  String get themeName => _themeName;
+
+  @override
+  Database get dbb => personalDB;
+
+  @override
+  ID get id => "theme";
+
+  Future<void> changeTheme(ID newThemeName) async {
+    if (themesRegistry[newThemeName] == null) return;
+    _themeName = newThemeName;
+    await merge();
+  }
+
+  static Future<FireTheme> get currentTheme async {
+    final doc = await personalDB.document("theme");
+    if (doc != null) return FireTheme(doc.string("themeName")!);
+    return FireTheme(themesRegistry.keys.first)..merge();
+  }
+
+  @override
+  Map<String, dynamic> toJson({bool toLocal = false}) => {
+        "themeName": _themeName,
+      };
+}
+
 class Location {
   final String id;
   final String? at, type;
@@ -1036,8 +1205,10 @@ class ExchangeRate extends FireObject {
 
   @override
   ID get id => "exchangeRate";
+
   int lastUpdate;
   double rate;
+
   ExchangeRate({required this.lastUpdate, required this.rate});
 
   static Future<ExchangeRate> get exchangeRate async {
@@ -1047,10 +1218,9 @@ class ExchangeRate extends FireObject {
   }
 
   factory ExchangeRate.fromJson(Map<String, Object?> decodedJson) {
-    return ExchangeRate(
-      lastUpdate: decodedJson["lastUpdate"] as int,
-      rate: decodedJson["rate"] as double,
-    );
+    final lastUpdate = decodedJson["lastUpdate"] as int;
+    final rate = decodedJson["rate"] as double;
+    return ExchangeRate(lastUpdate: lastUpdate, rate: rate);
   }
 
   @override

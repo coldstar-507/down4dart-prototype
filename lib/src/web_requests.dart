@@ -212,3 +212,67 @@ class MessageRequest {
         if (notifThumbnail != null) "n": base64Encode(notifThumbnail!),
       };
 }
+
+class PushRequest {
+// sender can be used to see if user is blocked
+  final String sender;
+  final List<ID> targets;
+  final String data;
+  PushRequest(
+      {required this.sender, required this.targets, required this.data});
+
+  Future<bool> process() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePushRequest",
+    );
+
+    final res = await http.post(url, body: jsonEncode(this));
+    if (res.statusCode == 200) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  Map toJson() => {
+        "s": sender,
+        "t": targets,
+        "d": data,
+      };
+}
+
+class NotificationRequest {
+// sender can be used to see if blocked
+
+  final String sender, header, body;
+  final String? thumbnail;
+  final List<ID> targets;
+  NotificationRequest({
+    required this.sender,
+    required this.header,
+    required this.body,
+    required this.targets,
+    this.thumbnail,
+  });
+
+  Future<bool> process() async {
+    final url = Uri.parse(
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleNotificationRequest",
+    );
+
+    final res = await http.post(url, body: jsonEncode(this));
+    if (res.statusCode == 200) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  Map toJson() => {
+        "s": sender,
+        "t": targets,
+        "h": header,
+        "b": body,
+        if (thumbnail != null) "n": thumbnail,
+      };
+}

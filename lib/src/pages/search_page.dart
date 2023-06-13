@@ -251,10 +251,11 @@ class _AddFriendPageState extends State<AddFriendPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        onInput: onInput,
-        config: Input2.singleLine,
-        ctrl: InputController(placeHolder: "@username ..."),
-        onFocusChange: onFocusChange),
+      onInput: onInput,
+      config: Input2.singleLine,
+      placeHolder: "@username ...",
+      onFocusChange: onFocusChange,
+    ),
   ];
 
   @override

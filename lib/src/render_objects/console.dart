@@ -453,8 +453,8 @@ class SnipInput extends StatelessWidget {
         child: Center(
             child: Container(
                 width: g.sizes.w,
-                color: Colors.black38,
                 height: ed.height,
+                color: g.theme.snipRibbon,
                 child: Align(
                   alignment: AlignmentDirectional.center,
                   child: ed,
@@ -1211,6 +1211,9 @@ class Console3 extends StatelessWidget {
     }).toList();
   }
 
+  ConsoleRow rowAt(int pageIndex) =>
+      rows[pageIndex][currentConsolesName[pageIndex]]!;
+
   // late List<Map<String, (List<double>, List<double>)>> _sizes;
 
   // final List<Widget> widgets;
@@ -1321,6 +1324,75 @@ class Console3 extends StatelessWidget {
   //     })
   //     .values
   //     .toList();
+
+  Widget rowOfPage({required int index}) {
+    final extension = extensionOfPage(index: index);
+    final ex = extension?.$1;
+    final h = extension?.$2;
+    return Column(children: [
+      AnimatedOpacity(
+        opacity: extension == null ? 0 : 1,
+        duration: Console.animationDuration,
+        child: AnimatedContainer(
+          duration: Console.animationDuration,
+          height: h ?? 0,
+          // constraints: BoxConstraints(
+          //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
+          child: ex ?? const SizedBox.shrink(),
+        ),
+      ),
+      ...rows[index]
+          .map((name, c) {
+            double currentHeight;
+            if (currentConsolesName.contains(name)) {
+              currentHeight = Console.buttonHeight;
+            } else {
+              currentHeight = 0;
+            }
+
+            final defaultWidth = 1 / c.widgets.length;
+            final inputHeight = c.inputMaxHeight;
+
+            final row = Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: c.widgets.indexed.map((e) {
+                final i = e.$1;
+                final w = e.$2;
+
+                final width = (c.widths?[i] ?? defaultWidth) * g.sizes.w;
+
+                double height;
+                if (w is ConsoleButton) {
+                  height = currentHeight;
+                } else {
+                  height = currentHeight == 0
+                      ? currentHeight
+                      : inputHeight ?? Console.buttonHeight;
+                }
+
+                final Widget w_ = AnimatedOpacity(
+                    duration: Andrew.pageSwitchOpacityDuration,
+                    opacity: 1, // ci == currentPageIndex ? 1 : 0,
+                    child: AnimatedContainer(
+                        duration: Andrew.pageSwitchAnimationDuration,
+                        width: width,
+                        height: height,
+                        child: w));
+
+                return w_;
+              }).toList(),
+            );
+
+            return MapEntry(name, row);
+          })
+          .values
+          .toList(),
+    ]);
+  }
+
+  (Widget, double?)? extensionOfPage({required int index}) {
+    return rows[index][currentConsolesName[index]]?.extension;
+  }
 
   @override
   Widget build(BuildContext context) {

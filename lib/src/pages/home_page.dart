@@ -268,6 +268,7 @@ class _HomePageState extends State<HomePage>
               ),
               basicMediaRowName: basicMediasRow,
               basicCameraRowName: basicCameraRow,
+              cameraConfirmationRowName: cameraConfirmationRow,
             }
           ],
           currentConsolesName: currentConsolesName,
@@ -325,10 +326,10 @@ class _HomePageState extends State<HomePage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        onInput: onInput,
-        onFocusChange: onFocusChange,
-        config: Input2.multiLine,
-        ctrl: InputController()),
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.multiLine,
+    ),
   ];
 
   Extra get extraGroup => extras[0];

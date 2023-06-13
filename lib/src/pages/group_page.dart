@@ -157,7 +157,7 @@ class _GroupPageState extends State<GroupPage>
         // nameCallBack: (name) => setState(() => _groupName = name),
         type: Nodes.group,
         imagePress: () {
-          forNode = forGroupNode;
+          forMediaMode = ("PUT", forGroupNode);
           changeConsole(basicMediaRowName);
         });
   }
@@ -481,6 +481,7 @@ class _GroupPageState extends State<GroupPage>
               basicComposeRowName: basicComposeRow,
               basicMediaRowName: basicMediasRow,
               basicCameraRowName: basicCameraRow,
+              cameraConfirmationRowName: cameraConfirmationRow,
             }
           ],
           currentConsolesName: currentConsolesName,
@@ -501,23 +502,22 @@ class _GroupPageState extends State<GroupPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        onInput: onInput,
-        onFocusChange: onFocusChange,
-        config: Input2.multiLine,
-        ctrl: InputController()),
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.multiLine,
+    ),
     MyTextEditor(
         onInput: (s, h) {
           _groupName = s;
           onInput(s, h);
         },
-        style: g.theme.paletteNameStyle(selected: false),
+        specificStyle: g.theme.paletteNameStyle(selected: false),
         placeholderStyle: g.theme.palettePlaceholderTextStyle,
         onFocusChange: onFocusChange,
         maxWidth: g.sizes.w * (1 / golden),
-        // alignment: AlignmentDirectional.topStart,
-        textPadding: 0,
+        isConsoleInput: false,
         config: Input2.singleLine,
-        ctrl: InputController(placeHolder: "Group Name...")),
+        placeHolder: "Group Name..."),
   ];
 
   MyTextEditor get groupInput => inputs[1];

@@ -67,17 +67,17 @@ class _SnipCameraState extends State<SnipCamera>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        config: Input2.multiLine,
-        ctrl: InputController(),
-        centered: true,
-        textPadding: 0,
-        // alignment: AlignmentDirectional.center,
-        maxWidth: 1.0,
-        onInput: onInput,
-        onFocusChange: onFocusChange)
+      config: Input2.multiLine,
+      centered: true,
+      isConsoleInput: false,
+      specificStyle: g.theme.snipInputTextStyle,
+      placeholderStyle: g.theme.snipInputTextStyle,
+      maxWidth: 1.0,
+      verticalTextPadding: 4,
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+    )
   ];
-
-  bool _extra = false;
 
   int camNum = 0;
 

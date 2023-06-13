@@ -472,13 +472,12 @@ class PaletteMaker extends StatelessWidget {
       height: Palette2.fullHeight,
       // width: squish ? 0 : null,
       // clipBehavior: Clip.hardEdge,
-      color: g.theme.backGroundColor,
+
       padding: EdgeInsets.all(Palette2.padding / 2),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(5)),
-          color: g.theme.backGroundColor,
-        ),
+            borderRadius: const BorderRadius.all(Radius.circular(5)),
+            color: g.theme.paletteColor),
         padding: EdgeInsets.all(Palette2.padding / 2),
         child: child,
       ),

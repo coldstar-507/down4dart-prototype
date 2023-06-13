@@ -113,18 +113,29 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
       : widget.node.defaultNodeImage(widget.displaySize);
   Image? realImage;
 
+  late final dSize = widget.displaySize ?? Palette2.imageSize;
+
   void loadImage() {
     if (media?.cachedFile != null) {
       // print("Will render file image");
       realImage = fileIm(media!.cachePath!);
-    } else if (media?.cachedImage != null) {
+    } else if (media?.cachedMemory != null) {
       // print("Will render memory image");
-      realImage = memoryIm(media!.cachedImage!);
+      realImage = memoryIm(media!.cachedMemory!);
     } else if (media?.cachedUrl != null) {
       // print("Will render network image");
       realImage = netIm(media!.cachedUrl!);
     }
     setState(() {});
+  }
+
+  double get scale {
+    if (media == null) return 1.0;
+    if (media!.size.width < media!.size.height) {
+      return dSize.width / media!.size.width;
+    } else {
+      return dSize.height / media!.size.height;
+    }
   }
 
   Widget transformedImage(Image image) => Down4ImageTransform(
@@ -134,13 +145,17 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
       isScaled: true,
       isReversed: media?.isReversed ?? false);
 
-  Image memoryIm(Uint8List d) => Image.memory(d,
-      fit: BoxFit.cover,
-      gaplessPlayback: true,
-      cacheHeight: widget.displaySize?.height.toInt() ??
-          Palette.paletteHeight.toInt() * 2,
-      cacheWidth: widget.displaySize?.width.toInt() ??
-          Palette.paletteHeight.toInt() * 2);
+  Image memoryIm(Uint8List d) => Image.memory(
+        d,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        cacheHeight: (scale * golden * media!.size.height).toInt(),
+        cacheWidth: (scale * golden * media!.size.width).toInt(),
+        // cacheHeight: widget.displaySize?.height.toInt() ??
+        //     Palette.paletteHeight.toInt() * 2,
+        // cacheWidth: widget.displaySize?.width.toInt() ??
+        //     Palette.paletteHeight.toInt() * 2,
+      );
 
   Image fileIm(String p) => Image.file(File(p),
       fit: BoxFit.cover,
@@ -166,8 +181,8 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
     loadImage();
 
     if (media?.cachePath != null) return;
-    if (media?.cachedImage == null) await media?.imageData;
-    if (media?.cachedImage != null) return loadImage();
+    if (media?.cachedMemory == null) await media?.localImageData;
+    if (media?.cachedMemory != null) return loadImage();
     if (media?.cachedUrl == null && media?.isVideo == false) await media?.url;
     if (media?.cachedUrl != null) return loadImage();
   }
@@ -192,18 +207,21 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
     return Stack(
       children: [
         SizedBox.fromSize(
-          size: widget.displaySize ?? Size.square(Palette.paletteHeight),
-          child: widget.node.iconPlaceHolder ?? transformedImage(image),
+          size: dSize,
+          child:
+              widget.node.iconPlaceHolder ?? image, // transformedImage(image),
         ),
         SizedBox.fromSize(
-          size: widget.displaySize ?? Size.square(Palette.paletteHeight),
+          size: dSize,
           child: AnimatedOpacity(
-              curve: Curves.easeInExpo,
-              duration: const Duration(milliseconds: 400),
-              opacity: realImage == null ? 0 : 1,
-              child: realImage != null
-                  ? transformedImage(realImage!)
-                  : const SizedBox.shrink()),
+            curve: Curves.easeInExpo,
+            duration: const Duration(milliseconds: 400),
+            opacity: realImage == null ? 0 : 1,
+            child: realImage ?? const SizedBox.shrink(),
+            // realImage != null
+            //     ? transformedImage(realImage!)
+            //     : const SizedBox.shrink(),
+          ),
         )
       ],
     );
@@ -241,11 +259,19 @@ class _FireImageDisplay extends State<FireImageDisplay> {
       isScaled: media.isSquared || widget.forceSquareAnyways,
       isReversed: media.isReversed);
 
+  double get scale {
+    if (media.size.width < media.size.height) {
+      return widget.displaySize.width / media.size.width;
+    } else {
+      return widget.displaySize.height / media.size.height;
+    }
+  }
+
   void loadImage() {
     if (media.cachePath != null) {
       realImage = fileIm(media.cachePath!);
-    } else if (media.cachedImage != null) {
-      realImage = memoryIm(media.cachedImage!);
+    } else if (media.cachedMemory != null) {
+      realImage = memoryIm(media.cachedMemory!);
     } else if (media.cachedUrl != null) {
       realImage = netIm(media.cachedUrl!);
     }
@@ -253,34 +279,43 @@ class _FireImageDisplay extends State<FireImageDisplay> {
   }
 
   Image memoryIm(Uint8List d) {
-    return Image.memory(d,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        cacheHeight: widget.displaySize.height.toInt(),
-        cacheWidth: widget.displaySize.width.toInt());
+    print("DISPLAY MEMORY IMAGE");
+    return Image.memory(
+      d,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      cacheHeight: (scale * golden * media.size.height).toInt(),
+      cacheWidth: (scale * golden * media.size.width).toInt(),
+    );
   }
 
   Image fileIm(String p) {
-    return Image.file(File(p),
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        cacheHeight: widget.displaySize.height.toInt(),
-        cacheWidth: widget.displaySize.width.toInt());
+    print("DISPLAY FILE IMAGE");
+    return Image.file(
+      File(p),
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      cacheHeight: (scale * golden * media.size.height).toInt(),
+      cacheWidth: (scale * golden * media.size.width).toInt(),
+    );
   }
 
   Image netIm(String url) {
-    return Image.network(url,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        cacheHeight: widget.displaySize.height.toInt(),
-        cacheWidth: widget.displaySize.width.toInt());
+    print("DISPLAY NETWORK IMAGE");
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      cacheHeight: (scale * golden * media.size.height).toInt(),
+      cacheWidth: (scale * golden * media.size.width).toInt(),
+    );
   }
 
   void loadThatBoy() async {
     loadImage();
-    if (media.cachePath != null) return;
-    if (media.cachedImage == null) await media.imageData;
-    if (media.cachedImage != null) return loadImage();
+    if (media.cachedFile != null) return;
+    if (media.cachedMemory == null) await media.localImageData;
+    if (media.cachedMemory != null) return loadImage();
     if (media.cachedUrl == null && !media.isVideo) await media.url;
     if (media.cachedUrl != null) return loadImage();
   }
@@ -306,17 +341,19 @@ class _FireImageDisplay extends State<FireImageDisplay> {
       children: [
         SizedBox.fromSize(
           size: widget.displaySize,
-          child: transformedImage(image),
+          child: image, // transformedImage(image),
         ),
         SizedBox.fromSize(
           size: widget.displaySize,
           child: AnimatedOpacity(
-              curve: Curves.easeInExpo,
-              duration: const Duration(seconds: 1),
-              opacity: realImage == null ? 0 : 1,
-              child: realImage != null
-                  ? transformedImage(realImage!)
-                  : const SizedBox.shrink()),
+            curve: Curves.easeInExpo,
+            duration: const Duration(seconds: 1),
+            opacity: realImage == null ? 0 : 1,
+            child: realImage ?? const SizedBox.shrink(),
+            // realImage != null
+            //     ? transformedImage(realImage!)
+            //     : const SizedBox.shrink(),
+          ),
         )
       ],
     );

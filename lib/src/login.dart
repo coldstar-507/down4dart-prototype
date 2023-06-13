@@ -80,7 +80,8 @@ class _Down4State extends State<Down4> {
       print("Error setting the correct ownership over user media");
       return onFailure("System failure");
     }
-    goodMedia.writeFromCachedPath();
+
+    await goodMedia.writeFromCachedPath();
 
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {

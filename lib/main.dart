@@ -1,6 +1,7 @@
 import 'package:cbl_flutter/cbl_flutter.dart';
 import 'package:cbl/cbl.dart';
 import 'package:down4/src/couch.dart';
+import 'package:down4/src/data_objects.dart';
 import 'package:down4/src/pages/_page_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -109,6 +110,7 @@ Future<void> main() async {
     nodesDB = await Database.openAsync("nodes");
     mediasDB = await Database.openAsync("medias");
     messagesDB = await Database.openAsync("messages");
+    reactionsDB = await Database.openAsync("reactions");
     personalDB = await Database.openAsync("personal");
     paymentsDB = await Database.openAsync("payments");
     utxosDB = await Database.openAsync("utxos");
@@ -165,14 +167,25 @@ Future<void> main() async {
     await FirebaseAuth.instance.signInAnonymously();
   }
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
-  );
+  // INIT THE THEME
+  {
+    g.loadTheme(await FireTheme.currentTheme);
+
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarBrightness: g.theme.topStatusIconBrightness,
+        systemNavigationBarColor: g.theme.bottomNavigationBarColor,
+        systemNavigationBarIconBrightness:
+            g.theme.bottonNavigationIconBrightness,
+      ),
+    );
+  }
 
   runApp(
-    MaterialApp(
-      theme: ThemeData(fontFamily: g.theme.font),
-      home: const Material(child: Down4()),
+    const MaterialApp(
+      // theme: ThemeData(fontFamily: g.theme.font),
+      home: Material(child: Down4()),
     ),
   );
 }

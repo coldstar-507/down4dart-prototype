@@ -144,6 +144,16 @@ extension IterableNodes on Iterable<FireNode> {
   Iterable<User> users() => whereType<User>();
 }
 
+extension ListExtensions on List {
+  (T? previous, T? next) surroundings<T>(T element) {
+    final index = indexOf(element);
+    T? previous, next;
+    if (index != 0) previous = this[index - 1];
+    if (index != length - 1) next = this[index + 1];
+    return (previous, next);
+  }
+}
+
 extension AsUint8List on List<int> {
   Uint8List toUint8List() => Uint8List.fromList(this);
 }
@@ -155,6 +165,7 @@ extension ByteEncoding on List<int> {
 }
 
 extension StringExtension on String {
+  List<int> toUtf8() => utf8.encode(this);
   String capitalize() =>
       "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   String mime() => lookupMimeType(this)!;

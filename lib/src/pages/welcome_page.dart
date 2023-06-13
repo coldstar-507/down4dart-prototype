@@ -1,6 +1,7 @@
 import 'package:down4/src/themes.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/data_objects.dart';
+import 'package:flutter/services.dart';
 
 import '../globals.dart';
 
@@ -27,10 +28,17 @@ class _ThemePageState extends State<ThemePage> with Pager2 {
   List<Extra> extras = [];
 
   void swapTheme(Down4Theme theme) {
-    g.theme = theme;
+    g.myTheme.changeTheme(theme.name);
     for (final t in themes) {
       writePalette3(NodeTheme(t), _palettes, bGen, setTheState);
     }
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarBrightness: g.theme.topStatusIconBrightness,
+      systemNavigationBarColor: g.theme.bottomNavigationBarColor,
+      systemNavigationBarIconBrightness: g.theme.bottonNavigationIconBrightness,
+    ));
+
     widget.onSwap.call();
     setState(() {});
   }

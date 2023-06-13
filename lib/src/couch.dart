@@ -25,6 +25,7 @@ final _messageStore =
 late AsyncDatabase nodesDB,
     personalDB,
     mediasDB,
+    reactionsDB,
     messagesDB,
     utxosDB,
     paymentsDB,
@@ -50,6 +51,8 @@ Future<List<T>> globall<T extends FireObject>(
 
 Map<ID, FireObject> _globalCache = {};
 
+FireObject? unCache(ID id) => _globalCache.remove(id);
+
 void gCache(FireObject obj) => _globalCache[obj.id] = obj;
 
 Future<void> loadIndexes() async {
@@ -66,6 +69,8 @@ Future<void> loadIndexes() async {
 
   final paymentTimestampIndexConfig = ValueIndexConfiguration(["ts"]);
 
+  final reactionMessageRefIndexConfig = ValueIndexConfiguration(["messageID"]);
+
   await nodesDB.createIndex("hiddenIndex", isHiddenNodeIndexConfig);
   await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
 
@@ -78,6 +83,9 @@ Future<void> loadIndexes() async {
   await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
 
   await paymentsDB.createIndex("timestampIndex", paymentTimestampIndexConfig);
+
+  await reactionsDB.createIndex(
+      "messageRefIndex", reactionMessageRefIndexConfig);
 }
 
 Future<T?> fetch<T extends FireObject>(
@@ -101,15 +109,15 @@ Future<T?> fetch<T extends FireObject>(
     return node as T;
   }
 
-  Future<FireMessage?> fetchMessage() async {
+  Future<T?> fetchMessage() async {
     final snapshot = await _realtime.child("Messages").child(id).get();
     if (!snapshot.exists) return null;
     final json = Map<String, Object?>.from(snapshot.value as Map);
     if (json["root"] == g.self.id) json["root"] = json["senderID"];
-    final message = FireMessage.fromJson(json);
+    final message = fromJson<T>(json);
     if (doMerge) {
       print("MERGING MESSAGE ID: $id");
-      message.merge();
+      await message.merge();
     }
     // print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
     return message;
@@ -131,12 +139,12 @@ Future<T?> fetch<T extends FireObject>(
       final bool isVideo = media.isVideo;
       if (isVideo) {
         final url = await ref.getDownloadURL();
-        media.cachedImage = videoThumbnail = await VideoThumbnail.thumbnailData(
+        media.cachedMemory = videoThumbnail = await VideoThumbnail.thumbnailData(
           video: url,
           quality: 50,
         );
       } else {
-        media.cachedImage = mediaData;
+        media.cachedMemory = mediaData;
       }
       if (doMerge) {
         await media.merge();
@@ -156,7 +164,22 @@ Future<T?> fetch<T extends FireObject>(
     }
   }
 
+  // Future<ChatReaction?> fetchChatReaction() async {
+  //   final snapshot = await _realtime.child("Messages").child(id).get();
+  //   if (!snapshot.exists) return null;
+  //   final json = Map<String, Object?>.from(snapshot.value as Map);
+  //   final reaction = ChatReaction.fromJson(json);
+  //   if (doMerge) {
+  //     print("MERGING REACTION ID: $id");
+  //     await reaction.merge();
+  //   }
+  //   // print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
+  //   return reaction;
+  // }
+
   switch (T) {
+    case ChatReaction:
+      return fetchMessage();
     case FireNode:
       return fetchNode();
     case Branchable:
@@ -180,7 +203,7 @@ Future<T?> fetch<T extends FireObject>(
     case FireMedia:
       return fetchMedia() as Future<T?>;
     case FireMessage:
-      return fetchMessage() as Future<T?>;
+      return fetchMessage();
     case Down4Payment:
       return downloadPayment(id) as Future<T?>;
   }
@@ -190,6 +213,8 @@ Future<T?> fetch<T extends FireObject>(
 
 Database gdb<T extends FireObject>() {
   switch (T) {
+    case ChatReaction:
+      return reactionsDB;
     case FireNode:
       return nodesDB;
     case Branchable:
@@ -253,20 +278,38 @@ Future<T?> global<T extends FireObject>(
   bool doMergeIfFetch = false,
   ({bool withData, ID? onlineID})? mediaInfo,
 }) async {
+  // if (T is FireMedia && id != null) {
+  //   if (mediaInfo?.withData == true) {
+  //     final localMedia = cache<FireMedia>(id) ?? (await local<FireMedia>(id));
+  //     final
+  //   }
+  // }
+
   if (id == null) return null;
   final cached = cache<T>(id);
-  if (cached != null) return cached;
+  if (cached != null) {
+    print("RETRIEVED $T ID: $id FROM CACHE");
+    return cached;
+  }
   final localed = await local<T>(id);
-  if (localed != null) return doCache ? _globalCache[id] = localed : localed;
+  if (localed != null) {
+    print("RETRIEVED $T ID: $id FROM LOCAL");
+    return doCache ? _globalCache[id] = localed : localed;
+  }
   if (!doFetch) return null;
   final fetched =
       await fetch<T>(id, doMerge: doMergeIfFetch, mediaInfo: mediaInfo);
-  if (fetched != null) return doCache ? _globalCache[id] = fetched : fetched;
+  if (fetched != null) {
+    print("RETRIEVED $T ID: $id FROM FETCH");
+    return doCache ? _globalCache[id] = fetched : fetched;
+  }
   return null;
 }
 
 T fromJson<T extends FireObject>(Map<String, Object?> json) {
   switch (T) {
+    case ChatReaction:
+      return ChatReaction.fromJson(json) as T;
     case FireNode:
       return FireNode.fromJson(json) as T;
     case Branchable:

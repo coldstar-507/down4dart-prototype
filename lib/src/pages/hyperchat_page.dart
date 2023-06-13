@@ -181,6 +181,7 @@ class _HyperchatPageState extends State<HyperchatPage>
             {
               "base": theRow,
               basicCameraRowName: basicCameraRow,
+              cameraConfirmationRowName: cameraConfirmationRow,
               basicMediaRowName: basicMediasRow,
             }
           ],
@@ -553,10 +554,10 @@ class _HyperchatPageState extends State<HyperchatPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        onInput: onInput,
-        onFocusChange: onFocusChange,
-        config: Input2.multiLine,
-        ctrl: InputController()),
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.multiLine,
+    ),
   ];
 
   Extra get mediasExtra => extras[0];

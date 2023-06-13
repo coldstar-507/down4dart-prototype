@@ -58,7 +58,7 @@ Future<bool> uploadPayment(Down4Payment pay) async {
 
 Future<bool> uploadNodeMedia(FireMedia media) async {
   try {
-    final mediaData = await media.imageData;
+    final mediaData = await media.localImageData;
     if (mediaData == null) {
       print("No image data for node image id ${media.id}, returning success");
       return true;
@@ -164,7 +164,46 @@ Future<Down4Payment?> downloadPayment(ID paymentID) async {
 //   }
 // }
 
-Future<bool> uploadMessage(FireMessage msg) async {
+// Future<bool> uploadReaction(ChatReaction reaction) async {
+//   final msgRef = db.child("Messages").child(reaction.id);
+//   try {
+//     List<Future<dynamic>> uploads = [];
+//
+//     final media = await global<FireMedia>(reaction.mediaID);
+//     // final msgCopy = msg.copy();
+//     print("MEDIA ONLINE TIMESTAMP = ${media?.onlineTimestamp}");
+//     int? freshTS;
+//     ID? freshOnlineID;
+//     if (media?.onlineTimestamp.shouldBeUpdated ?? false) {
+//       print("(RE)-uploading media!");
+//       freshOnlineID = messagePushId();
+//       freshTS = makeTimestamp();
+//
+//       final jsonMedia = media!.toJson(toLocal: false);
+//       jsonMedia["onlineID"] = freshOnlineID;
+//       jsonMedia["onlineTimestamp"] = freshTS.toString();
+//
+//       final ref = _st.ref(freshOnlineID);
+//       final setMetadata = SettableMetadata(customMetadata: jsonMedia);
+//
+//       if (media.cachePath != null) {
+//         uploads.add(ref.putFile(File(media.cachePath!), setMetadata));
+//       } else if (media.isVideo && media.videoFile != null) {
+//         uploads.add(ref.putFile(media.videoFile!, setMetadata));
+//       } else if ((await media.imageData) != null) {
+//         uploads.add(ref.putData((await media.imageData)!, setMetadata));
+//       } else {
+//         print("NO MEDIA TO UPLOAD BRO");
+//       }
+//     } else {
+//       print("NO NEED TO UPDATE MEDIA");
+//     }
+//
+//
+//   }
+// }
+
+Future<bool> uploadMessage(FireSendable msg) async {
   final msgRef = db.child("Messages").child(msg.id);
   try {
     List<Future<dynamic>> uploads = [];
@@ -174,24 +213,28 @@ Future<bool> uploadMessage(FireMessage msg) async {
     print("MEDIA ONLINE TIMESTAMP = ${media?.onlineTimestamp}");
     int? freshTS;
     ID? freshOnlineID;
-    if (media?.onlineTimestamp.shouldBeUpdated ?? false) {
+
+    final uploadMedia = media != null &&
+        (media.onlineID == null || media.onlineTimestamp.shouldBeUpdated);
+
+    if (uploadMedia) {
       print("(RE)-uploading media!");
       freshOnlineID = messagePushId();
       freshTS = makeTimestamp();
 
-      final jsonMedia = media!.toJson(toLocal: false);
+      final jsonMedia = media.toJson(toLocal: false);
       jsonMedia["onlineID"] = freshOnlineID;
       jsonMedia["onlineTimestamp"] = freshTS.toString();
 
       final ref = _st.ref(freshOnlineID);
       final setMetadata = SettableMetadata(customMetadata: jsonMedia);
 
-      if (media.cachePath != null) {
-        uploads.add(ref.putFile(File(media.cachePath!), setMetadata));
+      if (media.cachedFile != null) {
+        uploads.add(ref.putFile(media.cachedFile!, setMetadata));
       } else if (media.isVideo && media.videoFile != null) {
         uploads.add(ref.putFile(media.videoFile!, setMetadata));
-      } else if ((await media.imageData) != null) {
-        uploads.add(ref.putData((await media.imageData)!, setMetadata));
+      } else if ((await media.localImageData) != null) {
+        uploads.add(ref.putData((await media.localImageData)!, setMetadata));
       } else {
         print("NO MEDIA TO UPLOAD BRO");
       }
@@ -200,9 +243,10 @@ Future<bool> uploadMessage(FireMessage msg) async {
     }
 
     final msgJson = msg.toJson(toLocal: false);
-    if (freshOnlineID != null && freshTS != null) {
-      msgJson["onlineMediaID"] = freshOnlineID;
-      msgJson["onlineMediaTimestamp"] = freshTS.toString();
+    if (media != null) {
+      msgJson["onlineMediaID"] = freshOnlineID ?? media.onlineID!;
+      msgJson["onlineMediaTimestamp"] =
+          freshTS?.toString() ?? media.onlineTimestamp.toString();
     }
 
     // add the messageUpload
@@ -288,6 +332,8 @@ class PageState {
 
 class ViewState {
   // A view can have a single chat
+  // A chat is a List<ID> of every messages and a stream subscription that
+  // listens to changes
   Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
   // A view can be from a single node (chatPage, nodePage) both require a node
   final FireNode? node;
@@ -371,7 +417,9 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
-  Down4Theme theme = BlackTheme(); //PinkTheme();
+  late FireTheme myTheme;
+
+  Down4Theme get theme => themesRegistry[myTheme.themeName]!;
   late String appDirPath;
   late Self self;
   late Wallet wallet;
@@ -399,6 +447,8 @@ class Singletons {
   // TextInputConnection get numberPad => connections[2];
 
   void loadExchangeRate(ExchangeRate er) => exchangeRate = er;
+
+  void loadTheme(FireTheme theme) => myTheme = theme;
 
   void loadSizes(Sizes s) => sizes = s;
 
@@ -643,9 +693,11 @@ Future<ChatMessage?> getChatMessage({
   required ID msgID,
   required ID? prevMsgID,
   required ID? nextMsgID,
-  required bool isLast,
+  required bool isFirst,
   required void Function(FireNode)? openNode,
   required void Function() refreshCallback,
+  required Future<void> Function(FireMessage message) react,
+  required Future<void> Function(ChatReaction) increment,
 }) async {
   final msg = await global<FireMessage>(msgID);
   if (msg == null) return null;
@@ -653,7 +705,7 @@ Future<ChatMessage?> getChatMessage({
   ChatMessage? prevChatMessage = state[prevMsgID];
   // If new message while in chat, we might want to remove the header of the
   // previous last message
-  if (isLast &&
+  if (isFirst &&
       prevMsgID != null &&
       prevChatMessage != null &&
       prevChatMessage.hasHeader &&
@@ -679,16 +731,23 @@ Future<ChatMessage?> getChatMessage({
   final bool hasHeader =
       !senderIsSelf && ch is Groupable && nextMsg?.senderID != msg.senderID;
 
+  // load the reactions, from disk always
+  final reactions = await msg.reactions;
+  // then cache all the local medias
+  await globall<FireMedia>(reactions.map((e) => e.mediaID));
   final cm = ChatMessage(
       key: GlobalKey(),
       hasGap: hasGap,
       message: msg,
       nodeRef: ch.id,
+      react: react,
+      increment: increment,
       mediaInfo: await ChatMessage.generateMediaInfo(msg),
       nodes: null,
       repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
         print("TODO, GO TO REPLY ID = $replyID");
       }),
+      reactions: reactions,
       hasHeader: hasHeader,
       openNode: openNode,
       myMessage: g.self.id == msg.senderID,
@@ -714,6 +773,10 @@ Future<ChatMessage?> getChatMessage({
   return cm;
 }
 
+// Future<void> updatedMessageReactions({required Map<ID, ChatMessage> state}) {
+//
+// }
+
 Future<void> writeMessages({
   required Chatable ch,
   required List<ID> ordered,
@@ -723,6 +786,8 @@ Future<void> writeMessages({
   required void Function() refresh,
   required void Function(FireNode)? openNode,
   int limit = 20,
+  required Future<void> Function(FireMessage message) react,
+  required Future<void> Function(ChatReaction) increment,
 }) async {
   final orderedSet = ordered.toSet();
   final loadedSet = state.keys.toSet();
@@ -743,8 +808,10 @@ Future<void> writeMessages({
         msgID: msgID,
         prevMsgID: prv,
         nextMsgID: nxt,
-        isLast: isFirst,
+        isFirst: isFirst,
         openNode: openNode,
+        increment: increment,
+        react: react,
         refreshCallback: refresh);
     if (m != null) {
       state[m.id] = m;

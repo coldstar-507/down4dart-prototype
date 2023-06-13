@@ -124,6 +124,7 @@ class _ForwadingPageState extends State<ForwardingPage>
                 ],
               ),
               basicCameraRowName: basicCameraRow,
+              cameraConfirmationRowName: cameraConfirmationRow,
               basicMediaRowName: basicMediasRow,
             }
           ],
@@ -223,15 +224,14 @@ class _ForwadingPageState extends State<ForwardingPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-        onInput: onInput,
-        onFocusChange: onFocusChange,
-        config: Input2.multiLine,
-        ctrl: InputController()),
+      onInput: onInput,
+      onFocusChange: onFocusChange,
+      config: Input2.multiLine,
+    ),
   ];
 
   @override
   late List<Extra> extras = [Extra(setTheState: setTheState)];
 
   Extra get sendExtra => extras[0];
-
 }

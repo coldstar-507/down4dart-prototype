@@ -46,7 +46,7 @@ class InputController implements Listenable {
 
   void clear() {
     value = "";
-    height = Console.buttonHeight;
+    height = _initHeight;
     caretOffset = Offset.zero;
     caretPosition = 0;
     _tec.clear();
@@ -65,12 +65,17 @@ class InputController implements Listenable {
     }
   }
 
-  double height = Console.buttonHeight;
+  final double _initHeight;
+
+  double height;
+
   Offset caretOffset = Offset.zero;
   int caretPosition = 0;
-  InputController({String? placeHolder})
+
+  InputController({String? placeHolder, required this.height})
       : _placeHolder = (placeHolder ?? "").isEmpty ? " " : placeHolder!,
-        _tec = TextEditingController();
+        _tec = TextEditingController(),
+        _initHeight = height;
 
   final List<VoidCallback> _listeners = [];
 
@@ -87,101 +92,16 @@ class InputController implements Listenable {
   void dispose() {
     _tec.dispose();
   }
+}
 
-  // @override
-  // void connectionClosed() {
-  //   print("CONNECTION CLOSED");
-  // }
-  //
-  // @override
-  // AutofillScope? get currentAutofillScope => null;
-  //
-  // @override
-  // TextEditingValue? get currentTextEditingValue => null;
-  //
-  // @override
-  // void didChangeInputControl(
-  //     TextInputControl? oldControl, TextInputControl? newControl) {
-  //   print("DID CHANGE INPUT CONTROL");
-  // }
-  //
-  // @override
-  // void insertContent(KeyboardInsertedContent content) {
-  //   print("INSERTING CONTENT");
-  // }
-  //
-  // @override
-  // void insertTextPlaceholder(Size size) {
-  //   print("INSERT TEXT PLACEHOLDER LOL");
-  // }
-  //
-  // @override
-  // void performAction(TextInputAction action) {
-  //   switch (action) {
-  //     case TextInputAction.none:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.unspecified:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.done:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.go:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.search:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.send:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.next:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.previous:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.continueAction:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.join:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.route:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.emergencyCall:
-  //     // TODO: Handle this case.
-  //     case TextInputAction.newline:
-  //     // TODO: Handle this case.
-  //   }
-  //   print("PERFORMING ACTION");
-  // }
-  //
-  // @override
-  // void performPrivateCommand(String action, Map<String, dynamic> data) {
-  //   print("PERFORMING PRIVATE COMMAND");
-  // }
-  //
-  // @override
-  // void performSelector(String selectorName) {
-  //   print("PERFORMING SELECTOR");
-  // }
-  //
-  // @override
-  // void removeTextPlaceholder() {
-  //   print("REMOVED TEXT PLACEHOLDER");
-  // }
-  //
-  // @override
-  // void showAutocorrectionPromptRect(int start, int end) {
-  //   print("SHOWING AUTOCORRECTION PROMPT");
-  // }
-  //
-  // @override
-  // void showToolbar() {
-  //   print("SHOW TOOLBAR");
-  // }
-  //
-  // @override
-  // void updateEditingValue(TextEditingValue value) {
-  //   print("UPDATE EDITING VALUE");
-  // }
-  //
-  // @override
-  // void updateFloatingCursor(RawFloatingCursorPoint point) {
-  //   print("UPDATE FLOATING CURSOR");
-  // }
+extension on TextStyle {
+  double get singleLineHeight {
+    final lay = TextPainter(
+        text: TextSpan(text: "W", style: this),
+        textDirection: TextDirection.ltr)
+      ..layout();
+    return lay.height;
+  }
 }
 
 class MyTextEditor extends StatefulWidget {
@@ -189,9 +109,9 @@ class MyTextEditor extends StatefulWidget {
   ConsoleInput2 get consoleInput => ConsoleInput2(this);
   Widget get basicInput => BasicInput(this);
   Widget get snipInput => SnipInput(this);
+  bool get hasFocus => fn.hasFocus;
   String get value => ctrl.value;
   double get height => ctrl.height;
-  bool get hasFocus => fn.hasFocus;
   void clear() => ctrl.clear();
 
   final TextInputConfiguration config;
@@ -206,36 +126,51 @@ class MyTextEditor extends StatefulWidget {
   final int maxLines;
   final FocusNode fn;
   final InputController ctrl;
-  final double textPadding;
-  final TextStyle? style, placeholderStyle;
+  final TextStyle? specificStyle, placeholderStyle;
+  final bool isConsoleInput;
+
+  TextStyle get style => specificStyle ?? g.theme.inputTextStyle;
+
+  final double horizontalTextPadding, verticalTextPadding;
+
   MyTextEditor({
-    // this.isAnimated = false,
-    this.textPadding = 24,
-    this.style,
-    this.placeholderStyle,
+    this.specificStyle,
+    TextStyle? placeholderStyle,
     this.centered = false,
-    // this.alignment = AlignmentDirectional.centerStart,
-    // this.textAlignment = TextAlign.start,
+    this.isConsoleInput = true,
     required this.config,
-    required this.ctrl,
+    String? placeHolder,
     required this.onInput,
     required this.onFocusChange,
+    this.verticalTextPadding = 0,
+    double? horizontalTextPadding,
     this.maxWidth = 0.6,
     this.maxLines = 20,
     FocusNode? fn,
     Key? key,
   })  : fn = FocusNode()..addListener(onFocusChange),
+        placeholderStyle = placeholderStyle ??
+            specificStyle ??
+            g.theme.inputPlaceholderTextStyle,
+        horizontalTextPadding =
+            isConsoleInput ? 24.0 : horizontalTextPadding ?? 0,
+        ctrl = InputController(
+            height: isConsoleInput
+                ? Console.buttonHeight
+                : (specificStyle ?? g.theme.inputTextStyle).singleLineHeight +
+                    verticalTextPadding,
+            placeHolder: placeHolder),
         super(key: key);
 
   @override
   State<MyTextEditor> createState() => _MyTextEditorState();
 }
 
-class _MyTextEditorState extends State<MyTextEditor>
-// with SingleTickerProviderStateMixin
-{
+class _MyTextEditorState extends State<MyTextEditor> {
   String get value => widget.ctrl.value;
   set value(String v) => widget.ctrl.value = v;
+
+  late double caretSize = widget.style.singleLineHeight;
 
   String get placeHolder => widget.ctrl.placeHolder;
 
@@ -246,7 +181,8 @@ class _MyTextEditorState extends State<MyTextEditor>
   set caretPosition(Offset p) => widget.ctrl.caretOffset = p;
 
   Offset get paintingCaretOffset => caretPosition.translate(0, 1);
-  Offset get caretSecondaryOffset => paintingCaretOffset.translate(1, 18);
+  Offset get caretSecondaryOffset =>
+      paintingCaretOffset.translate(1, caretSize.toInt() - 2);
   Rect get caret => Rect.fromPoints(paintingCaretOffset, caretSecondaryOffset);
 
   // Rect get caret_ =>
@@ -367,6 +303,7 @@ class _MyTextEditorState extends State<MyTextEditor>
 
     final fullHeight = inputHeight();
     widget.ctrl.height = fullHeight;
+    print("full height: $fullHeight\n");
 
     return widget.onInput(newValue, fullHeight);
   };
@@ -423,7 +360,7 @@ class _MyTextEditorState extends State<MyTextEditor>
       text: value.isEmpty ? placeHolder : value,
       style: value.isEmpty
           ? widget.placeholderStyle ?? g.theme.inputPlaceholderTextStyle
-          : widget.style ?? g.theme.inputTextStyle,
+          : widget.specificStyle ?? g.theme.inputTextStyle,
       recognizer: widget.fn.hasFocus ? detector : null);
 
   // TextSpan get modifiedSpan => TextSpan(
@@ -442,7 +379,8 @@ class _MyTextEditorState extends State<MyTextEditor>
       textDirection: TextDirection.ltr,
       text: span,
       maxLines: widget.maxLines)
-    ..layout(maxWidth: (g.sizes.w * widget.maxWidth) - widget.textPadding);
+    ..layout(
+        maxWidth: (g.sizes.w * widget.maxWidth) - widget.horizontalTextPadding);
 
   // TextPainter get modifiedTextPainter => TextPainter(
   //     textAlign: widget.centered ? TextAlign.center : TextAlign.start,
@@ -455,16 +393,15 @@ class _MyTextEditorState extends State<MyTextEditor>
 
   double inputHeight() {
     final tp = textPainter;
-    // final tp = modifiedTextPainter;
     final textHeight = tp.height;
+    if (!widget.isConsoleInput) return tp.height + widget.verticalTextPadding;
     final nLines = tp.computeLineMetrics().length;
     final oneLineHeight = tp.height / nLines;
     final paddingHeight = Console.buttonHeight / 2;
     final inputHeight = Console.buttonHeight - paddingHeight;
     final greyNoText = inputHeight - oneLineHeight;
-    final trueHeight = greyNoText + paddingHeight + textHeight;
-
-    return trueHeight;
+    final consoleInputHeight = greyNoText + paddingHeight + textHeight;
+    return consoleInputHeight;
   }
 
   void updateTextEditor() {
@@ -602,6 +539,8 @@ mixin Pager2 {
 
   List<Extra> get extras;
   set extras(List<Extra> e);
+
+  static const double _widgetRadius = 2.0;
 
   void turnOffExtras() {
     for (final e in extras) {
@@ -1060,7 +999,8 @@ mixin Medias2 on Pager2 {
   bool _images =
       true; // or videos, but will change from bool to allow more types
 
-  void Function(FireMedia)? forNode;
+  (String, void Function(FireMedia))? forMediaMode;
+  FireMessage? reactingTo;
 
   List<(String, void Function(FireMedia))> get mediasMode;
 
@@ -1072,24 +1012,24 @@ mixin Medias2 on Pager2 {
   ConsoleButton get mediasButton => ConsoleButton(
       name: "MEDIAS",
       onPress: () {
-        forNode = null;
+        forMediaMode = null;
         changeConsole("medias");
       });
 
   ConsoleButton get mediasBackButton => ConsoleButton(
       name: "BACK",
       onPress: () {
-        forNode = null;
+        forMediaMode = null;
         changeConsole(backFromMediasConsoleName);
       });
 
   ConsoleButton get mediasImportButton => ConsoleButton(
       name: "IMPORT",
       onPress: () async {
-        if (forNode != null) {
+        if (forMediaMode != null) {
           final nodeMedia = await importNodeMedia();
           if (nodeMedia != null) {
-            forNode!.call(nodeMedia);
+            forMediaMode!.$2.call(nodeMedia);
           }
         } else {
           await importConsoleMedias(
@@ -1102,8 +1042,8 @@ mixin Medias2 on Pager2 {
 
   ConsoleButton get mediasTypeButton => ConsoleButton(
       isMode: true,
-      isActivated: forNode == null,
-      isGreyedOut: forNode != null,
+      isActivated: forMediaMode == null,
+      isGreyedOut: forMediaMode != null,
       name: _images ? "IMAGES" : "VIDEOS",
       onPress: () {
         _images = !_images;
@@ -1111,9 +1051,9 @@ mixin Medias2 on Pager2 {
       });
 
   ConsoleButton get mediasModeButton => ConsoleButton(
-      name: forNode != null ? "PUT" : curMode.$1,
+      name: forMediaMode?.$1 ?? curMode.$1,
       isMode: true,
-      isActivated: forNode == null,
+      isActivated: forMediaMode == null,
       onPress: () {
         currentMode = (currentMode + 1) % mediasMode.length;
         setTheState();
@@ -1141,8 +1081,8 @@ mixin Medias2 on Pager2 {
                     final cachedMedia = cache<FireMedia>(ids[i]);
                     if (cachedMedia != null) {
                       return GestureDetector(
-                          onTap: () => forNode != null
-                              ? forNode!.call(cachedMedia)
+                          onTap: () => forMediaMode != null
+                              ? forMediaMode!.$2.call(cachedMedia)
                               : curMode.$2(cachedMedia),
                           child: (cachedMedia.displayImage(
                               size: Size.square(_mediaCelSize),
@@ -1256,7 +1196,7 @@ mixin Camera2 on Pager2 {
               isReversed: isReversed,
               owner: g.self.id,
               isSquared: true);
-          setTheState();
+          changeConsole(cameraConfirmationRowName);
         },
         onLongPress: () async {
           await cameraController!.startVideoRecording();
@@ -1270,7 +1210,7 @@ mixin Camera2 on Pager2 {
               isReversed: isReversed,
               owner: g.self.id,
               isSquared: true);
-          setTheState();
+          changeConsole(cameraConfirmationRowName);
         },
       );
 
@@ -1280,39 +1220,44 @@ mixin Camera2 on Pager2 {
         cameraController?.dispose();
         cameraController = null;
         tempInput = null;
-        changeConsole("base");
+        changeConsole(backFromCameraConsoleName);
       });
 
   ConsoleButton get cameraAcceptButton => ConsoleButton(
       name: "ACCEPT",
       onPress: () {
-        cameraInput = tempInput?.copy();
+        // ugly way to make a copy, but we don't really make copies
+        // elsewhere so...
+        cameraInput = FireMedia.fromJson(tempInput!.toJson(toLocal: true))
+          ..cachePath = tempInput!.cachePath;
+
         cameraController?.dispose();
         cameraController = null;
         tempInput = null;
-        changeConsole("base");
+        changeConsole(backFromCameraConsoleName);
       });
 
   Widget get cameraExtension {
     if (tempInput != null) {
       return Container(
           clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(Console.consoleRad)),
-              border: Border.all(
-                  color: g.theme.consoleBorderColor,
-                  width: Console.borderWidth)),
+          decoration: const BoxDecoration(
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(Pager2._widgetRadius)),
+            // border: Border.all(
+            //     color: g.theme.consoleBorderColor, width: Console.borderWidth),
+          ),
           child: tempInput!.display(size: _squaredCamSize));
     } else if (cameraController != null) {
       return Container(
         clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
-            color: g.theme.consoleBorderColor,
-            border: Border.all(
-                color: g.theme.consoleBorderColor, width: Console.borderWidth)),
+        decoration: const BoxDecoration(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(Pager2._widgetRadius)),
+          // color: g.theme.consoleBorderColor,
+          // border: Border.all(
+          //     color: g.theme.consoleBorderColor, width: Console.borderWidth),
+        ),
         child: SizedBox.square(
             dimension: Console.trueWidth,
             child: Transform.scale(
@@ -1328,28 +1273,38 @@ mixin Camera2 on Pager2 {
       name: "BACK",
       onPress: () {
         tempInput = null;
-        setTheState();
+        changeConsole(basicCameraRowName);
       });
 
+  String get basicCameraRowName => "camera";
   ConsoleRow get basicCameraRow => ConsoleRow(
           widgets: [
-            cameraBackButton,
+            // cameraBackButton,
             cameraCloseButton,
-            cameraCancelButton,
+            // cameraCancelButton,
             cameraSwitchButton,
-            cameraAcceptButton,
+            // cameraAcceptButton,
             cameraCaptureButton,
           ],
           extension: (
             cameraExtension,
             g.sizes.w
           ),
-          widths: tempInput == null
-              ? [0.0, 0.34, 0.0, 0.33, 0.0, 0.33]
-              : [0.34, 0.0, 0.33, 0.0, 0.33, 0.0],
+          widths: null,
+          // tempInput == null
+          //     ? [0.0, 0.34, 0.0, 0.33, 0.0, 0.33]
+          //     : [0.34, 0.0, 0.33, 0.0, 0.33, 0.0],
           inputMaxHeight: null);
 
-  String get basicCameraRowName => "camera";
+  String get cameraConfirmationRowName => "cameraConfirmation";
+  ConsoleRow get cameraConfirmationRow => ConsoleRow(widgets: [
+        cameraBackButton,
+        cameraCancelButton,
+        cameraAcceptButton,
+      ], extension: (
+        cameraExtension,
+        g.sizes.w
+      ), widths: null, inputMaxHeight: null);
 }
 
 mixin Saver2 on Pager2 {
@@ -1440,7 +1395,8 @@ mixin Scanner2 on Pager2 {
   Widget get scanExtension => Container(
         clipBehavior: Clip.hardEdge,
         decoration: const BoxDecoration(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(2.0))),
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(Pager2._widgetRadius))),
         // border: Border.all(
         //     width: borderWidth, color: g.theme.consoleBorderColor)),
         child: Stack(children: [
@@ -2024,6 +1980,7 @@ FireMedia makeCameraMedia({
       width: size.width,
       height: size.height,
       cachePath: cachedPath,
+      tinyThumbnail: makeTiny(data),
       isSquared: isSquared,
       isReversed: isReversed,
       mime: mime);

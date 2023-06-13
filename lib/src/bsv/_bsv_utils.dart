@@ -163,6 +163,7 @@ Future<Map<String, Down4TXOUT>?> getUtxos(String checkAddress) async {
   var d4utxos = <String, Down4TXOUT>{};
   for (final utxo in utxos) {
     var d4txout = Down4TXOUT(
+      type: UtxoType.gets,
       txid: TXID.fromHex(utxo["tx_hash"]),
       sats: Sats(utxo["value"]),
       outIndex: utxo["tx_pos"],
