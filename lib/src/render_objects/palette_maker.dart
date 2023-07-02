@@ -1,13 +1,13 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
 
-import '../data_objects.dart';
 import '../pages/_page_utils.dart';
-import '../themes.dart';
 
 import 'palette.dart';
 import '_render_utils.dart';
@@ -387,10 +387,11 @@ class UserMakerPalette extends StatelessWidget {
 class PaletteMaker extends StatelessWidget {
   // final void Function(String)? nameCallBack;
   final void Function() imagePress;
-  final String name, id;
+  final Down4ID id;
+  final String name;
   // final String hintText;
   final FireMedia? image;
-  final void Function(ID)? go;
+  final void Function(Down4ID)? go;
   final NodesColor colorCode;
   final Nodes type;
   final Nodes? parentType;

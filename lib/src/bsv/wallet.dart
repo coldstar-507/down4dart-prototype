@@ -1,20 +1,24 @@
 import 'dart:convert';
-import '../couch.dart';
-import '../data_objects.dart';
-import '../_dart_utils.dart';
-import '../web_requests.dart' as r;
 import 'dart:io' as io;
-import '_bsv_utils.dart';
-import 'types.dart';
+
+import '../_dart_utils.dart';
+import '../data_objects/couch.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
+import '../web_requests.dart' as r;
+
 import 'package:bs58/bs58.dart';
 import 'package:cbl/cbl.dart';
 
-class Wallet extends FireObject {
+import '_bsv_utils.dart';
+import 'types.dart';
+
+class Wallet extends Locals {
   @override
   Database get dbb => personalDB;
 
   @override
-  ID get id => "wallet";
+  Down4ID get id => Down4ID(unique: "wallet");
 
   final Down4Keys _keys;
   int _ix;
@@ -85,8 +89,8 @@ class Wallet extends FireObject {
   }
 
   Future<Down4Payment?> payPeople({
-    required List<Personable> people,
-    required ID selfID,
+    required List<PersonNode> people,
+    required ComposedID selfID,
     required Sats amount,
     String textNote = "",
   }) async {
@@ -116,7 +120,7 @@ class Wallet extends FireObject {
     _ix = _ix + 1;
     merge({"ix": _ix});
     // the goal here is simply having a unique id everytime
-    final txSecret = makeUint32(_ix) + utf8.encode(selfID);
+    final txSecret = makeUint32(_ix) + utf8.encode(selfID.unique);
     final d4Keys = DOWN4_NEUTER.derive(txSecret);
     // except for here possibly? must be fucking rare tho
     if (d4Keys == null) return null;
@@ -174,10 +178,11 @@ class Wallet extends FireObject {
 
     final theTx = Down4TX(down4Secret: txSecret, txsIn: ins, txsOut: outs);
 
-    return Down4Payment(await _chainedTxs(theTx), true, textNote: textNote);
+    return Down4Payment(await _chainedTxs(theTx),
+        safe: true, textNote: textNote);
   }
 
-  Future<void> parsePayment(ID selfID, Down4Payment pay) async {
+  Future<void> parsePayment(Down4ID selfID, Down4Payment pay) async {
     for (final tx in pay.txs) {
       tx.writeTxInfosToUTXOs();
     }
@@ -193,7 +198,7 @@ class Wallet extends FireObject {
     return;
   }
 
-  Future<Down4Payment?> importMoney(String pkBase68, ID selfID) async {
+  Future<Down4Payment?> importMoney(String pkBase68, ComposedID selfID) async {
     final rawKey = BigInt.parse(base58.decode(pkBase68).toHex(), radix: 16);
 
     final importedKeys = Down4Keys.fromPrivateKey(rawKey);
@@ -215,7 +220,7 @@ class Wallet extends FireObject {
     if (encaissement.asInt <= 0) return null;
 
     _ix = _ix + 1;
-    final txSecret = makeUint32(_ix) + utf8.encode(selfID);
+    final txSecret = makeUint32(_ix) + utf8.encode(selfID.unique);
     final down4Keys = DOWN4_NEUTER.derive(txSecret);
     if (down4Keys == null) return null;
     var down4Out = Down4TXOUT(
@@ -256,7 +261,7 @@ class Wallet extends FireObject {
 
     final theTx = Down4TX(txsIn: ins, txsOut: outs, down4Secret: txSecret);
 
-    return Down4Payment([theTx], true, textNote: "Imported");
+    return Down4Payment([theTx], safe: true, textNote: "Imported");
   }
 
   Future<void> _trySettlement(Down4Payment payment) async {
@@ -305,7 +310,7 @@ class Wallet extends FireObject {
   }
 
   Future<List<dynamic>?> _unsignedIns(
-      ID selfID, Sats pay, int currentTxSize) async {
+      Down4ID selfID, Sats pay, int currentTxSize) async {
     const inSize = 148;
     List<Down4TXIN> ins = [];
     var cumulSize = currentTxSize;

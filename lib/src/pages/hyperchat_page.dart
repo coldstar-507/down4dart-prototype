@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:down4/src/_dart_utils.dart';
+import 'package:down4/src/data_objects/messages.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/data_objects.dart';
-import 'package:video_player/video_player.dart';
 
+import '../data_objects/_data_utils.dart';
+import '../data_objects/medias.dart';
+import '../render_objects/chat_message.dart';
 import '_page_utils.dart';
 
 import '../globals.dart';
@@ -13,15 +15,20 @@ import '../globals.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
-import '../render_objects/_render_utils.dart' as ru;
 
 class HyperchatPage extends StatefulWidget implements Down4PageWidget {
-  ID get id => "hyper";
+  @override
+  String get id => "hyper";
   final Transition transition;
   final List<Down4Object>? fo;
   final void Function(String text) ping;
   final void Function() back;
-  final void Function(Payload p, Set<ID> group) makeHyperchat;
+  final void Function(
+    List<Down4Object>? fo,
+    FireMedia? m,
+    String? textInput,
+    Set<ComposedID> members,
+  ) makeHyperchat;
 
   const HyperchatPage({
     required this.transition,
@@ -40,7 +47,6 @@ class _HyperchatPageState extends State<HyperchatPage>
     with
         WidgetsBindingObserver,
         Pager2,
-        // Backable,
         Camera2,
         Medias2,
         Input2,
@@ -204,16 +210,10 @@ class _HyperchatPageState extends State<HyperchatPage>
     final text = input.value;
     if (text.isEmpty && media == null) return;
 
-    final p = Payload(
-        text: text,
-        media: media,
-        forwards: widget.fo,
-        replies: null,
-        isSnip: false);
-
-    final group = Set<ID>.from(widget.transition.trueTargets.asIDs())
+    final members = Set<ComposedID>.from(widget.transition.trueTargets.asIDs())
       ..add(g.self.id);
-    widget.makeHyperchat(p, group);
+
+    widget.makeHyperchat(fo, media, text, members);
   }
 
   // void ping() {

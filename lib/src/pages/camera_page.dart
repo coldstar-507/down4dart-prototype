@@ -7,7 +7,7 @@ import 'package:camera/camera.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
 
-import '../data_objects.dart' show ID;
+import '../data_objects/_data_utils.dart';
 import '../render_objects/_render_utils.dart'
     show Down4PageWidget, InvertedSize;
 import '../render_objects/console.dart';
@@ -16,7 +16,7 @@ import '../globals.dart';
 
 class SnipCamera extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "snip";
+  String get id => "snip";
 
   // final CameraController ctrl;
   // final double minZoom, maxZoom;

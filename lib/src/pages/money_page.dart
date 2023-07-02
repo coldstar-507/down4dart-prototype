@@ -6,9 +6,10 @@ import 'package:down4/src/_dart_utils.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr/qr.dart';
 
-import '../data_objects.dart';
 import '../bsv/types.dart';
 import '../bsv/_bsv_utils.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
 
 import '../render_objects/console.dart';
@@ -32,7 +33,7 @@ void printWrapped(String text) {
 
 class PaymentPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "payment";
+  String get id => "payment";
   final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentAsList;
@@ -233,9 +234,9 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
 
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "money";
+  String get id => "money";
   final Transition? transition;
-  final Personable? single;
+  final PersonNode? single;
   final ViewState viewState;
   // final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
@@ -501,11 +502,13 @@ class _MoneyPageState extends State<MoneyPage>
       widget.viewState.pages[1].scroll = scroller1.offset;
     });
 
-  Map<ID, Palette2> get _payments => widget.viewState.pages[1].objects.cast();
+  Map<Down4ID, Palette2> get _payments =>
+      widget.viewState.pages[1].objects.cast();
 
-  Map<ID, Palette2> get _users => widget.viewState.pages[0].objects.cast();
+  Map<ComposedID, Palette2> get _users =>
+      widget.viewState.pages[0].objects.cast();
 
-  List<Personable> get people => _users.values.asNodes<Personable>().toList();
+  List<PersonNode> get people => _users.values.asNodes<PersonNode>().toList();
 
   @override
   void initState() {

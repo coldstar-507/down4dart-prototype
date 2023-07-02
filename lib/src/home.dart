@@ -1,17 +1,18 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:camera/camera.dart';
-import 'package:cbl/cbl.dart';
 import 'package:down4/src/bsv/_bsv_utils.dart';
-import 'package:down4/src/pages/_page_utils.dart';
-import 'package:down4/src/web_requests.dart';
+import 'package:down4/src/data_objects/firebase.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/data_objects.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
-import 'couch.dart';
+import 'data_objects/couch.dart';
+import 'data_objects/_data_utils.dart';
+import 'data_objects/medias.dart';
+import 'data_objects/messages.dart';
+import 'data_objects/nodes.dart';
 import 'globals.dart';
 import 'web_requests.dart' as r;
 import '_dart_utils.dart';
@@ -36,9 +37,6 @@ import 'pages/snipview_page.dart';
 import 'render_objects/palette.dart';
 import 'render_objects/chat_message.dart';
 import 'render_objects/_render_utils.dart' as ru;
-import 'render_objects/console.dart';
-
-import 'package:cloud_firestore/cloud_firestore.dart' as fs;
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -68,11 +66,11 @@ class _HomeState extends State<Home> {
   ViewState get currentView => viewManager.currentView;
 
   // homestate getters
-  Map<ID, Palette2> get _home => homeView.pages[0].objects.cast();
+  Map<Down4ID, Palette2> get _home => homeView.pages[0].objects.cast();
   Iterable<Palette2> get home => _home.values.showing();
   List<Palette2> get formattedHome => home.toList().formatted();
-  Map<ID, ChatMessage>? chatMessages(ID nodeID) {
-    return viewManager.views["chat-$nodeID"]?.pages[0].objects.cast();
+  Map<Down4ID, ChatMessage>? chatMessages(ComposedID nodeID) {
+    return viewManager.views["chat-${nodeID.value}"]?.pages[0].objects.cast();
   }
 
   void setPage(ru.Down4PageWidget p) {
@@ -86,7 +84,7 @@ class _HomeState extends State<Home> {
     final pID = popedView?.id.split('-');
     final pp0 = pID?.first;
     final n = popedView?.node;
-    if (pID != null && pID.length > 1 && pp0 == "chat" && n is Chatable) {
+    if (pID != null && pID.length > 1 && pp0 == "chat" && n is ChatNode) {
       popedView?.chat?.second.cancel();
       await writeHomePalette(n, _home, bGen, rfHome);
     }
@@ -96,10 +94,10 @@ class _HomeState extends State<Home> {
       case 'home':
         return setPage(homePage());
       case 'chat':
-        final node = currentView.node as Chatable;
+        final node = currentView.node as ChatNode;
         return setPage(chatPage(node, fo: f, isReload: true));
       case 'node':
-        final node = currentView.node as FireNode;
+        final node = currentView.node as Down4Node;
         return setPage(nodePage(node));
       case 'money':
         return setPage(moneyPage());
@@ -129,7 +127,10 @@ class _HomeState extends State<Home> {
 
   // Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? currentChat;
 
-  StreamSubscription? _messageListener, _savedImageIDs, _savedVideoIDs;
+  StreamSubscription? _messageListener,
+      _savedImageIDs,
+      _savedVideoIDs,
+      _forgroundMessageListener;
 
   void homeScrollToZero() => homePageState.scroll = 0;
 
@@ -141,22 +142,15 @@ class _HomeState extends State<Home> {
     final imageIDs = await savedMediaIDs(isVideo: false);
     _savedImageIDs = imageIDs.listen((event) async {
       final ar = await event.results.allResults();
-      g.savedImageIDs = ar.map((e) => e.string("id")!).toList();
+      final ids = ar.map((e) => Down4ID.fromString(e.string("id"))!).toList();
+      g.savedImageIDs = ids;
     });
 
     final videoIDs = await savedMediaIDs(isVideo: true);
     _savedVideoIDs = videoIDs.listen((event) async {
       final ar = await event.results.allResults();
-      g.savedVideoIDs = ar.map((e) => e.string("id")!).toList();
-      // ids.forEach((id) async {
-      //   final m = await global<FireMedia>(id);
-      //   try {
-      //     File(m!.videoPath).delete();
-      //     m.delete();
-      //   } catch (e) {
-      //     print("Error $e");
-      //   }
-      // });
+      final ids = ar.map((e) => Down4ID.fromString(e.string("id"))!).toList();
+      g.savedVideoIDs = ids;
     });
   }
 
@@ -168,7 +162,7 @@ class _HomeState extends State<Home> {
     ru.clearAppCache();
     g.wallet.walletRoutine();
     g.wallet.printWalletInfo();
-    connectToMessages();
+    // connectToMessages();
     processUnsentMessages();
     updateExchangeRate();
   }
@@ -183,15 +177,13 @@ class _HomeState extends State<Home> {
 
   Future<void> localPalettesRoutine({bool init = false}) async {
     final allHomeNodes = (await loadHome()).followedBy([g.self]);
-    final Iterable<Groupable> groups = allHomeNodes.whereType<Groupable>();
+    final Iterable<GroupNode> groups = allHomeNodes.whereType<GroupNode>();
     final groupUserIDs = groups.map((e) => e.group).expand((id) => id).toSet();
     final Iterable<User> users = allHomeNodes.whereType<User>();
 
     final homeIDs = allHomeNodes.asIDs().toSet();
-    await globall<FireMedia>(allHomeNodes.map((e) => e.mediaID).whereType(),
-        doFetch: true,
-        doMergeIfFetch: true,
-        mediaInfo: (withData: true, onlineID: null));
+    await globall<FireMedia>(allHomeNodes.mediaIDs,
+        doFetch: true, doMergeIfFetch: true);
 
     List<User> hiddenUsers = [];
     for (final u in users) {
@@ -203,7 +195,7 @@ class _HomeState extends State<Home> {
     // we dump hidden users that are not in groups
     final shouldDump = hiddenIDs.difference(groupUserIDs);
     for (final dump in shouldDump) {
-      gdb<FireNode>().purgeDocumentById(dump);
+      gdb<Down4Node>().purgeDocumentById(dump.value);
     }
 
     for (final n in allHomeNodes) {
@@ -215,17 +207,14 @@ class _HomeState extends State<Home> {
     // we fetch users in groups that are not in home
     final toFetch = groupUserIDs.difference(homeIDs);
     final fetchedNodes =
-        await globall<FireNode>(toFetch, doFetch: true, doMergeIfFetch: true);
-    final nodeMediasToFetch =
-        fetchedNodes.map((e) => e.mediaID).whereType<ID>();
-    await globall<FireMedia>(nodeMediasToFetch,
-        doFetch: true,
-        doMergeIfFetch: true,
-        mediaInfo: (withData: true, onlineID: null));
+        await globall<Down4Node>(toFetch, doFetch: true, doMergeIfFetch: true);
+
+    await globall<FireMedia>(fetchedNodes.mediaIDs,
+        doFetch: true, doMergeIfFetch: true);
   }
 
-  Future<List<ButtonsInfo2>> bGen(Chatable n,
-      {(FireMessage?, Iterable<ID>, bool)? chatInfo}) async {
+  Future<List<ButtonsInfo2>> bGen(ChatNode n,
+      {(Chat?, Iterable<Down4ID>, bool)? chatInfo}) async {
     final (_, snips, hasUnread) = chatInfo ?? await n.homeChatInfo();
     if (snips.isNotEmpty) {
       return [
@@ -233,7 +222,7 @@ class _HomeState extends State<Home> {
           asset: Icon(Icons.arrow_forward_ios_rounded,
               color: g.theme.snipArrowColor), //  g.red,
           pressFunc: () async => setPage(await snipView(n)),
-          longPressFunc: () => n is Personable ? setPage(nodePage(n)) : null,
+          longPressFunc: () => n is PersonNode ? setPage(nodePage(n)) : null,
           rightMost: true,
         )
       ];
@@ -246,13 +235,13 @@ class _HomeState extends State<Home> {
                     : g.theme.messageArrowColor),
             pressFunc: () => setPage(chatPage(n, isPush: true)),
             longPressFunc: () =>
-                n is Personable ? setPage(nodePage(n, isPush: true)) : null,
+                n is PersonNode ? setPage(nodePage(n, isPush: true)) : null,
             rightMost: true)
       ];
     }
   }
 
-  List<ButtonsInfo2> bGen2(FireNode n) {
+  List<ButtonsInfo2> bGen2(Down4Node n) {
     return [
       ButtonsInfo2(
           asset: Icon(Icons.arrow_forward_ios_rounded,
@@ -262,273 +251,310 @@ class _HomeState extends State<Home> {
     ];
   }
 
-
-  void connectToMessages() {
-    var msgQueue = db.child("Users").child(g.self.id).child("M");
-
-    _messageListener = msgQueue.onChildAdded.listen((event) async {
-      print("New message!");
-      final eventKey = event.snapshot.key;
-      final eventPayload = (event.snapshot.value as String).split("%");
-      msgQueue.child(eventKey!).remove(); // consume it
-      print("KEY = $eventKey\nPAYLOAD = $eventPayload\n");
-
-      // if (eventPayload.first == "h") {
-      //   // "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
-      //   // HYPERCHAT
-      //   final msgID = eventPayload[1];
-      //   final hcID = eventPayload[2];
-      //   final mediaID = eventPayload[3];
-      //   final firstWord = eventPayload[4];
-      //   final secondWord = eventPayload[5];
-      //   final members = eventPayload[6].split(" ");
-      //
-      //   final hcMedia = downloadMessageMediaAsNodeMedia(mediaID);
-      //   final msg = downloadMessage(msgID);
-      //
-      //   Future.wait([hcMedia, msg]).then((value) async {
-      //     if (value.first == null) return;
-      //     await (value[1] as FireMessage?)?.onReceipt(root: hcID);
-      //     final hyperchat = Hyperchat(
-      //         id: hcID,
-      //         firstWord: firstWord,
-      //         secondWord: secondWord,
-      //         group: members.toSet(),
-      //         messages: {msgID},
-      //         snips: {},
-      //         media: value.first as FireMedia)
-      //       ..save();
-      //
-      //     await writeHomePalette(hyperchat, _homePalettes, bGen, rfHome);
-      //     await localPalettesRoutine();
-      //     setPage(homePage());
-      //   });
-      // }
-      switch (eventPayload.first) {
-        case "p": // PAYMENT
-          print("RECEIVED A PAYMENT");
-          final paymentID = eventPayload[1];
-          final payment = await downloadPayment(paymentID);
-          if (payment == null) return;
-          await g.wallet.parsePayment(g.self.id, payment);
-          if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
-          return;
-        case "m": // MESSAGE
-          print("RECEIVED A MESSAGE");
-          final msgID = eventPayload[1];
-          // get the message, we wait until we get the maybe associated media
-          // before merging, the reason for that is merging would trigger
-          // reload chat if we are in the chat, but we want to have the media
-          // before reloading the chat
-          final msg = await global<FireMessage>(msgID, doFetch: true);
-          if (msg == null) return;
-
-          // get the rootNode
-          final rootNode = await global<Chatable>(msg.root,
-              doFetch: true, doMergeIfFetch: true);
-          if (rootNode == null) return;
-
-          User? senderNode = await global<User>(msg.senderID);
-          FireMedia? msgMedia;
-
-          if (senderNode != null && senderNode.isFriend) {
-            msgMedia = await global<FireMedia>(msg.mediaID,
-                doFetch: true,
-                doMergeIfFetch: true,
-                mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
-          }
-
-          // if is snip from a user that isn't a friend, we don't pre-download
-          // if (msg.isSnip && rootNode is User && !rootNode.isFriend) {
-          //   msgMedia = await global<FireMedia>(msg.mediaID,
-          //       doFetch: true,
-          //       doMergeIfFetch: true,
-          //       mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
-          // } else {
-          //   msgMedia = await global<FireMedia>(msg.mediaID,
-          //       doFetch: true,
-          //       doMergeIfFetch: true,
-          //       mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
-          // }
-          // get the rootNode media
-          await global<FireMedia>(rootNode.mediaID,
-              doFetch: true,
-              doMergeIfFetch: true,
-              mediaInfo: (withData: true, onlineID: null));
-
-          // msg medias references are dynamic and always get updated
-          // this is because messages are not kept for ever on server
-          if (msg.onlineMediaID != null) {
-            await msgMedia?.updateOnlineReference(
-                msg.onlineMediaID!, msg.onlineMediaTimestamp);
-          }
-          await msg.merge();
-          await writeHomePalette(
-              rootNode..updateActivity(), _home, bGen, rfHome);
-
+  void connectToMessages2() {
+    _forgroundMessageListener =
+        FirebaseMessaging.onMessage.listen((event) async {
+      final msg = Down4Message.fromJson(event.data);
+      if (msg is Messages) {
+        // Chats and Snips implements Chatter which have a special function
+        // on receipts that returns the rootnode that needs to be update
+        msg.onReceipt((rootNode) async {
+          rootNode.updateActivity();
+          await writeHomePalette(rootNode, _home, bGen, rfHome);
           if (page is HomePage) setPage(homePage());
-          return;
-        case "r": // REACTION
-          print("RECEIVED A REACTION");
-          final reactionID = eventPayload[1];
-          final reaction = await global<ChatReaction>(reactionID,
-              doFetch: true, doMergeIfFetch: true);
-          if (reaction != null) {
-            final m = await global<FireMedia>(
-              reaction.mediaID,
-              doFetch: true,
-              doMergeIfFetch: true,
-              mediaInfo: (onlineID: reaction.onlineMediaID, withData: true),
-            );
-            if (reaction.onlineMediaID != null && m != null) {
-              await m.updateOnlineReference(
-                  reaction.onlineMediaID!, reaction.onlineMediaTimestamp);
-            }
-            reloadReactions(reaction.root, reaction.messageID, () {
-              reloadChatWithID(reaction.root);
-            });
-          }
-          return;
-        case "i": // INCREMENT REACTION
-          print("RECEIVED A INCREMENT REACTION");
-          final chatReactionID = eventPayload[1];
-          final reactor = eventPayload[2];
-          final chatReaction = await global<ChatReaction>(chatReactionID,
-              doFetch: true, doMergeIfFetch: true);
-          if (chatReaction != null) {
-            await chatReaction.addReactor(reactor);
-            reloadReactions(chatReaction.root, chatReaction.messageID, () {
-              reloadChatWithID(chatReaction.root);
-            });
-          }
-          return;
+        });
+      } else if (msg is ReactionIncrement) {
+        final reactor = msg.senderID;
+        final reaction = await global<Reaction>(msg.reactionID);
+        if (reaction == null) return;
+        await reaction.addReactor(reactor);
+        reloadReactions(msg.root, msg.messageID, () {
+          reloadChatWithID(msg.root);
+        });
+      } else if (msg is Payment) {
+        Down4Payment? payment = msg.payment ??
+            await global<Down4Payment>(msg.paymentID,
+                doFetch: true, doMergeIfFetch: true);
+        if (payment == null) return;
+        await payment.merge();
+        if (page is MoneyPage) return setPage(moneyPage(payUpdate: payment));
+      } else if (msg is Reaction) {
+        await msg.merge();
+        reloadReactions(msg.root, msg.messageID, () {
+          reloadChatWithID(msg.root);
+        });
+      } else {
+        throw "connectToMessage has no implemented this type: ${msg.runtimeType}";
       }
-
-      // if (eventPayload.first == "p") {
-      //   // PAYMENT!
-      //   final paymentID = eventPayload[1];
-      //   final payment = await downloadPayment(paymentID);
-      //   if (payment == null) return;
-      //   await g.wallet.parsePayment(g.self.id, payment);
-      //   if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
-      //   return;
-      // } else if (eventPayload.first == "m") {
-      //   // MESSAGE!
-      //   final msgID = eventPayload[1];
-      //   // get the message, we wait until we get the maybe associated media
-      //   // before merging, the reason for that is merging would trigger
-      //   // reload chat if we are in the chat, but we want to have the media
-      //   // before reloading the chat
-      //   final msg = await global<FireMessage>(msgID, doFetch: true);
-      //   if (msg == null) return;
-      //
-      //   // get the rootNode
-      //   final rootNode = await global<Chatable>(msg.root,
-      //       doFetch: true, doMergeIfFetch: true);
-      //   if (rootNode == null) return;
-      //
-      //   FireMedia? msgMedia;
-      //
-      //   // if is snip from a user that isn't a friend, we don't pre-download
-      //   if (msg.isSnip && rootNode is User && !rootNode.isFriend) {
-      //     msgMedia = await global<FireMedia>(msg.mediaID,
-      //         doFetch: true,
-      //         doMergeIfFetch: true,
-      //         mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
-      //   } else {
-      //     msgMedia = await global<FireMedia>(msg.mediaID,
-      //         doFetch: true,
-      //         doMergeIfFetch: true,
-      //         mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
-      //   }
-      //   // get the rootNode media
-      //   await global<FireMedia>(rootNode.mediaID,
-      //       doFetch: true,
-      //       doMergeIfFetch: true,
-      //       mediaInfo: (withData: true, onlineID: null));
-      //
-      //   // msg medias references are dynamic and always get updated
-      //   // this is because messages are not kept for ever on server
-      //   if (msg.onlineMediaID != null) {
-      //     await msgMedia?.updateOnlineReference(
-      //         msg.onlineMediaID!, msg.onlineMediaTimestamp);
-      //   }
-      //   await msg.merge();
-      //   await writeHomePalette(rootNode..updateActivity(), _home, bGen, rfHome);
-      //
-      //   if (page is HomePage) setPage(homePage());
-      // } else if (eventPayload.first == "r") {
-      //   // chat reaction
-      //   final reactionID = eventPayload[1];
-      //   final reaction = await global<ChatReaction>(reactionID,
-      //       doFetch: true, doMergeIfFetch: true);
-      //   if (reaction != null) {
-      //     reloadReactions(reaction.root, reaction.messageID, () {
-      //       reloadChatWithID(reaction.root);
-      //     });
-      //   }
-      // } else if (eventPayload.first == "i") {
-      //   // chat reaction increment
-      //   final reactionID = eventPayload[1];
-      //   final reactor = eventPayload[2];
-      //   final reaction = await global<ChatReaction>(reactionID,
-      //       doFetch: true, doMergeIfFetch: true);
-      //   if (reaction != null) {
-      //     await reaction.addReactor(reactor);
-      //     reloadReactions(reaction.root, reaction.messageID, () {
-      //       reloadChatWithID(reaction.root);
-      //     });
-      //   }
-      // }
-      // else if (eventPayload.first == "s") {
-      // final String mediaID = eventPayload[1];
-      // final String root = eventPayload[2];
-      //
-      // final (snip, _) = await global<FireMedia>(mediaID,
-      //     fetch: true, merge: true, mediaData: true);
-      // if (snip == null) return;
-      //
-      // final (nodeRoot, gt) =
-      //     await global<Chatable>(root, fetch: true, merge: true);
-      // if (nodeRoot == null) return;
-      // nodeRoot.addSnipRef(snip.id);
-      // snip.addReference(nodeRoot.id);
-      //
-      // FireMedia? nodeMedia;
-      // if (gt == GetType.fetch) {
-      //   (nodeMedia, _) = await global<FireMedia>(nodeRoot.media,
-      //       fetch: true, merge: true, mediaData: true, nodesMedia: true);
-      //   nodeMedia?.addReference(nodeRoot.id);
-      // }
-      // final p = Palette2<Chatable>(rootNode: nodeRoot, image: nodeMedia);
-      // await writeHomePalette(p, _homePalettes, bGen, rfHome);
-      //
-      // if (cv.id == 'home') setPage(homePage());
-      // }
-      // else if (eventPayload.first == "f") {
-      //   // FORWARDED MESSAGE
-      //   final msgID = eventPayload[1];
-      //   final root = eventPayload[2];
-      //   final forwardedFrom = eventPayload[3];
-      //   final msg = await downloadMessage(msgID);
-      //   if (msg == null) return;
-      //   msg.forwarderID = forwardedFrom;
-      //   return handleMessage(msg, root);
-      // }
     });
   }
 
+  // void connectToMessages() {
+  //   var msgQueue = db.child("Users").child(g.self.id).child("M");
+  //
+  //   _messageListener = msgQueue.onChildAdded.listen((event) async {
+  //     print("New message!");
+  //     final eventKey = event.snapshot.key;
+  //     final eventPayload = (event.snapshot.value as String).split("%");
+  //     msgQueue.child(eventKey!).remove(); // consume it
+  //     print("KEY = $eventKey\nPAYLOAD = $eventPayload\n");
+  //
+  //     // if (eventPayload.first == "h") {
+  //     //   // "h-${msg.id}-$hcID-${hyper.media.id}-${hyper.firstWord}-${hyper.secondWord}-${hyper.group.join(" ")}";
+  //     //   // HYPERCHAT
+  //     //   final msgID = eventPayload[1];
+  //     //   final hcID = eventPayload[2];
+  //     //   final mediaID = eventPayload[3];
+  //     //   final firstWord = eventPayload[4];
+  //     //   final secondWord = eventPayload[5];
+  //     //   final members = eventPayload[6].split(" ");
+  //     //
+  //     //   final hcMedia = downloadMessageMediaAsNodeMedia(mediaID);
+  //     //   final msg = downloadMessage(msgID);
+  //     //
+  //     //   Future.wait([hcMedia, msg]).then((value) async {
+  //     //     if (value.first == null) return;
+  //     //     await (value[1] as FireMessage?)?.onReceipt(root: hcID);
+  //     //     final hyperchat = Hyperchat(
+  //     //         id: hcID,
+  //     //         firstWord: firstWord,
+  //     //         secondWord: secondWord,
+  //     //         group: members.toSet(),
+  //     //         messages: {msgID},
+  //     //         snips: {},
+  //     //         media: value.first as FireMedia)
+  //     //       ..save();
+  //     //
+  //     //     await writeHomePalette(hyperchat, _homePalettes, bGen, rfHome);
+  //     //     await localPalettesRoutine();
+  //     //     setPage(homePage());
+  //     //   });
+  //     // }
+  //     switch (eventPayload.first) {
+  //       case "p": // PAYMENT
+  //         print("RECEIVED A PAYMENT");
+  //         final paymentID = eventPayload[1];
+  //         final payment = await downloadPayment(paymentID);
+  //         if (payment == null) return;
+  //         await g.wallet.parsePayment(g.self.id, payment);
+  //         if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
+  //         return;
+  //       case "m": // MESSAGE
+  //         print("RECEIVED A MESSAGE");
+  //         final msgID = eventPayload[1];
+  //         // get the message, we wait until we get the maybe associated media
+  //         // before merging, the reason for that is merging would trigger
+  //         // reload chat if we are in the chat, but we want to have the media
+  //         // before reloading the chat
+  //         final msg = await global<Chat>(msgID, doFetch: true);
+  //         if (msg == null) return;
+  //
+  //         // get the rootNode
+  //         final rootNode = await global<Chatable>(msg.root,
+  //             doFetch: true, doMergeIfFetch: true);
+  //         if (rootNode == null) return;
+  //
+  //         User? senderNode = await global<User>(msg.senderID);
+  //         FireMedia? msgMedia;
+  //
+  //         if (senderNode != null && senderNode.isFriend) {
+  //           msgMedia = await global<FireMedia>(msg.mediaID,
+  //               doFetch: true,
+  //               doMergeIfFetch: true,
+  //               mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
+  //         }
+  //
+  //         // if is snip from a user that isn't a friend, we don't pre-download
+  //         // if (msg.isSnip && rootNode is User && !rootNode.isFriend) {
+  //         //   msgMedia = await global<FireMedia>(msg.mediaID,
+  //         //       doFetch: true,
+  //         //       doMergeIfFetch: true,
+  //         //       mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
+  //         // } else {
+  //         //   msgMedia = await global<FireMedia>(msg.mediaID,
+  //         //       doFetch: true,
+  //         //       doMergeIfFetch: true,
+  //         //       mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
+  //         // }
+  //         // get the rootNode media
+  //         await global<FireMedia>(rootNode.mediaID,
+  //             doFetch: true,
+  //             doMergeIfFetch: true,
+  //             mediaInfo: (withData: true, onlineID: null));
+  //
+  //         // msg medias references are dynamic and always get updated
+  //         // this is because messages are not kept for ever on server
+  //         if (msg.onlineMediaID != null) {
+  //           await msgMedia?.updateOnlineReference(
+  //               msg.onlineMediaID!, msg.onlineMediaTimestamp);
+  //         }
+  //         await msg.merge();
+  //         await writeHomePalette(
+  //             rootNode..updateActivity(), _home, bGen, rfHome);
+  //
+  //         if (page is HomePage) setPage(homePage());
+  //         return;
+  //       case "r": // REACTION
+  //         print("RECEIVED A REACTION");
+  //         final reactionID = eventPayload[1];
+  //         final reaction = await global<Reaction>(reactionID,
+  //             doFetch: true, doMergeIfFetch: true);
+  //         if (reaction != null) {
+  //           final m = await global<FireMedia>(
+  //             reaction.mediaID,
+  //             doFetch: true,
+  //             doMergeIfFetch: true,
+  //             mediaInfo: (onlineID: reaction.onlineMediaID, withData: true),
+  //           );
+  //           if (reaction.onlineMediaID != null && m != null) {
+  //             await m.updateOnlineReference(
+  //                 reaction.onlineMediaID!, reaction.onlineMediaTimestamp);
+  //           }
+  //           reloadReactions(reaction.root, reaction.messageID, () {
+  //             reloadChatWithID(reaction.root);
+  //           });
+  //         }
+  //         return;
+  //       case "i": // INCREMENT REACTION
+  //         print("RECEIVED A INCREMENT REACTION");
+  //         final chatReactionID = eventPayload[1];
+  //         final reactor = eventPayload[2];
+  //         final chatReaction = await global<Reaction>(chatReactionID,
+  //             doFetch: true, doMergeIfFetch: true);
+  //         if (chatReaction != null) {
+  //           await chatReaction.addReactor(reactor);
+  //           reloadReactions(chatReaction.root, chatReaction.messageID, () {
+  //             reloadChatWithID(chatReaction.root);
+  //           });
+  //         }
+  //         return;
+  //     }
+  //
+  //     // if (eventPayload.first == "p") {
+  //     //   // PAYMENT!
+  //     //   final paymentID = eventPayload[1];
+  //     //   final payment = await downloadPayment(paymentID);
+  //     //   if (payment == null) return;
+  //     //   await g.wallet.parsePayment(g.self.id, payment);
+  //     //   if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
+  //     //   return;
+  //     // } else if (eventPayload.first == "m") {
+  //     //   // MESSAGE!
+  //     //   final msgID = eventPayload[1];
+  //     //   // get the message, we wait until we get the maybe associated media
+  //     //   // before merging, the reason for that is merging would trigger
+  //     //   // reload chat if we are in the chat, but we want to have the media
+  //     //   // before reloading the chat
+  //     //   final msg = await global<FireMessage>(msgID, doFetch: true);
+  //     //   if (msg == null) return;
+  //     //
+  //     //   // get the rootNode
+  //     //   final rootNode = await global<Chatable>(msg.root,
+  //     //       doFetch: true, doMergeIfFetch: true);
+  //     //   if (rootNode == null) return;
+  //     //
+  //     //   FireMedia? msgMedia;
+  //     //
+  //     //   // if is snip from a user that isn't a friend, we don't pre-download
+  //     //   if (msg.isSnip && rootNode is User && !rootNode.isFriend) {
+  //     //     msgMedia = await global<FireMedia>(msg.mediaID,
+  //     //         doFetch: true,
+  //     //         doMergeIfFetch: true,
+  //     //         mediaInfo: (withData: false, onlineID: msg.onlineMediaID));
+  //     //   } else {
+  //     //     msgMedia = await global<FireMedia>(msg.mediaID,
+  //     //         doFetch: true,
+  //     //         doMergeIfFetch: true,
+  //     //         mediaInfo: (withData: true, onlineID: msg.onlineMediaID));
+  //     //   }
+  //     //   // get the rootNode media
+  //     //   await global<FireMedia>(rootNode.mediaID,
+  //     //       doFetch: true,
+  //     //       doMergeIfFetch: true,
+  //     //       mediaInfo: (withData: true, onlineID: null));
+  //     //
+  //     //   // msg medias references are dynamic and always get updated
+  //     //   // this is because messages are not kept for ever on server
+  //     //   if (msg.onlineMediaID != null) {
+  //     //     await msgMedia?.updateOnlineReference(
+  //     //         msg.onlineMediaID!, msg.onlineMediaTimestamp);
+  //     //   }
+  //     //   await msg.merge();
+  //     //   await writeHomePalette(rootNode..updateActivity(), _home, bGen, rfHome);
+  //     //
+  //     //   if (page is HomePage) setPage(homePage());
+  //     // } else if (eventPayload.first == "r") {
+  //     //   // chat reaction
+  //     //   final reactionID = eventPayload[1];
+  //     //   final reaction = await global<ChatReaction>(reactionID,
+  //     //       doFetch: true, doMergeIfFetch: true);
+  //     //   if (reaction != null) {
+  //     //     reloadReactions(reaction.root, reaction.messageID, () {
+  //     //       reloadChatWithID(reaction.root);
+  //     //     });
+  //     //   }
+  //     // } else if (eventPayload.first == "i") {
+  //     //   // chat reaction increment
+  //     //   final reactionID = eventPayload[1];
+  //     //   final reactor = eventPayload[2];
+  //     //   final reaction = await global<ChatReaction>(reactionID,
+  //     //       doFetch: true, doMergeIfFetch: true);
+  //     //   if (reaction != null) {
+  //     //     await reaction.addReactor(reactor);
+  //     //     reloadReactions(reaction.root, reaction.messageID, () {
+  //     //       reloadChatWithID(reaction.root);
+  //     //     });
+  //     //   }
+  //     // }
+  //     // else if (eventPayload.first == "s") {
+  //     // final String mediaID = eventPayload[1];
+  //     // final String root = eventPayload[2];
+  //     //
+  //     // final (snip, _) = await global<FireMedia>(mediaID,
+  //     //     fetch: true, merge: true, mediaData: true);
+  //     // if (snip == null) return;
+  //     //
+  //     // final (nodeRoot, gt) =
+  //     //     await global<Chatable>(root, fetch: true, merge: true);
+  //     // if (nodeRoot == null) return;
+  //     // nodeRoot.addSnipRef(snip.id);
+  //     // snip.addReference(nodeRoot.id);
+  //     //
+  //     // FireMedia? nodeMedia;
+  //     // if (gt == GetType.fetch) {
+  //     //   (nodeMedia, _) = await global<FireMedia>(nodeRoot.media,
+  //     //       fetch: true, merge: true, mediaData: true, nodesMedia: true);
+  //     //   nodeMedia?.addReference(nodeRoot.id);
+  //     // }
+  //     // final p = Palette2<Chatable>(rootNode: nodeRoot, image: nodeMedia);
+  //     // await writeHomePalette(p, _homePalettes, bGen, rfHome);
+  //     //
+  //     // if (cv.id == 'home') setPage(homePage());
+  //     // }
+  //     // else if (eventPayload.first == "f") {
+  //     //   // FORWARDED MESSAGE
+  //     //   final msgID = eventPayload[1];
+  //     //   final root = eventPayload[2];
+  //     //   final forwardedFrom = eventPayload[3];
+  //     //   final msg = await downloadMessage(msgID);
+  //     //   if (msg == null) return;
+  //     //   msg.forwarderID = forwardedFrom;
+  //     //   return handleMessage(msg, root);
+  //     // }
+  //   });
+  // }
+
   void rewriteHomePalettes() {
     for (final p in _home.values) {
-      writeHomePalette(p.node as Chatable, _home, bGen, rfHome);
+      writeHomePalette(p.node as ChatNode, _home, bGen, rfHome);
     }
   }
 
   // =============================== UTILS ============================== //
 
-  void reloadChatWithID(ID chatableNodeID) {
+  void reloadChatWithID(Down4ID chatableNodeID, {Chat? msgRe}) {
     if (currentView.id == "chat-$chatableNodeID") {
-      setPage(chatPage(currentView.node as Chatable));
+      setPage(chatPage(currentView.node as ChatNode, msgRe: msgRe));
     }
   }
 
@@ -549,7 +575,7 @@ class _HomeState extends State<Home> {
   Future<void> unselectHomeSelection({bool updateActivity = true}) async {
     for (final p in List.of(home)) {
       if (p.selected) {
-        await writeHomePalette(p.node as Chatable, _home, bGen, rfHome,
+        await writeHomePalette(p.node as ChatNode, _home, bGen, rfHome,
             sel: false);
       }
     }
@@ -558,12 +584,12 @@ class _HomeState extends State<Home> {
 
   List<Palette2> forwardables(List<Palette2> ps) {
     final idsInGroups = ps
-        .asNodes<Groupable>()
+        .asNodes<GroupNode>()
         .map((e) => e.group)
         .expand((element) => element)
         .toSet();
 
-    final forwardables = ps.whereNodeIs<Branchable>().asIds();
+    final forwardables = ps.whereNodeIs<BranchNode>().asIDs();
 
     final all = forwardables.followedBy(idsInGroups).toSet();
 
@@ -575,14 +601,29 @@ class _HomeState extends State<Home> {
   Future<void> processUnsentMessages() async {
     final unsents = await unsentMessages();
     for (final u in unsents) {
-      final root = await global<Chatable>(u.root);
-      if (root == null) continue;
-      await broadcastMessage(root, u);
+      u.processMessage();
+      // final root = await global<Chatable>(u.root);
+      // if (root == null) continue;
+      // await broadcastMessage(root, u);
+    }
+  }
+
+  void processChats(Iterable<Chat> chats) async {
+    for (final chat in chats) {
+      chat.processMessage(onResponse: (r) {
+        if (r.any((m) => m.success)) {
+          chat.markSent();
+          reloadChatWithID(chat.root, msgRe: chat);
+        }
+      });
     }
   }
 
   Future<void> reloadReactions(
-      ID nodeID, ID messageID, VoidCallback refreshChat) async {
+    ComposedID nodeID,
+    Down4ID messageID,
+    VoidCallback refreshChat,
+  ) async {
     final state = chatMessages(nodeID);
     print("state is null? $state");
     final msgRef = state?[messageID];
@@ -595,319 +636,349 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<void> incrementReaction(
-      Chatable c, ChatReaction cr, VoidCallback refreshChat) async {
-    if (cr.reactors.contains(g.self.id)) return;
+  // Future<void> incrementReaction(
+  //     Chatable c, Reaction cr, VoidCallback refreshChat) async {
+  //   if (cr.reactors.contains(g.self.id)) return;
+  //
+  //   await cr.addReactor(g.self.id);
+  //   reloadReactions(cr.root, cr.messageID, refreshChat);
+  //
+  //   // r.MessageRequest(
+  //   //   sender: g.self.id,
+  //   //   tokens:
+  //   // )
+  //
+  //   r.PushRequest(
+  //           sender: g.self.id,
+  //           targets: c.targets(selfID: g.self.id),
+  //           data: "i%${cr.id}%${g.self.id}")
+  //       .process();
+  // }
 
-    await cr.addReactor(g.self.id);
-    reloadReactions(cr.root, cr.messageID, refreshChat);
+  // Future<void> react(
+  //     Chatable node, ID mediaID, Chat message, VoidCallback refreshChat) async {
+  //   final cr = Reaction(messagePushId(),
+  //       mediaID: mediaID,
+  //       root: node.id,
+  //       messageID: message.id,
+  //       reactors: {g.self.id},
+  //       senderID: g.self.id,
+  //       timestamp: makeTimestamp())
+  //     ..cache();
+  //   await cr.merge();
+  //   await reloadReactions(node.id, message.id, refreshChat);
+  //
+  //   List<ID> pushReceipients;
+  //   ID notifReceipient = message.senderID;
+  //   String header, bodyPrefix;
+  //
+  //   final nodeRef = node;
+  //   if (nodeRef is Groupable) {
+  //     pushReceipients = List.from(nodeRef.group)..remove(g.self.id);
+  //     header = node.displayName;
+  //     bodyPrefix = "${g.self.firstName} ";
+  //   } else {
+  //     pushReceipients = [nodeRef.id];
+  //     bodyPrefix = "";
+  //     header = nodeRef.displayName;
+  //   }
+  //
+  //   if (node.id == g.self.id) {
+  //     await cr.markSent();
+  //     await reloadReactions(node.id, message.id, refreshChat);
+  //   } else {
+  //     final successfulUpload = await uploadMessage(cr);
+  //     if (successfulUpload) {
+  //       final pushReq = r.PushRequest(
+  //           sender: g.self.id, targets: pushReceipients, data: "r%${cr.id}");
+  //       final notifReq = r.NotificationRequest(
+  //         sender: g.self.id,
+  //         targets: [notifReceipient],
+  //         header: header,
+  //         body: "${bodyPrefix}reacted to your message!",
+  //       );
+  //
+  //       final p = await Future.wait([pushReq.process(), notifReq.process()]);
+  //
+  //       final successfulSent = p.every((element) => element);
+  //       if (successfulSent) {
+  //         await cr.markSent();
+  //         await reloadReactions(node.id, message.id, refreshChat);
+  //       }
+  //     }
+  //   }
+  // }
+  //
+  // Future<r.MessageBatchResponse?> makeRequest(
+  //     MessageData msg, Chatable nodeRef) async {
+  //   final bool isSnip = msg is Snip;
+  //   String header, bodyPrefix;
+  //
+  //   if (nodeRef is Groupable) {
+  //     header = nodeRef.displayName;
+  //     bodyPrefix = "${g.self.firstName}${isSnip ? " pinged" : ""}: ";
+  //   } else {
+  //     bodyPrefix = "";
+  //     header = "${nodeRef.displayName}${isSnip ? " pinged" : ""}";
+  //   }
+  //
+  //   final String body = bodyPrefix + msg.messagePreview;
+  //   return sendTheMessage(
+  //     msg: msg,
+  //     tokens: await nodeRef.messagingTokens,
+  //     header: header,
+  //     body: body,
+  //   );
+  //
+  //   // return r.MessageRequest(
+  //   //     sender: g.self.id,
+  //   //     tokens: tokens,
+  //   //     // targets: receipients,
+  //   //     header: header,
+  //   //     body: bodyPrefix + msg.messagePreview,
+  //   //     data: msg.toJson(toLocal: false));
+  // }
 
-    r.PushRequest(
-            sender: g.self.id,
-            targets: c.targets(selfID: g.self.id),
-            data: "i%${cr.id}%${g.self.id}")
-        .process();
-  }
+  // Future<void> broadcastMessage(Chatable t, Chat msg) async {
+  //   final successfulUpload = await uploadMessage(msg);
+  //   // final uploads = <Future<bool>>[];
+  //   // uploads.add(uploadMessage(msg));
+  //   // final media = await global<FireMedia>(msg.mediaID);
+  //   // if (media != null) uploads.add(uploadMedia(media, isSnip: msg.isSnip));
+  //
+  //   // final upSuccess = await Future.wait(uploads).then((u) => u.every((b) => b));
+  //
+  //   if (successfulUpload) {
+  //     final broadcastSuccess = await generateRequest(msg, t).process();
+  //     if (broadcastSuccess && !msg.isSnip) {
+  //       await msg.markSent();
+  //       if (page is ChatPage && currentView.node?.id == t.id) {
+  //         setPage(chatPage(t, msgRe: msg, isReload: true));
+  //       }
+  //     }
+  //   }
+  // }
 
-  Future<void> react(Chatable node, ID mediaID, FireMessage message,
-      VoidCallback refreshChat) async {
-    final cr = ChatReaction(messagePushId(),
-        mediaID: mediaID,
-        root: node.id,
-        messageID: message.id,
-        reactors: {g.self.id},
-        senderID: g.self.id)
-      ..cache();
-    await cr.merge();
-    await reloadReactions(node.id, message.id, refreshChat);
+  // Future<void> sendToTargets(Payload p, Iterable<Chatable> targets) async {
+  //   final messagesToForward =
+  //       p.forwardables?.whereType<ChatMessage>().map((cm) => cm.message) ?? [];
+  //
+  //
+  //
+  // }
 
-    List<ID> pushReceipients;
-    ID notifReceipient = message.senderID;
-    String header, bodyPrefix;
+  // Future<void> metaSend(Payload p, Iterable<Chatable> targets) async {
+  //   final messagesToForward =
+  //       p.forwardables?.whereType<ChatMessage>().map((cm) => cm.message) ?? [];
+  //
+  //   List<Future<void> Function()> awaitingProcess = [];
+  //   // Here, we will iterate over each target and each messages we are sending
+  //   // We can be sending multiple messages to multiple chats
+  //   // There are 2 types of messages, the normal and the forwarded
+  //   // There can only be one normal and multiple forwarded
+  //   // We still make a new message for every chat, in other words...
+  //   // ...Chats don't share messages
+  //   // Normal and Forwarded have different bodies for notification so...
+  //   // Function has some redundant code, but we try make it minimal
+  //   // We iterate over targets once, saving the messages locally and make...
+  //   // ... the upload requests
+  //   // Function then returns, but calls a future that will process sending...
+  //   // ...only after the uploads are successful
+  //   // After sending, each message will be marked as sent
+  //
+  //   // We start with uploading the payload media if there is one
+  //   // If it's a snip, we can know because there's the media cached path
+  //   // If it's not a snip, it should be pre-written
+  //
+  //   p.media?.cache();
+  //   await p.media?.merge();
+  //   for (final t in targets) {
+  //     p.make()
+  //
+  //
+  //     List<Chat> msgs = [];
+  //     t.updateActivity();
+  //     final ourMsg = p.makeMsg(root: t.id);
+  //     if (ourMsg != null) {
+  //       final bool doMarkRead = !(ourMsg.isSnip && t.id == g.self.id);
+  //       if (doMarkRead) await ourMsg.markRead();
+  //       msgs.add(ourMsg);
+  //     }
+  //
+  //     final fMsgs = messagesToForward.map((m) => m.forwarded(g.self.id, t.id));
+  //     for (final fMsg in fMsgs) {
+  //       await fMsg.markRead();
+  //     }
+  //
+  //     for (final m in msgs.followedBy(fMsgs)) {
+  //       m.cache();
+  //       if (t.id == g.self.id) {
+  //         await m.markSent();
+  //       } else {
+  //         awaitingProcess.add(() => broadcastMessage(t, m));
+  //       }
+  //     }
+  //     await writeHomePalette(t, _home, bGen, rfHome);
+  //   }
+  //
+  //   // for (final t in targets) {
+  //   //   t.updateActivity();
+  //   //   final ourMsg = p.makeMsg(root: t.id)?..cache();
+  //   //   final allMsgs = await ourMsg?.merge();
+  //   //   // this way we can send snips to ourself
+  //   //   final dontMarkRead = p.isSnip && t.id == g.self.id;
+  //   //   if (!dontMarkRead) await ourMsg?.markRead();
+  //   //
+  //   //   if (t.id != g.self.id && ourMsg != null) {
+  //   //     awaitingProcess.add(() => broadcastMessage(t, ourMsg));
+  //   //   } else if (ourMsg != null) {
+  //   //     await ourMsg.markSent();
+  //   //   }
+  //   //
+  //   //   // if (ourMsg != null) {
+  //   //   //   if (t.id != g.self.id) {
+  //   //   //     u.add(uploadMessage(ourMsg));
+  //   //   //     final req = generateRequest(ourMsg, t);
+  //   //   //     awatingProcess.add(() => broadcastMessage(req, t, ourMsg));
+  //   //   //   }
+  //   //   // }
+  //   //
+  //   //   for (final m in messagesToForward) {
+  //   //     final fMsg = m.message.forwarded(g.self.id, t.id)
+  //   //       ..markRead()
+  //   //       ..cache();
+  //   //
+  //   //     if (t.id != g.self.id) {
+  //   //       awaitingProcess.add(() => broadcastMessage(t, fMsg));
+  //   //     } else {
+  //   //       await fMsg.markSent();
+  //   //     }
+  //   //
+  //   //     await writeHomePalette(t, _home, bGen, rfHome);
+  //   //
+  //   //     // we don't send the message if the receipient is us
+  //   //     // if (t.id != g.self.id) {
+  //   //     //   u.add(uploadMessage(fMsg));
+  //   //     //   if (fMedia != null) u.add(uploadMedia(fMedia));
+  //   //     //   final req = generateRequest(fMsg, t);
+  //   //     //   awatingProcess.add(() => broadcastMessage(req, t, fMsg));
+  //   //     // }
+  //   //   }
+  //   // }
+  //
+  //   Future(() async {
+  //     for (final ap in awaitingProcess) {
+  //       await ap.call();
+  //     }
+  //   });
+  //
+  //   // Future(() async {
+  //   //   final finishedUploads = await Future.wait(u);
+  //   //   if (finishedUploads.every((success) => success)) {
+  //   //     for (var req in awatingProcess) {
+  //   //       req.call();
+  //   //     }
+  //   //   }
+  //   // });
+  //
+  //   return;
+  // }
 
-    final nodeRef = node;
-    if (nodeRef is Groupable) {
-      pushReceipients = List.from(nodeRef.group)..remove(g.self.id);
-      header = node.displayName;
-      bodyPrefix = "${g.self.firstName} ";
-    } else {
-      pushReceipients = [nodeRef.id];
-      bodyPrefix = "";
-      header = nodeRef.displayName;
-    }
+  // Future<void> makeHyperchat({
+  //   List<Down4Object>? fo,
+  //   FireMedia? m,
+  //   String? textInput,
+  //   required Set<ID> group,
+  // }) async {
+  //   setPage(loadingPage());
+  //   final prompts = await ru.randomPrompts(10);
+  //   final hc = await r.getHyperchat(prompts);
+  //   if (hc == null) {
+  //     viewManager.popUntilHome();
+  //     await unselectHomeSelection(updateActivity: false);
+  //     setPage(homePage(prompt: "Failed to create hyperchat!"));
+  //     return;
+  //   }
+  //
+  //   final hcID = sha1(hc.first).toBase58();
+  //   final hcMedia = FireMedia(deterministicMediaID(hc.first, g.self.id),
+  //       tinyThumbnail: ru.makeTiny(hc.first),
+  //       mime: "image/png",
+  //       ownerID: g.self.id,
+  //       timestamp: makeTimestamp(),
+  //       width: 512,
+  //       height: 512);
+  //   await hcMedia.write(imageData: hc.first);
+  //
+  //   final hyper = Hyperchat(hcID,
+  //       firstWord: hc.second.first,
+  //       secondWord: hc.second.second,
+  //       activity: makeTimestamp(),
+  //       group: grp,
+  //       mediaID: hcMedia.id);
+  //
+  //   final success = await uploadNode(hyper);
+  //
+  //   if (!success) {
+  //     hcMedia.delete();
+  //     viewManager.popUntilHome();
+  //     return setPage(homePage(prompt: "Failed to upload Hyperchat"));
+  //   } else {
+  //     hyper.merge();
+  //     gCache(hcMedia);
+  //     gCache(hyper);
+  //   }
+  //
+  //   p.makeMessage(root: hyper.id).processMessage();
+  //
+  //   unselectHomeSelection();
+  //   viewManager.popUntilHome();
+  //   setPage(chatPage(hyper, isPush: true));
+  //   return;
+  // }
 
-    if (node.id == g.self.id) {
-      await cr.markSent();
-      await reloadReactions(node.id, message.id, refreshChat);
-    } else {
-      final successfulUpload = await uploadMessage(cr);
-      if (successfulUpload) {
-        final pushReq = r.PushRequest(
-            sender: g.self.id, targets: pushReceipients, data: "r%${cr.id}");
-        final notifReq = r.NotificationRequest(
-          sender: g.self.id,
-          targets: [notifReceipient],
-          header: header,
-          body: "${bodyPrefix}reacted to your message!",
-        );
+  // Future<void> makeGroup(Group group, FireMedia m, Payload p) async {
+  //   setPage(loadingPage());
+  //   final success = await uploadNode(group);
+  //
+  //   if (success) {
+  //     await group.merge();
+  //     await m.merge();
+  //     m.cache();
+  //     group.cache();
+  //     p.makeMessage(root: group.id).processMessage();
+  //     await unselectHomeSelection();
+  //     viewManager.popUntilHome();
+  //     setPage(chatPage(group, isPush: true));
+  //   } else {
+  //     viewManager.popUntilHome();
+  //     setPage(homePage(prompt: "Failed to create group"));
+  //   }
+  // }
 
-        final p = await Future.wait([pushReq.process(), notifReq.process()]);
-
-        final successfulSent = p.every((element) => element);
-        if (successfulSent) {
-          await cr.markSent();
-          await reloadReactions(node.id, message.id, refreshChat);
-        }
-      }
-    }
-  }
-
-  r.MessageRequest generateRequest(FireMessage msg, Chatable nodeRef) {
-    final bool isSnip = msg.isSnip;
-    List<ID> receipients;
-    String header, bodyPrefix;
-
-    if (nodeRef is Groupable) {
-      receipients = List<ID>.from(nodeRef.group)..remove(g.self.id);
-      header = nodeRef.displayName;
-      bodyPrefix = "${g.self.firstName}${isSnip ? " pinged" : ""}: ";
-    } else {
-      receipients = [nodeRef.id];
-      bodyPrefix = "";
-      header = "${nodeRef.displayName}${isSnip ? " pinged" : ""}";
-    }
-
-    return r.MessageRequest(
-        sender: g.self.id,
-        targets: receipients,
-        header: header,
-        body: bodyPrefix + msg.messagePreview,
-        data: "m%${msg.id}");
-  }
-
-  Future<void> broadcastMessage(Chatable t, FireMessage msg) async {
-    final successfulUpload = await uploadMessage(msg);
-    // final uploads = <Future<bool>>[];
-    // uploads.add(uploadMessage(msg));
-    // final media = await global<FireMedia>(msg.mediaID);
-    // if (media != null) uploads.add(uploadMedia(media, isSnip: msg.isSnip));
-
-    // final upSuccess = await Future.wait(uploads).then((u) => u.every((b) => b));
-
-    if (successfulUpload) {
-      final broadcastSuccess = await generateRequest(msg, t).process();
-      if (broadcastSuccess && !msg.isSnip) {
-        await msg.markSent();
-        if (page is ChatPage && currentView.node?.id == t.id) {
-          setPage(chatPage(t, msgRe: msg, isReload: true));
-        }
-      }
-    }
-  }
-
-  Future<void> metaSend(Payload p, Iterable<Chatable> targets) async {
-    final messagesToForward =
-        p.forwardables.whereType<ChatMessage>().map((cm) => cm.message);
-
-    List<Future<void> Function()> awaitingProcess = [];
-    // Here, we will iterate over each target and each messages we are sending
-    // We can be sending multiple messages to multiple chats
-    // There are 2 types of messages, the normal and the forwarded
-    // There can only be one normal and multiple forwarded
-    // We still make a new message for every chat, in other words...
-    // ...Chats don't share messages
-    // Normal and Forwarded have different bodies for notification so...
-    // Function has some redundant code, but we try make it minimal
-    // We iterate over targets once, saving the messages locally and make...
-    // ... the upload requests
-    // Function then returns, but calls a future that will process sending...
-    // ...only after the uploads are successful
-    // After sending, each message will be marked as sent
-
-    // We start with uploading the payload media if there is one
-    // If it's a snip, we can know because there's the media cached path
-    // If it's not a snip, it should be pre-written
-
-    p.media?.cache();
-    await p.media?.merge();
-    for (final t in targets) {
-      List<FireMessage> msgs = [];
-      t.updateActivity();
-      final ourMsg = p.makeMsg(root: t.id);
-      if (ourMsg != null) {
-        final bool doMarkRead = !(ourMsg.isSnip && t.id == g.self.id);
-        if (doMarkRead) await ourMsg.markRead();
-        msgs.add(ourMsg);
-      }
-
-      final fMsgs = messagesToForward.map((m) => m.forwarded(g.self.id, t.id));
-      for (final fMsg in fMsgs) {
-        await fMsg.markRead();
-      }
-
-      for (final m in msgs.followedBy(fMsgs)) {
-        m.cache();
-        if (t.id == g.self.id) {
-          await m.markSent();
-        } else {
-          awaitingProcess.add(() => broadcastMessage(t, m));
-        }
-      }
-      await writeHomePalette(t, _home, bGen, rfHome);
-    }
-
-    // for (final t in targets) {
-    //   t.updateActivity();
-    //   final ourMsg = p.makeMsg(root: t.id)?..cache();
-    //   final allMsgs = await ourMsg?.merge();
-    //   // this way we can send snips to ourself
-    //   final dontMarkRead = p.isSnip && t.id == g.self.id;
-    //   if (!dontMarkRead) await ourMsg?.markRead();
-    //
-    //   if (t.id != g.self.id && ourMsg != null) {
-    //     awaitingProcess.add(() => broadcastMessage(t, ourMsg));
-    //   } else if (ourMsg != null) {
-    //     await ourMsg.markSent();
-    //   }
-    //
-    //   // if (ourMsg != null) {
-    //   //   if (t.id != g.self.id) {
-    //   //     u.add(uploadMessage(ourMsg));
-    //   //     final req = generateRequest(ourMsg, t);
-    //   //     awatingProcess.add(() => broadcastMessage(req, t, ourMsg));
-    //   //   }
-    //   // }
-    //
-    //   for (final m in messagesToForward) {
-    //     final fMsg = m.message.forwarded(g.self.id, t.id)
-    //       ..markRead()
-    //       ..cache();
-    //
-    //     if (t.id != g.self.id) {
-    //       awaitingProcess.add(() => broadcastMessage(t, fMsg));
-    //     } else {
-    //       await fMsg.markSent();
-    //     }
-    //
-    //     await writeHomePalette(t, _home, bGen, rfHome);
-    //
-    //     // we don't send the message if the receipient is us
-    //     // if (t.id != g.self.id) {
-    //     //   u.add(uploadMessage(fMsg));
-    //     //   if (fMedia != null) u.add(uploadMedia(fMedia));
-    //     //   final req = generateRequest(fMsg, t);
-    //     //   awatingProcess.add(() => broadcastMessage(req, t, fMsg));
-    //     // }
-    //   }
-    // }
-
-    Future(() async {
-      for (final ap in awaitingProcess) {
-        await ap.call();
-      }
-    });
-
-    // Future(() async {
-    //   final finishedUploads = await Future.wait(u);
-    //   if (finishedUploads.every((success) => success)) {
-    //     for (var req in awatingProcess) {
-    //       req.call();
-    //     }
-    //   }
-    // });
-
-    return;
-  }
-
-  Future<void> makeHyperchat(Payload p, Set<ID> grp) async {
-    setPage(loadingPage());
-    final prompts = await ru.randomPrompts(10);
-    final hc = await r.getHyperchat(prompts);
-    if (hc == null) {
-      viewManager.popUntilHome();
-      await unselectHomeSelection(updateActivity: false);
-      setPage(homePage(prompt: "Failed to create hyperchat!"));
-      return;
-    }
-
-    final hcID = sha1(hc.first).toBase58();
-    final hcMedia = FireMedia(deterministicMediaID(hc.first, g.self.id),
-        tinyThumbnail: ru.makeTiny(hc.first),
-        mime: "image/png",
-        ownerID: g.self.id,
-        timestamp: makeTimestamp(),
-        width: 512,
-        height: 512);
-    await hcMedia.write(imageData: hc.first);
-
-    final hyper = Hyperchat(hcID,
-        firstWord: hc.second.first,
-        secondWord: hc.second.second,
-        activity: makeTimestamp(),
-        group: grp,
-        mediaID: hcMedia.id);
-
-    final success = await uploadNode(hyper);
-
-    if (!success) {
-      hcMedia.delete();
-      viewManager.popUntilHome();
-      return setPage(homePage(prompt: "Failed to upload Hyperchat"));
-    } else {
-      hyper.merge();
-      gCache(hcMedia);
-      gCache(hyper);
-    }
-
-    await metaSend(p, [hyper]);
-    unselectHomeSelection();
-    viewManager.popUntilHome();
-    setPage(chatPage(hyper, isPush: true));
-    return;
-  }
-
-  Future<void> makeGroup(Group group, FireMedia m, Payload p) async {
-    setPage(loadingPage());
-    final success = await uploadNode(group);
-
-    if (success) {
-      await group.merge();
-      await m.merge();
-      m.cache();
-      group.cache();
-      await metaSend(p, [group]);
-      await unselectHomeSelection();
-      viewManager.popUntilHome();
-      setPage(chatPage(group, isPush: true));
-    } else {
-      viewManager.popUntilHome();
-      setPage(homePage(prompt: "Failed to create group"));
-    }
-  }
-
-  Future<void> ping(String text, Iterable<Chatable> targets) async {
-    for (final t in targets) {
-      final FireNode nodeRef = t;
-      if (nodeRef is Groupable) {
-        r.MessageRequest(
-          sender: g.self.id,
-          data: "",
-          targets: nodeRef.group.toList()..remove(g.self.id),
-          header: "${g.self.displayName} pinged ${nodeRef.displayName}",
-          body: text,
-        ).process();
-      } else {
-        r.MessageRequest(
-          sender: g.self.id,
-          data: "",
-          targets: [t.id],
-          header: "${g.self.displayName} pinged you",
-          body: text,
-        ).process();
-      }
-    }
-    await unselectHomeSelection(updateActivity: true);
-  }
+  // Future<void> ping(String text, Iterable<Chatable> targets) async {
+  //   for (final t in targets) {
+  //     final FireNode nodeRef = t;
+  //     if (nodeRef is Groupable) {
+  //       r.MessageRequest(
+  //         sender: g.self.id,
+  //         data: "",
+  //         targets: nodeRef.group.toList()..remove(g.self.id),
+  //         header: "${g.self.displayName} pinged ${nodeRef.displayName}",
+  //         body: text,
+  //       ).process();
+  //     } else {
+  //       r.MessageRequest(
+  //         sender: g.self.id,
+  //         data: "",
+  //         targets: [t.id],
+  //         header: "${g.self.displayName} pinged you",
+  //         body: text,
+  //       ).process();
+  //     }
+  //   }
+  //   await unselectHomeSelection(updateActivity: true);
+  // }
 
   Future<void> sendSnip({
     required String path,
@@ -922,7 +993,7 @@ class _HomeState extends State<Home> {
     final timestamp = makeTimestamp();
     setPage(loadingPage());
 
-    final media = FireMedia(messagePushId(),
+    final media = FireMedia(ComposedID(),
         tinyThumbnail: "",
         isSquared: false,
         ownerID: g.self.id,
@@ -932,12 +1003,23 @@ class _HomeState extends State<Home> {
         isReversed: isReversed,
         text: text,
         width: size.width,
-        height: size.height)
-      ..cache();
-    // payload could potentially have forwards in a snip...
-    final payload = Payload(
-        isSnip: true, replies: null, forwards: null, text: null, media: media);
-    await metaSend(payload, home.selected().asNodes<Chatable>());
+        height: size.height);
+
+    for (final sel in home.selected().asNodes<ChatNode>()) {
+      final snip = Snip(ComposedID(),
+          senderID: g.self.id, text: text, root: sel.id, mediaID: media.id)
+        ..processMessage();
+      if (sel.id == g.self.id) {
+        snip
+          ..cache()
+          ..merge();
+        media
+          ..cache()
+          ..merge();
+      }
+    }
+
+    // await metaSend(payload, home.selected().asNodes<Chatable>());
 
     // final success = await uploadMedia(media, isSnip: true);
     // if (!success) return print("Snip media upload unsucessful!");
@@ -973,7 +1055,7 @@ class _HomeState extends State<Home> {
 
     await unselectHomeSelection();
     viewManager.popUntilHome();
-    setPage(homePage(prompt: "Pinged &attachment"));
+    setPage(homePage(prompt: "SNIPED"));
   }
 
   // ============================== PAGES ============================== //
@@ -981,22 +1063,19 @@ class _HomeState extends State<Home> {
   ru.Down4PageWidget homePage({String? prompt}) {
     return HomePage(
       forward: (sel) => setPage(
-        forwardPage(sel.whereNodeIs<Branchable>().toList(), isPush: true),
+        forwardPage(sel.whereNodeIs<BranchNode>().toList(), isPush: true),
       ),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
-      send: (p, t) async {
-        await metaSend(p, t);
+      send: (chats) async {
+        processChats(chats);
         await unselectHomeSelection(updateActivity: true);
-        viewManager.popUntilHome();
-        setPage(homePage(prompt: "Sent messages!"));
       },
       homeState: homeView,
       hyperchat: () => setPage(hyperchatPage()),
       group: () => setPage(groupPage()),
-      money: () => setPage(
-        moneyPage(transition: homeTransition(), isPush: true),
-      ),
-      ping: (text) => ping(text, home.selected().asNodes<Chatable>()),
+      money: () =>
+          setPage(moneyPage(transition: homeTransition(), isPush: true)),
+      ping: (text) => print("Deprecated"),
       snip: () => setPage(snipPage()),
       search: () => setPage(searchPage(isPush: true)),
       themes: () => setPage(themePage()),
@@ -1018,9 +1097,9 @@ class _HomeState extends State<Home> {
   }
 
   ru.Down4PageWidget forwardPage(List<Down4Object> fo, {bool isPush = false}) {
-    Map<ID, Palette2> _fState() => currentView.currentPage.objects.cast();
+    Map<Down4ID, Palette2> _fState() => currentView.currentPage.objects.cast();
     void rf() => setPage(forwardPage(fo));
-    List<ButtonsInfo2> fbGen(Chatable c) {
+    List<ButtonsInfo2> fbGen(ChatNode c) {
       return [
         ButtonsInfo2(
             asset: Icon(Icons.arrow_forward_ios_rounded,
@@ -1033,26 +1112,25 @@ class _HomeState extends State<Home> {
     if (isPush) {
       viewManager.popUntilHome();
       viewManager.push(ViewState(id: "forward", pages: [PageState()]));
-      for (final c in formattedHome.asNodes<Chatable>()) {
-        writePalette3<Chatable>(c, _fState(), fbGen, rf,
+      for (final c in formattedHome.asNodes<ChatNode>()) {
+        writePalette3<ChatNode>(c, _fState(), fbGen, rf,
             pr: _home[c.id]?.messagePreview);
       }
     }
 
     return ForwardingPage(
-        // hiddenHomeState: _hiddenPalettes,
         viewState: viewManager.currentView,
         fObjects: fo,
         openChat: (fObjects, node) =>
             setPage(chatPage(node, fo: fObjects, isPush: true)),
         hyper: (fObjects, transition) =>
             setPage(hyperchatPage(fObjects, transition)),
-        forward: (p, t) async {
-          await metaSend(p, t);
+        forward: (chats) async {
+          processChats(chats);
           await unselectHomeSelection();
           homeScrollToZero();
           viewManager.popUntilHome();
-          setPage(homePage(prompt: "Forwarded messages"));
+          setPage(homePage());
         },
         back: () => back(withPop: true));
   }
@@ -1064,22 +1142,26 @@ class _HomeState extends State<Home> {
         setPage(homePage());
       },
       sendPayment: (pay) async {
-        final targets = pay.txs.last.txsOut
+        final receivers = pay.txs.last.txsOut
             .map((utxo) => utxo.isGets ? utxo.receiver : null)
-            .whereType<String>()
+            .whereType<ComposedID>()
             .toList(growable: false);
-        final success = await uploadPayment(pay);
-        if (success) {
-          r.MessageRequest(
-            sender: g.self.id,
-            targets: targets,
-            data: "p%${payment.id}",
-            header: "${g.self.displayName} payed you",
-            body: pay.textNote,
-          ).process();
-          viewManager.popUntilHome();
-          setPage(homePage(prompt: "Sent payment"));
-        }
+
+        final targets = (await globall<PersonNode>(receivers, doFetch: true))
+            .map((e) => MessageTarget(
+                userID: e.id,
+                device: e.mainDeviceID,
+                token: e.messagingTokens[e.mainDeviceID]!));
+
+        Payment(Down4ID(),
+                senderID: g.self.id,
+                paymentID: pay.id,
+                payment: payment,
+                targets: targets.toList())
+            .processMessage();
+
+        viewManager.popUntilHome();
+        setPage(homePage());
       },
       back: () => back(withPop: false),
       payment: payment,
@@ -1097,25 +1179,25 @@ class _HomeState extends State<Home> {
     bool isPush = false,
     bool isReload = false,
     Transition? transition,
-    Personable? single,
+    PersonNode? single,
     Down4Payment? payUpdate,
     // payment update is for when we are in money view, and
     // we receive an online payment, this let us update status with this new
     // payment, it would not be necessary if listeners work on lazy box, but
     // haven't found a way to make the listener work yet...
   }) {
-    Map<ID, Palette2> people() => currentView.pages[0].objects.cast();
-    Map<ID, Palette2> payments() => currentView.pages[1].objects.cast();
+    Map<ComposedID, Palette2> people() => currentView.pages[0].objects.cast();
+    Map<Down4ID, Palette2> payments() => currentView.pages[1].objects.cast();
     void rf() => setPage(moneyPage());
     void openPay(Down4Payment payment) => setPage(paymentPage(payment));
 
     void scanOrReceivePayment(Down4Payment pay) {
       // this will put the payment at the begining of the list
-      final p = Payment(pay.id, payment: pay, selfID: g.self.id);
+      final p = PaymentNode(pay.id, payment: pay, selfID: g.self.id);
       currentView.pages[1].objects = {
         pay.id: Palette2(
             node: p,
-            key: Key(p.id),
+            key: Key(p.id.unique),
             messagePreview: pay.textNote,
             buttonsInfo2: pay.isSpentBy(id: g.self.id)
                 ? [
@@ -1172,13 +1254,74 @@ class _HomeState extends State<Home> {
     Transition? transition,
   ]) {
     final transition_ = transition ?? homeTransition();
-    final pingGroup = transition_.trueTargets; // simply
     return HyperchatPage(
       transition: transition_,
       fo: fObjects,
-      makeHyperchat: makeHyperchat,
+      makeHyperchat: (fo, media, text, group) async {
+        setPage(loadingPage());
+        final prompts = await ru.randomPrompts(10);
+        final hc = await r.getHyperchat(prompts);
+        if (hc == null) {
+          viewManager.popUntilHome();
+          await unselectHomeSelection(updateActivity: false);
+          setPage(homePage());
+          return;
+        }
+
+        final hcMedia = FireMedia(ComposedID(),
+            tinyThumbnail: ru.makeTiny(hc.first),
+            mime: "image/png",
+            ownerID: g.self.id,
+            timestamp: makeTimestamp(),
+            width: 512,
+            height: 512);
+        await hcMedia.write(imageData: hc.first);
+
+        final hyper = Hyperchat(ComposedID(),
+            firstWord: hc.second.first,
+            secondWord: hc.second.second,
+            activity: makeTimestamp(),
+            group: group,
+            mediaID: hcMedia.id,
+            ownerID: g.self.id);
+
+        final uploads = [hyper.remoteMerge(), hcMedia.staticUpload()];
+
+        final success = Future.wait(uploads).then((u) => u.every((b) => b));
+
+        if (!await success) {
+          hcMedia.delete();
+          viewManager.popUntilHome();
+          return setPage(homePage(prompt: "Failed to upload Hyperchat"));
+        } else {
+          hyper
+            ..cache()
+            ..merge();
+          hcMedia
+            ..cache()
+            ..merge();
+
+          final chat = Chat(Down4ID(),
+              senderID: g.self.id,
+              root: hyper.id,
+              text: text,
+              mediaID: media?.id,
+              timestamp: makeTimestamp(),
+              messages: fo?.whereType<ChatMessage>().asIDs().toSet(),
+              nodes: fo?.whereType<Down4Node>().asComposedIDs().toSet())
+            ..cache()
+            ..merge();
+
+          processChats([chat]);
+        }
+
+        unselectHomeSelection();
+        viewManager.popUntilHome();
+        setPage(chatPage(hyper, isPush: true));
+        return;
+      },
       back: () => back(withPop: false, f: fObjects),
-      ping: (text) => ping(text, pingGroup),
+      ping: (text) => print("Deprecated"),
     );
   }
 
@@ -1187,7 +1330,33 @@ class _HomeState extends State<Home> {
     return GroupPage(
         initialOffset: transition.scroll,
         back: () => back(withPop: false),
-        makeGroup: makeGroup,
+        makeGroup: (group, groupMedia, chat) async {
+          setPage(loadingPage());
+
+          final uploads = [group.remoteMerge(), groupMedia.staticUpload()];
+          final success = Future.wait(uploads).then((u) => u.every((b) => b));
+
+          if (await success) {
+            group
+              ..cache()
+              ..merge();
+
+            groupMedia
+              ..cache()
+              ..merge();
+
+            processChats([chat]);
+
+            await unselectHomeSelection();
+            viewManager.popUntilHome();
+            setPage(chatPage(group, isPush: true));
+          } else {
+            group.remoteDelete();
+            groupMedia.staticDelete();
+            viewManager.popUntilHome();
+            setPage(homePage(prompt: "Failed to create group"));
+          }
+        },
         palettesForTransition: transition.postTransition,
         people: transition.trueTargets,
         nHidden: transition.nHidden,
@@ -1200,21 +1369,21 @@ class _HomeState extends State<Home> {
     }
 
     void rf() => setPage(searchPage());
-    Map<ID, Palette2> searchs() => currentView.currentPage.objects.cast();
+    Map<Down4ID, Palette2> searchs() => currentView.currentPage.objects.cast();
 
     return AddFriendPage(
         viewState: currentView,
         search: (strIDs) async {
           final ids = strIDs.split(" ").toSet();
-          // TODO r.fetchNodes currently broken, Q: is globall good enough?
-          // final inHome = _home.those(ids).noNull().whereNodeIs<Personable>();
-          // final toFetch = ids.difference(inHome.asIds().toSet());
-          // final fetchedNodes = await r.fetchNodes(toFetch);
-          final nodes = await nodesFetchWithCachedMedias(ids,
-              doMerge: false, doFetch: true);
-          // final nodes = await globall<FireNode>(ids);
-          for (final node in nodes) {
-            // fn.second?.cache();
+          final locals = await searchLocalsByUnique(ids);
+          final localIDs = locals.map((e) => e.id.unique).toSet();
+          final toFetch = ids.difference(localIDs);
+          final futureNodes = r.getUsers(toFetch);
+          for (final local in locals) {
+            writePalette3(local, searchs(), bGen2, rf);
+          }
+          final fetchedNodes = (await futureNodes) ?? [];
+          for (final node in fetchedNodes) {
             writePalette3(node..cache(), searchs(), bGen2, rf);
           }
           rf();
@@ -1299,7 +1468,7 @@ class _HomeState extends State<Home> {
     // return snip();
   }
 
-  ru.Down4PageWidget nodePage(FireNode n, {bool isPush = false}) {
+  ru.Down4PageWidget nodePage(Down4Node n, {bool isPush = false}) {
     if (isPush) {
       final id = "node-${n.id}";
       final r = List<String>.from(route);
@@ -1328,28 +1497,28 @@ class _HomeState extends State<Home> {
   }
 
   ru.Down4PageWidget chatPage(
-    Chatable c, {
+    ChatNode c, {
     bool isPush = false,
     bool isReload = false,
     bool rewriteMsgWithNodes = false,
-    FireMessage? msgRe,
+    Chat? msgRe,
     List<Down4Object>? fo,
-    FireMessage? reactingTo,
+    Chat? reactingTo,
   }) {
-    ID chatID() => "chat-${c.id}";
+    String chatID() => "chat-${c.id.value}";
     ViewState chat() => viewManager.at(chatID());
 
-    List<ID> orderedMsgsIDs() => chat().chat?.first ?? [];
-    Map<ID, ChatMessage> messages() => chat().pages[0].objects.cast();
-    Map<ID, Palette2> members() => chat().pages[1].objects.cast();
-    Set<ID> msgsWithVideos() => chat().refs("messages_with_videos");
-    Set<ID> msgsWithNodes() => chat().refs("messages_with_nodes");
+    List<Down4ID> orderedMsgsIDs() => chat().chat?.first ?? [];
+    Map<Down4ID, ChatMessage> messages() => chat().pages[0].objects.cast();
+    Map<Down4ID, Palette2> members() => chat().pages[1].objects.cast();
+    Set<Down4ID> msgsWithVideos() => chat().refs("messages_with_videos");
+    Set<Down4ID> msgsWithNodes() => chat().refs("messages_with_nodes");
 
     bool forwarding() => fo != null;
 
-    void opn(FireNode n_) => setPage(nodePage(n_, isPush: true));
-    void Function(FireNode)? openNode() => forwarding() ? null : opn;
-    List<ButtonsInfo2> Function(Chatable)? cbGen = forwarding() ? null : bGen2;
+    void opn(Down4Node n_) => setPage(nodePage(n_, isPush: true));
+    void Function(Down4Node)? openNode() => forwarding() ? null : opn;
+    List<ButtonsInfo2> Function(ChatNode)? cbGen = forwarding() ? null : bGen2;
 
     void refreshChat({bool stopVid = false}) async {
       final pg = page;
@@ -1365,9 +1534,9 @@ class _HomeState extends State<Home> {
     }
 
     void writeGroupNodesIfGroup() {
-      final FireNode ref = c;
-      if (ref is Groupable) {
-        for (final n in _home.those(ref.group).noNull().asNodes<Personable>()) {
+      final Down4Node ref = c;
+      if (ref is GroupNode) {
+        for (final n in _home.those(ref.group).noNull().asNodes<PersonNode>()) {
           writePalette3(n, members(), cbGen, refreshChat);
         }
       }
@@ -1375,11 +1544,19 @@ class _HomeState extends State<Home> {
 
     void rf() => setPage(chatPage(c));
 
-    Future<void> increment(ChatReaction cr) async {
-      return incrementReaction(c, cr, rf);
+    Future<void> increment(Reaction cr) async {
+      if (cr.reactors.contains(g.self.id)) return;
+      cr.addReactor(g.self.id);
+      ReactionIncrement(Down4ID(),
+              root: c.id,
+              messageID: cr.messageID,
+              reactionID: cr.id,
+              senderID: g.self.id)
+          .processMessage();
+      reloadReactions(c.id, cr.messageID, rf);
     }
 
-    Future<void> reactToMsg(FireMessage msg) async =>
+    Future<void> reactToMsg(Chat msg) async =>
         setPage(chatPage(c, reactingTo: msg));
 
     Future<void> loadMore([int i = 20]) async {
@@ -1402,9 +1579,10 @@ class _HomeState extends State<Home> {
         // is a reload, load all NEW messages, hence the break;
         final pg = page;
         if (pg is! ChatPage || pg.viewState.node?.id != c.id) return;
-        final loaded = messages().keys.toList()..sort((a, b) => b.compareTo(a));
+        final loaded = messages().keys.toList()
+          ..sort((a, b) => b.unique.compareTo(a.unique));
 
-        List<ID> toLoad = [];
+        List<Down4ID> toLoad = [];
         for (final id in orderedMsgsIDs()) {
           if (id == loaded.last) {
             break;
@@ -1435,7 +1613,7 @@ class _HomeState extends State<Home> {
           theChat.second.listen((event) async {
             final r = await event.results.allResults();
             chat().chat = Pair(
-              r.map((e) => e.string("id")!).toList(),
+              r.map((e) => Down4ID.fromString(e.string("id"))!).toList(),
               chat().chat!.second,
             );
             reloadChat();
@@ -1498,19 +1676,30 @@ class _HomeState extends State<Home> {
       viewState: viewManager.at(chatID()),
       fo: fo,
       reactingTo: reactingTo,
-      react: (ID mediaID, FireMessage msg) => react(c, mediaID, msg, rf),
+      react: (ComposedID mediaID, Chat msg) async {
+        Reaction(Down4ID(),
+            senderID: g.self.id,
+            root: c.id,
+            mediaID: mediaID,
+            messageID: msg.id,
+            reactors: {g.self.id})
+          ..cache()
+          ..merge()
+          ..processMessage();
+        reloadReactions(c.id, msg.id, () => reloadChatWithID(c.id, msgRe: msg));
+      },
       openNode: opn,
-      send: (payload) async {
-        await metaSend(payload, [c]);
+      send: (chat) async {
+        processChats([chat]);
         // poping the forwarding page
         if (forwarding()) viewManager.popInBetween();
-        setPage(chatPage(c,
-            isReload: true,
-            rewriteMsgWithNodes: payload.forwardables.isNotEmpty));
+        setPage(
+          chatPage(c, isReload: true, rewriteMsgWithNodes: chat.hadForwards),
+        );
       }, // TODO, will need future nodes
       back: () => back(withPop: true, f: fo),
       add: () async {
-        for (final n in members().values.selected().asNodes<Personable>()) {
+        for (final n in members().values.selected().asNodes<PersonNode>()) {
           if (n is User) await n.updateFriendStatus(true);
           writePalette3(n, members(), bGen2, rf, sel: false);
           writeHomePalette(n, _home, bGen, rfHome);
@@ -1537,7 +1726,7 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Future<ru.Down4PageWidget> snipView(Chatable node, [List<ID>? l]) async {
+  Future<ru.Down4PageWidget> snipView(ChatNode node, [List<Down4ID>? l]) async {
     final unreadSnips = l ?? (await node.unreadSnipIDs()).toList();
     VideoPlayerController? vpc;
 
@@ -1561,13 +1750,11 @@ class _HomeState extends State<Home> {
       await writeHomePalette(node, _home, bGen, rfHome);
       setPage(homePage());
     }
-    final s = await global<FireMessage>(unreadSnips.first, doCache: false);
+    final s = await global<Chat>(unreadSnips.first, doCache: false);
     await s!.markRead();
 
     final m = await global<FireMedia>(s.mediaID,
-        doCache: false,
-        doFetch: true,
-        mediaInfo: (withData: true, onlineID: s.onlineMediaID));
+        doCache: false, doFetch: true, tempID: s.tempMediaID);
     print("media JSON: \n${m?.toJson()}");
 
     if (m == null) return snipView(node);

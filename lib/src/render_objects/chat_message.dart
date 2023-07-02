@@ -1,20 +1,22 @@
 import 'dart:math';
 
-import 'package:down4/src/render_objects/console.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/couch.dart';
 import 'package:video_player/video_player.dart';
 import '../_dart_utils.dart' show Pair, golden;
 
-import '../data_objects.dart';
+import '../data_objects/couch.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/messages.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
-import '../themes.dart';
 
 import '_render_utils.dart';
 import 'palette.dart' show Palette, Palette2;
 
 class ChatReplyInfo {
-  final ID messageRefID, senderID; // senderName,
+  final Down4ID messageRefID;
+  final ComposedID senderID; // senderName,
   final String body;
   final void Function() onPressReply;
   const ChatReplyInfo({
@@ -51,24 +53,24 @@ class ChatTextInfo {
 
 class ChatMessage extends StatelessWidget implements Down4Object {
   @override
-  ID get id => message.id;
+  Down4ID get id => message.id;
 
   static const double headerHeight = 18.0;
-  final ID nodeRef;
+  final ComposedID nodeRef;
   final bool myMessage, selected, isPost;
-  final void Function(ID id)? select;
-  final FireMessage message;
+  final void Function(Down4ID id)? select;
+  final Chat message;
   final bool hasGap, hasHeader;
-  final void Function(FireNode)? openNode;
+  final void Function(Down4Node)? openNode;
 
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
-  final List<FireNode>? nodes;
-  final List<ChatReaction>? reactions;
+  final List<Down4Node>? nodes;
+  final List<Reaction>? reactions;
 
-  final Future<void> Function(FireMessage message) react;
+  final Future<void> Function(Chat message) react;
 
-  final Future<void> Function(ChatReaction) increment;
+  final Future<void> Function(Reaction) increment;
 
   bool get videoIsPlaying =>
       mediaInfo?.videoController?.value.isPlaying ?? false;
@@ -95,7 +97,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }) : super(key: key);
 
   ChatMessage withOpenNode({
-    required void Function(FireNode)? open,
+    required void Function(Down4Node)? open,
   }) {
     return ChatMessage(
       message: message,
@@ -136,7 +138,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage reloaded(FireMessage msg) {
+  ChatMessage reloaded(Chat msg) {
     return ChatMessage(
       message: msg,
       isPost: isPost,
@@ -156,7 +158,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage withNodes(List<FireNode>? pNodes) {
+  ChatMessage withNodes(List<Down4Node>? pNodes) {
     return ChatMessage(
       message: message,
       repliesInfo: repliesInfo,
@@ -176,7 +178,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage withReactions(List<ChatReaction>? pReactions) {
+  ChatMessage withReactions(List<Reaction>? pReactions) {
     return ChatMessage(
         message: message,
         repliesInfo: repliesInfo,
@@ -285,7 +287,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   bool get hasPalettes => (nodes ?? []).isNotEmpty;
 
-  static String timeString(FireMessage message) {
+  static String timeString(Chat message) {
     final ts = DateTime.fromMillisecondsSinceEpoch(message.timestamp).toLocal();
     final now = DateTime.now().toLocal();
     String timeStr;
@@ -310,19 +312,17 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     return "    $timeStr";
   }
 
-  static Future<ChatMediaInfo?> generateMediaInfo(FireMessage message) async {
+  static Future<ChatMediaInfo?> generateMediaInfo(Chat message) async {
     if (message.mediaID == null) return null;
     // print("GENERATING MEDIA INFO");
     double mediaHeight = 0;
     double mediaWidth = 0;
     final media = await global<FireMedia>(message.mediaID!,
-        doFetch: true,
-        doMergeIfFetch: true,
-        mediaInfo: (withData: true, onlineID: message.onlineMediaID));
+        doFetch: true, doMergeIfFetch: true, tempID: message.tempMediaID);
     if (media == null) return null;
-    if (message.onlineMediaID != null) {
-      await media.updateOnlineReference(
-          message.onlineMediaID!, message.onlineMediaTimestamp);
+    if (message.tempMediaID != null) {
+      await media.updateTempReferences(
+          message.tempMediaID!, message.tempMediaTS!);
     }
 
     mediaWidth = maxMessageWidth - (bodyBorderWidth * 2);
@@ -340,20 +340,18 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   static Future<List<ChatReplyInfo>?> generateRepliesInfo(
-      FireMessage message, void Function(String) goToReply) async {
+      Chat message, void Function(Down4ID) goToReply) async {
     if (message.replies == null) return null;
     List<ChatReplyInfo> chatReplies = [];
     for (final replyID in message.replies!) {
-      final reply = await global<FireMessage>(replyID);
+      final reply = await global<Chat>(replyID);
       if (reply == null) continue;
-      final String replyBody =
-          reply.text?.isNotEmpty ?? false ? reply.text! : "&attachment";
 
       final info = ChatReplyInfo(
           onPressReply: () => goToReply.call(replyID),
           senderID: reply.senderID,
           messageRefID: reply.id,
-          body: replyBody);
+          body: reply.messagePreview);
 
       chatReplies.add(info);
     }
@@ -378,7 +376,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     //     .toList(growable: false);
   }
 
-  static bool displayGap(FireMessage msg, FireMessage prevMsg) {
+  static bool displayGap(Chat msg, Chat prevMsg) {
     final prevMsgTS = DateTime.fromMillisecondsSinceEpoch(prevMsg.timestamp);
     final curMsgTS = DateTime.fromMillisecondsSinceEpoch(msg.timestamp);
     if (curMsgTS.difference(prevMsgTS).inMinutes > 20) {
@@ -410,7 +408,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                 // color: PinkTheme.nodeColors[replyData.type],
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  replyData.senderID,
+                  replyData.senderID.unique,
                   style: g.theme.chatRepilesTextStyle,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -459,12 +457,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   Widget? get forwarderHeader {
-    if (message.forwardedFrom == null) return null;
+    if (message.forwardedFromID == null) return null;
     return SizedBox(
         height: headerHeight * 0.8,
         child: Row(children: [
           Text(
-            "   >> ${message.forwardedFrom}",
+            "   >> ${message.forwardedFromID}",
             style: g.theme.messageForwarderTextStyle,
           ),
         ]));
@@ -474,26 +472,27 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   Widget? get messagePalettes {
     if (!hasPalettes && (message.nodes ?? {}).isEmpty) return null;
-    Widget unloadedPalette(ID id) {
+    Widget unloadedPalette(Down4ID id) {
       return Container(
         key: GlobalKey(),
         height: nodeHeight,
         color: Colors.black54,
         child: Row(
           children: [
-            Image.asset("assets/images/down4_inverted.png",
-                cacheHeight: (nodeHeight * 2).toInt(),
-                cacheWidth: (nodeHeight * 2).toInt()),
+            g.theme.down4Icon(g.theme.down4IconForPaletteColor),
+            // Image.asset("assets/images/down4_inverted.png",
+            //     cacheHeight: (nodeHeight * 2).toInt(),
+            //     cacheWidth: (nodeHeight * 2).toInt()),
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 12.0, left: 12.0),
-                    child: Text(id)))
+                    child: Text(id.unique)))
           ],
         ),
       );
     }
 
-    Widget loadedPalette(FireNode n) {
+    Widget loadedPalette(Down4Node n) {
       return Container(
         key: GlobalKey(),
         height: nodeHeight,
@@ -651,7 +650,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     return min(nReaction - 1, nReactions);
   }
 
-  Widget? reaction(ChatReaction r) {
+  Widget? reaction(Reaction r) {
     final media = cache<FireMedia>(r.mediaID);
 
     if (media == null) return null;
@@ -665,7 +664,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     final tp = TextPainter(
         textDirection: TextDirection.ltr,
         text: TextSpan(
-            text: r.reactionCount.toString(),
+            text: r.reactors.length.toString(),
             style: g.theme.chatReactionCounterTextStyle))
       ..layout();
     final maxi = max(tp.height, tp.width);
@@ -702,7 +701,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                   color: g.theme.chatReactionCounterColor,
                   borderRadius: BorderRadius.all(Radius.circular(maxi / 2))),
               child: Text(
-                r.reactionCount.toString(),
+                r.reactors.length.toString(),
                 style: g.theme.chatReactionCounterTextStyle,
                 softWrap: false,
               ),

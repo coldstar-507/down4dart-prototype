@@ -2,24 +2,23 @@ import 'package:camera/camera.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/pages/_page_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/data_objects.dart';
 
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
 import '../render_objects/console.dart';
-import '../render_objects/palette.dart';
-import '../render_objects/lists.dart';
 import '../render_objects/_render_utils.dart' show Down4PageWidget, backArrow;
 import '../render_objects/navigator.dart';
 import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "node-${viewState.node!.id}";
+  String get id => "node-${viewState.node!.id}";
 
   final ViewState viewState;
   // final FireNode node;
-  final void Function(Chatable) openChat;
-  final void Function(FireNode) openNode;
-  final void Function(Personable) payNode;
+  final void Function(ChatNode) openChat;
+  final void Function(Down4Node) openNode;
+  final void Function(PersonNode) payNode;
   final void Function() back;
 
   const NodePage({
@@ -38,7 +37,7 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
 
 class _NodePageState extends State<NodePage> with Pager2 {
   Widget? _view;
-  FireNode get node => widget.viewState.node!;
+  Down4Node get node => widget.viewState.node!;
 
   late final ScrollController scroller =
       ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
@@ -130,11 +129,11 @@ class _NodePageState extends State<NodePage> with Pager2 {
               "base": ConsoleRow(widgets: [
                 ConsoleButton(
                   name: "MSG",
-                  onPress: () => widget.openChat(node as Chatable),
+                  onPress: () => widget.openChat(node as ChatNode),
                 ),
                 ConsoleButton(
                   name: "PAY",
-                  onPress: () => widget.payNode(node as Personable),
+                  onPress: () => widget.payNode(node as PersonNode),
                 ),
               ], extension: null, widths: null, inputMaxHeight: null)
             }

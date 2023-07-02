@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert' show base64Encode, utf8;
 
+import 'package:down4/src/data_objects/messages.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/bsv/_bsv_utils.dart';
-import 'package:down4/src/data_objects.dart';
-import 'package:video_player/video_player.dart';
 
 import '../_dart_utils.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/firebase.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/nodes.dart';
 import '_page_utils.dart';
 
 import '../globals.dart';
@@ -20,12 +23,12 @@ import '../render_objects/_render_utils.dart';
 
 class GroupPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "group";
+  String get id => "group";
   final List<Palette2> homePalettes, palettesForTransition;
-  final Iterable<Personable> people;
+  final Iterable<PersonNode> people;
   final int nHidden;
   final void Function() back;
-  final void Function(Group group, FireMedia m, Payload p) makeGroup;
+  final void Function(Group group, FireMedia m, Chat c) makeGroup;
   final double initialOffset;
 
   const GroupPage({
@@ -47,7 +50,6 @@ class _GroupPageState extends State<GroupPage>
     with
         WidgetsBindingObserver,
         Pager2,
-        // Backable,
         Input2,
         Medias2,
         Camera2,
@@ -150,7 +152,7 @@ class _GroupPageState extends State<GroupPage>
         fold: fold,
         colorCode: NodesColor.group,
         tec: groupInput,
-        id: "",
+        id: Down4ID(unique: "groupMaker"),
         name: _groupName,
         // hintText: "Group Name",
         image: _groupImage,
@@ -164,29 +166,36 @@ class _GroupPageState extends State<GroupPage>
 
   @override
   Future<void> send({FireMedia? mediaInput}) async {
-    final media = mediaInput ?? cameraInput;
+    final media = mediaInput ?? cameraInput
+      ?..cache()
+      ..merge();
     final text = input.value;
     if (_groupImage == null || _groupName.isEmpty) return;
     if (text.isEmpty && media == null) return;
 
-    final ts = u.makeTimestamp();
-    final idd =
-        utf8.encode(_groupName + _groupImage!.id + ts.toRadixString(16));
-    final groupID = sha1(idd).toBase58();
+    final groupID = ComposedID();
 
-    final p = Payload(
-        text: text, media: media, replies: null, forwards: null, isSnip: false);
+    final chat = Chat(Down4ID(),
+        text: text,
+        mediaID: media?.id,
+        senderID: g.self.id,
+        root: groupID,
+        timestamp: makeTimestamp())
+      ..cache()
+      ..merge();
 
-    final members = Set<ID>.from(widget.people.asIDs())..add(g.self.id);
+    final members = Set<ComposedID>.from(widget.people.asComposedIDs())
+      ..add(g.self.id);
 
     final group = Group(groupID,
-        activity: ts,
+        activity: makeTimestamp(),
         isPrivate: _private,
         name: _groupName,
         mediaID: _groupImage!.id,
-        group: members);
+        group: members,
+        ownerID: g.self.id);
 
-    widget.makeGroup(group, _groupImage!, p);
+    widget.makeGroup(group, _groupImage!, chat);
   }
 
   void reloadItems() {

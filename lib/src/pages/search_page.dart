@@ -1,35 +1,34 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:camera/camera.dart';
-import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/bsv/types.dart';
-import 'package:down4/src/data_objects.dart';
-import 'package:down4/src/couch.dart';
-import 'package:down4/src/render_objects/_render_utils.dart';
+
+import '../_dart_utils.dart';
+import '../bsv/types.dart';
+
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../data_objects/couch.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
-
-import '../web_requests.dart' as r;
 
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
+import '../render_objects/_render_utils.dart';
+
 import '_page_utils.dart';
 
 class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "search";
+  String get id => "search";
 
   final ViewState viewState;
-  final void Function(Branchable) openNode;
+  final void Function(BranchNode) openNode;
   final void Function(List<Palette2>) forwardNodes;
-  final void Function(Iterable<Personable>) add;
-  final void Function(FireNode) onScan;
+  final void Function(Iterable<PersonNode>) add;
+  final void Function(Down4Node) onScan;
   final Future<void> Function(String) search;
   final void Function() back;
 
@@ -55,7 +54,7 @@ class _AddFriendPageState extends State<AddFriendPage>
   // CameraController? _cameraController;
   // MobileScannerController? scanner;
 
-  Future<List<ButtonsInfo2>> bGen(Branchable b) async {
+  Future<List<ButtonsInfo2>> bGen(BranchNode b) async {
     return [
       ButtonsInfo2(
         asset: g.fifty,
@@ -65,7 +64,8 @@ class _AddFriendPageState extends State<AddFriendPage>
     ];
   }
 
-  Map<ID, Palette2> get searchs => widget.viewState.currentPage.objects.cast();
+  Map<ComposedID, Palette2> get searchs =>
+      widget.viewState.currentPage.objects.cast();
 
   // @override
   // void initState() {
@@ -105,12 +105,13 @@ class _AddFriendPageState extends State<AddFriendPage>
   }
 
   String get qrData => [
-        g.self.id,
+        g.self.id.value,
         g.self.firstName,
         g.self.lastName,
         g.self.mediaID,
         g.self.neuter.toYouKnow(),
-      ].join("~");
+        g.self.mainDeviceID,
+      ].join("%");
 
   static double get qrDimension => g.sizes.w - (g.sizes.w * 0.08 * golden * 2);
 
@@ -134,19 +135,23 @@ class _AddFriendPageState extends State<AddFriendPage>
   @override
   void onScan(Barcode bc, MobileScannerArguments? args) async {
     if (bc.rawValue == null) return;
-    final data = bc.rawValue!.split("~");
-    if (data.length != 5) return;
-    final localUser = await global<User>(data[0]);
-    final node = localUser ??
-        User(data[0],
+    final data = bc.rawValue!.split("%");
+    if (data.length != 6) return;
+    final userID = ComposedID.fromString(data[0]);
+    // We try to download the user for a more complete user
+    final tryGet = await global<User>(userID, doFetch: true);
+    final node = tryGet ??
+        User(userID!,
             name: data[1],
             lastName: data[2],
-            mediaID: data[3],
+            mediaID: ComposedID.fromString(data[3]),
             neuter: Down4Keys.fromYouKnow(data[4]),
-            publics: {},
+            children: {},
             activity: makeTimestamp(),
-            isFriend: false,
-            description: "");
+            isConnected: false,
+            description: "",
+            mainDeviceID: data[5],
+            messagingTokens: {});
     widget.onScan(node);
   }
 
@@ -161,7 +166,7 @@ class _AddFriendPageState extends State<AddFriendPage>
   ConsoleButton get addButton => ConsoleButton(
         name: "ADD",
         onPress: () => widget.add(
-          searchs.values.selected().asNodes<Personable>(),
+          searchs.values.selected().asNodes<PersonNode>(),
         ),
       );
 

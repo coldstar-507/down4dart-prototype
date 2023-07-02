@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:down4/src/render_objects/chat_message.dart';
@@ -9,12 +8,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../couch.dart';
-import '../data_objects.dart';
+import '../data_objects/couch.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/medias.dart';
+
 import '../globals.dart';
 import '../pages/_page_utils.dart';
-import '../themes.dart';
-import '../_dart_utils.dart' show golden;
 
 import 'navigator.dart';
 import 'palette.dart';
@@ -336,8 +335,8 @@ class InitInput2 extends StatelessWidget {
                 FocusScope.of(context).requestFocus(ed.fn);
               }
             : null,
-        child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: SizedBox(
+            // padding: const EdgeInsets.symmetric(horizontal: 30),
             height: Console.buttonHeight,
             child: DecoratedBox(
                 decoration: BoxDecoration(

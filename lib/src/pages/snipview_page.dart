@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../data_objects/_data_utils.dart';
 import '../globals.dart';
-import '../data_objects.dart' show ID;
 import '../render_objects/console.dart';
 import '_page_utils.dart';
 import '../render_objects/_render_utils.dart' show Down4PageWidget;
@@ -9,7 +9,7 @@ class SnipViewPage extends StatelessWidget
     with Pager2
     implements Down4PageWidget {
   @override
-  ID get id => "snipview";
+  String get id => "snipview";
 
   final Widget displayMedia;
   final String? text;

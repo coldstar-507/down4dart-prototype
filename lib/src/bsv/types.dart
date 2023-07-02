@@ -3,14 +3,16 @@ import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:convert/convert.dart';
-import 'package:down4/src/couch.dart';
+import 'package:cbl/cbl.dart';
 import 'package:pointycastle/export.dart';
 import 'package:base85/base85.dart';
 
 import '../_dart_utils.dart';
-import '../data_objects.dart';
+
+import '../data_objects/couch.dart';
+import '../data_objects/_data_utils.dart';
+
 import '_bsv_utils.dart';
-import 'package:cbl/cbl.dart';
 
 final secp256k1 = ECCurve_secp256k1();
 const SATS_PER_BYTE = 0.05;
@@ -21,25 +23,85 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
 
 enum UtxoType { fee, change, gets, tip, tax }
 
-class Down4Payment extends FireObject {
+class Down4Payment extends Locals with Temps {
   @override
   Database get dbb => paymentsDB;
 
   final List<Down4TX> txs;
   final bool safe;
   final String textNote;
-  final int timeStamp;
-  Down4Payment(this.txs, this.safe, {required this.textNote, int? tsSeconds})
-      : timeStamp = tsSeconds ?? makeTimestamp();
+  final int timestamp;
+
+  ComposedID? _tempID;
+  int? _tempTS;
+
+  @override
+  ComposedID? get tempID => _tempID;
+
+  @override
+  int? get tempTS => _tempTS;
+
+  @override
+  Future<Map<String, String>?> temporaryUpload(Map<String, String> msg) async {
+    int? freshTS;
+    ComposedID? freshID;
+    try {
+      final uploadPayment = tempID == null || tempTS.shouldBeUpdated;
+
+      if (uploadPayment) {
+        print("(RE)-uploading payment!");
+        freshID = ComposedID();
+        freshTS = makeTimestamp();
+
+        final ref = freshID.tempStoreRef;
+
+        final jsonPay = toJson(toLocal: false);
+        jsonPay["tempID"] = freshID.value;
+        jsonPay["tempTS"] = freshTS.toString();
+
+        await ref.putString(jsonEncode(jsonPay));
+      } else {
+        print("OK: NO NEED TO UPDATE PAYMENT");
+      }
+
+      msg["tempPaymentID"] = freshID?.value ?? tempID!.value;
+      msg["tempPaymentTS"] = freshTS?.toString() ?? tempTS!.toString();
+
+      if (freshTS != null && freshID != null) {
+        this
+          ..updateTempReferences(freshID, freshTS)
+          ..cache();
+      }
+
+      // we remove the payment from the message, since it's too big which
+      // is the reason why we just uploaded the payment
+      return msg..remove("payment");
+    } catch (e) {
+      print("ERROR uploadMessageMedia,  message id: $id, error: $e");
+      return null;
+    }
+  }
+
+  Down4Payment(
+    this.txs, {
+    required this.safe,
+    required this.textNote,
+    int? tempTS,
+    ComposedID? tempID,
+    Region? region,
+    int? timestamp,
+  })  : timestamp = timestamp ?? makeTimestamp(),
+        _tempTS = tempTS,
+        _tempID = tempID;
 
   int get independentGets =>
       txs.last.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
 
-  bool isSpentBy({required ID id}) {
+  bool isSpentBy({required Down4ID id}) {
     return txs.last.txsIn.any((element) => element.spender == id);
   }
 
-  String formattedName(ID selfID) {
+  String formattedName(Down4ID selfID) {
     bool spentBySelf = isSpentBy(id: selfID);
     int outSats; // can be positive of negative
     if (spentBySelf) {
@@ -58,9 +120,9 @@ class Down4Payment extends FireObject {
   }
 
   @override
-  String get id {
+  Down4ID get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    return sha1(idFold.toUint8List()).toBase58();
+    return Down4ID(unique: sha1(idFold.toUint8List()).toBase58());
     // final tsPart = makePrefix(timeStamp);
     // return "$tsPart-$dataPart";
   }
@@ -68,7 +130,7 @@ class Down4Payment extends FireObject {
   int get lastConfirmations => txs.last.confirmations;
 
   @override
-  int get hashCode => BigInt.parse(id, radix: 16).hashCode;
+  int get hashCode => sha1(id.value.codeUnits).toUtf16().hashCode;
 
   @override
   operator ==(other) => other is Down4Payment && other.id == id;
@@ -79,7 +141,7 @@ class Down4Payment extends FireObject {
         ...utf8.encode(textNote), // this needs to be utf8 obviously
         ...VarInt.fromInt(txs.length).data,
         ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
-        ...utf8.encode(timeStamp.toRadixString(34)),
+        ...utf8.encode(timestamp.toRadixString(34)),
       ];
 
   factory Down4Payment.fromCompressed(Uint8List buf) {
@@ -110,7 +172,7 @@ class Down4Payment extends FireObject {
     final tsString = utf8.decode(tsBuf);
     final ts = int.parse(tsString, radix: 34);
 
-    return Down4Payment(txs, safe, textNote: textNote, tsSeconds: ts);
+    return Down4Payment(txs, safe: safe, textNote: textNote, timestamp: ts);
   }
 
   List<String> get asQrData {
@@ -167,7 +229,9 @@ class Down4Payment extends FireObject {
         "tx": txs.map((tx) => tx.toJson()).toList(),
         "len": txs.length,
         "safe": safe,
-        "ts": timeStamp,
+        "ts": timestamp,
+        if (_tempTS != null) "tempTS": _tempTS!,
+        if (_tempID != null) "tempID": _tempID!,
         if (textNote.isNotEmpty) "txt": textNote,
       };
 
@@ -185,8 +249,10 @@ class Down4Payment extends FireObject {
       List<dynamic>.from(decodedJson["tx"])
           .map((e) => Down4TX.fromJson(e))
           .toList(),
-      decodedJson["safe"],
-      tsSeconds: decodedJson["ts"],
+      safe: decodedJson["safe"],
+      tempTS: decodedJson["tempTS"],
+      tempID: decodedJson["tempID"],
+      timestamp: decodedJson["ts"],
       textNote: decodedJson["txt"] ?? "", // TODO ?? "" should be temporary
     );
   }
@@ -304,7 +370,7 @@ class Sats {
 }
 
 class Down4TXIN {
-  ID? spender;
+  Down4ID? spender;
   VarInt? _scriptSigLen;
   TXID utxoTXID;
   FourByteInt utxoIndex;
@@ -329,9 +395,10 @@ class Down4TXIN {
   List<int>? get scriptSig => _scriptSig;
 
   List<int> get compressed {
+    final encodedSpender = utf8.encode(spender!.value);
     return [
       ...raw,
-      ...spender == null ? [0x00] : [spender!.length, ...utf8.encode(spender!)],
+      ...spender == null ? [0x00] : [encodedSpender.length, ...encodedSpender],
     ];
   }
 
@@ -347,10 +414,10 @@ class Down4TXIN {
     );
 
     final d4Offset = 36 + offset + scriptLen + 4;
-    String? spender;
+    Down4ID? spender;
     if (d4[d4Offset] != 0x00) {
       final spenderData = d4.sublist(d4Offset + 1, d4Offset + 1 + d4[d4Offset]);
-      spender = utf8.decode(spenderData);
+      spender = Down4ID.fromString(utf8.decode(spenderData));
     }
 
     final txin = Down4TXIN(
@@ -364,7 +431,7 @@ class Down4TXIN {
     return Pair(txin, d4Offset + 1 + d4[d4Offset]); // final offset
   }
 
-  String get utxoID => down4UtxoID(utxoTXID, utxoIndex);
+  Down4ID get utxoID => down4UtxoID(utxoTXID, utxoIndex);
 
   factory Down4TXIN.fromJson(dynamic decodedJson) => Down4TXIN(
         utxoTXID: TXID.fromBase64(decodedJson["id"]),
@@ -409,7 +476,7 @@ class Down4TXIN {
       };
 }
 
-class Down4TXOUT extends FireObject {
+class Down4TXOUT extends Locals {
   @override
   Database get dbb => utxosDB;
 
@@ -418,7 +485,7 @@ class Down4TXOUT extends FireObject {
   final UtxoType type;
   // final bool isChange;
   // final bool isFee;
-  ID? receiver;
+  ComposedID? receiver;
   int? outIndex;
   List<int>? secret;
   TXID? txid;
@@ -451,7 +518,10 @@ class Down4TXOUT extends FireObject {
       );
 
   @override
-  String get id => down4UtxoID(txid!, FourByteInt(outIndex!));
+  Down4ID get id => down4UtxoID(txid!, FourByteInt(outIndex!));
+
+  // @override
+  // String get id => down4UtxoID(txid!, FourByteInt(outIndex!));
 
   bool get isGets => type == UtxoType.gets;
 
@@ -471,13 +541,14 @@ class Down4TXOUT extends FireObject {
         ...scriptPubKey,
       ];
 
-  List<int> get compressed => [
-        ...raw,
-        ...receiver == null
-            ? [0x00]
-            : [receiver!.length, ...utf8.encode(receiver!)],
-        type.index,
-      ];
+  List<int> get compressed {
+    final utf8Receiver = utf8.encode(receiver!.value);
+    return [
+      ...raw,
+      ...receiver == null ? [0x00] : [utf8Receiver.length, ...utf8Receiver],
+      type.index,
+    ];
+  }
 
   static Pair<Down4TXOUT, int> fromCompressed(Uint8List d4) {
     final satInt = Uint8List.fromList(d4.sublist(0, 8))
@@ -492,12 +563,12 @@ class Down4TXOUT extends FireObject {
 
     final curOffset = 8 + offset + scriptLen;
 
-    String? receiver;
+    ComposedID? receiver;
     int receiverLen = 0;
     if ((receiverLen = d4[curOffset]) != 0x00) {
       final receiverData =
           d4.sublist(curOffset + 1, curOffset + 1 + receiverLen);
-      receiver = utf8.decode(receiverData);
+      receiver = ComposedID.fromString(utf8.decode(receiverData));
     }
 
     final flag = d4[curOffset + 1 + receiverLen];
@@ -525,7 +596,7 @@ class Down4TXOUT extends FireObject {
 }
 
 class Down4TX {
-  ID? maker;
+  ComposedID? maker;
   final List<int> down4Secret;
   final FourByteInt versionNo, nLockTime;
   final List<Down4TXIN> txsIn;
@@ -559,7 +630,7 @@ class Down4TX {
   }
 
   factory Down4TX.fromJson(dynamic decodedJson) => Down4TX(
-        maker: decodedJson["mk"],
+        maker: ComposedID.fromString(decodedJson["mk"]),
         vNo: FourByteInt(decodedJson["vn"]),
         nLock: FourByteInt(decodedJson["nl"]),
         confirmations: decodedJson["cf"],
@@ -657,7 +728,7 @@ class Down4TX {
 
   Map<String, Object?> toJson([bool withTxs = true]) => {
         "sc": down4Secret,
-        "mk": maker,
+        if (maker != null) "mk": maker!.value,
         "vn": versionNo.asInt,
         "nl": nLockTime.asInt,
         "id": txID.asHex,

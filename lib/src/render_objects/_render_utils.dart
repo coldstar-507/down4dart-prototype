@@ -3,20 +3,23 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';
 
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:flutter/services.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mime/mime.dart';
-import '../couch.dart' show cache, global;
+
 import 'package:image/image.dart' as IMG;
 
-// import 'package:better_player/better_player.dart';
+import '../data_objects/couch.dart' show cache, global;
+import '../data_objects/_data_utils.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/nodes.dart';
 import '../themes.dart';
 import 'palette.dart';
 
-import '../data_objects.dart';
 import 'chat_message.dart' show ChatMessage;
 import 'package:flutter_video_info/flutter_video_info.dart';
 import 'package:file_picker/file_picker.dart';
@@ -94,7 +97,7 @@ import '../globals.dart';
 // }
 
 class FireNodeImageDisplay extends StatefulWidget {
-  final FireNode node;
+  final Down4Node node;
   final Size? displaySize;
   const FireNodeImageDisplay(
     this.node, [
@@ -175,8 +178,7 @@ class _FireNodeImageDisplayState extends State<FireNodeImageDisplay> {
 
   void loadThatBoy() async {
     loadImage();
-    media ??= await global<FireMedia>(widget.node.mediaID,
-        doFetch: true, mediaInfo: (withData: false, onlineID: null));
+    media ??= await global<FireMedia>(widget.node.mediaID, doFetch: true);
     if (media == null) return;
     loadImage();
 
@@ -665,32 +667,32 @@ Widget backArrow() {
 }
 
 abstract class Down4PageWidget extends Widget {
-  ID get id;
+  String get id;
 }
 
 class PageManager {
-  List<ID> _idStack;
-  Map<ID, Down4PageWidget> pages;
+  List<String> _stack;
+  Map<String, Down4PageWidget> pages;
   PageManager()
-      : _idStack = [],
+      : _stack = [],
         pages = {};
 
-  Down4PageWidget get currentPage => pages[_idStack.last]!;
-  Down4PageWidget get prevPage => pages[_idStack[_idStack.length - 2]]!;
+  Down4PageWidget get currentPage => pages[_stack.last]!;
+  Down4PageWidget get prevPage => pages[_stack[_stack.length - 2]]!;
 
-  int get nPages => _idStack.length;
+  int get nPages => _stack.length;
 
-  ID get currentID => _idStack.last;
-  Iterable<ID> get path => _idStack
+  String get currentID => _stack.last;
+  Iterable<String> get path => _stack
       .asMap()
-      .map((i, id) => _idStack.sublist(i + 1).contains(id)
+      .map((i, id) => _stack.sublist(i + 1).contains(id)
           ? MapEntry(i, null)
           : MapEntry(i, id))
       .values
-      .whereType<ID>();
+      .whereType<String>();
 
   void put(Down4PageWidget page) {
-    _idStack.add(page.id);
+    _stack.add(page.id);
     pages[page.id] = page;
   }
 
@@ -699,8 +701,8 @@ class PageManager {
   void popInBetween() {
     final n = nPages;
     for (int i = 1; i < n - 1; i++) {
-      pages.remove(_idStack[i]);
-      _idStack.removeAt(i);
+      pages.remove(_stack[i]);
+      _stack.removeAt(i);
     }
   }
 
@@ -712,10 +714,10 @@ class PageManager {
   }
 
   void pop() {
-    final last = _idStack.removeLast();
+    final last = _stack.removeLast();
     // id could be twice in stack because graph can be cyclic
     // in this case we don't remove the page from pages to keep the state
-    if (!_idStack.contains(last)) pages.remove(last);
+    if (!_stack.contains(last)) pages.remove(last);
   }
 }
 
@@ -1374,7 +1376,9 @@ class _Down4VideoPlayerState extends State<Down4VideoPlayer> {
 
 extension ChatMessageExtension on Iterable<ChatMessage> {
   Iterable<ChatMessage> selected() => where((e) => e.selected);
-  Iterable<ID> asIDs() => map((e) => e.id);
+  Iterable<Down4ID> asIDs() => map((e) => e.id);
+  Iterable<ComposedID> asComposedIDs() =>
+      map((e) => e.id).whereType<ComposedID>();
 }
 
 // extension PaletteExtensionsMap on Map<ID, Palette> {
@@ -1434,8 +1438,8 @@ extension ChatMessageExtension on Iterable<ChatMessage> {
 //       where((p) => p.node.isPublicGroup || p.node is User);
 // }
 
-extension MapHelpers on Map<ID, Palette2> {
-  Iterable<Palette2?> those(Iterable<ID> ids) sync* {
+extension MapHelpers on Map<Down4ID, Palette2> {
+  Iterable<Palette2?> those(Iterable<Down4ID> ids) sync* {
     for (final id in ids) {
       yield this[id];
     }
@@ -1457,23 +1461,25 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   Iterable<Palette2> deactivated() => map((p) => p.deactivated());
   Iterable<Palette2> selected() => where((element) => element.selected);
   Iterable<Palette2> notSelected() => where((p) => !p.selected);
-  Iterable<Palette2> whereNodeIsNot<T extends FireNode>() =>
+  Iterable<Palette2> whereNodeIsNot<T extends Down4Node>() =>
       where((p) => p.node is! T);
-  Iterable<Palette2> whereNodeIs<T extends FireNode>() =>
+  Iterable<Palette2> whereNodeIs<T extends Down4Node>() =>
       where((p) => p.node is T);
 
   Iterable<Palette2> showing() => where((p) => p.show);
   Iterable<Palette2> hidden() => where((p) => !p.show);
-  Iterable<ID> asIds() => map((e) => e.node.id);
+  Iterable<Down4ID> asIDs() => map((e) => e.node.id);
+  Iterable<ComposedID> asComposedIDs() => asIDs().whereType<ComposedID>();
+
   Iterable<BaseNode> asNodes<BaseNode>() =>
       map((p) => p.node).whereType<BaseNode>();
-  Iterable<Palette2> those(Iterable<ID> ids) =>
+  Iterable<Palette2> those(Iterable<Down4ID> ids) =>
       where((p) => ids.contains(p.node.id));
-  Iterable<Palette2> notThose(Iterable<ID> ids) =>
+  Iterable<Palette2> notThose(Iterable<Down4ID> ids) =>
       where((p) => !ids.contains(p.node.id));
-  List<Palette2> inThatOrder(Iterable<ID> ids) {
+  List<Palette2> inThatOrder(Iterable<Down4ID> ids) {
     var theList = <Palette2>[];
-    var palIds = asIds();
+    var palIds = asIDs();
     for (final id in ids) {
       if (palIds.contains(id)) {
         theList.add(firstWhere((p) => p.node.id == id));
@@ -1482,9 +1488,9 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
     return theList;
   }
 
-  List<Palette2> inReversedOrder(Iterable<ID> ids) {
+  List<Palette2> inReversedOrder(Iterable<Down4ID> ids) {
     var theList = <Palette2>[];
-    var palIds = asIds();
+    var palIds = asIDs();
     for (final id in ids.toList(growable: false).reversed) {
       if (palIds.contains(id)) {
         theList.add(firstWhere((p) => p.node.id == id));
@@ -1493,12 +1499,12 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
     return theList;
   }
 
-  Set<ID> allPeopleIds() {
-    Set<ID> ids = {};
+  Set<Down4ID> allPeopleIds() {
+    Set<Down4ID> ids = {};
     for (final node in asNodes()) {
-      if (node is Groupable) {
+      if (node is GroupNode) {
         ids.addAll(node.group);
-      } else if (node is Personable) {
+      } else if (node is PersonNode) {
         ids.add(node.id);
       }
     }
@@ -1506,7 +1512,7 @@ extension IterablePalette2Extensions on Iterable<Palette2> {
   }
 }
 
-extension ImageOfNodes on FireNode {
+extension ImageOfNodes on Down4Node {
   Widget nodeImage([Size? s]) => FireNodeImageDisplay(this, s);
 
   // cache<FireMedia>(mediaID)?.displayImage(
@@ -1552,12 +1558,12 @@ extension ImageOfNodes on FireNode {
       //     cacheHeight: (Palette.paletteHeight * 3).toInt(),
       //     cacheWidth: (Palette.paletteHeight * 3).toInt())
       // :
-    } else if (n is Groupable) {
+    } else if (n is GroupNode) {
       return Image.asset('assets/images/hashirama.jpg',
           fit: BoxFit.cover,
           cacheHeight: s?.height.toInt() ?? Palette.paletteHeight.toInt(),
           cacheWidth: s?.width.toInt() ?? Palette.paletteHeight.toInt());
-    } else if (n is Payment) {
+    } else if (n is PaymentNode) {
       return n.payment.independentGets < 2000000
           ? g.d1
           : n.payment.independentGets < 10000000
@@ -1749,10 +1755,10 @@ Future<FireMedia?> importNodeMedia() async {
       withData: true);
   if (result == null) return null;
   final bytes = result.files.single.bytes;
-  final mediaID = deterministicMediaID(bytes!, g.self.id);
-  final size = await decodeImageSize(bytes);
+  // final mediaID = deterministicMediaID(bytes!, g.self.id);
+  final size = await decodeImageSize(bytes!);
   final mime = lookupMimeType(result.files.single.path!)!;
-  return FireMedia(mediaID,
+  return FireMedia(ComposedID(),
       mime: mime,
       tinyThumbnail: makeTiny(bytes),
       isSquared: true,
@@ -1789,11 +1795,11 @@ Future<void> importConsoleMedias({
     if (results == null) return;
     for (final image in results.files) {
       if (image.path == null || image.bytes == null) continue;
-      final mediaID = deterministicMediaID(image.bytes!, g.self.id);
+      // final mediaID = deterministicMediaID(image.bytes!, g.self.id);
       final size = await decodeImageSize(image.bytes!);
       final mime = lookupMimeType(image.path!)!;
       final tiny = makeTiny(image.bytes!);
-      final media = FireMedia(mediaID,
+      final media = FireMedia(ComposedID(),
           isSaved: true,
           isSquared: false,
           isReversed: false,
@@ -1818,14 +1824,14 @@ Future<void> importConsoleMedias({
       if (video.path == null || video.bytes == null) continue;
       final videoInfoGetter = FlutterVideoInfo();
       final videoInfo = await videoInfoGetter.getVideoInfo(video.path!);
-      final mediaID = deterministicMediaID(video.bytes!, g.self.id);
+      // final mediaID = deterministicMediaID(video.bytes!, g.self.id);
       final mime = lookupMimeType(video.path!)!;
       final tn = await VideoThumbnail.thumbnailData(
         video: video.path!,
         quality: 80,
       );
       final tiny = makeTiny(tn!);
-      final media = FireMedia(mediaID,
+      final media = FireMedia(ComposedID(),
           mime: mime,
           tinyThumbnail: tiny,
           isReversed: false,

@@ -2,13 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../data_objects/_data_utils.dart';
 import '../globals.dart';
-import '../data_objects.dart' show ID;
 import '../render_objects/_render_utils.dart' show down4Logo, Down4PageWidget;
 
 class LoadingPage2 extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "loading";
+  String get id => "loading";
 
   final String? seed;
   const LoadingPage2({this.seed, Key? key}) : super(key: key);

@@ -1,16 +1,17 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:convert/convert.dart';
 import 'package:mime/mime.dart';
-import 'package:path/path.dart' as p;
 import 'bsv/_bsv_utils.dart';
 import 'dart:typed_data';
-import 'data_objects.dart';
 import 'package:collection/collection.dart';
 import 'dart:io';
 import 'package:bs58/bs58.dart';
 import 'dart:math' as math;
-import 'package:english_words/english_words.dart' as w;
+
+import 'data_objects/_data_utils.dart';
+import 'data_objects/nodes.dart';
 
 const golden = 1.618;
 
@@ -19,6 +20,10 @@ const videoExtensions = ["mp4", "3gp", "webm", "mkv", "m4a", "mov"];
 const imageExtensions = ["jpeg", "jpg", "png", "gif", "bmp", "webp", "apng"];
 
 const animatedImageExtensions = ["apng", "gif"];
+
+double calcDistance(num x1, num y1, num x2, num y2) {
+  return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+}
 
 String makePrefix(int ms) {
   const differ = 78364164096; // 36^6
@@ -38,47 +43,6 @@ class Pair<E, F> {
   final F second;
   const Pair(this.first, this.second);
 }
-//
-// class Triple<E, F, G> {
-//   final E first;
-//   final F second;
-//   final G third;
-//   Triple(this.first, this.second, this.third);
-// }
-//
-// class Quadruple<E, F, G, H> {
-//   final E first;
-//   final F second;
-//   final G third;
-//   final H fourth;
-//   Quadruple(this.first, this.second, this.third, this.fourth);
-// }
-//
-// class Quintuple<E, F, G, H, K> {
-//   final E first;
-//   final F second;
-//   final G third;
-//   final H fourth;
-//   final K fifth;
-//   Quintuple(this.first, this.second, this.third, this.fourth, this.fifth);
-// }
-//
-// class Sixtuple<E, F, G, H, K, J> {
-//   final E first;
-//   final F second;
-//   final G third;
-//   final H fourth;
-//   final K fifth;
-//   final J sixth;
-//   Sixtuple(
-//     this.first,
-//     this.second,
-//     this.third,
-//     this.fourth,
-//     this.fifth,
-//     this.sixth,
-//   );
-// }
 
 Future<bool> hasNetwork() async {
   try {
@@ -89,38 +53,14 @@ Future<bool> hasNetwork() async {
   }
 }
 
-// String deterministicHyperchatRoot(List<String> ids) {
-//   final sortedList = ids..sort();
-//   final asString = sortedList.join("");
-//   return sha1(utf8.encode(asString)).toBase64();
-// }
-
-// Iterable<(String, String)> randomPairs(int count) {
-//   final random = math.Random();
-//
-//   return Iterable.generate(
-//     count,
-//     (_) => (
-//       w.adjectives[random.nextInt(w.adjectives.length)],
-//       w.nouns[random.nextInt(w.nouns.length)],
-//     ),
-//   );
-// }
-
-// String deterministicGroupRoot(List<String> ids) {
-//   final sortedList = ids..sort();
-//   final asString = sortedList.reversed.join("");
-//   return sha1(utf8.encode(asString)).toBase64();
-// }
-
 String generateMessageID(String senderID, num timeStamp) {
   return sha1(utf8.encode(senderID + timeStamp.toString())).toBase58();
 }
 
-String deterministicMediaID(Uint8List mediaData, String selfID) {
-  final selfData = utf8.encode(selfID);
-  return sha1(mediaData + selfData).toBase58();
-}
+// ComposedID deterministicMediaID(Uint8List mediaData, Down4ID selfID) {
+//   final selfData = utf8.encode(selfID.unique);
+//   return ComposedID(sha1(mediaData + selfData).toBase58());
+// }
 
 Uint8List randomBytes({int size = 16}) {
   return Uint8List.fromList(
@@ -134,13 +74,15 @@ String randomMediaID() {
 
 int makeTimestamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
-extension IterableNodes on Iterable<FireNode> {
-  List<FireNode> formatted() =>
+extension IterableNodes on Iterable<Down4Node> {
+  List<Down4Node> formatted() =>
       toList(growable: false)..sort((a, b) => b.activity.compareTo(a.activity));
-  Iterable<String> asIDs() => map((node) => node.id);
-  Iterable<FireNode> those(List<ID> ids) =>
+  Iterable<Down4ID> asIDs() => map((node) => node.id);
+  Iterable<ComposedID> asComposedIDs() =>
+      map((node) => node.id).whereType<ComposedID>();
+  Iterable<Down4Node> those(List<Down4ID> ids) =>
       where((node) => ids.contains(node.id));
-  Iterable<Groupable> groups() => whereType<Groupable>();
+  Iterable<GroupNode> groups() => whereType<GroupNode>();
   Iterable<User> users() => whereType<User>();
 }
 
@@ -161,11 +103,13 @@ extension AsUint8List on List<int> {
 extension ByteEncoding on List<int> {
   String toHex() => hex.encode(this);
   String toBase58() => base58.encode(toUint8List());
+  String toUtf16() => String.fromCharCodes(this);
   String toBase64() => base64Encode(this);
 }
 
 extension StringExtension on String {
-  List<int> toUtf8() => utf8.encode(this);
+  List<int> asUtf8() => utf8.encode(this);
+  List<int> asUtf16() => codeUnits;
   String capitalize() =>
       "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   String mime() => lookupMimeType(this)!;
@@ -175,17 +119,19 @@ extension StringExtension on String {
   bool isImageExtension() => imageExtensions.contains(this);
 }
 
-extension Down4TimestampExpiration on int {
+extension Down4TimestampExpiration on int? {
   bool get isExpired {
+    if (this == null) return true;
     final now = DateTime.now();
     final expirationDate =
-        DateTime.fromMillisecondsSinceEpoch(this).add(const Duration(days: 4));
+        DateTime.fromMillisecondsSinceEpoch(this!).add(const Duration(days: 4));
     return now.isAfter(expirationDate);
   }
 
   bool get shouldBeUpdated {
+    if (this == null) return true;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final diff = now - this;
+    final diff = now - this!;
     final duration = Duration(milliseconds: diff);
     return duration.inDays > 20;
   }

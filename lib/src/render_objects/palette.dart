@@ -1,12 +1,9 @@
-import 'dart:convert';
-
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
-import '../couch.dart';
-import '../data_objects.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
-import '../themes.dart';
 
 // class BasicActionButton extends StatelessWidget {
 //   final void Function(String, String) goPress;
@@ -126,10 +123,10 @@ class Palette2 extends StatelessWidget implements Down4Object {
   static Color get shadowColor => Colors.black.withOpacity(0.66);
 
   @override
-  ID get id => node.id;
+  Down4ID get id => node.id;
   final Widget _image;
 
-  final FireNode node;
+  final Down4Node node;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish, show;
   final List<ButtonsInfo2> buttonsInfo2;
@@ -428,10 +425,10 @@ class Palette2 extends StatelessWidget implements Down4Object {
 
 class Palette3 extends StatelessWidget implements Down4Object {
   @override
-  ID get id => node.id;
+  Down4ID get id => node.id;
   final Widget _image;
 
-  final FireNode node;
+  final Down4Node node;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish, show;
   final List<ButtonsInfo2> buttonsInfo2;

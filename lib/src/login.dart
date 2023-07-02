@@ -1,71 +1,72 @@
 import 'dart:convert';
 import 'dart:async';
 
+import 'package:down4/src/data_objects/firebase.dart';
+import 'package:down4/src/data_objects/nodes.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'data_objects/_data_utils.dart';
+import 'data_objects/medias.dart';
 import 'web_requests.dart' as r;
 import 'globals.dart';
 import '_dart_utils.dart' as d4utils;
 import 'home.dart';
-import 'data_objects.dart';
 import 'bsv/_bsv_utils.dart';
 
 import 'pages/init_page.dart';
 import 'pages/loading_page.dart';
 
 class Down4 extends StatefulWidget {
-  const Down4({Key? key}) : super(key: key);
+  final auth.User? user;
+  const Down4({required this.user, Key? key}) : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
 }
 
 class _Down4State extends State<Down4> {
-  // ============================================================ VARIABLES ============================================================ //
-  // Self? _self;
-  // Wallet? _wallet;
   Widget? _view;
-
-  // ============================================================ KERNEL ============================================================ //
 
   @override
   void initState() {
     super.initState();
-    FirebaseDatabase.instance.setPersistenceEnabled(false);
-    loadTokenChangeListener();
-    loadUser();
+    login();
   }
 
   void loadTokenChangeListener() {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       final res = await r.refreshTokenRequest(newToken);
-      if (res == 200) Token(newToken).merge();
+      if (res == 200) g.self.updateMessagingToken({g.self.deviceID: newToken});
     });
   }
 
-  Future<void> loadUser() async {
-    ImageCache().maximumSize = 0;
-
-    await g.loadAppDirPath();
+  Future<void> login() async {
     g.loadExchangeRate(await ExchangeRate.exchangeRate);
-    g.loadWallet();
     // this initialized self it it exists
     if (await g.notYetInitialized) {
       createUser();
     } else {
+      await g.loadWallet();
+      await widget.user?.updateDisplayName(g.self.id.value);
       home();
     }
   }
 
   Future<void> initUser({
-    required ID id,
+    required ComposedID id,
+    required String deviceID,
     required String name,
     required String lastName,
+    required double longitude,
+    required double latitude,
     required FireMedia media,
   }) async {
+    // update login for database rules
+    await widget.user?.updateDisplayName(id.value);
+
     _view = const LoadingPage2();
     setState(() {});
 
@@ -75,13 +76,14 @@ class _Down4State extends State<Down4> {
     // this is because the mediaID is calculated with the userID
     // and when it was calculated in the init user, we are not sure if
     // the ID was the proper one
-    final goodMedia = await media.userInitRecalculation(id);
+    final goodMedia = (await media.userInitRecalculation(id))
+      ?..writeFromCachedPath()
+      ..staticUpload();
+
     if (goodMedia == null) {
       print("Error setting the correct ownership over user media");
       return onFailure("System failure");
     }
-
-    await goodMedia.writeFromCachedPath();
 
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
@@ -92,48 +94,59 @@ class _Down4State extends State<Down4> {
     final seed1 = unsafeSeed(32);
     final seed2 = unsafeSeed(32);
     final secret = hash256(seed1 + seed2);
-    g.initWallet(seed1, seed2);
+    await g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
-    final successfulMediaUpload = await uploadNodeMedia(goodMedia);
-    if (!successfulMediaUpload) {
-      print("Unsuccessful media upload");
-      return onFailure("Check internet connection!");
-    }
+    final ref = Down4Server.instance.masterDB.ref('/users/${id.unique}');
+    final initResult = await ref.runTransaction((value) {
+      if (value != null) return Transaction.abort();
+      return Transaction.success({
+        "id": id.value,
+        "secret": secret.toBase58(),
+        "neuter": neuter.toYouKnow(),
+        "token": token,
+        "longitude": longitude,
+        "latitude": latitude,
+      });
+    });
 
-    final userInfo = {
-      'id': id,
-      'name': name,
-      'lastName': lastName,
-      'secret': secret.toBase58(),
-      'token': token,
-      'neuter': neuter.toYouKnow(),
-      'mediaID': goodMedia.id,
-    };
+    if (!initResult.committed) return onFailure("Please try again");
 
-    final success = await r.initUser(jsonEncode(userInfo));
-
-    if (!success) {
-      print("Error initializing account, try again!");
-      return onFailure("Error initializing account, try again!");
-    }
-
-    await g.initSelf(id, goodMedia, neuter, name, lastName);
-
-    await Token(token).merge();
+    g.initSelf(Self(id,
+        deviceID: deviceID,
+        activity: d4utils.makeTimestamp(),
+        name: name,
+        description: "",
+        lastName: lastName,
+        mainDeviceID: deviceID,
+        messagingTokens: {deviceID: token},
+        neuter: neuter,
+        mediaID: goodMedia.id,
+        children: {},
+        privates: {})
+      ..cache()
+      ..merge()
+      ..remoteMerge());
 
     home();
   }
 
-  // ============================================================ RENDER ============================================================ //
-
   void home() {
+    loadTokenChangeListener();
     _view = const Home();
     setState(() {});
   }
 
-  void createUser({String? errorMessage}) {
-    _view = UserMakerPage(initUser: initUser, errorMessage: errorMessage);
+  void createUser({String? errorMessage}) async {
+    final loc = await requestGeoloc(askPermission: true);
+    _view = UserMakerPage(
+      initUser: initUser,
+      errorMessage: errorMessage,
+      deviceID: await getDeviceID() ?? Down4ID().value,
+      closestRegion: Geo.closestRegion(loc),
+      longitude: loc?.longitude ?? 0,
+      latitude: loc?.latitude ?? 0,
+    );
     setState(() {});
   }
 
@@ -153,9 +166,6 @@ class _Down4State extends State<Down4> {
     final truePadding = mediaQuery.viewPadding;
     final headerHeight = size.height * 0.056;
     final allPadding = truePadding.top + truePadding.bottom + headerHeight;
-    // print(
-    //     "TRUE PADDING TOP=${truePadding.top}, TRUEPADDING BOT=${truePadding.bottom}");
-    // final fakePadding = mediaQuery.padding;
     final sizes = Sizes(
         h: size.height - allPadding,
         w: size.width - truePadding.left - truePadding.right,
@@ -163,6 +173,8 @@ class _Down4State extends State<Down4> {
         headerHeight: headerHeight);
 
     g.loadSizes(sizes);
+
+    ImageCache().maximumSize = 0;
 
     return _view ?? const LoadingPage2();
   }

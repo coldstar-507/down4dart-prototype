@@ -1,27 +1,29 @@
 import 'dart:io';
-import 'dart:math';
 import 'dart:ui';
 
-// import 'package:better_player/better_player.dart';
 import 'package:camera/camera.dart';
-import 'package:down4/main.dart';
-import 'package:down4/src/couch.dart';
-import 'package:down4/src/render_objects/navigator.dart';
+import 'package:down4/src/data_objects/firebase.dart';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import 'package:mime/mime.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:video_player/video_player.dart';
 
 import '../_dart_utils.dart';
-import '../data_objects.dart';
+
+import '../data_objects/couch.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/messages.dart';
+
 import '../globals.dart';
+
 import '../render_objects/_render_utils.dart';
 import '../render_objects/chat_message.dart';
 import '../render_objects/console.dart';
 import '../render_objects/palette.dart';
-import 'chat_page.dart';
 
 class Caret extends CustomPainter {
   Rect caret;
@@ -1000,7 +1002,7 @@ mixin Medias2 on Pager2 {
       true; // or videos, but will change from bool to allow more types
 
   (String, void Function(FireMedia))? forMediaMode;
-  FireMessage? reactingTo;
+  Chat? reactingTo;
 
   List<(String, void Function(FireMedia))> get mediasMode;
 
@@ -1166,10 +1168,10 @@ mixin Camera2 on Pager2 {
   ConsoleButton get cameraCloseButton => ConsoleButton(
         name: "CLOSE",
         onPress: () async {
+          changeConsole(backFromCameraConsoleName);
           tempInput = null;
           await cameraController?.dispose();
           cameraController = null;
-          changeConsole(backFromCameraConsoleName);
         },
       );
 
@@ -1277,24 +1279,14 @@ mixin Camera2 on Pager2 {
       });
 
   String get basicCameraRowName => "camera";
-  ConsoleRow get basicCameraRow => ConsoleRow(
-          widgets: [
-            // cameraBackButton,
-            cameraCloseButton,
-            // cameraCancelButton,
-            cameraSwitchButton,
-            // cameraAcceptButton,
-            cameraCaptureButton,
-          ],
-          extension: (
-            cameraExtension,
-            g.sizes.w
-          ),
-          widths: null,
-          // tempInput == null
-          //     ? [0.0, 0.34, 0.0, 0.33, 0.0, 0.33]
-          //     : [0.34, 0.0, 0.33, 0.0, 0.33, 0.0],
-          inputMaxHeight: null);
+  ConsoleRow get basicCameraRow => ConsoleRow(widgets: [
+        cameraCloseButton,
+        cameraSwitchButton,
+        cameraCaptureButton,
+      ], extension: (
+        cameraExtension,
+        g.sizes.w
+      ), widths: null, inputMaxHeight: null);
 
   String get cameraConfirmationRowName => "cameraConfirmation";
   ConsoleRow get cameraConfirmationRow => ConsoleRow(widgets: [
@@ -1968,13 +1960,13 @@ FireMedia makeCameraMedia({
   required String cachedPath,
   required Size size,
   required bool isReversed,
-  required String owner,
+  required ComposedID owner,
   required bool isSquared,
 }) {
   final mime = lookupMimeType(cachedPath)!;
   final data = File(cachedPath).readAsBytesSync();
-  final id = deterministicMediaID(data, owner);
-  return FireMedia(id,
+  // final id = deterministicMediaID(data, owner);
+  return FireMedia(ComposedID(region: owner.region), // hack for init
       ownerID: owner,
       timestamp: makeTimestamp(),
       width: size.width,

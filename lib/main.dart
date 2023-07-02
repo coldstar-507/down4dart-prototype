@@ -1,8 +1,7 @@
 import 'package:cbl_flutter/cbl_flutter.dart';
 import 'package:cbl/cbl.dart';
-import 'package:down4/src/couch.dart';
-import 'package:down4/src/data_objects.dart';
-import 'package:down4/src/pages/_page_utils.dart';
+import 'package:down4/src/data_objects/couch.dart';
+import 'package:down4/src/data_objects/_data_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -154,6 +153,11 @@ Future<void> main() async {
 
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+  // load application directory folder
+  {
+    await g.loadAppDirPath();
+  }
+
   // initializing cameras
   {
     try {
@@ -161,10 +165,6 @@ Future<void> main() async {
     } catch (err) {
       print("Available cameras error $err");
     }
-  }
-
-  if (await hasNetwork()) {
-    await FirebaseAuth.instance.signInAnonymously();
   }
 
   // INIT THE THEME
@@ -182,10 +182,6 @@ Future<void> main() async {
     );
   }
 
-  runApp(
-    const MaterialApp(
-      // theme: ThemeData(fontFamily: g.theme.font),
-      home: Material(child: Down4()),
-    ),
-  );
+  final cred = await FirebaseAuth.instance.signInAnonymously();
+  runApp(MaterialApp(home: Material(child: Down4(user: cred.user))));
 }

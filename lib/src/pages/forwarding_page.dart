@@ -1,9 +1,13 @@
+import 'package:down4/src/_dart_utils.dart';
+import 'package:down4/src/data_objects/messages.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 
-import '../_dart_utils.dart';
-import '../data_objects.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/firebase.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/nodes.dart';
+import '../render_objects/chat_message.dart';
 import '_page_utils.dart';
 
 import '../render_objects/console.dart';
@@ -13,13 +17,13 @@ import '../globals.dart';
 
 class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "forward";
+  String get id => "forward";
   final ViewState viewState;
   final List<Down4Object> fObjects;
   final void Function() back;
-  final void Function(List<Down4Object>, Chatable) openChat;
+  final void Function(List<Down4Object>, ChatNode) openChat;
   final void Function(List<Down4Object>, Transition) hyper;
-  final Future<void> Function(Payload, Iterable<Chatable>) forward;
+  final Future<void> Function(Iterable<Chat>) forward;
 
   const ForwardingPage({
     required this.viewState,
@@ -80,7 +84,7 @@ class _ForwadingPageState extends State<ForwardingPage>
     super.dispose();
   }
 
-  Map<ID, Palette2> get _forwardState =>
+  Map<ComposedID, Palette2> get _forwardState =>
       widget.viewState.pages[0].objects.cast();
 
   Iterable<Palette2> get _fList => _forwardState.values;
@@ -166,13 +170,22 @@ class _ForwadingPageState extends State<ForwardingPage>
 
   @override
   Future<void> send({FireMedia? mediaInput}) async {
-    final p = Payload(
-        media: mediaInput ?? cameraInput,
-        replies: [],
-        forwards: fo,
+    final media = mediaInput ?? cameraInput
+      ?..cache()
+      ..merge();
+
+    if (mediaInput == null && input.value.isEmpty && fo.isEmpty) return;
+
+    widget.forward(selection.asComposedIDs().map((root) => Chat(Down4ID(),
+        senderID: g.self.id,
+        root: root,
         text: input.value,
-        isSnip: false);
-    widget.forward(p, selection.asNodes<Chatable>());
+        messages: fo.whereType<ChatMessage>().asComposedIDs().toSet(),
+        nodes: fo.whereType<Palette2>().asComposedIDs().toSet(),
+        timestamp: makeTimestamp(),
+        mediaID: media?.id)
+      ..cache()
+      ..merge()));
   }
 
   @override

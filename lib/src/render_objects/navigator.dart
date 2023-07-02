@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 // import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../_dart_utils.dart';
+import '../data_objects/_data_utils.dart';
 import '../globals.dart';
 import '../themes.dart';
 
@@ -44,8 +45,8 @@ class Down4Page {
   final List<Widget>? _list;
   final Stream<Widget>? stream;
   final Future<void> Function()? onRefresh;
-  final Map<String, Widget>? asMap;
-  final List<String>? orderedKeys;
+  final Map<Down4ID, Widget>? asMap;
+  final List<Down4ID>? orderedKeys;
   final Iterable<Widget>? _iterables;
   final int? iterableLen, trueLen;
   final List<Widget>? stackWidgets;

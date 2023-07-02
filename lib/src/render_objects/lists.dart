@@ -1,14 +1,10 @@
-import 'package:down4/src/themes.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-// import 'package:pull_to_refresh/pull_to_refresh.dart';
 
-import '../data_objects.dart';
+import '../data_objects/_data_utils.dart';
 import '../globals.dart';
 
 import 'palette.dart';
-import 'chat_message.dart';
-import 'palette_maker.dart';
 import '_render_utils.dart';
 
 class FutureList extends StatefulWidget {
@@ -27,11 +23,11 @@ class _FutureListState extends State<FutureList> {
         stream: widget.stream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Text('Loading');
+            return const Text('Loading');
           } else if (snapshot.connectionState == ConnectionState.done) {
             return DynamicList(list: items);
           } else if (snapshot.hasError) {
-            return Text('Error!');
+            return const Text('Error!');
           } else {
             items.add(snapshot.data!);
             return DynamicList(list: items);
@@ -66,8 +62,8 @@ class DynamicList extends StatelessWidget {
   final ScrollController? scrollController;
   final List<Widget> list;
   final Future<void> Function()? onRefresh;
-  final Map<ID, Widget>? asMap;
-  final List<ID>? orderedKeys;
+  final Map<Down4ID, Widget>? asMap;
+  final List<Down4ID>? orderedKeys;
   final Iterable<Widget>? iterables;
   final int? iterableLen;
   final bool reversed;

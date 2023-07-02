@@ -1,23 +1,17 @@
-import 'dart:convert';
-
-import 'package:down4/src/_dart_utils.dart';
-import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
 import 'palette.dart';
 
-import '../data_objects.dart';
 import '../globals.dart';
-import '../themes.dart';
-
-import '../render_objects/lists.dart';
 
 class ProfileWidget extends StatelessWidget implements Down4Object {
   @override
-  ID get id => node.id;
+  Down4ID get id => node.id;
 
-  final FireNode node;
+  final Down4Node node;
   const ProfileWidget({required this.node, Key? key}) : super(key: key);
 
   @override
@@ -42,7 +36,7 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
                 offset: Offset(8.0, 8.0),
                 blurStyle: BlurStyle.normal)
           ],
-          borderRadius: const BorderRadius.all(Radius.circular(16.0)),
+          borderRadius: BorderRadius.all(Radius.circular(16.0)),
           color: Colors.white10), // g.theme.nodeColors[node_.colorCode]),
       child: Column(
         children: [
@@ -61,7 +55,7 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           //     textAlign: TextAlign.center,
           //     maxLines: 1),
           const SizedBox(height: 8.0),
-          (node_ is Personable && (node_.description ?? "").isNotEmpty)
+          (node_ is PersonNode && (node_.description ?? "").isNotEmpty)
               ? Container(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(node_.description!, textAlign: TextAlign.justify))

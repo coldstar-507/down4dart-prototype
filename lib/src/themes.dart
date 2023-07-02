@@ -1,5 +1,7 @@
-import 'data_objects.dart';
 import 'package:flutter/material.dart';
+
+import 'data_objects/_data_utils.dart';
+import 'data_objects/nodes.dart';
 
 /// Flutter icons Down4Icon
 /// Copyright (C) 2023 by original authors @ fluttericon.com, fontello.com
@@ -17,7 +19,7 @@ import 'package:flutter/material.dart';
 ///
 ///
 
-Map<ID, Down4Theme> themesRegistry = {
+Map<String, Down4Theme> themesRegistry = {
   BlackTheme().name: BlackTheme(),
   PinkTheme().name: PinkTheme(),
 };
@@ -87,6 +89,7 @@ abstract class Down4Theme {
   Color get paletteBorderColor;
   Color get paletteTextColor;
   Color get inputColor;
+  Color get selectedRegionColor;
   Color get inputBorderColor;
   Color get consoleBorderColor;
 
@@ -417,6 +420,9 @@ class BlackTheme extends Down4Theme {
 
   @override
   Brightness get topStatusIconBrightness => Brightness.light;
+
+  @override
+  Color get selectedRegionColor => const Color.fromARGB(255, 56, 56, 56);
 }
 
 class PinkTheme extends Down4Theme {
@@ -527,7 +533,7 @@ class PinkTheme extends Down4Theme {
 
   @override
   Color get otherBubblesColor =>
-      paletteColor; //const  Color.fromARGB(255, 255, 230, 231);
+      paletteColor; //c// onst  Color.fromARGB(255, 255, 230, 231);
 
   @override
   Color get paletteBorderColor => Colors.black;
@@ -666,6 +672,7 @@ class PinkTheme extends Down4Theme {
 
   Color get _palePink => const Color.fromARGB(255, 255, 241, 242);
   Color get _darkerPink => const Color.fromARGB(255, 250, 222, 224);
+  Color get _darkerDarkerPink => const Color.fromARGB(255, 250, 192, 196);
 
   @override
   Color get paletteColor => _darkerPink;
@@ -711,4 +718,7 @@ class PinkTheme extends Down4Theme {
 
   @override
   Brightness get topStatusIconBrightness => Brightness.light;
+
+  @override
+  Color get selectedRegionColor => _darkerDarkerPink;
 }

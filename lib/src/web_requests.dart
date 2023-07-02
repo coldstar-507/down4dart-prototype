@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
-import 'package:down4/src/render_objects/palette.dart';
 import 'package:http/http.dart' as http;
 import '_dart_utils.dart';
-import 'data_objects.dart';
 import 'bsv/types.dart' show Down4Payment, Down4TX;
+import 'data_objects/_data_utils.dart';
+import 'data_objects/medias.dart';
+import 'data_objects/messages.dart';
+import 'data_objects/nodes.dart';
 
 Future<bool> usernameIsValid(String username) async {
   if (username.length < 3) {
@@ -38,7 +40,7 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<Pair<FireNode, FireMedia?>>> fetchNodes<T extends FireNode>(
+Future<List<Pair<Down4Node, FireMedia?>>> fetchNodes<T extends Down4Node>(
     Iterable<String> ids) async {
   if (ids.isEmpty) return [];
   final url = Uri.parse(
@@ -51,7 +53,7 @@ Future<List<Pair<FireNode, FireMedia?>>> fetchNodes<T extends FireNode>(
     return jsonList.map((e) {
       final nodeJson = e["node"] as Map<String, Object?>;
       final mediaJson = e["media"] as Map<String, Object?>?;
-      final node = FireNode.fromJson(nodeJson);
+      final node = Down4Node.fromJson(nodeJson);
       final media = mediaJson == null ? null : FireMedia.fromJson(mediaJson);
       return Pair(node, media);
     }).toList();
@@ -171,41 +173,58 @@ Future<int> refreshTokenRequest(String newToken) async {
   return res.statusCode;
 }
 
-Future<List<FireMessage>?> getPosts(List<String> ids) async {
+Future<List<Chat>?> getPosts(List<String> ids) async {
   // TODO: getPosts
   return null;
 }
 
+Future<Iterable<PersonNode>?> getUsers(Iterable<String> uniques) async {
+  final url = Uri.parse(
+    "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes2",
+  );
+  final response = await http.post(url, body: uniques);
+  if (response.statusCode != 200) return null;
+  return List.from(jsonDecode(response.body)).map((e) {
+    final person = Down4Node.fromJson(jsonDecode(e["node"]))..cache();
+    final data = Uint8List.fromList(base64Decode((e["data"])));
+    FireMedia.fromJson(jsonDecode(e["metadata"]))
+      ..cache()
+      ..cachedMemory = data;
+    return person as PersonNode;
+  });
+}
+
 class MessageRequest {
-  final List<ID> targets;
-  final ID sender;
+  final List<String> tokens;
+  final ComposedID sender;
   final String header, body, data;
   final Uint8List? notifThumbnail;
   const MessageRequest({
     required this.sender,
-    required this.targets,
+    required this.tokens,
     required this.header,
     required this.body,
     required this.data,
     this.notifThumbnail,
   });
 
-  Future<bool> process() async {
+  Future<MessageBatchResponse> process() async {
     final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest2",
     );
 
     final res = await http.post(url, body: jsonEncode(this));
     if (res.statusCode == 200) {
-      return true;
+      return MessageBatchResponse.fromJson(jsonDecode(res.body));
     } else {
-      return false;
+      return MessageBatchResponse(0, tokens.length,
+          tokens.map((e) => SendResponse(false, "", "Unknown")).toList());
     }
   }
 
   Map toJson() => {
-        "s": sender,
-        "t": targets,
+        "s": sender.value,
+        "t": tokens,
         "h": header,
         "b": body,
         "d": data,
@@ -215,8 +234,8 @@ class MessageRequest {
 
 class PushRequest {
 // sender can be used to see if user is blocked
-  final String sender;
-  final List<ID> targets;
+  final ComposedID sender;
+  final List<String> targets;
   final String data;
   PushRequest(
       {required this.sender, required this.targets, required this.data});
@@ -235,7 +254,7 @@ class PushRequest {
   }
 
   Map toJson() => {
-        "s": sender,
+        "s": sender.value,
         "t": targets,
         "d": data,
       };
@@ -243,10 +262,10 @@ class PushRequest {
 
 class NotificationRequest {
 // sender can be used to see if blocked
-
-  final String sender, header, body;
+  final ComposedID sender;
+  final String header, body;
   final String? thumbnail;
-  final List<ID> targets;
+  final List<String> targets;
   NotificationRequest({
     required this.sender,
     required this.header,
@@ -269,10 +288,42 @@ class NotificationRequest {
   }
 
   Map toJson() => {
-        "s": sender,
+        "s": sender.value,
         "t": targets,
         "h": header,
         "b": body,
         if (thumbnail != null) "n": thumbnail,
       };
+}
+
+class MessageBatchResponse {
+  final int successCount;
+  final int failureCount;
+  final List<SendResponse> sendResponses;
+  MessageBatchResponse(
+      this.successCount, this.failureCount, this.sendResponses);
+
+  factory MessageBatchResponse.fromJson(dynamic decodedJson) {
+    return MessageBatchResponse(
+      decodedJson["SuccessCount"],
+      decodedJson["FailureCount"],
+      List.from(decodedJson["SendResponses"])
+          .map((e) => SendResponse.fromJson(e))
+          .toList(),
+    );
+  }
+}
+
+class SendResponse {
+  final bool success;
+  final String messageID;
+  final String error;
+  SendResponse(this.success, this.messageID, this.error);
+  factory SendResponse.fromJson(dynamic decodedJson) {
+    return SendResponse(
+      decodedJson["Success"],
+      decodedJson["MessageID"],
+      decodedJson["Error"],
+    );
+  }
 }

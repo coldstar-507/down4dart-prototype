@@ -1,111 +1,188 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:cbl/cbl.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:down4/src/_dart_utils.dart';
-import 'package:down4/src/pages/_page_utils.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'render_objects/palette.dart';
-import 'package:flutter/cupertino.dart';
-import 'couch.dart';
 
+import 'data_objects/couch.dart';
+import 'data_objects/_data_utils.dart';
+import 'data_objects/firebase.dart';
+import 'data_objects/medias.dart';
+import 'data_objects/messages.dart';
+import 'data_objects/nodes.dart';
+
+import 'package:flutter/cupertino.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 
 import 'render_objects/_render_utils.dart';
 import 'render_objects/chat_message.dart';
+import 'render_objects/palette.dart';
 
 import 'themes.dart';
-import 'data_objects.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
-import 'web_requests.dart' show fetchNodes;
+import 'web_requests.dart'
+    show MessageBatchResponse, MessageRequest, fetchNodes;
+
+// final masterDB = FirebaseDatabase.instanceFor(
+//   app: Firebase.app(),
+//   databaseURL: "https://down4-26ee1-default-rtdb.firebaseio.com/",
+// );
 
 final g = Singletons.instance;
-final db = FirebaseDatabase.instance.ref();
-final _fs = FirebaseFirestore.instance;
-final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
-final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-Future<List<FireNode>> nodesFetchWithCachedMedias(
-  Iterable<ID> nodeIDs, {
-  required bool doFetch,
-  required bool doMerge,
-}) async {
-  final nodes = await globall<FireNode>(nodeIDs,
-      doFetch: doFetch, doMergeIfFetch: doMerge);
-  print(nodes);
-  await globall<FireMedia>(nodes.map((e) => e.mediaID).whereType(),
-      doFetch: doFetch,
-      doMergeIfFetch: doMerge,
-      mediaInfo: (withData: true, onlineID: null));
-  return nodes;
-}
+// final db = FirebaseDatabase.instance.ref();
+// final _fs = FirebaseFirestore.instance;
+// final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
+// final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
-Future<bool> uploadPayment(Down4Payment pay) async {
-  try {
-    await _st.ref(pay.id).putData(pay.compressed.toUint8List());
-    return true;
-  } catch (e) {
-    print("Error uploading payment: $e");
-    return false;
-  }
-}
+/// Determine the current position of the device.
+///
+/// When the location services are not enabled or permissions
+/// are denied the `Future` will return an error.
+Future<GeoLoc?> requestGeoloc({required bool askPermission}) async {
+  bool serviceEnabled;
+  LocationPermission permission;
 
-Future<bool> uploadNodeMedia(FireMedia media) async {
-  try {
-    final mediaData = await media.localImageData;
-    if (mediaData == null) {
-      print("No image data for node image id ${media.id}, returning success");
-      return true;
-    }
-    final mediaMetadata = media.toJson(toLocal: false);
-    await _st_node
-        .ref(media.id)
-        .putData(mediaData, SettableMetadata(customMetadata: mediaMetadata));
-    return true;
-  } catch (e) {
-    print("ERROR uploading node media id: ${media.id}");
-    return false;
-  }
-}
-
-Future<bool> uploadNode(FireNode node) async {
-  final nodeMedia = await global<FireMedia>(node.mediaID);
-  final body = node.toJson(toLocal: false);
-  List<Future<dynamic>> uploads = [];
-  try {
-    if (nodeMedia != null) uploads.add(uploadNodeMedia(nodeMedia));
-    uploads.add(_fs.collection("Nodes").doc(node.id).set(body));
-    await Future.wait(uploads);
-    print("Success uploading node: ${node.id} ${node.displayName}");
-    return true;
-  } catch (e) {
-    print("Failure uploading node: $e");
-    return false;
-  }
-}
-
-String messagePushId() => db.child("Messages").push().key!;
-
-Future<Down4Payment?> downloadPayment(ID paymentID) async {
-  final payRef = _st.ref(paymentID);
-  try {
-    final compressed = await payRef.getData();
-    if (compressed == null) {
-      print("Error, no data at payment id: $paymentID");
-      return null;
-    }
-    print("Success downloading payment id: $paymentID");
-    return Down4Payment.fromCompressed(compressed);
-  } catch (e) {
-    print("Error downloading payment id: $paymentID, err: $e");
+  // Test if location services are enabled.
+  serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) {
+    // Location services are not enabled don't continue
+    // accessing the position and request users of the
+    // App to enable the location services.
     return null;
   }
+
+  permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied && !askPermission) {
+    return null;
+  } else {
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      // Permissions are denied, next time you could try
+      // requesting permissions again (this is also where
+      // Android's shouldShowRequestPermissionRationale
+      // returned true. According to Android guidelines
+      // your App should show an explanatory UI now.
+      return null;
+    }
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    // Permissions are denied forever, handle appropriately.
+    return null;
+  }
+
+  // When we reach here, permissions are granted and we can
+  // continue accessing the position of the device.
+  try {
+    final point = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.lowest,
+        timeLimit: const Duration(seconds: 2));
+    return GeoLoc(point.latitude, point.longitude);
+  } catch (_) {
+    return null;
+  }
+}
+
+// Future<List<Down4Node>> nodesFetchWithCachedMedias(
+//   Iterable<ID> nodeIDs, {
+//   required bool doFetch,
+//   required bool doMerge,
+// }) async {
+//   final nodes = await globall<Down4Node>(nodeIDs,
+//       doFetch: doFetch, doMergeIfFetch: doMerge);
+//   print(nodes);
+//   await globall<FireMedia>(nodes.map((e) => e.mediaID).whereType(),
+//       doFetch: doFetch,
+//       doMergeIfFetch: doMerge,
+//       mediaInfo: (withData: true, onlineID: null));
+//   return nodes;
+// }
+//
+// Future<bool> uploadPayment(Down4Payment pay) async {
+//   try {
+//     await _st.ref(pay.id).putData(pay.compressed.toUint8List());
+//     return true;
+//   } catch (e) {
+//     print("Error uploading payment: $e");
+//     return false;
+//   }
+// }
+//
+// Future<bool> uploadNodeMedia(FireMedia media) async {
+//   try {
+//     final mediaData = await media.localImageData;
+//     if (mediaData == null) {
+//       print("No image data for node image id ${media.id}, returning success");
+//       return true;
+//     }
+//     final mediaMetadata = media.toJson(toLocal: false);
+//     await _st_node
+//         .ref(media.id)
+//         .putData(mediaData, SettableMetadata(customMetadata: mediaMetadata));
+//     return true;
+//   } catch (e) {
+//     print("ERROR uploading node media id: ${media.id}");
+//     return false;
+//   }
+// }
+//
+// Future<bool> uploadNode(Down4Node node) async {
+//   final nodeMedia = await global<FireMedia>(node.mediaID);
+//   final body = node.toJson(toLocal: false);
+//   List<Future<dynamic>> uploads = [];
+//   try {
+//     if (nodeMedia != null) uploads.add(uploadNodeMedia(nodeMedia));
+//     uploads.add(_fs.collection("Nodes").doc(node.id).set(body));
+//     await Future.wait(uploads);
+//     print("Success uploading node: ${node.id} ${node.displayName}");
+//     return true;
+//   } catch (e) {
+//     print("Failure uploading node: $e");
+//     return false;
+//   }
+// }
+
+// Future<Down4Payment?> downloadPayment(ID paymentID) async {
+//   final payRef = _st.ref(paymentID);
+//   try {
+//     final compressed = await payRef.getData();
+//     if (compressed == null) {
+//       print("Error, no data at payment id: $paymentID");
+//       return null;
+//     }
+//     print("Success downloading payment id: $paymentID");
+//     return Down4Payment.fromCompressed(compressed);
+//   } catch (e) {
+//     print("Error downloading payment id: $paymentID, err: $e");
+//     return null;
+//   }
+// }
+
+Future<String?> getDeviceID() async {
+  var deviceInfo = DeviceInfoPlugin();
+  if (Platform.isIOS) {
+    var iosDeviceInfo = await deviceInfo.iosInfo;
+    return iosDeviceInfo.identifierForVendor;
+  } else if (Platform.isAndroid) {
+    var androidDeviceInfo = await deviceInfo.androidInfo;
+    return androidDeviceInfo.id;
+  } else if (Platform.isFuchsia) {
+  } else if (Platform.isIOS) {
+  } else if (Platform.isMacOS) {
+  } else if (Platform.isWindows) {}
+  return null;
 }
 
 // Future<bool> uploadMedia(
@@ -203,68 +280,135 @@ Future<Down4Payment?> downloadPayment(ID paymentID) async {
 //   }
 // }
 
-Future<bool> uploadMessage(FireSendable msg) async {
-  final msgRef = db.child("Messages").child(msg.id);
-  try {
-    List<Future<dynamic>> uploads = [];
-
-    final media = await global<FireMedia>(msg.mediaID);
-    // final msgCopy = msg.copy();
-    print("MEDIA ONLINE TIMESTAMP = ${media?.onlineTimestamp}");
-    int? freshTS;
-    ID? freshOnlineID;
-
-    final uploadMedia = media != null &&
-        (media.onlineID == null || media.onlineTimestamp.shouldBeUpdated);
-
-    if (uploadMedia) {
-      print("(RE)-uploading media!");
-      freshOnlineID = messagePushId();
-      freshTS = makeTimestamp();
-
-      final jsonMedia = media.toJson(toLocal: false);
-      jsonMedia["onlineID"] = freshOnlineID;
-      jsonMedia["onlineTimestamp"] = freshTS.toString();
-
-      final ref = _st.ref(freshOnlineID);
-      final setMetadata = SettableMetadata(customMetadata: jsonMedia);
-
-      if (media.cachedFile != null) {
-        uploads.add(ref.putFile(media.cachedFile!, setMetadata));
-      } else if (media.isVideo && media.videoFile != null) {
-        uploads.add(ref.putFile(media.videoFile!, setMetadata));
-      } else if ((await media.localImageData) != null) {
-        uploads.add(ref.putData((await media.localImageData)!, setMetadata));
-      } else {
-        print("NO MEDIA TO UPLOAD BRO");
-      }
-    } else {
-      print("NO NEED TO UPDATE MEDIA");
-    }
-
-    final msgJson = msg.toJson(toLocal: false);
-    if (media != null) {
-      msgJson["onlineMediaID"] = freshOnlineID ?? media.onlineID!;
-      msgJson["onlineMediaTimestamp"] =
-          freshTS?.toString() ?? media.onlineTimestamp.toString();
-    }
-
-    // add the messageUpload
-    uploads.add(msgRef.set(msgJson));
-    // await the uploads, a failure will throw
-    await Future.wait(uploads);
-
-    if (media != null && freshTS != null && freshOnlineID != null) {
-      await media.updateOnlineReference(freshOnlineID, freshTS);
-    }
-
-    print("Success uploading message id: ${msg.id}");
-    return true;
-  } catch (e) {
-    print("Error uploading message id: ${msg.id}, error: $e");
-    return false;
-  }
-}
+// Future<bool> uploadMessage(Sendable msg) async {
+//   final msgRef = db.child("Messages").child(msg.id);
+//   try {
+//     List<Future<dynamic>> uploads = [];
+//
+//     final media = await global<FireMedia>(msg.mediaID);
+//     // final msgCopy = msg.copy();
+//     print("MEDIA ONLINE TIMESTAMP = ${media?.onlineTimestamp}");
+//     int? freshTS;
+//     ID? freshOnlineID;
+//
+//     final uploadMedia = media != null &&
+//         (media.onlineID == null || media.onlineTimestamp.shouldBeUpdated);
+//
+//     if (uploadMedia) {
+//       print("(RE)-uploading media!");
+//       freshOnlineID = messagePushId();
+//       freshTS = makeTimestamp();
+//
+//       final jsonMedia = media.toJson(toLocal: false);
+//       jsonMedia["onlineID"] = freshOnlineID;
+//       jsonMedia["onlineTimestamp"] = freshTS.toString();
+//
+//       final ref = _st.ref(freshOnlineID);
+//       final setMetadata = SettableMetadata(customMetadata: jsonMedia);
+//
+//       if (media.cachedFile != null) {
+//         uploads.add(ref.putFile(media.cachedFile!, setMetadata));
+//       } else if (media.isVideo && media.videoFile != null) {
+//         uploads.add(ref.putFile(media.videoFile!, setMetadata));
+//       } else if ((await media.localImageData) != null) {
+//         uploads.add(ref.putData((await media.localImageData)!, setMetadata));
+//       } else {
+//         print("NO MEDIA TO UPLOAD BRO");
+//       }
+//     } else {
+//       print("NO NEED TO UPDATE MEDIA");
+//     }
+//
+//     final msgJson = msg.toJson(toLocal: false);
+//     if (media != null) {
+//       msgJson["onlineMediaID"] = freshOnlineID ?? media.onlineID!;
+//       msgJson["onlineMediaTimestamp"] =
+//           freshTS?.toString() ?? media.onlineTimestamp.toString();
+//     }
+//
+//     // add the messageUpload
+//     uploads.add(msgRef.set(msgJson));
+//     // await the uploads, a failure will throw
+//     await Future.wait(uploads);
+//
+//     if (media != null && freshTS != null && freshOnlineID != null) {
+//       await media.updateOnlineReference(freshOnlineID, freshTS);
+//     }
+//
+//     print("Success uploading message id: ${msg.id}");
+//     return true;
+//   } catch (e) {
+//     print("Error uploading message id: ${msg.id}, error: $e");
+//     return false;
+//   }
+// }
+//
+// Future<MessageBatchResponse?> sendTheMessage({
+//   required Sendable msg,
+//   required List<ID> tokens,
+//   required String header,
+//   required String body,
+// }) async {
+//   FireMedia? media;
+//   int? freshTS;
+//   ID? freshOnlineID;
+//   try {
+//     if (msg is Mediable) {
+//       media = await global<FireMedia>(msg.mediaID);
+//       print("MEDIA ONLINE TIMESTAMP = ${media?.onlineTimestamp}");
+//
+//       final uploadMedia = media != null &&
+//           (media.onlineID == null || media.onlineTimestamp.shouldBeUpdated);
+//
+//       if (uploadMedia) {
+//         print("(RE)-uploading media!");
+//         freshOnlineID = messagePushId();
+//         freshTS = makeTimestamp();
+//
+//         final jsonMedia = media.toJson(toLocal: false);
+//         jsonMedia["onlineID"] = freshOnlineID;
+//         jsonMedia["onlineTimestamp"] = freshTS.toString();
+//
+//         final ref = _st.ref(freshOnlineID);
+//         final setMetadata = SettableMetadata(customMetadata: jsonMedia);
+//
+//         if (media.cachedFile != null) {
+//           await ref.putFile(media.cachedFile!, setMetadata);
+//         } else if (media.isVideo && media.videoFile != null) {
+//           await ref.putFile(media.videoFile!, setMetadata);
+//         } else if ((await media.localImageData) != null) {
+//           await ref.putData((await media.localImageData)!, setMetadata);
+//         } else {
+//           print("PROBLEM: NO MEDIA TO UPLOAD BRO");
+//         }
+//       } else {
+//         print("OK: NO NEED TO UPDATE MEDIA");
+//       }
+//     }
+//
+//     final msgJson = msg.toJson(toLocal: false);
+//     if (media != null) {
+//       msgJson["onlineMediaID"] = freshOnlineID ?? media.onlineID!;
+//       msgJson["onlineMediaTimestamp"] =
+//           freshTS?.toString() ?? media.onlineTimestamp.toString();
+//     }
+//
+//     if (media != null && freshTS != null && freshOnlineID != null) {
+//       await media.updateOnlineReference(freshOnlineID, freshTS);
+//     }
+//
+//     return MessageRequest(
+//       sender: msg.senderID,
+//       tokens: tokens,
+//       header: header,
+//       body: body,
+//       data: jsonEncode(msgJson),
+//     ).process();
+//   } catch (e) {
+//     print("ERROR uploadMessageMedia,  message id: ${msg.id}, error: $e");
+//     return null;
+//   }
+// }
 
 class ViewManager {
   // view IDs code
@@ -278,14 +422,14 @@ class ViewManager {
   // ForwardPage   -> 'forward'
   // MoneyPage     -> 'money'
   // LoadingPage   -> 'loading'
-  List<ID> route;
-  Map<ID, ViewState?> views;
+  List<String> route;
+  Map<String, ViewState?> views;
 
   ViewManager()
       : route = [],
         views = {};
 
-  ViewState at(ID viewID) => views[viewID]!;
+  ViewState at(String viewID) => views[viewID]!;
 
   ViewState get home => views[route.first]!;
   ViewState get currentView => views[route.last]!;
@@ -324,8 +468,8 @@ class PageState {
   // a page has a scroll state
   double scroll;
   // a page has a state of objects
-  Map<ID, Down4Object> objects;
-  PageState({double? scroll, Map<ID, Down4Object>? objects})
+  Map<Down4ID, Down4Object> objects;
+  PageState({double? scroll, Map<Down4ID, Down4Object>? objects})
       : scroll = scroll ?? 0.0,
         objects = objects ?? {};
 }
@@ -334,19 +478,20 @@ class ViewState {
   // A view can have a single chat
   // A chat is a List<ID> of every messages and a stream subscription that
   // listens to changes
-  Pair<List<ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
+  Pair<List<Down4ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
   // A view can be from a single node (chatPage, nodePage) both require a node
-  final FireNode? node;
+  final Down4Node? node;
   // Every view has an ID
-  final ID id;
+  final String id;
   // A view has a least 1 page, limited to 3
   final List<PageState> pages;
   // A view has a current index of the page
   int currentIndex;
   // A view can have maps of special references, ex: messagesWithVideos
-  Map<String, Set<ID>> notableReferences;
+  Map<String, Set<Down4ID>> notableReferences;
 
-  Set<ID> refs(String name) => notableReferences[name] ??= Set<ID>.identity();
+  Set<Down4ID> refs(String name) =>
+      notableReferences[name] ??= Set<Down4ID>.identity();
 
   ViewState({
     required this.id,
@@ -358,41 +503,6 @@ class ViewState {
         notableReferences = {};
 
   PageState get currentPage => pages[currentIndex];
-}
-
-class Payload {
-  final List<Down4Object> forwardables;
-  final List<ID> replies;
-  final String text;
-  final FireMedia? media;
-  final bool isSnip;
-
-  Set<ID> get nodesRef => forwardables.whereType<Palette2>().asIds().toSet();
-
-  FireMessage? makeMsg({required ID root}) {
-    if (text.isEmpty && media == null && nodesRef.isEmpty) return null;
-    return FireMessage(messagePushId(),
-        root: root,
-        senderID: g.self.id,
-        timestamp: makeTimestamp(),
-        isSnip: isSnip,
-        mediaID: media?.id,
-        onlineMediaID: media?.onlineID,
-        onlineMediaTimestamp: media?.onlineTimestamp,
-        text: text,
-        replies: replies.isEmpty ? null : replies.toSet(),
-        nodes: nodesRef.isEmpty ? null : nodesRef.toSet());
-  }
-
-  Payload({
-    required List<ID>? replies,
-    required List<Down4Object>? forwards,
-    required String? text,
-    required this.media,
-    required this.isSnip,
-  })  : forwardables = forwards?.reversed.toList(growable: false) ?? [],
-        replies = replies ?? [],
-        text = text ?? "";
 }
 
 class Sizes {
@@ -425,8 +535,8 @@ class Singletons {
   late Wallet wallet;
   late Sizes sizes;
   late ExchangeRate exchangeRate;
-  List<ID> savedImageIDs = [];
-  List<ID> savedVideoIDs = [];
+  List<Down4ID> savedImageIDs = [];
+  List<Down4ID> savedVideoIDs = [];
   late Image fifty, black, red, ph, d1, d2, d3, lg;
   late Uint8List background;
   late List<CameraDescription> cameras;
@@ -468,28 +578,8 @@ class Singletons {
     await wallet.merge();
   }
 
-  Future<void> initSelf(
-    ID id,
-    FireMedia media,
-    Down4Keys neuter,
-    String name,
-    String? lastName,
-  ) async {
-    final selfNode = Self(id,
-        activity: 0,
-        name: name,
-        description: "",
-        lastName: lastName,
-        mediaID: media.id,
-        publics: {},
-        neuter: neuter,
-        privates: {})
-      ..cache()
-      ..merge();
-    media
-      ..cache
-      ..merge();
-    self = selfNode;
+  void initSelf(Self s) {
+    self = s;
   }
 
   Icon get snipArrow =>
@@ -502,17 +592,17 @@ class Singletons {
       Icon(Icons.arrow_forward_ios_rounded, color: theme.messageArrowColor);
 }
 
-void unselectedSelectedPalettes(Map<ID, Palette2> state) {
+void unselectedSelectedPalettes(Map<Down4ID, Palette2> state) {
   for (final p in state.values) {
     if (p.selected) state[p.id] = p.select();
   }
 }
 
 Future<void> writeHomePalette(
-  Chatable c,
-  Map<ID, Palette2> state,
-  Future<List<ButtonsInfo2>> Function(Chatable n,
-          {(FireMessage?, Iterable<ID>, bool)? chatInfo})?
+  ChatNode c,
+  Map<Down4ID, Palette2> state,
+  Future<List<ButtonsInfo2>> Function(ChatNode n,
+          {(Chat?, Iterable<Down4ID>, bool)? chatInfo})?
       bGen,
   void Function()? onSel, {
   bool? sel,
@@ -538,7 +628,7 @@ Future<void> writeHomePalette(
         };
 
   state[c.id] = Palette2(
-      key: Key(c.id),
+      key: Key(c.id.unique),
       node: c,
       selected: isSelected,
       messagePreview: lastMsg?.messagePreview,
@@ -548,9 +638,9 @@ Future<void> writeHomePalette(
       buttonsInfo2: hide ? [] : await bGen?.call(c, chatInfo: chatInfo) ?? []);
 }
 
-void writePalette3<T extends FireNode>(
+void writePalette3<T extends Down4Node>(
   T n,
-  Map<ID, Palette2> state,
+  Map<Down4ID, Palette2> state,
   List<ButtonsInfo2> Function(T)? bGen,
   void Function()? onSel, {
   bool? sel,
@@ -572,7 +662,7 @@ void writePalette3<T extends FireNode>(
         };
 
   state[n.id] = Palette2(
-      key: Key(n.id),
+      key: Key(n.id.unique),
       node: n,
       selected: isSelected,
       imPress: onSelect,
@@ -582,9 +672,9 @@ void writePalette3<T extends FireNode>(
 }
 
 class Transition {
-  final Iterable<Personable> trueTargets;
+  final Iterable<PersonNode> trueTargets;
   final List<Palette2> preTransition, postTransition;
-  final Map<ID, Palette2> state;
+  final Map<Down4ID, Palette2> state;
   final int nHidden;
   final double scroll;
 
@@ -600,27 +690,27 @@ class Transition {
 
 Transition selectionTransition({
   required List<Palette2> originalList,
-  required Map<ID, Palette2> state,
+  required Map<Down4ID, Palette2> state,
   required double scrollOffset,
 }) {
   final hidden = state.values.hidden();
 
-  final ogOrder = originalList.asIds();
+  final ogOrder = originalList.asIDs();
   final selected = originalList.selected();
   final unselected = originalList.notSelected();
 
-  final selectedPeople = selected.whereNodeIs<Personable>();
+  final selectedPeople = selected.whereNodeIs<PersonNode>();
 
-  final selectedGroups = selected.whereNodeIs<Groupable>();
+  final selectedGroups = selected.whereNodeIs<GroupNode>();
 
   final idsInGroups = selectedGroups
-      .asNodes<Groupable>()
+      .asNodes<GroupNode>()
       .map((g) => g.group)
       .expand((id) => id)
       .toSet();
 
-  final unselectedGroups = unselected.whereNodeIs<Groupable>();
-  final unselectedUsers = unselected.whereNodeIs<Personable>();
+  final unselectedGroups = unselected.whereNodeIs<GroupNode>();
+  final unselectedUsers = unselected.whereNodeIs<PersonNode>();
   final unHide = hidden.those(idsInGroups);
   final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
   final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
@@ -650,9 +740,9 @@ Transition selectionTransition({
 
   print("pals=${pals.map((e) => e.node.displayName).toList()}");
   return Transition(
-      trueTargets: pals.where((p) => !p.fold && p.show).asNodes<Personable>(),
+      trueTargets: pals.where((p) => !p.fold && p.show).asNodes<PersonNode>(),
       preTransition: originalList,
-      postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIds())),
+      postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIDs())),
       state: state,
       nHidden: unHide.length,
       scroll: scrollOffset);
@@ -688,20 +778,20 @@ Transition selectionTransition({
 // }
 
 Future<ChatMessage?> getChatMessage({
-  required Map<ID, ChatMessage> state,
-  required Chatable ch,
-  required ID msgID,
-  required ID? prevMsgID,
-  required ID? nextMsgID,
+  required Map<Down4ID, ChatMessage> state,
+  required ChatNode ch,
+  required Down4ID msgID,
+  required Down4ID? prevMsgID,
+  required Down4ID? nextMsgID,
   required bool isFirst,
-  required void Function(FireNode)? openNode,
+  required void Function(Down4Node)? openNode,
   required void Function() refreshCallback,
-  required Future<void> Function(FireMessage message) react,
-  required Future<void> Function(ChatReaction) increment,
+  required Future<void> Function(Chat message) react,
+  required Future<void> Function(Reaction) increment,
 }) async {
-  final msg = await global<FireMessage>(msgID);
+  final msg = await global<Chat>(msgID);
   if (msg == null) return null;
-  FireMessage? prevMsg, nextMsg;
+  Chat? prevMsg, nextMsg;
   ChatMessage? prevChatMessage = state[prevMsgID];
   // If new message while in chat, we might want to remove the header of the
   // previous last message
@@ -718,8 +808,8 @@ Future<ChatMessage?> getChatMessage({
 
   if (state[msgID] != null) return state[msgID]!;
 
-  prevMsg = await global<FireMessage>(prevMsgID);
-  nextMsg = await global<FireMessage>(nextMsgID);
+  prevMsg = await global<Chat>(prevMsgID);
+  nextMsg = await global<Chat>(nextMsgID);
 
   bool hasGap = false;
   if (prevMsg != null) hasGap = ChatMessage.displayGap(msg, prevMsg);
@@ -729,7 +819,7 @@ Future<ChatMessage?> getChatMessage({
 
   final bool senderIsSelf = msg.senderID == g.self.id;
   final bool hasHeader =
-      !senderIsSelf && ch is Groupable && nextMsg?.senderID != msg.senderID;
+      !senderIsSelf && ch is GroupNode && nextMsg?.senderID != msg.senderID;
 
   // load the reactions, from disk always
   final reactions = await msg.reactions;
@@ -761,8 +851,7 @@ Future<ChatMessage?> getChatMessage({
   // the palettes showing properly
   Future.microtask(() async {
     if ((msg.nodes ?? {}).isNotEmpty) {
-      final nodes = await nodesFetchWithCachedMedias(msg.nodes!,
-          doFetch: true, doMerge: false);
+      final nodes = await globall<Down4Node>(msg.nodes!, doFetch: true);
       if (nodes.isNotEmpty) {
         state[msg.id] = state[msg.id]!.withNodes(nodes);
         refreshCallback();
@@ -778,16 +867,16 @@ Future<ChatMessage?> getChatMessage({
 // }
 
 Future<void> writeMessages({
-  required Chatable ch,
-  required List<ID> ordered,
-  required Map<ID, ChatMessage> state,
-  required Set<ID> videos,
-  required Set<ID> withNodes,
+  required ChatNode ch,
+  required List<Down4ID> ordered,
+  required Map<Down4ID, ChatMessage> state,
+  required Set<Down4ID> videos,
+  required Set<Down4ID> withNodes,
   required void Function() refresh,
-  required void Function(FireNode)? openNode,
+  required void Function(Down4Node)? openNode,
   int limit = 20,
-  required Future<void> Function(FireMessage message) react,
-  required Future<void> Function(ChatReaction) increment,
+  required Future<void> Function(Chat message) react,
+  required Future<void> Function(Reaction) increment,
 }) async {
   final orderedSet = ordered.toSet();
   final loadedSet = state.keys.toSet();
@@ -822,15 +911,15 @@ Future<void> writeMessages({
 }
 
 Future<void> writePayments(
-  Map<ID, Palette2> state,
+  Map<Down4ID, Palette2> state,
   void Function(Down4Payment) openPayment, [
   int limit = 5,
 ]) async {
   final offset = state.length;
   await for (final pay in g.wallet.nPayments(limit: limit, offset: offset)) {
     state[pay.id] = Palette2(
-      key: Key(pay.id),
-      node: Payment(pay.id, payment: pay, selfID: g.self.id),
+      key: Key(pay.id.unique),
+      node: PaymentNode(pay.id, payment: pay, selfID: g.self.id),
       messagePreview: pay.textNote,
       buttonsInfo2: pay.isSpentBy(id: g.self.id)
           ? [
@@ -845,10 +934,10 @@ Future<void> writePayments(
   }
 }
 
-class EmptyObject extends Down4Object {
-  @override
-  ID get id => randomBytes(size: 8).toBase58();
-}
+// class EmptyObject extends Down4Object {
+//   @override
+//   ID get id => randomBytes(size: 8).toBase58();
+// }
 
 final topButtonsKey = [
   GlobalKey(),
@@ -859,11 +948,3 @@ final topButtonsKey = [
 ];
 
 final bottomButtonsKey = List.generate(1000, (index) => GlobalKey());
-//
-// final bottomButtonsKey = [
-//   GlobalKey(),
-//   GlobalKey(),
-//   GlobalKey(),
-//   GlobalKey(),
-//   GlobalKey(),
-// ];

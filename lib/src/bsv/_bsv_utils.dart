@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:down4/src/_dart_utils.dart';
 
+import '../data_objects/_data_utils.dart';
 import 'types.dart';
 
 import 'package:http/http.dart' as http;
@@ -142,7 +143,7 @@ List<int>? sigData({
   return null;
 }
 
-Future<Map<String, Down4TXOUT>?> getUtxos(String checkAddress) async {
+Future<Map<Down4ID, Down4TXOUT>?> getUtxos(String checkAddress) async {
   final url = Uri.parse(
     "https://api.whatsonchain.com/v1/bsv/test/address/$checkAddress/unspent",
   );
@@ -160,7 +161,7 @@ Future<Map<String, Down4TXOUT>?> getUtxos(String checkAddress) async {
 
   final utxos = List.from(jsonDecode(res.body));
 
-  var d4utxos = <String, Down4TXOUT>{};
+  var d4utxos = <Down4ID, Down4TXOUT>{};
   for (final utxo in utxos) {
     var d4txout = Down4TXOUT(
       type: UtxoType.gets,
@@ -174,10 +175,11 @@ Future<Map<String, Down4TXOUT>?> getUtxos(String checkAddress) async {
   return d4utxos;
 }
 
-String down4UtxoID(TXID txid, FourByteInt ix) =>
-    sha256((txid.data + ix.data)).toBase58();
+Down4ID down4UtxoID(TXID txid, FourByteInt ix) {
+  return Down4ID(unique: sha1(txid.data + ix.data).toBase58());
+}
 
-Future<Map<String, Down4TXOUT>?> checkPrivateKey(
+Future<Map<Down4ID, Down4TXOUT>?> checkPrivateKey(
     String base58PrivateKey) async {
   final asByte = base58.decode(base58PrivateKey);
   final big = BigInt.parse(asByte.toHex(), radix: 16);

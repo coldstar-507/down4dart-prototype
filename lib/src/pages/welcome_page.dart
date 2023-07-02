@@ -1,8 +1,9 @@
 import 'package:down4/src/themes.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/data_objects.dart';
 import 'package:flutter/services.dart';
 
+import '../data_objects/_data_utils.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
 
 import '../render_objects/_render_utils.dart';
@@ -20,7 +21,7 @@ class ThemePage extends StatefulWidget implements Down4PageWidget {
   State<ThemePage> createState() => _ThemePageState();
 
   @override
-  ID get id => "themes";
+  String get id => "themes";
 }
 
 class _ThemePageState extends State<ThemePage> with Pager2 {
@@ -60,7 +61,7 @@ class _ThemePageState extends State<ThemePage> with Pager2 {
     }
   }
 
-  Map<String, Palette2> _palettes = {};
+  Map<Down4ID, Palette2> _palettes = {};
 
   List<Down4Theme> themes = [BlackTheme(), PinkTheme()];
 

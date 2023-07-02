@@ -3,11 +3,15 @@ import 'dart:async';
 import 'package:cbl/cbl.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:down4/src/data_objects.dart';
 import 'package:video_player/video_player.dart';
 // import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 
 import '../_dart_utils.dart';
+import '../data_objects/_data_utils.dart';
+import '../data_objects/firebase.dart';
+import '../data_objects/medias.dart';
+import '../data_objects/messages.dart';
+import '../data_objects/nodes.dart';
 import '../globals.dart';
 
 import '../render_objects/console.dart';
@@ -19,18 +23,18 @@ import '_page_utils.dart';
 
 class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
-  ID get id => "chat-${viewState.node!.id}";
+  String get id => "chat-${viewState.node!.id}";
 
   final ViewState viewState;
   final List<Down4Object>? fo;
   final void Function(int) onPageChange;
   final void Function() back, add, money, hyper;
   final Future<void> Function([int limit]) loadMore;
-  final void Function(Branchable) openNode;
-  final void Function(Payload) send;
+  final void Function(BranchNode) openNode;
+  final void Function(Chat) send;
   final void Function(List<Down4Object> fo) forward;
-  final FireMessage? reactingTo;
-  final Future<void> Function(ID, FireMessage) react;
+  final Chat? reactingTo;
+  final Future<void> Function(ComposedID, Chat) react;
 
   const ChatPage({
     required this.add,
@@ -66,40 +70,9 @@ class _ChatPageState extends State<ChatPage>
         Money2,
         ForwardSender2,
         Saver2,
-        Forwarder2
-// Sender,
-// Forwarder,
-// SingleTickerProviderStateMixin,
-
-{
-  // Future<bool> keyboardIsHidden() {
-  //   return Future.delayed(const Duration(milliseconds: 200),
-  //       () => MediaQuery.of(context).viewInsets.bottom <= 0);
-  // }
-
-  // @override
-  // Future<void> focusRoutine() async {
-  //   print("DOING FOCUS ROUTINE!");
-  //   if (hasFocus && await keyboardIsHidden()) {
-  //     print("REMOVEING FOCUS");
-  //     removeFocus();
-  //     // focusNode.unfocus();
-  //     showForwardButtonExtra = false;
-  //     showMediaButtonExtra = false;
-  //     setState(() {});
-  //   }
-  // }
-
-  // @override
-  // void didChangeMetrics() async {
-  //   focusRoutine();
-  // }
-
-  // GlobalKey mediaModeKey = GlobalKey();
-  // GlobalKey mediaForwardModeKey = GlobalKey();
-
-  Chatable get node => widget.viewState.node as Chatable;
-  List<ID> get orderedChats => widget.viewState.chat?.first ?? [];
+        Forwarder2 {
+  ChatNode get node => widget.viewState.node as ChatNode;
+  List<Down4ID> get orderedChats => widget.viewState.chat?.first ?? [];
 
   @override
   List<(String, void Function(FireMedia))> get mediasMode => [
@@ -120,16 +93,10 @@ class _ChatPageState extends State<ChatPage>
           }
         ),
       ];
-  // @override
-  // ID get selfID => g.self.id;
   @override
   List<Down4Object>? get fo => widget.fo;
   @override
   void setTheState() => setState(() {});
-
-  // @override
-  // late Console console;
-  // final _tec = TextEditingController();
 
   late ScrollController scroller0 =
       ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
@@ -137,23 +104,17 @@ class _ChatPageState extends State<ChatPage>
           widget.viewState.pages[0].scroll = scroller0.offset;
         });
 
-  late ScrollController? scroller1 = node is Groupable
+  late ScrollController? scroller1 = node is GroupNode
       ? (ScrollController(initialScrollOffset: widget.viewState.pages[1].scroll)
         ..addListener(() {
           widget.viewState.pages[1].scroll = scroller1!.offset;
         }))
       : null;
 
-  // @override
-  // late final aCtrl =
-  //     AnimationController(duration: Console.animationDuration, vsync: this)
-  //       ..addListener(() {
-  //         loadBaseConsole();
-  //       });
-
-  Map<ID, ChatMessage> get _messages =>
+  Map<ComposedID, ChatMessage> get _messages =>
       widget.viewState.pages[0].objects.cast();
-  Map<ID, Palette2> get _group => widget.viewState.pages[1].objects.cast();
+  Map<ComposedID, Palette2> get _group =>
+      widget.viewState.pages[1].objects.cast();
 
   var lastOffsetUpdate = 0.0;
 
@@ -198,54 +159,6 @@ class _ChatPageState extends State<ChatPage>
     // }
   }
 
-  // @override
-  // late ConsoleInput mainInput = ConsoleInput(
-  //     maxLines: 8,
-  //     tec: _tec,
-  //     focus: focusNode,
-  //     placeHolder: "",
-  //     inputCallBack: (_) {
-  //       loadBaseConsole();
-  //     });
-
-  // void loadSavingConsole() {
-  //   console = Console(
-  //     // bottomInputs: [mainInput],
-  //     topButtons: [],
-  //     bottomButtons: [],
-  //     consoleRow: Console3(
-  //       widgets: [
-  //         ConsoleButton(name: "Back", onPress: loadBaseConsole),
-  //         ConsoleButton(
-  //             name: "To Messages",
-  //             onPress: () async {
-  //               for (var chat in _messages.values.selected()) {
-  //                 chat.message.updateSavedStatus(true);
-  //               }
-  //               // g.self.save();
-  //               unselectSelectedMessage();
-  //               loadBaseConsole();
-  //             }),
-  //         ConsoleButton(
-  //             name: "To Medias",
-  //             onPress: () {
-  //               final selectedMedias = _messages.values
-  //                   .selected()
-  //                   .where((chat) => chat.hasMedia)
-  //                   .map((chat) => chat.mediaInfo!.media);
-  //               for (final media in selectedMedias) {
-  //                 media.updateSaveStatus(true);
-  //               }
-  //               // g.self.save();
-  //               unselectSelectedMessage();
-  //               loadBaseConsole();
-  //             }),
-  //       ],
-  //     ),
-  //   );
-  //   setState(() {});
-  // }
-
   void unselectSelectedMessage() {
     for (final key in _messages.keys) {
       if (_messages[key]?.selected ?? false) {
@@ -261,17 +174,23 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   Future<void> send({FireMedia? mediaInput}) async {
-    final media = cameraInput ?? mediaInput;
+    final media = (cameraInput ?? mediaInput)
+      ?..cache()
+      ..merge();
+
     if (input.value == "" && media != null && fo != null) return;
 
-    final r = _messages.values.selected().asIDs().toList();
-
-    final p = Payload(
-        media: media,
+    final p = Chat(Down4ID(),
         text: input.value,
-        forwards: fo,
-        replies: r,
-        isSnip: false);
+        mediaID: media?.id,
+        nodes: fo?.whereType<Palette2>().asComposedIDs().toSet(),
+        replies: _messages.values.selected().asComposedIDs().toSet(),
+        messages: fo?.whereType<ChatMessage>().asComposedIDs().toSet(),
+        senderID: g.self.id,
+        root: node.id,
+        timestamp: makeTimestamp())
+      ..cache()
+      ..merge();
 
     widget.send(p);
 
@@ -289,7 +208,6 @@ class _ChatPageState extends State<ChatPage>
   ];
 
   Extra get mediaButtonExtra => extras[0];
-  // Extra get mediaButtonExtra => extras[0];
 
   List<double> get baseConsoleWidth {
     if (forwarding) {
@@ -308,17 +226,6 @@ class _ChatPageState extends State<ChatPage>
   }
 
   bool get forwarding => (fo ?? []).isNotEmpty;
-
-  // @override
-  // void changeConsole(String consoleName) {
-  //   currentConsolesName[currentPageIndex] = consoleName;
-  //   showMediaButtonExtra = false;
-  //   showMediaButtonExtra = false;
-  //   setState(() {});
-  // }
-
-  // final GlobalKey _doubleCameraKey = GlobalKey();
-  // final GlobalKey _mediasButtonKey = GlobalKey();
 
   @override
   Console3 get console {
@@ -378,82 +285,9 @@ class _ChatPageState extends State<ChatPage>
     );
   }
 
-  // @override
-  // void loadConsole() {}
-
-  // InputController input = InputController();
-  // double fullHeight = Console.buttonHeight;
-  // late MyTextEditor te = MyTextEditor(
-  //     onInputChange: (input, height) {
-  //       input = input;
-  //       fullHeight = height;
-  //       loadBaseConsole();
-  //     },
-  //     input: input,
-  //     maxWidth: 0.7,
-  //     maxLines: 8,
-  //     fn: focusNode!);
-
-  // @override
-  // void loadBaseConsole({bool images = true, bool extra = false}) {
-  //   if (fo != null) {
-  //     loadForwardingConsole();
-  //   } else {
-  //     console = Console(
-  //       // bottomInputs: [mainInput],
-  //       // topButtons: [
-  //       //   ConsoleButton(name: "Save", onPress: loadSavingConsole),
-  //       // ],
-  //       bottomButtons: [
-  //         // ConsoleButton(
-  //         //   name: "BACK",
-  //         //   onPress: !extra ? widget.back : loadBaseConsole,
-  //         //   showExtra: extra,
-  //         //   onLongPress: () => loadBaseConsole(extra: !extra),
-  //         //   isSpecial: true,
-  //         //   extraButtons: [
-  //         //     ConsoleButton(name: "SAVE", onPress: loadSavingConsole),
-  //         //     ConsoleButton(
-  //         //       name: "FORWARD",
-  //         //       onPress: () => widget.forward(
-  //         //         _messages.values.selected().toList(growable: false),
-  //         //       ),
-  //         //     ),
-  //         //   ],
-  //         // ),
-  //       ],
-  //       consoleRow: Console3(
-  //         beginSizes: const [0.25, 0.25, 0.25, 0.25],
-  //         endSizes: const [0.0, 0.15, 0.70, 0.15],
-  //         ctrl: aCtrl,
-  //         maxHeight: focusNode!.hasFocus ? fullHeight : null,
-  //         widgets: [
-  //           ConsoleButton(
-  //             name: cameraInput == null ? "CAMERA" : "@CAMERA",
-  //             onPress: () => loadSquaredCameraConsole(0),
-  //           ),
-  //           ConsoleButton(
-  //             name: "MEDIAS",
-  //             onPress: () => loadMediasConsole(images),
-  //           ),
-  //           ConsoleInput2(te),
-  //           ConsoleButton(
-  //             name: "SEND",
-  //             onPress: () {
-  //               send();
-  //               loadBaseConsole();
-  //             },
-  //           ),
-  //         ],
-  //       ),
-  //     );
-  //   }
-  //   setState(() {});
-  // }
-
   @override
   Widget build(BuildContext context) {
-    final pages = node is Groupable
+    final pages = node is GroupNode
         ? [
             Down4Page(
                 scrollController: scroller0,
@@ -538,7 +372,9 @@ class _ChatPageState extends State<ChatPage>
   @override
   void saveToMessages() {
     for (var chat in _messages.values.selected()) {
-      chat.message.updateSavedStatus(true);
+      chat.message.copiedFor(root: g.self.id)
+        ..cache()
+        ..merge();
     }
     unselectSelectedMessage();
     changeConsole("base");
@@ -553,111 +389,3 @@ class _ChatPageState extends State<ChatPage>
   @override
   void money() => widget.money();
 }
-
-// Future<void> squaredCamera(
-//   Console c,
-//   void Function() b,
-//   ConsoleInput i,
-//   void Function(String f) cb, {
-//   CameraController? ctrl,
-//   int cam = 0,
-//   String? path,
-// }) async {
-//   if (ctrl == null) {
-//     try {
-//       ctrl = CameraController(g.cameras[cam], ResolutionPreset.medium);
-//       await ctrl.initialize();
-//     } catch (err) {
-//       b();
-//     }
-//   }
-//
-//   Future<void> nextCam() async {
-//     await ctrl?.dispose();
-//     return squaredCamera(c, b, i, cb, cam: (cam + 1) % 2);
-//   }
-//
-//   if (path == null) {
-//     c = Console(
-//       bottomInputs: [i],
-//       cameraController: ctrl,
-//       topButtons: [
-//         ConsoleButton(
-//           name: "Capture",
-//           isSpecial: true,
-//           shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
-//           onPress: () async {
-//             final XFile f = await ctrl!.takePicture();
-//             squaredCamera(c, b, i, cb, ctrl: ctrl, cam: cam, path: f.path);
-//           },
-//           onLongPress: () async {
-//             await ctrl!.startVideoRecording();
-//             squaredCamera(c, b, i, cb, ctrl: ctrl, cam: cam);
-//           },
-//           onLongPressUp: () async {
-//             final XFile f = await ctrl!.stopVideoRecording();
-//             squaredCamera(c, b, i, cb, ctrl: ctrl, cam: cam, path: f.path);
-//           },
-//         ),
-//       ],
-//       bottomButtons: [
-//         ConsoleButton(
-//             name: "Back",
-//             onPress: () {
-//               ctrl?.dispose();
-//               b();
-//             }),
-//         ConsoleButton(
-//           name: cam == 0 ? "Rear" : "Front",
-//           onPress: nextCam,
-//           isMode: true,
-//         ),
-//       ],
-//     );
-//   } else {
-//     BetterPlayerController? vpc;
-//     final topBottons = [
-//       ConsoleButton(
-//         name: "Accept",
-//         onPress: () => cb(path),
-//       ),
-//     ];
-//     final bottomButtons = [
-//       ConsoleButton(
-//         name: "Back",
-//         onPress: () => squaredCamera(c, b, i, cb, ctrl: ctrl, cam: cam),
-//       ),
-//       ConsoleButton(
-//           name: "Cancel",
-//           onPress: () {
-//             ctrl?.dispose();
-//             b();
-//           }),
-//     ];
-//
-//     if (path.extension().isVideoExtension()) {
-//       vpc = BetterPlayerController(const BetterPlayerConfiguration());
-//       await vpc.setupDataSource(BetterPlayerDataSource.file(path));
-//       await vpc.setLooping(true);
-//       await vpc.play();
-//       _console = Console(
-//           bottomInputs: [consoleInput],
-//           videoForPreview: VideoPreview(
-//               videoPlayer: BetterPlayer(controller: vpc),
-//               videoAspectRatio: ctrl!.value.aspectRatio,
-//               isReversed: cam == 1),
-//           topButtons: topBottons,
-//           bottomButtons: bottomButtons);
-//     } else {
-//       _console = Console(
-//           bottomInputs: [consoleInput],
-//           imageForPreview: ImagePreview(
-//               path: path,
-//               isReversed: cam == 1,
-//               imageAspectRatio: ctrl!.value.aspectRatio),
-//           topButtons: topBottons,
-//           bottomButtons: bottomButtons);
-//     }
-//   }
-//   setState(() {});
-// }
