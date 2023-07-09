@@ -1,10 +1,8 @@
-import 'dart:convert';
 import 'dart:async';
 
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
-import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 

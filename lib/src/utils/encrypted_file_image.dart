@@ -39,7 +39,6 @@ class EncryptedFileImage extends ImageProvider<EncryptedFileImage> {
     );
   }
 
-
   Future<Codec> _loadAsync(
       EncryptedFileImage key, ImageDecoderCallback decode) async {
     assert(key == this);

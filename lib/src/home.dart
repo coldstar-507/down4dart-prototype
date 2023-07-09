@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
-import 'package:down4/src/bsv/_bsv_utils.dart';
-import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/themes.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +15,6 @@ import 'data_objects/nodes.dart';
 import 'globals.dart';
 import 'web_requests.dart' as r;
 import '_dart_utils.dart';
-import 'bsv/wallet.dart';
 import 'bsv/types.dart';
 
 import 'pages/chat_page.dart';
@@ -25,9 +22,7 @@ import 'pages/forwarding_page.dart';
 import 'pages/group_page.dart';
 import 'pages/home_page.dart';
 import 'pages/hyperchat_page.dart';
-import 'pages/init_page.dart';
 import 'pages/loading_page.dart';
-import 'pages/maker_page.dart';
 import 'pages/money_page.dart';
 import 'pages/node_page.dart';
 import 'pages/search_page.dart';
@@ -1064,7 +1059,7 @@ class _HomeState extends State<Home> {
     final timestamp = makeTimestamp();
     setPage(loadingPage());
 
-    final media = Down4Media.fromCamera(ComposedID(),
+    final media = Down4Media.fromLocal(ComposedID(),
         mainCachedPath: path,
         metadata: Down4MediaMetadata(
             isSquared: false,
@@ -1372,7 +1367,7 @@ class _HomeState extends State<Home> {
           return;
         }
 
-        final hcMedia = Down4Media.fromCamera(ComposedID(),
+        final hcMedia = Down4Media.fromLocal(ComposedID(),
             metadata: Down4MediaMetadata(
                 ownerID: g.self.id,
                 mime: "image/png",

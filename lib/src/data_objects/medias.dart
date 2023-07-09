@@ -5,6 +5,7 @@ import 'dart:ui' show Size;
 
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
+import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
@@ -21,31 +22,13 @@ import '_data_utils.dart';
 import 'couch.dart';
 
 class Down4MediaMetadata implements Jsons {
-  // Widget display({required Size displaySize, required bool isSquared});
-  //
-  // @override
-  // Database get dbb => mediasDB;
-  //
-  // @override
-  // final ComposedID id;
-
   final bool isReversed, isSquared;
-  // String? cachePath,
-
-  // String? cachedUrl;
-  // String? tinyThumbnail;
-  // bool _isSaved;
-  // int _lastUse;
-  // isPaidToView,
-  // isPaidToOwn,
-  // isLocked,
   final String mime;
-  late final bool isEncrypted;
+  final bool isEncrypted;
   final ComposedID ownerID;
   final double width, height;
   final String? text;
   final int timestamp;
-  // Uint8List? cachedMemory;
 
   Size get size => Size(width, height);
 
@@ -55,149 +38,34 @@ class Down4MediaMetadata implements Jsons {
 
   bool get isVideo => extension.isVideoExtension();
 
-  // Future<VideoPlayerController?> get videoController async {
-  //   if (!isVideo) throw 'Media needs to be a video';
-  //   final f = (cachedFile) ?? file;
-  //   if (f != null) return VideoPlayerController.file(f);
-  //   final url_ = await url;
-  //   if (url_ != null) return VideoPlayerController.network(url_);
-  //   return null;
-  // }
-  //
-  // String get path => "${g.appDirPath}${Platform.pathSeparator}${id.value}";
-  //
-  // File? get cachedFile {
-  //   if (cachePath == null) return null;
-  //   if (!File(cachePath!).existsSync()) return null;
-  //   return File(cachePath!);
-  // }
-  //
-  // File? get file {
-  //   if (!File(path).existsSync()) return null;
-  //   return File(path);
-  // }
-
-  // Future<String?> get url async {
-  //   if (cachedUrl != null) return cachedUrl;
-  //   if (!tempTS.isExpired && tempID != null) {
-  //     // online time stamp is not expired, online id isn't null
-  //     // good chances we will find the message media URL
-  //     try {
-  //       return cachedUrl = await tempID!.tempStoreRef.getDownloadURL();
-  //     } catch (e) {
-  //       return null;
-  //     }
-  //     // else if can try to fetch a node image
-  //   } else {
-  //     try {
-  //       return cachedUrl = await id.staticStoreRef.getDownloadURL();
-  //     } catch (e) {
-  //       return null;
-  //     }
-  //   }
-  // }
-
-  // Future<Uint8List?> get localImageData async {
-  //   final blob = (await dbb.document(id.value))?.blob("image");
-  //   return cachedMemory = await blob?.content();
-  // }
-
-  // Future<bool> get cachedAndReady async {
-  //   if (cachedFile != null) return true;
-  //   if (file != null) return true;
-  //   // if (await localImageData != null) return true;
-  //   if (await url != null) return true;
-  //   return false;
-  // }
-  //
-  // Image? get displayCachedImage {
-  //   // if (cachedMemory != null) return Image.memory(cachedMemory!);
-  //   if (cachedFile != null) return Image.file(cachedFile!);
-  //   if (cachedUrl != null) return Image.network(cachedUrl!);
-  //   return null;
-  // }
-
   Down4MediaMetadata({
     required this.ownerID,
     required this.timestamp,
     required this.width,
     required this.height,
     required this.mime,
-    // this.cachePath,
-    // this.tinyThumbnail,
-    // super.tempTS,
-    // super.tempID,
-    // int lastUse = 0,
-    // bool isSaved = false,
-    // this.isLocked = false,
-    // this.isPaidToView = false,
+    this.isEncrypted = false,
     this.isReversed = false,
-    // this.isPaidToOwn = false,
     this.isSquared = false,
     this.text,
-  }) {
-    isEncrypted = !isVideo; // for now, we want to encrypt video aswell
-  }
-  // : _lastUse = lastUse,
-  //       _isSaved = isSaved;
+  });
 
-  // FireMedia copy() {
-  //   return FireMedia.fromJson(toJson(toLocal: true));
-  // }
-
-  // special function upon user intialization
   Future<Down4MediaMetadata?> userInitRecalculation(
       ComposedID properOwnerID) async {
     final json = toJson();
     json["ownerID"] = properOwnerID.value;
     return Down4MediaMetadata.fromJson(json);
   }
-  //
-  // Future<void> writeFromCachedPath() async {
-  //   if (cachePath == null) return;
-  //   final d = File(cachePath!).readAsBytesSync();
-  //   write(d);
-  //   //
-  //   // Uint8List? tn;
-  //   // if (isVideo) {
-  //   //   tn = await VideoThumbnail.thumbnailData(video: cachePath!, quality: 80);
-  //   //   await File(path).writeAsBytes(d);
-  //   // }
-  //   // await write(imageData: tn ?? d);
-  // }
-  //
-  // Future<void> write(Uint8List data) async {
-  //   final Uint8List d = isEncrypted ? Cy4.encrypt(data) : data;
-  //   if (isVideo) {}
-  //   if (!isVideo) tinyThumbnail ??= makeTiny(data);
-  //   await File(path).writeAsBytes(d);
-  //   return;
-  //   // final imageMime = isVideo ? "image/png" : mime;
-  //   // final imageBlob = Blob.fromData(imageMime, imageData);
-  //   // var doc = (await dbb.document(id.value))!.toMutable();
-  //   // doc.setBlob(imageBlob, key: "image");
-  //   // await dbb.saveDocument(doc);
-  // }
 
   factory Down4MediaMetadata.fromJson(Map<String, String?> decodedJson) {
-    // final tempID = decodedJson["tempID"];
+
     return Down4MediaMetadata(
-        // ComposedID.fromString(decodedJson["id"])!,
+
         ownerID: ComposedID.fromString(decodedJson["ownerID"])!,
         timestamp: int.parse(decodedJson["timestamp"]!),
         mime: decodedJson["mime"]!,
-        // cachePath: decodedJson["cachePath"],
-        // lastUse: int.parse(decodedJson["lastUse"] ?? "0"),
-        // tinyThumbnail: decodedJson["tinyThumbnail"],
-        // tempID: tempID != null ? ComposedID.fromString(tempID) : null,
-        // tempTS: int.tryParse(decodedJson["tempTS"] ?? ""),
-        // isSaved: decodedJson["isSaved"] == "true",
         isReversed: decodedJson["isReversed"] == "true",
         isSquared: decodedJson["isSquared"] == "true",
-        // isLocked: decodedJson["isLocked"] == "true",
-        // isPaidToOwn: decodedJson["isPaidToView"] == "true",
-        // isPaidToView: decodedJson["isPaidToOwn"] == "true",
-        // isEncrypted: decodedJson["isEncrypted"] == "true",
         width: double.parse(decodedJson["width"]!),
         height: double.parse(decodedJson["height"]!),
         text: decodedJson["text"]);
@@ -205,56 +73,16 @@ class Down4MediaMetadata implements Jsons {
 
   @override
   Map<String, String> toJson() => {
-        // "id": id.value,
         "ownerID": ownerID.value,
         "timestamp": timestamp.toString(),
         "mime": mime,
-        // if (tempID != null) "tempID": tempID!.value,
-        // if (tempTS != null) "tempTS": tempTS!.toString(),
-        // if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
         if (text != null) "text": text!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
-        // "isLocked": isLocked.toString(),
-        // "isPaidToView": isPaidToView.toString(),
-        // "isPaidToOwn": isPaidToOwn.toString(),
         "isEncrypted": isEncrypted.toString(),
         "width": width.toString(),
         "height": height.toString(),
-        // if (includeLocal) "lastUse": _lastUse.toString(),
-        // if (includeLocal) "isVideo": isVideo.toString(),
-        // if (includeLocal) "isSaved": _isSaved.toString(),
       };
-
-  // Future<bool> staticUpload() async {
-  //   final ref = id.staticStoreRef;
-  //   final metadata =
-  //       SettableMetadata(customMetadata: toJson(includeLocal: false));
-  //   try {
-  //     if (cachedFile != null) {
-  //       await ref.putFile(cachedFile!, metadata);
-  //     } else if (isVideo && file != null) {
-  //       await ref.putFile(file!, metadata);
-  //       // } else if ((await localImageData) != null) {
-  //       //   await ref.putData((await localImageData)!, metadata);
-  //     } else {
-  //       print("PROBLEM: NO MEDIA TO UPLOAD BRO, RETURNING A FAILURE");
-  //       return false;
-  //     }
-  //     return true;
-  //   } catch (e) {
-  //     print("ERROR UPLOADING MEDIA ID=${id.value}, ERR=$e");
-  //     return false;
-  //   }
-  // }
-  //
-  // Future<void> staticDelete() async {
-  //   try {
-  //     await id.staticStoreRef.delete();
-  //   } catch (e) {
-  //     print("error deleting media id=${id.value}, err=$e");
-  //   }
-  // }
 }
 
 abstract class Down4Media extends Temps {
@@ -285,7 +113,7 @@ abstract class Down4Media extends Temps {
         _isPaidToOwn = isPaidToOwn,
         _isLocked = isLocked;
 
-  factory Down4Media.fromCamera(
+  factory Down4Media.fromLocal(
     ComposedID id, {
     required Down4MediaMetadata metadata,
     ComposedID? tempID,
@@ -451,12 +279,15 @@ abstract class Down4Media extends Temps {
         final ref = freshID.server.temporaryStore.ref(freshID.value);
         final setMetadata = SettableMetadata(customMetadata: jsonMedia);
 
-        if (mainCachedFile != null) {
-          await ref.putFile(mainCachedFile!, setMetadata);
-        } else if (mainFile != null) {
-          await ref.putFile(mainFile!, setMetadata);
-          // } else if ((await localImageData) != null) {
-          //   await ref.putData((await localImageData)!, setMetadata);
+        File? f;
+        if ((f = mainCachedFile ?? mainFile) != null) {
+          if (metadata.isEncrypted) {
+            final d = f!.readAsBytesSync();
+            final dec = Cy4.decrypt(d);
+            await ref.putData(dec, setMetadata);
+          } else {
+            await ref.putFile(f!, setMetadata);
+          }
         } else {
           print("PROBLEM: NO MEDIA TO UPLOAD BRO");
         }
@@ -482,15 +313,18 @@ abstract class Down4Media extends Temps {
 
   Future<bool> staticUpload() async {
     final ref = id.staticStoreRef;
-    final metadata =
+    final setMetadata =
         SettableMetadata(customMetadata: toJson(includeLocal: false));
     try {
-      if (mainCachedFile != null) {
-        await ref.putFile(mainCachedFile!, metadata);
-      } else if (mainFile != null) {
-        await ref.putFile(mainFile!, metadata);
-        // } else if ((await localImageData) != null) {
-        //   await ref.putData((await localImageData)!, metadata);
+      File? f;
+      if ((f = mainCachedFile ?? mainFile) != null) {
+        if (metadata.isEncrypted) {
+          final d = f!.readAsBytesSync();
+          final dec = Cy4.decrypt(d);
+          await ref.putData(dec, setMetadata);
+        } else {
+          await ref.putFile(f!, setMetadata);
+        }
       } else {
         print("PROBLEM: NO MEDIA TO UPLOAD BRO, RETURNING A FAILURE");
         return false;
@@ -536,7 +370,7 @@ abstract class Down4Media extends Temps {
   Down4Media userInitRecalculation(ComposedID oid) {
     final metadataJson = metadata.toJson();
     metadataJson["ownerID"] = oid.value;
-    return Down4Media.fromCamera(id,
+    return Down4Media.fromLocal(id,
         metadata: metadata, tinyThumbnail: tinyThumbnail);
   }
 }
@@ -557,23 +391,27 @@ class Down4Image extends Down4Media {
   });
 
   Image? readyImage(Size s, {bool forceSquare = false}) {
-    if ((mainCachedFile ?? mainFile) != null) {
-      return Image.file((mainCachedFile ?? mainFile)!,
-          key: Key(makeTimestamp().toString()),
-          gaplessPlayback: true,
-          fit: BoxFit.cover,
-          cacheWidth: (s.width * golden).toInt(),
-          cacheHeight: (s.height * golden).toInt());
+    File? f;
+    final int w = (s.width * golden).toInt();
+    final int h = (s.height * golden).toInt();
+
+    if ((f = mainCachedFile ?? mainFile) != null) {
+      if (isEncrypted) {
+        final enc = EncryptedFileImage(f!);
+        final res = ResizeImage(enc, width: w, height: h);
+        return Image(image: res);
+      } else {
+        final res = ResizeImage(FileImage(f!), width: w, height: h);
+        return Image(image: res);
+      }
     } else if (_cachedUrl != null) {
-      return Image.network(_cachedUrl!,
-          key: Key(makeTimestamp().toString()),
-          gaplessPlayback: true,
-          fit: BoxFit.cover,
-          cacheWidth: (s.width * golden).toInt(),
-          cacheHeight: (s.height * golden).toInt());
+      final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
+      return Image(image: res);
     }
     return null;
   }
+
+  bool get isEncrypted => metadata.isEncrypted;
 
   Future<Image?> futureImage(Size s, {bool forceSquare = false}) async {
     await url;

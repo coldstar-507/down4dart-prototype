@@ -1919,7 +1919,7 @@ Future<void> importConsoleMedias({
         mime: mime,
         isSquared: false,
         isReversed: false);
-    final media = Down4Media.fromCamera(ComposedID(),
+    final media = Down4Media.fromLocal(ComposedID(),
         metadata: metadata, isSaved: true, lastUse: makeTimestamp());
     await media.write(r.bytes!);
     reload();

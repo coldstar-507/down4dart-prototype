@@ -1968,7 +1968,7 @@ Down4Media makeCameraMedia({
   final mime = lookupMimeType(cachedPath)!;
   final data = File(cachedPath).readAsBytesSync();
   // final id = deterministicMediaID(data, owner);
-  return Down4Media.fromCamera(
+  return Down4Media.fromLocal(
       ComposedID(region: owner.region), // hack for init
       mainCachedPath: cachedPath,
       metadata: Down4MediaMetadata(
