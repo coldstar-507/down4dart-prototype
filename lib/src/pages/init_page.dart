@@ -29,7 +29,7 @@ class UserMakerPage extends StatefulWidget {
     required String lastName,
     required double longitude,
     required double latitude,
-    required FireMedia media,
+    required Down4Media media,
   }) initUser;
 
   final String deviceID;
@@ -59,8 +59,6 @@ class _UserMakerPageState extends State<UserMakerPage>
   String get lastName => lastNameInput.value;
   late Region region = widget.closestRegion ?? Region.america;
   ComposedID get willBeReplacedID => ComposedID(unique: id, region: region);
-
-
 
   @override
   void setTheState() => setState(() {});
@@ -127,7 +125,9 @@ class _UserMakerPageState extends State<UserMakerPage>
           decoration: const BoxDecoration(
             borderRadius: BorderRadius.all(Radius.circular(5)),
           ),
-          child: cameraInput?.display(size: Size.square(imageSize)) ?? g.ph,
+          child: cameraInput?.display(
+                  size: Size.square(imageSize), forceSquare: true) ??
+              g.ph,
         ),
       );
 

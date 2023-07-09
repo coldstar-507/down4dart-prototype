@@ -30,7 +30,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function(int) onPageChange;
   final void Function() back, add, money, hyper;
   final Future<void> Function([int limit]) loadMore;
-  final void Function(BranchNode) openNode;
+  final void Function(BranchN) openNode;
   final void Function(Chat) send;
   final void Function(List<Down4Object> fo) forward;
   final Chat? reactingTo;
@@ -71,11 +71,11 @@ class _ChatPageState extends State<ChatPage>
         ForwardSender2,
         Saver2,
         Forwarder2 {
-  ChatNode get node => widget.viewState.node as ChatNode;
+  ChatN get node => widget.viewState.node as ChatN;
   List<Down4ID> get orderedChats => widget.viewState.chat?.first ?? [];
 
   @override
-  List<(String, void Function(FireMedia))> get mediasMode => [
+  List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
           (m) async {
@@ -104,14 +104,14 @@ class _ChatPageState extends State<ChatPage>
           widget.viewState.pages[0].scroll = scroller0.offset;
         });
 
-  late ScrollController? scroller1 = node is GroupNode
+  late ScrollController? scroller1 = node is GroupN
       ? (ScrollController(initialScrollOffset: widget.viewState.pages[1].scroll)
         ..addListener(() {
           widget.viewState.pages[1].scroll = scroller1!.offset;
         }))
       : null;
 
-  Map<ComposedID, ChatMessage> get _messages =>
+  Map<Down4ID, ChatMessage> get _messages =>
       widget.viewState.pages[0].objects.cast();
   Map<ComposedID, Palette2> get _group =>
       widget.viewState.pages[1].objects.cast();
@@ -147,7 +147,7 @@ class _ChatPageState extends State<ChatPage>
     if (widget.reactingTo != null) {
       forMediaMode = (
         "REACT",
-        (FireMedia m) => widget.react(m.id, widget.reactingTo!),
+        (Down4Media m) => widget.react(m.id, widget.reactingTo!),
       );
 
       changeConsole(basicMediaRowName);
@@ -173,7 +173,7 @@ class _ChatPageState extends State<ChatPage>
   }
 
   @override
-  Future<void> send({FireMedia? mediaInput}) async {
+  Future<void> send({Down4Media? mediaInput}) async {
     final media = (cameraInput ?? mediaInput)
       ?..cache()
       ..merge();
@@ -184,8 +184,8 @@ class _ChatPageState extends State<ChatPage>
         text: input.value,
         mediaID: media?.id,
         nodes: fo?.whereType<Palette2>().asComposedIDs().toSet(),
-        replies: _messages.values.selected().asComposedIDs().toSet(),
-        messages: fo?.whereType<ChatMessage>().asComposedIDs().toSet(),
+        replies: _messages.values.selected().asIDs().toSet(),
+        messages: fo?.whereType<ChatMessage>().asIDs().toSet(),
         senderID: g.self.id,
         root: node.id,
         timestamp: makeTimestamp())
@@ -287,7 +287,7 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   Widget build(BuildContext context) {
-    final pages = node is GroupNode
+    final pages = node is GroupN
         ? [
             Down4Page(
                 scrollController: scroller0,

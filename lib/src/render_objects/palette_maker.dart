@@ -113,7 +113,7 @@ class UserPaletteMaker extends StatelessWidget {
 
 class UserMakerPalette extends StatelessWidget {
   final String name, lastName, id;
-  final FireMedia? media;
+  final Down4Media? media;
   final void Function() selectFile;
 
   const UserMakerPalette({
@@ -136,13 +136,7 @@ class UserMakerPalette extends StatelessWidget {
           ),
           height: Palette.paletteHeight,
           width: Palette.paletteHeight, // borderWidth x2
-          child: media != null
-              ? FireImageDisplay(
-                  media!,
-                  Size.square(Palette.paletteHeight),
-                  true,
-                )
-              : g.ph,
+          child: media?.display(size: Palette2.paletteSquare) ?? g.ph,
         ),
       );
 
@@ -390,7 +384,7 @@ class PaletteMaker extends StatelessWidget {
   final Down4ID id;
   final String name;
   // final String hintText;
-  final FireMedia? image;
+  final Down4Image? image;
   final void Function(Down4ID)? go;
   final NodesColor colorCode;
   final Nodes type;

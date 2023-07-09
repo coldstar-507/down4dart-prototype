@@ -236,7 +236,7 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "money";
   final Transition? transition;
-  final PersonNode? single;
+  final PersonN? single;
   final ViewState viewState;
   // final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
@@ -508,7 +508,7 @@ class _MoneyPageState extends State<MoneyPage>
   Map<ComposedID, Palette2> get _users =>
       widget.viewState.pages[0].objects.cast();
 
-  List<PersonNode> get people => _users.values.asNodes<PersonNode>().toList();
+  List<PersonN> get people => _users.values.asNodes<PersonN>().toList();
 
   @override
   void initState() {

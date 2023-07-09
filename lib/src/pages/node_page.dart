@@ -16,9 +16,9 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
 
   final ViewState viewState;
   // final FireNode node;
-  final void Function(ChatNode) openChat;
+  final void Function(ChatN) openChat;
   final void Function(Down4Node) openNode;
-  final void Function(PersonNode) payNode;
+  final void Function(PersonN) payNode;
   final void Function() back;
 
   const NodePage({
@@ -129,11 +129,11 @@ class _NodePageState extends State<NodePage> with Pager2 {
               "base": ConsoleRow(widgets: [
                 ConsoleButton(
                   name: "MSG",
-                  onPress: () => widget.openChat(node as ChatNode),
+                  onPress: () => widget.openChat(node as ChatN),
                 ),
                 ConsoleButton(
                   name: "PAY",
-                  onPress: () => widget.payNode(node as PersonNode),
+                  onPress: () => widget.payNode(node as PersonN),
                 ),
               ], extension: null, widths: null, inputMaxHeight: null)
             }

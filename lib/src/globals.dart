@@ -598,12 +598,15 @@ void unselectedSelectedPalettes(Map<Down4ID, Palette2> state) {
   }
 }
 
-Future<void> writeHomePalette(
-  ChatNode c,
+// typedef BGEN<T extends Down4Node> = Future<List<ButtonsInfo2>> Function(
+//   T n, {
+//   (Chat?, Iterable<Down4ID>, bool)? chatInfo,
+// })?;
+
+FutureOr<void> writePalette<T extends PaletteN>(
+  T c,
   Map<Down4ID, Palette2> state,
-  Future<List<ButtonsInfo2>> Function(ChatNode n,
-          {(Chat?, Iterable<Down4ID>, bool)? chatInfo})?
-      bGen,
+  FutureOr<List<ButtonsInfo2>> Function(T n)? bGen,
   void Function()? onSel, {
   bool? sel,
 }) async {
@@ -614,16 +617,16 @@ Future<void> writeHomePalette(
   final bool? selectionIfReload = pInState?.selected;
   final bool isSelected = sel ?? selectionIfReload ?? false;
 
-  final chatInfo = await c.homeChatInfo();
-  final (lastMsg, _, _) = chatInfo;
-
   final node = c;
-  final hide = node is User && !node.isFriend && !await node.hasMessages();
+
+  final lastChat = node is ChatN ? await node.lastChatMessage() : null;
+
+  final hide = node is User && !node.isConnected && !await node.hasMessages();
 
   void Function()? onSelect = onSel == null || hide
       ? null
       : () async {
-          await writeHomePalette(c, state, bGen, onSel, sel: !isSelected);
+          await writePalette(c, state, bGen, onSel, sel: !isSelected);
           onSel.call();
         };
 
@@ -631,48 +634,49 @@ Future<void> writeHomePalette(
       key: Key(c.id.unique),
       node: c,
       selected: isSelected,
-      messagePreview: lastMsg?.messagePreview,
+      messagePreview: lastChat?.messagePreview,
       imPress: onSelect,
       show: !hide,
       bodyPress: onSelect,
-      buttonsInfo2: hide ? [] : await bGen?.call(c, chatInfo: chatInfo) ?? []);
+      buttonsInfo2: hide ? [] : await bGen?.call(c) ?? []);
+  //, chatInfo: chatInfo) ?? []);
 }
 
-void writePalette3<T extends Down4Node>(
-  T n,
-  Map<Down4ID, Palette2> state,
-  List<ButtonsInfo2> Function(T)? bGen,
-  void Function()? onSel, {
-  bool? sel,
-  String? pr,
-}) {
-  // isSelected will check first if it's an argument, else it will check
-  // if the palette is a reload and use it's current status, or else it will
-  // default to false
-  bool? selectionIfReload;
-  final Palette2? pInState = state[n.id];
-  selectionIfReload = pInState?.selected;
-  bool isSelected = sel ?? selectionIfReload ?? false;
-
-  void Function()? onSelect = onSel == null
-      ? null
-      : () {
-          writePalette3(n, state, bGen, onSel, sel: !isSelected, pr: pr);
-          onSel.call();
-        };
-
-  state[n.id] = Palette2(
-      key: Key(n.id.unique),
-      node: n,
-      selected: isSelected,
-      imPress: onSelect,
-      bodyPress: onSelect,
-      messagePreview: pr,
-      buttonsInfo2: bGen?.call(n) ?? []);
-}
+// void writePalette3<T extends Down4Node>(
+//   T n,
+//   Map<Down4ID, Palette2> state,
+//   Future<List<ButtonsInfo2>> Function(T n)? bGen,
+//   void Function()? onSel, {
+//   bool? sel,
+//   String? pr,
+// }) async {
+//   // isSelected will check first if it's an argument, else it will check
+//   // if the palette is a reload and use it's current status, or else it will
+//   // default to false
+//   bool? selectionIfReload;
+//   final Palette2? pInState = state[n.id];
+//   selectionIfReload = pInState?.selected;
+//   bool isSelected = sel ?? selectionIfReload ?? false;
+//
+//   void Function()? onSelect = onSel == null
+//       ? null
+//       : () {
+//           writePalette3(n, state, bGen, onSel, sel: !isSelected, pr: pr);
+//           onSel.call();
+//         };
+//
+//   state[n.id] = Palette2(
+//       key: Key(n.id.unique),
+//       node: n,
+//       selected: isSelected,
+//       imPress: onSelect,
+//       bodyPress: onSelect,
+//       messagePreview: pr,
+//       buttonsInfo2: await bGen?.call(n) ?? []);
+// }
 
 class Transition {
-  final Iterable<PersonNode> trueTargets;
+  final Iterable<PersonN> trueTargets;
   final List<Palette2> preTransition, postTransition;
   final Map<Down4ID, Palette2> state;
   final int nHidden;
@@ -699,18 +703,18 @@ Transition selectionTransition({
   final selected = originalList.selected();
   final unselected = originalList.notSelected();
 
-  final selectedPeople = selected.whereNodeIs<PersonNode>();
+  final selectedPeople = selected.whereNodeIs<PersonN>();
 
-  final selectedGroups = selected.whereNodeIs<GroupNode>();
+  final selectedGroups = selected.whereNodeIs<GroupN>();
 
   final idsInGroups = selectedGroups
-      .asNodes<GroupNode>()
+      .asNodes<GroupN>()
       .map((g) => g.group)
       .expand((id) => id)
       .toSet();
 
-  final unselectedGroups = unselected.whereNodeIs<GroupNode>();
-  final unselectedUsers = unselected.whereNodeIs<PersonNode>();
+  final unselectedGroups = unselected.whereNodeIs<GroupN>();
+  final unselectedUsers = unselected.whereNodeIs<PersonN>();
   final unHide = hidden.those(idsInGroups);
   final unselectedUsersNotInGroups = unselectedUsers.notThose(idsInGroups);
   final unselectedUserInGroups = unselectedUsers.those(idsInGroups);
@@ -740,7 +744,7 @@ Transition selectionTransition({
 
   print("pals=${pals.map((e) => e.node.displayName).toList()}");
   return Transition(
-      trueTargets: pals.where((p) => !p.fold && p.show).asNodes<PersonNode>(),
+      trueTargets: pals.where((p) => !p.fold && p.show).asNodes<PersonN>(),
       preTransition: originalList,
       postTransition: pals.inThatOrder(ogOrder.followedBy(unHide.asIDs())),
       state: state,
@@ -779,7 +783,7 @@ Transition selectionTransition({
 
 Future<ChatMessage?> getChatMessage({
   required Map<Down4ID, ChatMessage> state,
-  required ChatNode ch,
+  required ChatN ch,
   required Down4ID msgID,
   required Down4ID? prevMsgID,
   required Down4ID? nextMsgID,
@@ -819,12 +823,12 @@ Future<ChatMessage?> getChatMessage({
 
   final bool senderIsSelf = msg.senderID == g.self.id;
   final bool hasHeader =
-      !senderIsSelf && ch is GroupNode && nextMsg?.senderID != msg.senderID;
+      !senderIsSelf && ch is GroupN && nextMsg?.senderID != msg.senderID;
 
   // load the reactions, from disk always
   final reactions = await msg.reactions;
   // then cache all the local medias
-  await globall<FireMedia>(reactions.map((e) => e.mediaID));
+  await globall<Down4Media>(reactions.map((e) => e.mediaID));
   final cm = ChatMessage(
       key: GlobalKey(),
       hasGap: hasGap,
@@ -867,7 +871,7 @@ Future<ChatMessage?> getChatMessage({
 // }
 
 Future<void> writeMessages({
-  required ChatNode ch,
+  required ChatN ch,
   required List<Down4ID> ordered,
   required Map<Down4ID, ChatMessage> state,
   required Set<Down4ID> videos,
@@ -904,7 +908,7 @@ Future<void> writeMessages({
         refreshCallback: refresh);
     if (m != null) {
       state[m.id] = m;
-      if (m.mediaInfo?.media.isVideo ?? false) videos.add(m.id);
+      if (m.mediaInfo?.media is Down4Video) videos.add(m.id);
       if ((m.message.nodes ?? {}).isNotEmpty) withNodes.add(m.id);
     }
   }
@@ -919,7 +923,7 @@ Future<void> writePayments(
   await for (final pay in g.wallet.nPayments(limit: limit, offset: offset)) {
     state[pay.id] = Palette2(
       key: Key(pay.id.unique),
-      node: PaymentNode(pay.id, payment: pay, selfID: g.self.id),
+      node: PaymentNode(payment: pay, selfID: g.self.id),
       messagePreview: pay.textNote,
       buttonsInfo2: pay.isSpentBy(id: g.self.id)
           ? [

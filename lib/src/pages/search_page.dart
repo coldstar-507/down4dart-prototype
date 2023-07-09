@@ -25,9 +25,9 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   String get id => "search";
 
   final ViewState viewState;
-  final void Function(BranchNode) openNode;
+  final void Function(BranchN) openNode;
   final void Function(List<Palette2>) forwardNodes;
-  final void Function(Iterable<PersonNode>) add;
+  final void Function(Iterable<PersonN>) add;
   final void Function(Down4Node) onScan;
   final Future<void> Function(String) search;
   final void Function() back;
@@ -54,7 +54,7 @@ class _AddFriendPageState extends State<AddFriendPage>
   // CameraController? _cameraController;
   // MobileScannerController? scanner;
 
-  Future<List<ButtonsInfo2>> bGen(BranchNode b) async {
+  Future<List<ButtonsInfo2>> bGen(BranchN b) async {
     return [
       ButtonsInfo2(
         asset: g.fifty,
@@ -148,6 +148,7 @@ class _AddFriendPageState extends State<AddFriendPage>
             neuter: Down4Keys.fromYouKnow(data[4]),
             children: {},
             activity: makeTimestamp(),
+            lastOnline: 0,
             isConnected: false,
             description: "",
             mainDeviceID: data[5],
@@ -166,7 +167,7 @@ class _AddFriendPageState extends State<AddFriendPage>
   ConsoleButton get addButton => ConsoleButton(
         name: "ADD",
         onPress: () => widget.add(
-          searchs.values.selected().asNodes<PersonNode>(),
+          searchs.values.selected().asNodes<PersonN>(),
         ),
       );
 

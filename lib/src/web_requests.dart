@@ -40,8 +40,8 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<Pair<Down4Node, FireMedia?>>> fetchNodes<T extends Down4Node>(
-    Iterable<String> ids) async {
+Future<List<Pair<Down4Node, Down4MediaMetadata?>>>
+    fetchNodes<T extends Down4Node>(Iterable<String> ids) async {
   if (ids.isEmpty) return [];
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
@@ -51,10 +51,11 @@ Future<List<Pair<Down4Node, FireMedia?>>> fetchNodes<T extends Down4Node>(
   final jsonList = List<Map<String, Object?>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
     return jsonList.map((e) {
-      final nodeJson = e["node"] as Map<String, Object?>;
-      final mediaJson = e["media"] as Map<String, Object?>?;
+      final nodeJson = e["node"] as Map<String, String?>;
+      final mediaJson = e["media"] as Map<String, String?>?;
       final node = Down4Node.fromJson(nodeJson);
-      final media = mediaJson == null ? null : FireMedia.fromJson(mediaJson);
+      final media =
+          mediaJson == null ? null : Down4MediaMetadata.fromJson(mediaJson);
       return Pair(node, media);
     }).toList();
   }
@@ -178,19 +179,17 @@ Future<List<Chat>?> getPosts(List<String> ids) async {
   return null;
 }
 
-Future<Iterable<PersonNode>?> getUsers(Iterable<String> uniques) async {
+Future<Iterable<PersonN>?> getUsers(Iterable<String> uniques) async {
   final url = Uri.parse(
-    "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes2",
+    "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
   );
-  final response = await http.post(url, body: uniques);
+  final response = await http.post(url, body: uniques.join(" "));
   if (response.statusCode != 200) return null;
   return List.from(jsonDecode(response.body)).map((e) {
-    final person = Down4Node.fromJson(jsonDecode(e["node"]))..cache();
-    final data = Uint8List.fromList(base64Decode((e["data"])));
-    FireMedia.fromJson(jsonDecode(e["metadata"]))
-      ..cache()
-      ..cachedMemory = data;
-    return person as PersonNode;
+    final person = Down4Node.fromJson(e["node"])..cache();
+    // final data = Uint8List.fromList(base64Decode((e["data"])));
+    Down4Media.fromJson(e["metadata"]).cache();
+    return person as PersonN;
   });
 }
 

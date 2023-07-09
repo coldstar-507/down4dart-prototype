@@ -25,7 +25,7 @@ class HyperchatPage extends StatefulWidget implements Down4PageWidget {
   final void Function() back;
   final void Function(
     List<Down4Object>? fo,
-    FireMedia? m,
+    Down4Media? m,
     String? textInput,
     Set<ComposedID> members,
   ) makeHyperchat;
@@ -76,7 +76,7 @@ class _HyperchatPageState extends State<HyperchatPage>
   // ID get selfID => g.self.id;
 
   @override
-  List<(String, void Function(FireMedia))> get mediasMode => [
+  List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
           (m) async {
@@ -205,7 +205,7 @@ class _HyperchatPageState extends State<HyperchatPage>
   }
 
   @override
-  Future<void> send({FireMedia? mediaInput}) async {
+  Future<void> send({Down4Media? mediaInput}) async {
     final media = mediaInput ?? cameraInput;
     final text = input.value;
     if (text.isEmpty && media == null) return;

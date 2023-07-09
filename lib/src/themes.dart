@@ -19,7 +19,7 @@ import 'data_objects/nodes.dart';
 ///
 ///
 
-Map<String, Down4Theme> themesRegistry = {
+final Map<String, Down4Theme> themesRegistry = {
   BlackTheme().name: BlackTheme(),
   PinkTheme().name: PinkTheme(),
 };

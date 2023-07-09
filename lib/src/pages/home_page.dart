@@ -22,7 +22,7 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final ViewState homeState;
   // final List<Palette2> palettes;
   final void Function(String text) ping;
-  final void Function(ChatNode, List<Locals>) openChat; // TODO what is this?
+  final void Function(ChatN, List<Locals>) openChat; // TODO what is this?
   final void Function(Iterable<Chat>) send;
   final void Function(List<Palette2>) forward;
   final void Function() hyperchat, themes;
@@ -153,7 +153,7 @@ class _HomePageState extends State<HomePage>
           currentPageIndex: currentPageIndex);
 
   @override
-  List<(String, void Function(FireMedia))> get mediasMode => [
+  List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
           (m) async {
@@ -171,14 +171,14 @@ class _HomePageState extends State<HomePage>
       ];
 
   @override
-  Future<void> send({FireMedia? mediaInput}) async {
+  Future<void> send({Down4Media? mediaInput}) async {
     final media = mediaInput ?? cameraInput
       ?..cache()
       ..merge();
     if (media == null && input.value.isEmpty) return;
     final messages = palettes.values
         .selected()
-        .asNodes<ChatNode>()
+        .asNodes<ChatN>()
         .asComposedIDs()
         .map((root) => Chat(Down4ID(),
             senderID: g.self.id,

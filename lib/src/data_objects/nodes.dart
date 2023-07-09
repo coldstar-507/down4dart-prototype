@@ -5,6 +5,7 @@ import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/themes.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart' show Color;
 import 'package:cbl/cbl.dart';
 
@@ -56,7 +57,7 @@ class MessageTarget with Jsons {
   final String token;
   bool success;
 
-  String get messageSuccessKey => "${userID.value}%$device%$token";
+  String get messageSuccessKey => "${userID.value}~$device~$token";
 
   MessageTarget({
     required this.userID,
@@ -65,7 +66,7 @@ class MessageTarget with Jsons {
     this.success = false,
   });
   @override
-  Map<String, String> toJson({bool toLocal = false}) => {
+  Map<String, String> toJson({bool includeLocal = false}) => {
         "userID": userID.value,
         "device": device,
         "token": token,
@@ -82,50 +83,82 @@ class MessageTarget with Jsons {
   }
 }
 
-abstract class Down4Node extends Locals {
+mixin PaletteN on Down4Object {
+  Color get color;
+  Nodes get type;
+  String get displayID;
+  String get displayName;
+  ComposedID? get mediaID;
+  int get activity;
+}
+
+abstract class Down4Node extends Locals with PaletteN {
   @override
   Database get dbb => nodesDB;
 
   final Down4ID _id;
   final String? _deviceID, _mainDeviceID;
+  bool? _isConnected;
+
   int _activity;
-  int? _lastOnline;
   String _name;
   String? _lastName, _description;
   Map<String, String>? _messagingTokens;
   final Down4Keys? _neuter;
   ComposedID? _mediaID;
-  bool? _isConnected, _isPrivate;
+  bool? _isPrivate;
   final Set<ComposedID>? _group, _children, _privates, _posts, _admins;
   final ComposedID? _ownerID;
   double? _longitude, _latitude;
+  Map<ComposedID, String>? _treeHash;
+
+  @override
+  int get activity => _activity;
 
   @override
   Down4ID get id => _id;
-  ComposedID? get mediaID;
-  Color get color;
-  Nodes get type;
-  String get displayID;
-  String get displayName;
-  int get activity => _activity;
-  Map<ComposedID, String>? _treeHash;
 
-  String get publicHash;
+  String get _connection => [
+        publicHash,
+        _blueArrowHash,
+        _lastOnline.toString(),
+      ].join("~");
+  String _blueArrowHash;
+  int _lastOnline;
+  String get publicHash => md5(publicData.asUtf8()).toBase64();
 
   Map<String, String>? get _jsonTreeHash =>
       _treeHash?.map((key, value) => MapEntry(key.value, value));
 
+  static (String, String b, int) parseConnection(String conn) {
+    final s = conn.split("~");
+    print(s);
+    return (s[0], s[1], int.parse(s[2]));
+  }
+
+  String get publicData {
+    return id.unique +
+        _name +
+        (_lastName ?? "") +
+        jsonEncode(_messagingTokens ?? {}) +
+        (_mainDeviceID ?? "") +
+        (jsonEncode(_jsonTreeHash ?? {})) +
+        (_ownerID?.value ?? "") +
+        (_mediaID?.value ?? "") +
+        (_children?.join(" ") ?? "") +
+        (_posts?.join(" ") ?? "") +
+        (_admins?.join(" ") ?? "") +
+        (_group?.join(" ") ?? "");
+  }
+
   @override
-  Map<String, String> toJson({
-    bool toLocal = true,
-    bool includePublic = true,
-    bool includeConnection = true,
-  }) {
+  Map<String, String> toJson({bool includeLocal = true}) {
     return {
       "id": id.value,
-      "type": (this is Self && !toLocal) ? Nodes.user.name : type.name,
+      "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
       "name": _name,
-      if (toLocal) "unique": id.unique,
+      "connection": _connection,
+      if (includeLocal) "unique": id.unique,
       if (_messagingTokens != null)
         "messagingTokens": jsonEncode(_messagingTokens),
       if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID!,
@@ -141,152 +174,175 @@ abstract class Down4Node extends Locals {
       if (_admins != null) "admins": _admins!.values,
       if (_neuter != null) "neuter": _neuter!.toYouKnow(),
       if (_group != null) "group": _group!.values,
-      if (toLocal && _deviceID != null) "deviceID": _deviceID!,
-      if (toLocal && _isConnected != null) "isFriend": _isConnected!.toString(),
-      if (toLocal) "activity": _activity.toString(),
+      if (includeLocal && _deviceID != null) "deviceID": _deviceID!,
+      if (includeLocal && _isConnected != null)
+        "isFriend": _isConnected!.toString(),
+      if (includeLocal) "activity": _activity.toString(),
     };
   }
 
-  Map<String, dynamic> toJson2({
-    bool includeLocal = true,
-    bool includePublic = true,
-    bool includePrivate = false,
-    bool includeConnection = true,
-  }) {
-    return {
-      if (includeConnection)
-        "connection": {
-          if (_lastOnline != null) "lastOnline": _lastOnline,
-          "publicHash": publicHash,
-        },
-      if (includePublic)
-        "public": {
-          "id": id.value,
-          "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
-          "name": _name,
-          if (_messagingTokens != null) "messagingTokens": _messagingTokens,
-          if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID,
-          if (_treeHash != null) "treeHash": _jsonTreeHash,
-          if (_ownerID != null) "ownerID": _ownerID!.value,
-          if (_lastName != null) "lastName": _lastName,
-          if (_longitude != null) "longitude": _longitude,
-          if (_latitude != null) "latitude": _latitude,
-          if (_mediaID != null) "mediaID": _mediaID!.value,
-          if (_children != null) "children": _children!.values,
-          if (_posts != null) "posts": _posts!.values,
-          if (_privates != null) "privates": _privates!.values,
-          if (_admins != null) "admins": _admins!.values,
-          if (_neuter != null) "neuter": _neuter!.toYouKnow(),
-          if (_group != null) "group": _group!.values,
-        },
-      if (includePrivate)
-        "private": {
-          if (_privates != null) "privates": _privates!,
-        },
-      if (includeLocal)
-        "local": {
-          if (_deviceID != null) "deviceID": _deviceID,
-          if (_isConnected != null) "isConnected": _isConnected,
-          "unique": id.unique,
-          "activity": _activity,
-        }
-    };
+  // everything but the localValue we can see in toJson
+  void mergeWith(Down4Node? other) {
+    if (other == null) return;
+    _lastOnline = other._lastOnline;
+    _name = other._name;
+    _lastName = other._lastName;
+    _description = other._description;
+    _messagingTokens = other._messagingTokens;
+    _mediaID = other._mediaID;
+    _isPrivate = other._isPrivate;
+    _longitude = other._longitude;
+    _latitude = other._latitude;
+    _treeHash = other._treeHash;
   }
 
-  factory Down4Node.fromJson2(dynamic json2) {
-    final connection = jsonDecode(json2["connection"]);
-    final private = json2["private"];
-    final public = json2["public"];
-    final local = json2["local"];
+  // @override
+  // Map<String, dynamic> toJson({
+  //   bool includeLocal = true,
+  //   bool includePublic = true,
+  //   bool includePrivate = true,
+  //   bool includeConnection = true,
+  // }) {
+  //   return {
+  //     if (includeConnection)
+  //       "connection": {
+  //         if (_lastOnline != null) "lastOnline": _lastOnline,
+  //         "publicHash": publicHash,
+  //       },
+  //     if (includePublic)
+  //       "public": {
+  //         "id": id.value,
+  //         "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
+  //         "name": _name,
+  //         if (_messagingTokens != null) "messagingTokens": _messagingTokens,
+  //         if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID,
+  //         if (_treeHash != null) "treeHash": _jsonTreeHash,
+  //         if (_ownerID != null) "ownerID": _ownerID!.value,
+  //         if (_lastName != null) "lastName": _lastName,
+  //         if (_longitude != null) "longitude": _longitude,
+  //         if (_latitude != null) "latitude": _latitude,
+  //         if (_mediaID != null) "mediaID": _mediaID!.value,
+  //         if (_children != null) "children": _children!.values,
+  //         if (_posts != null) "posts": _posts!.values,
+  //         if (_privates != null) "privates": _privates!.values,
+  //         if (_admins != null) "admins": _admins!.values,
+  //         if (_neuter != null) "neuter": _neuter!.toYouKnow(),
+  //         if (_group != null) "group": _group!.values,
+  //       },
+  //     if (includePrivate)
+  //       "private": {
+  //         if (_privates != null) "privates": _privates!,
+  //       },
+  //     if (includeLocal)
+  //       "local": {
+  //         if (_deviceID != null) "deviceID": _deviceID,
+  //         if (_isConnected != null) "isConnected": _isConnected,
+  //         "unique": id.unique,
+  //         "activity": _activity,
+  //       }
+  //   };
+  // }
 
-    final id = Down4ID.fromString(public["id"]);
-    final mainDeviceID = public["mainDeviceID"];
-    final type = Nodes.values.byName(public["type"]);
-    final mediaID = ComposedID.fromString(public["mediaID"]);
-    final latitude = public["latitude"];
-    final longitude = public["longitude"];
-    final ownerID = ComposedID.fromString(public["ownerID"]);
-    final name = public["name"];
-    final isPrivate = public["isPrivate"];
-    final lastName = public["lastName"];
-    final messagingTokens = public["messagingTokens"];
-    final description = public["description"];
-    final children = (public["children"] as String?)?.toComposedIDs();
-    final privates = (public["privates"] as String?)?.toComposedIDs();
-    final admins = (public["admins"] as String?)?.toComposedIDs();
-    final group = (public["group"] as String?)?.toComposedIDs();
-    final neuter = public["neuter"] != null
-        ? Down4Keys.fromYouKnow(public["neuter"] as String)
-        : null;
-
-    final deviceID = local["deviceID"];
-    final activity = local["activity"];
-    final isConnected = local["isConnected"];
-
-    switch (type) {
-      case Nodes.user:
-        return User(id as ComposedID,
-            activity: activity,
-            name: name,
-            mainDeviceID: mainDeviceID,
-            messagingTokens: messagingTokens,
-            isConnected: isConnected,
-            children: children!,
-            description: description,
-            lastName: lastName,
-            mediaID: mediaID,
-            neuter: neuter!);
-      case Nodes.hyperchat:
-        return Hyperchat(id as ComposedID,
-            activity: activity,
-            mediaID: mediaID!,
-            ownerID: ownerID!,
-            firstWord: name,
-            secondWord: lastName,
-            group: group!);
-      case Nodes.self:
-        return Self(id as ComposedID,
-            deviceID: deviceID,
-            activity: activity,
-            name: name,
-            description: description,
-            lastName: lastName,
-            mainDeviceID: mainDeviceID,
-            messagingTokens: messagingTokens,
-            neuter: neuter!,
-            mediaID: mediaID!,
-            children: children!,
-            privates: privates!);
-      case Nodes.group:
-        return Group(id as ComposedID,
-            activity: activity,
-            name: name,
-            mediaID: mediaID!,
-            ownerID: ownerID!,
-            isPrivate: isPrivate,
-            group: group!);
-      case Nodes.root:
-      // TODO: Handle this case.
-      case Nodes.market:
-      // TODO: Handle this case.
-      case Nodes.checkpoint:
-      // TODO: Handle this case.
-      case Nodes.journal:
-      // TODO: Handle this case.
-      case Nodes.item:
-      // TODO: Handle this case.
-      case Nodes.event:
-      // TODO: Handle this case.
-      case Nodes.ticket:
-      // TODO: Handle this case.
-      case Nodes.payment:
-      // TODO: Handle this case.
-      case Nodes.theme:
-      // TODO: Handle this case.
-    }
-
-    throw 'Down4Node fromJson not yet implemented for type: $type';
-  }
+  // factory Down4Node.fromJson(dynamic json) {
+  //   final connection = json["connection"];
+  //   final private = json["private"];
+  //   final public = json["public"];
+  //   final local = json["local"];
+  //
+  //   final id = Down4ID.fromString(public["id"]);
+  //   final mainDeviceID = public["mainDeviceID"];
+  //   final type = Nodes.values.byName(public["type"]);
+  //   final mediaID = ComposedID.fromString(public["mediaID"]);
+  //   final latitude = public["latitude"];
+  //   final longitude = public["longitude"];
+  //   final ownerID = ComposedID.fromString(public["ownerID"]);
+  //   final name = public["name"];
+  //   final isPrivate = public["isPrivate"];
+  //   final lastName = public["lastName"];
+  //   final messagingTokens = public["messagingTokens"];
+  //   final description = public["description"];
+  //   final children = (public["children"] as String?)?.toComposedIDs();
+  //   final privates = (public["privates"] as String?)?.toComposedIDs();
+  //   final admins = (public["admins"] as String?)?.toComposedIDs();
+  //   final group = (public["group"] as String?)?.toComposedIDs();
+  //   final neuter = public["neuter"] != null
+  //       ? Down4Keys.fromYouKnow(public["neuter"] as String)
+  //       : null;
+  //
+  //   final deviceID = local["deviceID"];
+  //   final activity = local["activity"];
+  //   final isConnected = local["isConnected"];
+  //
+  //   final lastOnline = connection["lastOnline"];
+  //
+  //   switch (type) {
+  //     case Nodes.user:
+  //       return User(id as ComposedID,
+  //           activity: activity,
+  //           name: name,
+  //           lastOnline: lastOnline,
+  //           mainDeviceID: mainDeviceID,
+  //           messagingTokens: messagingTokens,
+  //           isConnected: isConnected ?? false,
+  //           children: children!,
+  //           description: description,
+  //           lastName: lastName,
+  //           mediaID: mediaID,
+  //           neuter: neuter!);
+  //     case Nodes.hyperchat:
+  //       return Hyperchat(id as ComposedID,
+  //           activity: activity,
+  //           mediaID: mediaID!,
+  //           ownerID: ownerID!,
+  //           firstWord: name,
+  //           isConnected: isConnected ?? false,
+  //           secondWord: lastName,
+  //           group: group!);
+  //     case Nodes.self:
+  //       return Self(id as ComposedID,
+  //           deviceID: deviceID,
+  //           activity: activity,
+  //           name: name,
+  //           lastOnline: lastOnline,
+  //           description: description,
+  //           lastName: lastName,
+  //           mainDeviceID: mainDeviceID,
+  //           messagingTokens: messagingTokens,
+  //           neuter: neuter!,
+  //           mediaID: mediaID!,
+  //           children: children!,
+  //           privates: privates!);
+  //     case Nodes.group:
+  //       return Group(id as ComposedID,
+  //           activity: activity,
+  //           name: name,
+  //           mediaID: mediaID!,
+  //           ownerID: ownerID!,
+  //           isConnected: isConnected ?? false,
+  //           isPrivate: isPrivate,
+  //           group: group!);
+  //     case Nodes.root:
+  //     // TODO: Handle this case.
+  //     case Nodes.market:
+  //     // TODO: Handle this case.
+  //     case Nodes.checkpoint:
+  //     // TODO: Handle this case.
+  //     case Nodes.journal:
+  //     // TODO: Handle this case.
+  //     case Nodes.item:
+  //     // TODO: Handle this case.
+  //     case Nodes.event:
+  //     // TODO: Handle this case.
+  //     case Nodes.ticket:
+  //     // TODO: Handle this case.
+  //     case Nodes.payment:
+  //     // TODO: Handle this case.
+  //     case Nodes.theme:
+  //     // TODO: Handle this case.
+  //   }
+  //
+  //   throw 'Down4Node fromJson not yet implemented for type: $type';
+  // }
 
   Down4Node(
     Down4ID id, {
@@ -294,6 +350,8 @@ abstract class Down4Node extends Locals {
     String? mainDeviceID,
     required int activity,
     required String name,
+    String? blueArrowHash,
+    bool isConnected = false,
     int? lastOnline,
     String? lastName,
     bool? isFriend,
@@ -313,12 +371,13 @@ abstract class Down4Node extends Locals {
     Set<ComposedID>? group,
   })  : _id = id,
         _activity = activity,
-        _lastOnline = lastOnline,
+        _lastOnline = lastOnline ?? 0,
         _name = name,
+        _isConnected = isConnected,
         _mainDeviceID = mainDeviceID,
         _deviceID = deviceID,
         _lastName = lastName,
-        _isConnected = isFriend,
+        _blueArrowHash = blueArrowHash ?? id.unique,
         _isPrivate = isPrivate,
         _latitude = latitude,
         _longitude = longitude,
@@ -333,34 +392,37 @@ abstract class Down4Node extends Locals {
         _posts = posts,
         _children = children;
 
-  Down4Node copy() => Down4Node.fromJson(toJson(toLocal: true));
+  Down4Node copy() => Down4Node.fromJson(toJson());
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? makeTimestamp();
     merge({"activity": _activity.toString()});
   }
 
-  factory Down4Node.fromJson(Map<String, Object?> json) {
-    final id = Down4ID.fromString(json["id"] as String);
-    final deviceID = json["deviceID"] as String?;
-    final mainDeviceID = json["mainDeviceID"] as String?;
-    final activity = int.parse(json["activity"] as String? ?? "0");
-    final type = Nodes.values.byName(json["type"] as String);
-    final mediaID = ComposedID.fromString(json["mediaID"] as String?);
-    final latitude = double.tryParse(json["latitude"] as String? ?? "");
-    final longitude = double.tryParse(json["longitude"] as String? ?? "");
-    final ownerID = ComposedID.fromString(json["ownerID"] as String?);
-    final name = json["name"] as String;
+  factory Down4Node.fromJson(Map<String, String?> json) {
+    final (_, blueH, lastO) = parseConnection(json["connection"]!);
+
+    final id = Down4ID.fromString(json["id"]!);
+    final deviceID = json["deviceID"];
+    final mainDeviceID = json["mainDeviceID"];
+    final activity = int.parse(json["activity"] ?? "0");
+    final type = Nodes.values.byName(json["type"]!);
+    final mediaID = ComposedID.fromString(json["mediaID"]);
+    final latitude = double.tryParse(json["latitude"] ?? "");
+    final longitude = double.tryParse(json["longitude"] ?? "");
+    final ownerID = ComposedID.fromString(json["ownerID"]);
+    final name = json["name"]!;
+    final isConnected = json["isConnected"] == "true";
     final isFriend = json["isFriend"] == "true";
     final isPrivate = json["isPrivate"] == "true";
-    final lastName = json["lastName"] as String?;
-    final tokensStr = json["messagingTokens"] as String? ?? '{}';
+    final lastName = json["lastName"];
+    final tokensStr = json["messagingTokens"] ?? '{}';
     final messagingTokens = Map<String, String>.from(jsonDecode(tokensStr));
-    final description = json["description"] as String?;
-    final children = (json["children"] as String?)?.toComposedIDs();
-    final privates = (json["privates"] as String?)?.toComposedIDs();
-    final admins = (json["admins"] as String?)?.toComposedIDs();
-    final group = (json["group"] as String?)?.toComposedIDs();
+    final description = json["description"];
+    final children = json["children"]?.toComposedIDs();
+    final privates = json["privates"]?.toComposedIDs();
+    final admins = json["admins"]?.toComposedIDs();
+    final group = json["group"]?.toComposedIDs();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
@@ -371,6 +433,8 @@ abstract class Down4Node extends Locals {
             mainDeviceID: mainDeviceID!,
             activity: activity,
             name: name,
+            blueArrowHash: blueH,
+            lastOnline: lastO,
             lastName: lastName,
             mediaID: mediaID,
             messagingTokens: messagingTokens,
@@ -386,15 +450,19 @@ abstract class Down4Node extends Locals {
             activity: activity,
             ownerID: ownerID!,
             mediaID: mediaID!,
+            blueArrowHash: blueH,
             firstWord: name,
             secondWord: lastName!,
-            group: group!);
+            group: group!,
+            isConnected: isConnected);
 
       case Nodes.group:
         return Group(id as ComposedID,
             isPrivate: isPrivate,
             activity: activity,
             ownerID: ownerID!,
+            blueArrowHash: blueH,
+            isConnected: isConnected,
             name: name,
             mediaID: mediaID!,
             group: group!);
@@ -405,6 +473,8 @@ abstract class Down4Node extends Locals {
             deviceID: deviceID!,
             activity: activity,
             name: name,
+            blueArrowHash: blueH,
+            lastOnline: lastO,
             description: description,
             messagingTokens: messagingTokens,
             lastName: lastName,
@@ -447,9 +517,26 @@ abstract class Down4Node extends Locals {
   }
 }
 
-mixin BranchNode on Down4Node {
+mixin ConnectN on RemoteN, Down4Node {
+  @override
+  ComposedID get id;
+
+  bool get isConnected;
+  Future<void> updateConnectionStatus(bool isConnected) async {
+    _isConnected = isConnected;
+    await merge({"isConnected": isConnected.toString()});
+  }
+
+  Stream<DatabaseEvent> get connection {
+    return id.userRef.child("connection").onChildChanged;
+  }
+}
+
+mixin BranchN on ConnectN, Down4Node {
   @override
   ComposedID get id => _id as ComposedID;
+
+  String get blueArrowHash => _blueArrowHash ??= "";
 
   Map<ComposedID, String>? get treeHash;
   set treeHash(Map<ComposedID, String>? t) => _treeHash = t;
@@ -460,11 +547,11 @@ mixin BranchNode on Down4Node {
     for (final c in children) {
       final n = await global<Down4Node>(c);
       if (n != null) {
-        if (n is BranchNode) {
+        if (n is BranchN) {
           await n._calculateTreeHash();
           tree.addAll(n._treeHash!);
-        } else {
-          tree[n.id as ComposedID] = n.publicHash;
+        } else if (n is ConnectN) {
+          tree[n.id] = n.publicHash;
         }
       }
     }
@@ -487,11 +574,11 @@ mixin BranchNode on Down4Node {
   }
 }
 
-mixin ChildNode on Down4Node {
+mixin ChildN on Down4Node {
   ComposedID get ownerID;
 }
 
-mixin ChatNode on Down4Node {
+mixin ChatN on Down4Node {
   @override
   ComposedID get id => _id as ComposedID;
 
@@ -506,11 +593,11 @@ mixin ChatNode on Down4Node {
     final nodeRef = this;
     List<MessageTarget> targets = [];
     // List<MessageTarget> selfTargets = [];
-    final people = nodeRef is GroupNode
-        ? (await globall<PersonNode>(nodeRef.group))
+    final people = nodeRef is GroupN
+        ? (await globall<PersonN>(nodeRef.group))
         : nodeRef.id == g.self.id
             ? [g.self]
-            : [g.self, nodeRef as PersonNode];
+            : [g.self, nodeRef as PersonN];
 
     for (final person in people) {
       for (final token in person.messagingTokens.entries) {
@@ -532,18 +619,18 @@ mixin ChatNode on Down4Node {
     // return (selfTargets, targets);
   }
 
-  Future<Pair<Iterable<ComposedID>, AsyncListenStream<QueryChange<ResultSet>>>>
+  Future<Pair<Iterable<Down4ID>, AsyncListenStream<QueryChange<ResultSet>>>>
       getTheChat() async {
     final raw = """
         SELECT META().id AS id FROM _
-        WHERE root = '${id.value}' AND isSnip = 'false'
+        WHERE root = '${id.value}' AND type = 'chat'
         ORDER BY id DESC
         """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
     final r = await q.execute();
     return Pair(
       (await r.allResults())
-          .map((e) => ComposedID.fromString(e.toPlainMap()["id"] as String)!),
+          .map((e) => Down4ID.fromString(e.toPlainMap()["id"] as String)!),
       q.changes(),
     );
   }
@@ -551,7 +638,7 @@ mixin ChatNode on Down4Node {
   Future<Iterable<ComposedID>> unreadSnipIDs() async {
     final raw = """
         SELECT META().id AS id FROM _
-        WHERE root = '${id.value}' AND isSnip = 'true' AND isRead = 'false'
+        WHERE root = '${id.value}' AND type = 'snip' AND isRead = false
         ORDER BY id ASC
         """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -573,7 +660,7 @@ mixin ChatNode on Down4Node {
   Future<Chat?> lastChatMessage() async {
     final raw = """
             SELECT * FROM _ AS m
-            WHERE root = '${id.value}' AND isSnip = 'false'
+            WHERE root = '${id.value}' AND type = 'chat'
             ORDER BY META(m).id DESC LIMIT 1
             """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -589,7 +676,7 @@ mixin ChatNode on Down4Node {
     final raw = """
             SELECT * FROM _
             WHERE root = '${id.value}'
-              AND isSnip = 'false'
+              AND type = 'chat'
               AND isRead = 'false'
               AND senderID != '${g.self.id.value}'
             ORDER BY META().id DESC LIMIT 1
@@ -601,27 +688,29 @@ mixin ChatNode on Down4Node {
     return a.isNotEmpty;
   }
 
-  Future<(Chat?, Iterable<ComposedID>, bool)> homeChatInfo() async {
-    final val = await Future.wait([
-      lastChatMessage(),
-      unreadSnipIDs(),
-      lastChatFromOtherIsUnread(),
-    ]);
-    return (val[0] as Chat?, val[1] as Iterable<ComposedID>, val[2] as bool);
-  }
+  // Future<(Chat?, Iterable<ComposedID>, bool)> homeChatInfo() async {
+  //   final val = await Future.wait([
+  //     lastChatMessage(),
+  //     unreadSnipIDs(),
+  //     lastChatFromOtherIsUnread(),
+  //   ]);
+  //   return (val[0] as Chat?, val[1] as Iterable<ComposedID>, val[2] as bool);
+  // }
 }
 
-mixin GroupNode on ChatNode, ChildNode {
+mixin GroupN on ChatN, ChildN {
   Iterable<ComposedID> get group;
   @override
   String get displayID => group.map((id) => "@${id.unique}").join(" ");
 }
 
-mixin PersonNode on ChatNode, GeoNode, BranchNode {
+mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
   String get mainDeviceID;
 
   @override
   ComposedID get id => _id as ComposedID;
+
+  int get lastOnline;
 
   String get firstName;
   String? get description;
@@ -631,9 +720,15 @@ mixin PersonNode on ChatNode, GeoNode, BranchNode {
 
   Down4Keys get neuter;
 
+  Future<void> updateLastOnline(int? lastOnline) async {
+    if (lastOnline == null) return;
+    _lastOnline = lastOnline;
+    await merge({"lastOnline": _lastOnline.toString()});
+  }
+
   Future<void> updateMessagingToken(Map<String, String> newToken) async {
     _messagingTokens = {...?_messagingTokens, ...newToken};
-    await merge({"messagingToken": jsonEncode(_messagingTokens)});
+    await merge({"messagingTokens": jsonEncode(messagingTokens)});
   }
 
   @override
@@ -644,7 +739,7 @@ mixin PersonNode on ChatNode, GeoNode, BranchNode {
       firstName + ((lastName != null) ? " $lastName" : "");
 }
 
-mixin EditNode on Down4Node {
+mixin EditN on Down4Node {
   Future<void> editName(String newName) async {
     _name = newName;
     await merge({"name": _name});
@@ -655,9 +750,9 @@ mixin EditNode on Down4Node {
     await merge({"lastName": _lastName ?? ""});
   }
 
-  Future<void> editImage(FireMedia newImage) async {
+  Future<void> editImage(Down4Media newImage) async {
     _mediaID = newImage.id;
-    await merge({"media": _mediaID!});
+    await merge({"mediaID": _mediaID!.value});
   }
 
   Future<void> editDescription(String newDescription) async {
@@ -666,7 +761,7 @@ mixin EditNode on Down4Node {
   }
 }
 
-mixin GeoNode on Geo, Down4Node {
+mixin GeoN on Geo, Down4Node {
   Future<void> updateLocation(double lon, double lat) async {
     _longitude = lon;
     _latitude = lat;
@@ -674,13 +769,13 @@ mixin GeoNode on Geo, Down4Node {
   }
 }
 
-mixin RemoteNode on Down4Node {
+mixin RemoteN on Down4Node {
   @override
   ComposedID get id;
 
   bool get isRemoteMutable {
     dynamic ref = this;
-    return ref is Self || (ref is ChildNode && ref.ownerID == g.self.id);
+    return ref is Self || (ref is ChildN && ref.ownerID == g.self.id);
   }
 
   Future<void> remoteDelete() async {
@@ -699,7 +794,7 @@ mixin RemoteNode on Down4Node {
   Future<bool> remoteMerge({Map<String, dynamic>? data}) async {
     if (isRemoteMutable) {
       try {
-        await id.userRef.update(data ?? toJson(toLocal: false));
+        await id.userRef.update(data ?? toJson(includeLocal: false));
         return true;
       } catch (e) {
         print("error remoteMerge node id=${id.unique}");
@@ -709,10 +804,16 @@ mixin RemoteNode on Down4Node {
       throw "node type=$runtimeType, id=${id.unique} isn't remoteMutable";
     }
   }
+
+  Future<RemoteN?> remoteFetch() async {
+    final data = (await id.userRef.get()).value as Map<String, String>?;
+    if (data == null) return null;
+    return fromJson<RemoteN>(data);
+  }
 }
 
 class User extends Down4Node
-    with BranchNode, ChatNode, Geo, GeoNode, PersonNode {
+    with RemoteN, ConnectN, BranchN, ChatN, Geo, GeoN, PersonN {
   User(
     super.id, {
     required super.activity,
@@ -721,6 +822,8 @@ class User extends Down4Node
     required Map<String, String> messagingTokens,
     required bool isConnected,
     required Set<ComposedID> children,
+    required int lastOnline,
+    super.blueArrowHash,
     required super.description,
     required super.lastName,
     required super.mediaID,
@@ -728,19 +831,21 @@ class User extends Down4Node
     super.latitude,
     super.longitude,
   }) : super(
+            lastOnline: lastOnline,
+            isConnected: isConnected,
             mainDeviceID: mainDeviceID,
             messagingTokens: messagingTokens,
             isFriend: isConnected,
             children: children,
             neuter: neuter);
 
-  Future<void> updateFriendStatus(bool newFriendStatus) async {
-    _isConnected = newFriendStatus;
-    Map<String, String> mergeInfo = {};
-    mergeInfo["isFriend"] = _isConnected.toString();
-    if (_isConnected!) mergeInfo["isHidden"] = false.toString();
-    await merge(mergeInfo);
-  }
+  // Future<void> updateFriendStatus(bool newFriendStatus) async {
+  //   _isConnected = newFriendStatus;
+  //   Map<String, String> mergeInfo = {};
+  //   mergeInfo["isFriend"] = _isConnected.toString();
+  //   if (_isConnected) mergeInfo["isHidden"] = false.toString();
+  //   await merge(mergeInfo);
+  // }
 
   @override
   Map<String, String> get messagingTokens => _messagingTokens!;
@@ -758,14 +863,14 @@ class User extends Down4Node
     return e_.isNotEmpty;
   }
 
-  bool get isFriend => _isConnected!;
+  // bool get isFriend => _isConnected!;
 
   @override
   Iterable<ComposedID> get children => _children!;
 
   @override
-  Color get color =>
-      g.theme.nodeColors[isFriend ? NodesColor.friend : NodesColor.nonFriend]!;
+  Color get color => g.theme
+      .nodeColors[isConnected ? NodesColor.friend : NodesColor.nonFriend]!;
 
   @override
   String? get description => _description;
@@ -796,10 +901,19 @@ class User extends Down4Node
 
   @override
   String get mainDeviceID => _mainDeviceID!;
+
+  @override
+  bool get isConnected => _isConnected!;
+
+  @override
+  int get lastOnline => _lastOnline;
+
+  // @override
+  // bool get isConnected => _isConnected;
 }
 
 class Self extends Down4Node
-    with RemoteNode, BranchNode, ChatNode, Geo, GeoNode, PersonNode, EditNode {
+    with RemoteN, ConnectN, BranchN, ChatN, Geo, GeoN, PersonN, EditN {
   Self(
     super.id, {
     required String deviceID,
@@ -807,6 +921,8 @@ class Self extends Down4Node
     required super.name,
     required super.description,
     required super.lastName,
+    super.blueArrowHash,
+    required int lastOnline,
     required String mainDeviceID,
     required Map<String, String> messagingTokens,
     required Down4Keys neuter,
@@ -816,6 +932,7 @@ class Self extends Down4Node
     super.latitude,
     super.longitude,
   }) : super(
+            lastOnline: lastOnline,
             deviceID: deviceID,
             mainDeviceID: mainDeviceID,
             mediaID: mediaID,
@@ -861,9 +978,9 @@ class Self extends Down4Node
 
     if (r.isEmpty) return null;
     final json = r.single.toPlainMap();
-    final jsonNode = Map<String, Object?>.from(json["n"] as Map);
+    final jsonNode = Map<String, String?>.from(json["n"] as Map);
     final self = fromJson<Self>(jsonNode)..cache();
-    await global<FireMedia>(self.mediaID);
+    await global<Down4Media>(self.mediaID);
     return self;
   }
 
@@ -883,19 +1000,28 @@ class Self extends Down4Node
 
   @override
   String get mainDeviceID => _mainDeviceID!;
+
+  @override
+  int get lastOnline => _lastOnline;
+
+  @override
+  bool get isConnected => false;
 }
 
 class Group extends Down4Node
-    with RemoteNode, ChatNode, ChildNode, GroupNode, EditNode {
+    with RemoteN, ConnectN, ChatN, ChildN, GroupN, EditN {
   Group(
     super.id, {
     required super.activity,
     required super.name,
+    super.blueArrowHash,
+    required bool isConnected,
     required ComposedID mediaID,
     required ComposedID ownerID,
     required bool isPrivate,
     required Set<ComposedID> group,
   }) : super(
+            isConnected: isConnected,
             group: group,
             isPrivate: isPrivate,
             mediaID: mediaID,
@@ -931,19 +1057,25 @@ class Group extends Down4Node
       // we hash ids to get fixed size
       XORedStrings(
           group.map((e) => sha1(e.unique.codeUnits).toUtf16()).toList());
+
+  @override
+  bool get isConnected => _isConnected!;
 }
 
 class Hyperchat extends Down4Node
-    with RemoteNode, ChatNode, ChildNode, GroupNode {
+    with RemoteN, ConnectN, ChatN, ChildN, GroupN {
   Hyperchat(
     super.id, {
     required super.activity,
+    super.blueArrowHash,
+    required bool isConnected,
     required ComposedID mediaID,
     required ComposedID ownerID,
     required String firstWord,
     required String secondWord,
     required Set<ComposedID> group,
   }) : super(
+            isConnected: isConnected,
             mediaID: mediaID,
             group: group,
             name: firstWord,
@@ -973,26 +1105,27 @@ class Hyperchat extends Down4Node
       // we hash ids to get fixed size
       XORedStrings(
           group.map((e) => sha1(e.unique.codeUnits).toUtf16()).toList());
+
+  @override
+  bool get isConnected => _isConnected!;
 }
 
-class PaymentNode extends Down4Node {
-  @override
-  Database get dbb => throw "Don't merge palette payment";
-
-  @override
-  int get activity => _payment.timestamp;
-
-  @override
-  ComposedID? get mediaID => null;
+class PaymentNode with Down4Object, PaletteN {
+  // @override
+  // Database get dbb => throw "Don't merge palette payment";
+  //
+  // @override
+  // int get activity => _payment.timestamp;
+  //
+  // @override
+  // ComposedID? get mediaID => null;
 
   final Down4Payment _payment;
   final ComposedID selfID;
-  PaymentNode(
-    super.id, {
+  PaymentNode({
     required Down4Payment payment,
     required this.selfID,
-  })  : _payment = payment,
-        super(activity: payment.timestamp, name: payment.id.unique);
+  }) : _payment = payment;
 
   @override
   String get displayName => payment.formattedName(selfID);
@@ -1014,13 +1147,18 @@ class PaymentNode extends Down4Node {
   Nodes get type => Nodes.payment;
 
   @override
-  String get publicHash => _payment.id.unique;
+  Down4ID get id => payment.id;
+
+  @override
+  ComposedID? get mediaID => null;
+
+  @override
+  int get activity => payment.timestamp;
 }
 
-class NodeTheme extends Down4Node {
+class NodeTheme with Down4Object, PaletteN {
   final Down4Theme theme;
-  NodeTheme(this.theme)
-      : super(Down4ID(unique: theme.font), activity: 0, name: theme.name);
+  NodeTheme(this.theme);
 
   @override
   Color get color => g.theme.paletteTextColor;
@@ -1029,14 +1167,17 @@ class NodeTheme extends Down4Node {
   String get displayID => "font : ${theme.font}";
 
   @override
-  String get displayName => _name;
-
-  @override
-  ComposedID? get mediaID => null;
+  String get displayName => theme.name;
 
   @override
   Nodes get type => Nodes.theme;
 
   @override
-  String get publicHash => theme.name;
+  Down4ID get id => Down4ID(unique: theme.name);
+
+  @override
+  ComposedID? get mediaID => null;
+
+  @override
+  int get activity => 0;
 }

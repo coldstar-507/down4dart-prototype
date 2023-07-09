@@ -489,7 +489,7 @@ class ConsoleText extends StatelessWidget {
 }
 
 class ConsoleMedias2 {
-  final void Function(FireMedia) onSelect;
+  final void Function(Down4Media) onSelect;
   final bool images;
   ConsoleMedias2({required this.images, required this.onSelect});
 }
@@ -749,16 +749,16 @@ class Console extends StatelessWidget {
               itemBuilder: ((context, index) {
                 Widget f(int i) {
                   if (i < ids.length) {
-                    final cachedMedia = cache<FireMedia>(ids[i]);
+                    final cachedMedia = cache<Down4Media>(ids[i]);
                     if (cachedMedia != null) {
                       return GestureDetector(
                           onTap: () => medias!.onSelect(cachedMedia),
-                          child: (cachedMedia.displayImage(
+                          child: (cachedMedia.display(
                               size: Size.square(mediaCelSize),
                               forceSquare: true)));
                     }
                     return FutureBuilder(
-                      future: global<FireMedia>(ids[i]),
+                      future: global<Down4Media>(ids[i]),
                       builder: (ctx, ans) {
                         if (ans.connectionState == ConnectionState.done &&
                             ans.hasData) {
@@ -766,7 +766,7 @@ class Console extends StatelessWidget {
                               onTap: () => ans.data != null
                                   ? medias!.onSelect(ans.data!)
                                   : null,
-                              child: (ans.requireData?.displayImage(
+                              child: (ans.requireData?.display(
                                       size: Size.square(mediaCelSize),
                                       forceSquare: true)) ??
                                   SizedBox.square(dimension: mediaCelSize));

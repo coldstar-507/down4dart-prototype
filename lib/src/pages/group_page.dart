@@ -25,10 +25,10 @@ class GroupPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "group";
   final List<Palette2> homePalettes, palettesForTransition;
-  final Iterable<PersonNode> people;
+  final Iterable<PersonN> people;
   final int nHidden;
   final void Function() back;
-  final void Function(Group group, FireMedia m, Chat c) makeGroup;
+  final void Function(Group group, Down4Image m, Chat c) makeGroup;
   final double initialOffset;
 
   const GroupPage({
@@ -66,7 +66,7 @@ class _GroupPageState extends State<GroupPage>
     initialScrollOffset: widget.initialOffset,
   );
 
-  FireMedia? _groupImage;
+  Down4Image? _groupImage;
   String _groupName = "";
 
   // @override
@@ -80,7 +80,7 @@ class _GroupPageState extends State<GroupPage>
   // late FocusNode focusNode = FocusNode()..addListener(onFocusChange);
 
   @override
-  List<(String, void Function(FireMedia))> get mediasMode => [
+  List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
           (m) async {
@@ -142,7 +142,7 @@ class _GroupPageState extends State<GroupPage>
         }));
   }
 
-  void forGroupNode(FireMedia m) {
+  void forGroupNode(Down4Image m) {
     _groupImage = m;
     reloadItems();
   }
@@ -165,7 +165,7 @@ class _GroupPageState extends State<GroupPage>
   }
 
   @override
-  Future<void> send({FireMedia? mediaInput}) async {
+  Future<void> send({Down4Media? mediaInput}) async {
     final media = mediaInput ?? cameraInput
       ?..cache()
       ..merge();
@@ -189,6 +189,7 @@ class _GroupPageState extends State<GroupPage>
 
     final group = Group(groupID,
         activity: makeTimestamp(),
+        isConnected: true,
         isPrivate: _private,
         name: _groupName,
         mediaID: _groupImage!.id,

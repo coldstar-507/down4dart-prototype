@@ -89,7 +89,7 @@ class Wallet extends Locals {
   }
 
   Future<Down4Payment?> payPeople({
-    required List<PersonNode> people,
+    required List<PersonN> people,
     required ComposedID selfID,
     required Sats amount,
     String textNote = "",
@@ -118,7 +118,7 @@ class Wallet extends Locals {
     // function again should solve the problem
     List<Down4TXOUT> outs = [];
     _ix = _ix + 1;
-    merge({"ix": _ix});
+    merge({"ix": _ix.toString()});
     // the goal here is simply having a unique id everytime
     final txSecret = makeUint32(_ix) + utf8.encode(selfID.unique);
     final d4Keys = DOWN4_NEUTER.derive(txSecret);
@@ -353,17 +353,17 @@ class Wallet extends Locals {
   })  : _keys = keys,
         _ix = ix ?? -1;
 
-  factory Wallet.fromJson(dynamic decodedJson) {
+  factory Wallet.fromJson(Map<String, String?> decodedJson) {
     return Wallet(
-      keys: Down4Keys.fromYouKnow(decodedJson["keys"]),
-      ix: decodedJson["ix"],
+      keys: Down4Keys.fromYouKnow(decodedJson["keys"]!),
+      ix: int.parse(decodedJson["ix"]!),
     );
   }
 
   @override
-  Map<String, Object> toJson({bool toLocal = true}) => {
+  Map<String, String> toJson({bool includeLocal = true}) => {
         "keys": _keys.toYouKnow(),
-        "ix": _ix,
+        "ix": _ix.toString(),
       };
 }
 

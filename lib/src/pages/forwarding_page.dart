@@ -21,7 +21,7 @@ class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   final ViewState viewState;
   final List<Down4Object> fObjects;
   final void Function() back;
-  final void Function(List<Down4Object>, ChatNode) openChat;
+  final void Function(List<Down4Object>, ChatN) openChat;
   final void Function(List<Down4Object>, Transition) hyper;
   final Future<void> Function(Iterable<Chat>) forward;
 
@@ -147,7 +147,7 @@ class _ForwadingPageState extends State<ForwardingPage>
   // }
 
   @override
-  List<(String, void Function(FireMedia))> get mediasMode => [
+  List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
           (m) async {
@@ -169,7 +169,7 @@ class _ForwadingPageState extends State<ForwardingPage>
   // ID get selfID => g.self.id;
 
   @override
-  Future<void> send({FireMedia? mediaInput}) async {
+  Future<void> send({Down4Media? mediaInput}) async {
     final media = mediaInput ?? cameraInput
       ?..cache()
       ..merge();
@@ -180,7 +180,7 @@ class _ForwadingPageState extends State<ForwardingPage>
         senderID: g.self.id,
         root: root,
         text: input.value,
-        messages: fo.whereType<ChatMessage>().asComposedIDs().toSet(),
+        messages: fo.whereType<ChatMessage>().asIDs().toSet(),
         nodes: fo.whereType<Palette2>().asComposedIDs().toSet(),
         timestamp: makeTimestamp(),
         mediaID: media?.id)

@@ -82,7 +82,7 @@ extension IterableNodes on Iterable<Down4Node> {
       map((node) => node.id).whereType<ComposedID>();
   Iterable<Down4Node> those(List<Down4ID> ids) =>
       where((node) => ids.contains(node.id));
-  Iterable<GroupNode> groups() => whereType<GroupNode>();
+  Iterable<GroupN> groups() => whereType<GroupN>();
   Iterable<User> users() => whereType<User>();
 }
 

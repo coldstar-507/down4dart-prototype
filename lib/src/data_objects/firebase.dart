@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -9,7 +10,10 @@ final app = Firebase.app();
 
 const _nShards = 2;
 
-String pushKey() => Down4Server.instance.masterDB.ref().push().key!;
+String pushKey() => Down4Server.instance.shards[Region.america]![0].realtimeDB
+    .ref()
+    .push()
+    .key!;
 
 int calculateShard(String unique) =>
     unique.codeUnits.fold(0, (p, e) => p + e) % _nShards;
@@ -41,8 +45,9 @@ Future<bool> isUsernameValid(String username) async {
     return false;
   }
 
-  final bool exists = await Down4Server.instance.masterDB
-      .ref('users/$username')
+  final bool exists = await Down4Server.instance.masterFS
+      .collection("users")
+      .doc(username)
       .get()
       .then((value) => value.exists);
 
@@ -58,10 +63,12 @@ class Down4Server {
   static Down4Server? _instance;
   static Down4Server get instance => _instance ??= Down4Server();
 
-  final masterDB = FirebaseDatabase.instanceFor(
-    app: app,
-    databaseURL: "https://down4-26ee1-default-rtdb.firebaseio.com/",
-  )..setPersistenceEnabled(false);
+  final masterFS = FirebaseFirestore.instance;
+
+  // final masterDB = FirebaseDatabase.instanceFor(
+  //   app: app,
+  //   databaseURL: "https://down4-26ee1-default-rtdb.firebaseio.com/",
+  // )..setPersistenceEnabled(false);
 
   // > Server instance are accessed first by region then by index of the shard
   //   that is calculated(once) and saved on any objects that goes onto servers

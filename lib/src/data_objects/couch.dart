@@ -48,7 +48,13 @@ Map<Down4ID, Locals> _globalCache = {};
 
 Locals? unCache(Down4ID id) => _globalCache.remove(id);
 
-void gCache(Locals obj) => _globalCache[obj.id] = obj;
+void gCache(Locals obj, {bool ifAbsent = false}) {
+  if (ifAbsent) {
+    _globalCache[obj.id] ??= obj;
+  } else {
+    _globalCache[obj.id] = obj;
+  }
+}
 
 Future<void> loadIndexes() async {
   final isHiddenNodeIndexConfig = ValueIndexConfiguration(["isHidden"]);
@@ -92,7 +98,7 @@ Future<T?> fetch<T extends Locals>(
     if (id == null) return null;
     final ss = await id.userRef.get();
     if (!ss.exists) return null;
-    final node = Down4Node.fromJson(ss.value as Map<String, Object?>)..cache();
+    final node = Down4Node.fromJson(ss.value as Map<String, String?>)..cache();
     if (doMerge) node.merge();
     // print("==== RETRIVED $T ID =${id.value} FROM FETCH");
     return node as T;
@@ -125,39 +131,25 @@ Future<T?> fetch<T extends Locals>(
   //   return message;
   // }
 
-  Future<FireMedia?> fetchMedia() async {
+  Future<Down4Media?> fetchMedia() async {
     if (id == null && tempID == null) return null;
-    // final onlineID = mediaInfo!.onlineID;
-    // final withData = mediaInfo.withData;
     final fromNodes = tempID == null;
     print(
         "FETCHING MEDIA ID = ${tempID?.value ?? id?.value} FROM NODES = $fromNodes");
     final ref = fromNodes ? id!.staticStoreRef : tempID.tempStoreRef;
     try {
-      final futureFullMetadata = ref.getMetadata();
-      final mediaData = await ref.getData();
+      final futureMedia = ref.getMetadata();
+      // for now seems, good to only get the data if we local merge
+      // no need for another parameter
+      final rawData = doMerge ? (await ref.getData()) : null;
+
       // will throw if no metadata, so we can use !
-      final mediaJson = (await futureFullMetadata).customMetadata!;
-      final media = FireMedia.fromJson(mediaJson)..cache();
-      Uint8List? videoThumbnail;
-      final bool isVideo = media.isVideo;
-      if (isVideo) {
-        final url = await ref.getDownloadURL();
-        media.cachedMemory = videoThumbnail =
-            await VideoThumbnail.thumbnailData(video: url, quality: 50);
-      } else {
-        media.cachedMemory = mediaData;
-      }
+      final mediaJson = (await futureMedia).customMetadata!;
+      final media = Down4Media.fromJson(mediaJson)..cache();
+
       if (doMerge) {
         media.merge();
-        print("MERGING MEDIA ID: $id");
-        if (mediaData != null) {
-          //withData && mediaData != null) {
-          if (isVideo) {
-            await File(media.videoPath).writeAsBytes(mediaData);
-          }
-          await media.write(imageData: isVideo ? videoThumbnail! : mediaData);
-        }
+        if (rawData != null) await media.write(rawData);
       }
       return media;
     } catch (e) {
@@ -166,31 +158,18 @@ Future<T?> fetch<T extends Locals>(
     }
   }
 
-  // Future<ChatReaction?> fetchChatReaction() async {
-  //   final snapshot = await _realtime.child("Messages").child(id).get();
-  //   if (!snapshot.exists) return null;
-  //   final json = Map<String, Object?>.from(snapshot.value as Map);
-  //   final reaction = ChatReaction.fromJson(json);
-  //   if (doMerge) {
-  //     print("MERGING REACTION ID: $id");
-  //     await reaction.merge();
-  //   }
-  //   // print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
-  //   return reaction;
-  // }
-
   switch (T) {
     case Down4Node:
       return fetchNode();
-    case BranchNode:
+    case BranchN:
       return fetchNode();
-    case ChatNode:
+    case ChatN:
       return fetchNode();
-    case GroupNode:
+    case GroupN:
       return fetchNode();
-    case PersonNode:
+    case PersonN:
       return fetchNode();
-    case EditNode:
+    case EditN:
       return fetchNode();
     case User:
       return fetchNode();
@@ -200,7 +179,7 @@ Future<T?> fetch<T extends Locals>(
       return fetchNode();
     case Hyperchat:
       return fetchNode();
-    case FireMedia:
+    case Down4MediaMetadata:
       return fetchMedia() as Future<T?>;
     case Down4Payment:
       final data = tempID?.tempStoreRef.getData().toString();
@@ -218,15 +197,15 @@ Database gdb<T extends Locals>() {
       return reactionsDB;
     case Down4Node:
       return nodesDB;
-    case BranchNode:
+    case BranchN:
       return nodesDB;
-    case ChatNode:
+    case ChatN:
       return nodesDB;
-    case GroupNode:
+    case GroupN:
       return nodesDB;
-    case PersonNode:
+    case PersonN:
       return nodesDB;
-    case EditNode:
+    case EditN:
       return nodesDB;
     case User:
       return nodesDB;
@@ -236,7 +215,7 @@ Database gdb<T extends Locals>() {
       return nodesDB;
     case Hyperchat:
       return nodesDB;
-    case FireMedia:
+    case Down4MediaMetadata:
       return mediasDB;
     case Chat:
       return messagesDB;
@@ -307,21 +286,21 @@ Future<T?> global<T extends Locals>(
   return null;
 }
 
-T fromJson<T extends Locals>(Map<String, Object?> json) {
+T fromJson<T extends Locals>(Map<String, String?> json) {
   switch (T) {
     case Reaction:
       return Down4Message.fromJson(json) as T;
     case Down4Node:
       return Down4Node.fromJson(json) as T;
-    case BranchNode:
+    case BranchN:
       return Down4Node.fromJson(json) as T;
-    case ChatNode:
+    case ChatN:
       return Down4Node.fromJson(json) as T;
-    case GroupNode:
+    case GroupN:
       return Down4Node.fromJson(json) as T;
-    case PersonNode:
+    case PersonN:
       return Down4Node.fromJson(json) as T;
-    case EditNode:
+    case EditN:
       return Down4Node.fromJson(json) as T;
     case User:
       return Down4Node.fromJson(json) as T;
@@ -331,8 +310,8 @@ T fromJson<T extends Locals>(Map<String, Object?> json) {
       return Down4Node.fromJson(json) as T;
     case Hyperchat:
       return Down4Node.fromJson(json) as T;
-    case FireMedia:
-      return FireMedia.fromJson(json) as T;
+    case Down4MediaMetadata:
+      return Down4MediaMetadata.fromJson(json) as T;
     case Chat:
       return Down4Message.fromJson(json) as T;
     case Snip:
@@ -388,10 +367,10 @@ Future<List<Chat>> unsentMessages() async {
 //   return trulyHidden;
 // }
 
-Future<List<PersonNode>> searchLocalsByUnique(Iterable<String> uniques) async {
+Future<List<PersonN>> searchLocalsByUnique(Iterable<String> uniques) async {
   final raw = """
     SELECT * FROM _ as n
-    WHERE n.unique IN ${uniques.map((e) => "'$e'").toList().toString()} 
+    WHERE n.unique IN ${uniques.map((e) => "'$e'").toString()} 
   """;
 
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
@@ -399,13 +378,16 @@ Future<List<PersonNode>> searchLocalsByUnique(Iterable<String> uniques) async {
   final r = await e.allResults();
 
   return r.map((e) {
-    final json = e.toPlainMap()["n"] as Map<String, Object?>;
-    return fromJson<PersonNode>(json);
+    final json = e.toPlainMap()["n"] as Map<String, String?>;
+    return fromJson<PersonN>(json);
   }).toList();
 }
 
 Future<Set<ComposedID>> allGroupIDs() async {
-  const rawq = "SELECT group FROM _ WHERE nodes.type in ('hyperchat', 'group')";
+  const rawq = """
+    SELECT group FROM _ 
+    WHERE nodes.type in ('hyperchat', 'group')
+    """;
   final q = await AsyncQuery.fromN1ql(nodesDB, rawq);
   final e = await q.execute();
   final r = await e.allResults();
@@ -459,7 +441,7 @@ Future<void> mediaDeletingRoutine() async {
   }
 }
 
-Future<List<ChatNode>> loadHome() async {
+Future<List<ChatN>> loadHome() async {
   const raw = """
     SELECT * FROM _ AS n
     WHERE n.type in ('hyperchat', 'group', 'user')
@@ -468,13 +450,39 @@ Future<List<ChatNode>> loadHome() async {
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
   final r = await q.execute();
   return Future.wait((await r.allResults()).map((e) async {
-    final nodeJson = e.toPlainMap()["n"] as Map<String, Object?>;
+    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
     print("Loading home node id =${nodeJson["id"]}");
-    return fromJson<ChatNode>(nodeJson)..cache();
+    return fromJson<ChatN>(nodeJson)..cache();
   }).toList());
 }
 
-Stream<FireMedia> savedMedia(bool images) async* {
+Future<List<ConnectN>> loadConnectionNodes() async {
+  const raw = """
+    SELECT * FROM _ as n
+    WHERE n.isConnected = 'true'
+    """;
+
+  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
+  final r = await q.execute();
+  return Future.wait((await r.allResults()).map((e) async {
+    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
+    print("Loading home node id =${nodeJson["id"]}");
+    return fromJson<ConnectN>(nodeJson)..cache();
+  }).toList());
+}
+
+Future<List<Down4Node>> loadAllNodes() async {
+  const raw = "SELECT * FROM _ as n";
+  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
+  final r = await q.execute();
+  return Future.wait((await r.allResults()).map((e) async {
+    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
+    print("Loading home node id =${nodeJson["id"]}");
+    return fromJson<Down4Node>(nodeJson)..cache();
+  }).toList());
+}
+
+Stream<Down4MediaMetadata> savedMedia(bool images) async* {
   final isVideo = images ? "'false'" : "'true'";
   final raw = """
         SELECT * FROM _ AS im
@@ -485,9 +493,9 @@ Stream<FireMedia> savedMedia(bool images) async* {
   final results = await query.execute();
   await for (final r in results.asStream()) {
     print("returning an image!");
-    final json = r.toPlainMap()["im"] as Map<String, Object?>;
+    final json = r.toPlainMap()["im"] as Map<String, String?>;
     print("image ID=${json['id']}");
-    yield FireMedia.fromJson(json);
+    yield Down4MediaMetadata.fromJson(json);
   }
 }
 
@@ -529,7 +537,7 @@ extension WalletManager on Wallet {
     final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
     final r = await q.execute();
     await for (final p in r.asStream()) {
-      yield Down4Payment.fromJson(p.toPlainMap()["p"]);
+      yield Down4Payment.fromJson(p.toPlainMap()["p"] as Map<String, String?>);
     }
   }
 
@@ -542,7 +550,7 @@ extension WalletManager on Wallet {
     final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
     final r = await q.execute();
     await for (final p in r.asStream()) {
-      yield Down4Payment.fromJson(p.toPlainMap()["p"]);
+      yield Down4Payment.fromJson(p.toPlainMap()["p"] as Map<String, String?>);
     }
   }
 
@@ -551,7 +559,7 @@ extension WalletManager on Wallet {
     final q = await AsyncQuery.fromN1ql(utxosDB, raw);
     final r = await q.execute();
     await for (final u in r.asStream()) {
-      yield Down4TXOUT.fromJson(u.toPlainMap()["u"]);
+      yield Down4TXOUT.fromJson(u.toPlainMap()["u"] as Map<String, String?>);
     }
   }
 
@@ -580,11 +588,11 @@ extension WalletManager on Wallet {
   }
 
   Future<bool> isSpent(Down4ID utxoID) async {
-    return (await dbb.document(id.value))?.boolean(utxoID.value) ?? false;
+    return (await dbb.document(id.value))?.string(utxoID.value) == "true";
   }
 
   Future<void> setSpent(Down4ID id, bool spent) async {
-    await merge({id.value: spent});
+    await merge({id.value: spent.toString()});
   }
 
   static Future<Wallet?> load() async {

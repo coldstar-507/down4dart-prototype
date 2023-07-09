@@ -14,8 +14,13 @@ import '_page_utils.dart';
 
 class ThemePage extends StatefulWidget implements Down4PageWidget {
   final void Function() back, onSwap;
-  const ThemePage({required this.back, required this.onSwap, Key? key})
-      : super(key: key);
+  final Map<Down4ID, Palette2> themes;
+  const ThemePage({
+    required this.back,
+    required this.onSwap,
+    required this.themes,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<ThemePage> createState() => _ThemePageState();
@@ -27,43 +32,31 @@ class ThemePage extends StatefulWidget implements Down4PageWidget {
 class _ThemePageState extends State<ThemePage> with Pager2 {
   @override
   List<Extra> extras = [];
+  //
+  // void swapTheme(Down4Theme theme) async {
+  //   g.myTheme.changeTheme(theme.name);
+  //   for (final t in widget.themes.values.asNodes<NodeTheme>()) {
+  //     await writePalette<NodeTheme>(t, widget.themes, bGen, setTheState);
+  //   }
+  //   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+  //     statusBarColor: Colors.transparent,
+  //     statusBarBrightness: g.theme.topStatusIconBrightness,
+  //     systemNavigationBarColor: g.theme.bottomNavigationBarColor,
+  //     systemNavigationBarIconBrightness: g.theme.bottonNavigationIconBrightness,
+  //   ));
+  //
+  //   widget.onSwap.call();
+  //   setState(() {});
+  // }
 
-  void swapTheme(Down4Theme theme) {
-    g.myTheme.changeTheme(theme.name);
-    for (final t in themes) {
-      writePalette3(NodeTheme(t), _palettes, bGen, setTheState);
-    }
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarBrightness: g.theme.topStatusIconBrightness,
-      systemNavigationBarColor: g.theme.bottomNavigationBarColor,
-      systemNavigationBarIconBrightness: g.theme.bottonNavigationIconBrightness,
-    ));
-
-    widget.onSwap.call();
-    setState(() {});
-  }
-
-  List<ButtonsInfo2> bGen(NodeTheme t) {
-    return [
-      ButtonsInfo2(
-          asset: g.noMessageArrow,
-          pressFunc: () => swapTheme(t.theme),
-          rightMost: true)
-    ];
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    for (final t in themes) {
-      writePalette3(NodeTheme(t), _palettes, bGen, setTheState);
-    }
-  }
-
-  Map<Down4ID, Palette2> _palettes = {};
-
-  List<Down4Theme> themes = [BlackTheme(), PinkTheme()];
+  // List<ButtonsInfo2> bGen(NodeTheme t) {
+  //   return [
+  //     ButtonsInfo2(
+  //         asset: g.noMessageArrow,
+  //         pressFunc: () => swapTheme(t.theme),
+  //         rightMost: true)
+  //   ];
+  // }
 
   ConsoleButton get purchaseButton =>
       ConsoleButton(name: "PURCHASE", onPress: () {});
@@ -93,7 +86,7 @@ class _ThemePageState extends State<ThemePage> with Pager2 {
   Widget build(BuildContext context) {
     return Andrew(backFunction: widget.back, pages: [
       Down4Page(
-        list: _palettes.values.toList(),
+        list: widget.themes.values.toList(),
         title: "Themes",
         console: console,
       )

@@ -62,7 +62,7 @@ class _Down4State extends State<Down4> {
     required String lastName,
     required double longitude,
     required double latitude,
-    required FireMedia media,
+    required Down4Media media,
   }) async {
     // update login for database rules
     await widget.user?.updateDisplayName(id.value);
@@ -72,24 +72,19 @@ class _Down4State extends State<Down4> {
 
     void onFailure(String msg) => createUser(errorMessage: msg);
 
-    // exception, recalculate the media information with the proper ID
-    // this is because the mediaID is calculated with the userID
-    // and when it was calculated in the init user, we are not sure if
-    // the ID was the proper one
-    final goodMedia = (await media.userInitRecalculation(id))
-      ?..writeFromCachedPath()
-      ..staticUpload();
-
-    if (goodMedia == null) {
-      print("Error setting the correct ownership over user media");
-      return onFailure("System failure");
-    }
-
     final token = await FirebaseMessaging.instance.getToken();
     if (token == null) {
       print("error getting firebase messaging token");
       return onFailure("Check if valid internet connection!");
     }
+
+    // exception, recalculate the media information with the proper ID
+    // this is because the mediaID is calculated with the userID
+    // and when it was calculated in the init user, we are not sure if
+    // the ID was the proper one
+    final goodMedia = media.userInitRecalculation(id)
+      ..writeFromCachedPath()
+      ..staticUpload();
 
     final seed1 = unsafeSeed(32);
     final seed2 = unsafeSeed(32);
@@ -97,10 +92,12 @@ class _Down4State extends State<Down4> {
     await g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
-    final ref = Down4Server.instance.masterDB.ref('/users/${id.unique}');
-    final initResult = await ref.runTransaction((value) {
-      if (value != null) return Transaction.abort();
-      return Transaction.success({
+    final fs = Down4Server.instance.masterFS;
+    final ref = fs.collection("users").doc(id.unique);
+    final success = await fs.runTransaction<bool>((transaction) async {
+      final exists = await transaction.get(ref).then((value) => value.exists);
+      if (exists) return false;
+      transaction.set(ref, {
         "id": id.value,
         "secret": secret.toBase58(),
         "neuter": neuter.toYouKnow(),
@@ -108,9 +105,23 @@ class _Down4State extends State<Down4> {
         "longitude": longitude,
         "latitude": latitude,
       });
+      return true;
     });
 
-    if (!initResult.committed) return onFailure("Please try again");
+    // final ref = Down4Server.instance.masterDB.ref('/users/${id.unique}');
+    // final initResult = await ref.runTransaction((value) {
+    //   if (value != null) return Transaction.abort();
+    //   return Transaction.success({
+    //     "id": id.value,
+    //     "secret": secret.toBase58(),
+    //     "neuter": neuter.toYouKnow(),
+    //     "token": token,
+    //     "longitude": longitude,
+    //     "latitude": latitude,
+    //   });
+    // });
+
+    if (!success) return onFailure("Please try again");
 
     g.initSelf(Self(id,
         deviceID: deviceID,
@@ -118,6 +129,7 @@ class _Down4State extends State<Down4> {
         name: name,
         description: "",
         lastName: lastName,
+        lastOnline: d4utils.makeTimestamp(),
         mainDeviceID: deviceID,
         messagingTokens: {deviceID: token},
         neuter: neuter,

@@ -567,7 +567,7 @@ mixin Pager2 {
 }
 
 mixin Sender2 {
-  void send({FireMedia? mediaInput});
+  void send({Down4Media? mediaInput});
 
   final GlobalKey _sendButtonKey = GlobalKey();
   ConsoleButton get sendButton =>
@@ -1001,13 +1001,13 @@ mixin Medias2 on Pager2 {
   bool _images =
       true; // or videos, but will change from bool to allow more types
 
-  (String, void Function(FireMedia))? forMediaMode;
+  (String, void Function(Down4Image))? forMediaMode;
   Chat? reactingTo;
 
-  List<(String, void Function(FireMedia))> get mediasMode;
+  List<(String, void Function(Down4Media))> get mediasMode;
 
   int currentMode = 0;
-  (String, void Function(FireMedia)) get curMode => mediasMode[currentMode];
+  (String, void Function(Down4Media)) get curMode => mediasMode[currentMode];
 
   String get backFromMediasConsoleName => "base";
 
@@ -1080,18 +1080,18 @@ mixin Medias2 on Pager2 {
               itemBuilder: ((context, index) {
                 Widget f(int i) {
                   if (i < ids.length) {
-                    final cachedMedia = cache<FireMedia>(ids[i]);
+                    final cachedMedia = cache<Down4Media>(ids[i]);
                     if (cachedMedia != null) {
                       return GestureDetector(
                           onTap: () => forMediaMode != null
-                              ? forMediaMode!.$2.call(cachedMedia)
+                              ? forMediaMode!.$2.call(cachedMedia as Down4Image)
                               : curMode.$2(cachedMedia),
-                          child: (cachedMedia.displayImage(
+                          child: (cachedMedia.display(
                               size: Size.square(_mediaCelSize),
                               forceSquare: true)));
                     }
                     return FutureBuilder(
-                      future: global<FireMedia>(ids[i]),
+                      future: global<Down4Media>(ids[i]),
                       builder: (ctx, ans) {
                         if (ans.connectionState == ConnectionState.done &&
                             ans.hasData) {
@@ -1099,7 +1099,7 @@ mixin Medias2 on Pager2 {
                               onTap: () => ans.data != null
                                   ? curMode.$2(ans.data!)
                                   : null,
-                              child: (ans.requireData?.displayImage(
+                              child: (ans.requireData?.display(
                                       size: Size.square(_mediaCelSize),
                                       forceSquare: true)) ??
                                   SizedBox.square(dimension: _mediaCelSize));
@@ -1148,7 +1148,7 @@ mixin Camera2 on Pager2 {
   Size get _squaredCamSize => Size.square(Console.trueWidth);
   int _currentCam = 0;
   CameraController? cameraController;
-  FireMedia? tempInput, cameraInput;
+  Down4Media? tempInput, cameraInput;
   bool get isReversed => _currentCam == 1;
 
   CameraDescription get cam => g.cameras[_currentCam];
@@ -1230,8 +1230,10 @@ mixin Camera2 on Pager2 {
       onPress: () {
         // ugly way to make a copy, but we don't really make copies
         // elsewhere so...
-        cameraInput = FireMedia.fromJson(tempInput!.toJson(toLocal: true))
-          ..cachePath = tempInput!.cachePath;
+        cameraInput = Down4Media.fromJson(tempInput!.toJson(includeLocal: true))
+          ..mainCachedPath = tempInput!.mainCachedPath;
+        // Down4MediaMetadata.fromJson(tempInput!.toJson(includeLocal: true))
+        //   ..cachePath = tempInput!.cachePath;
 
         cameraController?.dispose();
         cameraController = null;
@@ -1249,7 +1251,7 @@ mixin Camera2 on Pager2 {
             // border: Border.all(
             //     color: g.theme.consoleBorderColor, width: Console.borderWidth),
           ),
-          child: tempInput!.display(size: _squaredCamSize));
+          child: tempInput!.display(size: _squaredCamSize, forceSquare: true));
     } else if (cameraController != null) {
       return Container(
         clipBehavior: Clip.hardEdge,
@@ -1956,7 +1958,7 @@ mixin Scanner2 on Pager2 {
 //   Future<void> send({FireMedia? mediaInput});
 // }
 
-FireMedia makeCameraMedia({
+Down4Media makeCameraMedia({
   required String cachedPath,
   required Size size,
   required bool isReversed,
@@ -1966,14 +1968,24 @@ FireMedia makeCameraMedia({
   final mime = lookupMimeType(cachedPath)!;
   final data = File(cachedPath).readAsBytesSync();
   // final id = deterministicMediaID(data, owner);
-  return FireMedia(ComposedID(region: owner.region), // hack for init
-      ownerID: owner,
-      timestamp: makeTimestamp(),
-      width: size.width,
-      height: size.height,
-      cachePath: cachedPath,
-      tinyThumbnail: makeTiny(data),
-      isSquared: isSquared,
-      isReversed: isReversed,
-      mime: mime);
+  return Down4Media.fromCamera(
+      ComposedID(region: owner.region), // hack for init
+      mainCachedPath: cachedPath,
+      metadata: Down4MediaMetadata(
+          ownerID: owner,
+          timestamp: makeTimestamp(),
+          width: size.width,
+          height: size.height,
+          mime: mime),
+      tinyThumbnail: makeTiny(data));
+
+  // ownerID: owner,
+  // timestamp: makeTimestamp(),
+  // width: size.width,
+  // height: size.height,
+  // cachePath: cachedPath,
+
+  // isSquared: isSquared,
+  // isReversed: isReversed,
+  // mime: mime);
 }

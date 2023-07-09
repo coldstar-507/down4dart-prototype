@@ -98,7 +98,7 @@ class ButtonsInfo2 {
   ButtonsInfo2({
     required this.asset,
     required this.pressFunc,
-    required this.rightMost,
+    this.rightMost = true,
     this.longPressFunc,
   });
 
@@ -113,6 +113,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
   static double get padding => 10;
   static double get paletteRadius => fullHeight / 2;
   static double get paletteHeight => (g.sizes.h * 0.1212);
+  static Size get paletteSquare => Size(paletteHeight, paletteHeight);
   static double get gapSize => g.sizes.h * 0.0119;
   static double get paletteMargin => g.sizes.w * 0.042;
   static double get blurRadius => 6.0;
@@ -126,7 +127,7 @@ class Palette2 extends StatelessWidget implements Down4Object {
   Down4ID get id => node.id;
   final Widget _image;
 
-  final Down4Node node;
+  final PaletteN node;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final bool selected, fade, fadeButton, fold, squish, show;
   final List<ButtonsInfo2> buttonsInfo2;

@@ -28,7 +28,7 @@ class ChatReplyInfo {
 }
 
 class ChatMediaInfo {
-  final FireMedia media;
+  final Down4Media media;
   final Size precalculatedMediaSize;
   final VideoPlayerController? videoController;
   const ChatMediaInfo({
@@ -317,7 +317,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     // print("GENERATING MEDIA INFO");
     double mediaHeight = 0;
     double mediaWidth = 0;
-    final media = await global<FireMedia>(message.mediaID!,
+    final media = await global<Down4Media>(message.mediaID!,
         doFetch: true, doMergeIfFetch: true, tempID: message.tempMediaID);
     if (media == null) return null;
     if (message.tempMediaID != null) {
@@ -329,8 +329,8 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     mediaHeight = mediaWidth * (media.isSquared ? 1.0 : 1 / media.aspectRatio);
 
     VideoPlayerController? vpc;
-    if (media.isVideo) {
-      vpc = await media.videoController;
+    if (media is Down4Video) {
+      vpc = (media.newReadyController()) ?? (await media.futureController());
     }
 
     return ChatMediaInfo(
@@ -572,6 +572,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     return mediaBody(
       child: mi.media.display(
         size: mi.precalculatedMediaSize,
+        forceSquare: mi.media.isSquared,
         controller: mi.videoController,
       ),
     );
@@ -651,7 +652,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   }
 
   Widget? reaction(Reaction r) {
-    final media = cache<FireMedia>(r.mediaID);
+    final media = cache<Down4Media>(r.mediaID);
 
     if (media == null) return null;
 
@@ -683,7 +684,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                 decoration:
                     BoxDecoration(borderRadius: BorderRadius.circular(4)),
                 clipBehavior: Clip.hardEdge,
-                child: media.displayImage(
+                child: media.display(
                   forceSquare: true,
                   size: Size.square(reactionWidth),
                 ),

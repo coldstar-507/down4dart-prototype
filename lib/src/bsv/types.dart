@@ -23,7 +23,7 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
 
 enum UtxoType { fee, change, gets, tip, tax }
 
-class Down4Payment extends Locals with Temps {
+class Down4Payment extends Temps {
   @override
   Database get dbb => paymentsDB;
 
@@ -31,15 +31,6 @@ class Down4Payment extends Locals with Temps {
   final bool safe;
   final String textNote;
   final int timestamp;
-
-  ComposedID? _tempID;
-  int? _tempTS;
-
-  @override
-  ComposedID? get tempID => _tempID;
-
-  @override
-  int? get tempTS => _tempTS;
 
   @override
   Future<Map<String, String>?> temporaryUpload(Map<String, String> msg) async {
@@ -55,7 +46,7 @@ class Down4Payment extends Locals with Temps {
 
         final ref = freshID.tempStoreRef;
 
-        final jsonPay = toJson(toLocal: false);
+        final jsonPay = toJson();
         jsonPay["tempID"] = freshID.value;
         jsonPay["tempTS"] = freshTS.toString();
 
@@ -86,13 +77,10 @@ class Down4Payment extends Locals with Temps {
     this.txs, {
     required this.safe,
     required this.textNote,
-    int? tempTS,
-    ComposedID? tempID,
-    Region? region,
+    super.tempTS,
+    super.tempID,
     int? timestamp,
-  })  : timestamp = timestamp ?? makeTimestamp(),
-        _tempTS = tempTS,
-        _tempID = tempID;
+  }) : timestamp = timestamp ?? makeTimestamp();
 
   int get independentGets =>
       txs.last.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
@@ -224,14 +212,14 @@ class Down4Payment extends Locals with Temps {
   }
 
   @override
-  Map<String, Object> toJson({bool toLocal = true}) => {
-        "id": id,
-        "tx": txs.map((tx) => tx.toJson()).toList(),
-        "len": txs.length,
-        "safe": safe,
-        "ts": timestamp,
-        if (_tempTS != null) "tempTS": _tempTS!,
-        if (_tempID != null) "tempID": _tempID!,
+  Map<String, String> toJson({bool includeLocal = true}) => {
+        "id": id.value,
+        "tx": jsonEncode(txs.map((tx) => tx.toJson()).toList()),
+        "len": txs.length.toString(),
+        "safe": safe.toString(),
+        "ts": timestamp.toString(),
+        if (tempTS != null) "tempTS": tempTS!.toString(),
+        if (tempID != null) "tempID": tempID!.value,
         if (textNote.isNotEmpty) "txt": textNote,
       };
 
@@ -244,16 +232,16 @@ class Down4Payment extends Locals with Temps {
     return Down4Payment.fromJson(jsonDecoded);
   }
 
-  factory Down4Payment.fromJson(dynamic decodedJson) {
+  factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
     return Down4Payment(
-      List<dynamic>.from(decodedJson["tx"])
-          .map((e) => Down4TX.fromJson(e))
+      List.from(jsonDecode(decodedJson["tx"]!))
+          .map((e) => Down4TX.fromJson(Map<String, String?>.from(e)))
           .toList(),
-      safe: decodedJson["safe"],
-      tempTS: decodedJson["tempTS"],
-      tempID: decodedJson["tempID"],
-      timestamp: decodedJson["ts"],
-      textNote: decodedJson["txt"] ?? "", // TODO ?? "" should be temporary
+      safe: decodedJson["safe"] == "true",
+      tempTS: int.tryParse(decodedJson["tempTS"] ?? ""),
+      tempID: ComposedID.fromString(decodedJson["tempID"]),
+      timestamp: int.parse(decodedJson["ts"]!),
+      textNote: decodedJson["txt"] ?? "",
     );
   }
 }
@@ -358,7 +346,7 @@ class Sats {
 
   Sats operator *(Sats s) => Sats(asInt * s.asInt);
 
-  Sats operator /(Sats s) => Sats((asInt / s.asInt).floor());
+  Sats operator ~/(Sats s) => Sats(asInt ~/ s.asInt);
 
   bool operator >(Sats s) => asInt > s.asInt;
 
@@ -501,20 +489,16 @@ class Down4TXOUT extends Locals {
     this.outIndex,
   }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey.length);
 
-  factory Down4TXOUT.fromJson(dynamic decodedJson) => Down4TXOUT(
-        receiver: decodedJson["rc"],
+  factory Down4TXOUT.fromJson(Map<String, String?> decodedJson) => Down4TXOUT(
+        receiver: ComposedID.fromString(decodedJson["rc"])!,
         secret: decodedJson["st"] != null
-            ? List<int>.from(decodedJson["st"])
+            ? List<int>.from(base64Decode(decodedJson["st"]!))
             : null,
-        outIndex: decodedJson["oi"],
-        txid: TXID.fromHex(decodedJson["id"]),
-        sats: Sats(decodedJson["s"]),
-        type: UtxoType.values.byName(decodedJson["t"]),
-        // isChange:
-        //     decodedJson["ic"] ?? false, // TODO the ?? false should be removed
-        // isFee:
-        //     decodedJson["if"] ?? false, // TODO the ?? false should be removed
-        scriptPubKey: hex.decode(decodedJson["sc"]),
+        outIndex: int.parse(decodedJson["oi"]!),
+        txid: TXID.fromHex(decodedJson["id"]!),
+        sats: Sats(int.parse(decodedJson["s"]!)),
+        type: UtxoType.values.byName(decodedJson["t"]!),
+        scriptPubKey: hex.decode(decodedJson["sc"]!),
       );
 
   @override
@@ -584,13 +568,13 @@ class Down4TXOUT extends Locals {
   }
 
   @override
-  Map<String, Object> toJson({bool toLocal = true}) => {
+  Map<String, String> toJson({bool includeLocal = true}) => {
         "t": type.name,
-        if (receiver != null) "rc": receiver!,
-        "st": secret!,
-        "oi": outIndex!,
+        if (receiver != null) "rc": receiver!.value,
+        "st": secret!.toBase64(),
+        "oi": outIndex!.toString(),
         "id": txid!.asHex,
-        "s": sats.asInt,
+        "s": sats.asInt.toString(),
         "sc": hex.encode(scriptPubKey),
       };
 }

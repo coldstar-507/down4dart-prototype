@@ -188,15 +188,14 @@ abstract class Down4Message extends Down4Object with Jsons {
   }
 
   @override
-  Map<String, String> toJson({bool toLocal = false}) => {
+  Map<String, String> toJson({bool includeLocal = true}) => {
         "id": id.value,
         "type": type.name,
         "senderID": senderID.value,
         if (_root != null) "root": _root!.value,
-        if (_isSent != null && toLocal) "isSent": _isSent!.toString(),
-        if (_isRead != null && toLocal) "isRead": _isRead!.toString(),
-        if (_payment != null)
-          "payment": jsonEncode(_payment!.toJson(toLocal: toLocal)),
+        if (_isSent != null && includeLocal) "isSent": _isSent!.toString(),
+        if (_isRead != null && includeLocal) "isRead": _isRead!.toString(),
+        if (_payment != null) "payment": jsonEncode(_payment!),
         if (_reactionID != null) "reactionID": _reactionID!.value,
         if (_forwardedFromID != null)
           "forwardedFromID": _forwardedFromID!.value,
@@ -232,7 +231,7 @@ extension on Map {
 }
 
 mixin Reads on Down4Message, Locals {
-  bool get isRead => _isRead!;
+  bool get isRead;
   Future<void> markRead() async {
     if (isRead) return;
     await merge({"isRead": (_isRead = true).toString()});
@@ -248,7 +247,7 @@ mixin Medias on Down4Message {
   Future<Map<String, String>?> _mediableRoutine({
     Map<String, String>? preMsg,
   }) async {
-    final media = await global<FireMedia>(mediaID);
+    final media = await global<Down4Media>(mediaID);
     final fullJson = preMsg ?? toJson();
     if (media != null) {
       return media.temporaryUpload(fullJson);
@@ -375,7 +374,7 @@ mixin Cash on Down4Message {
   Future<Map<String, String>?> _paymentUploadRoutine({
     Map<String, String>? preMsg,
   }) async {
-    final fullJson = preMsg ?? toJson(toLocal: false);
+    final fullJson = preMsg ?? toJson(includeLocal: false);
     final asData = jsonEncode(fullJson);
     // only way to have over 4kb in payload is to have a payment
     if (asData.length > 4000) {
@@ -393,13 +392,13 @@ mixin Sents on Down4Message, Locals {
 mixin Roots on Down4Message {
   ComposedID get root;
 
-  Future<ChatNode?> get rootNode => global<ChatNode>(root);
+  Future<ChatN?> get rootNode => global<ChatN>(root);
 
   @override
   Future<String> makeHeader() async {
-    final rootNode = await global<ChatNode>(root);
+    final rootNode = await global<ChatN>(root);
     if (rootNode == null) return "";
-    if (rootNode is GroupNode) {
+    if (rootNode is GroupN) {
       return rootNode.displayName;
     } else {
       return g.self.displayName;
@@ -413,23 +412,23 @@ mixin Roots on Down4Message {
 }
 
 mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
-  Future<void> onReceipt(void Function(ChatNode rootNode) callback) async {
+  Future<void> onReceipt(void Function(ChatN rootNode) callback) async {
     // get the rootNode
     final rootNode =
-        await global<ChatNode>(root, doFetch: true, doMergeIfFetch: true);
+        await global<ChatN>(root, doFetch: true, doMergeIfFetch: true);
     if (rootNode == null) return;
 
     User? senderNode = await global<User>(senderID);
-    FireMedia? msgMedia;
+    Down4Media? msgMedia;
 
-    if (senderNode != null && senderNode.isFriend) {
+    if (senderNode != null && senderNode.isConnected) {
       // we predownload the media, else it's download on open
-      msgMedia = await global<FireMedia>(mediaID,
+      msgMedia = await global<Down4Media>(mediaID,
           doFetch: true, doMergeIfFetch: true, tempID: tempMediaID);
     }
 
     // get the rootNode media
-    await global<FireMedia>(rootNode.mediaID,
+    await global<Down4Media>(rootNode.mediaID,
         doFetch: true, doMergeIfFetch: true);
 
     // msg medias references are dynamic and always get updated
@@ -532,9 +531,9 @@ class Reaction extends Down4Message with Roots, Medias, Locals {
 
   @override
   Future<String> makeBody() async {
-    final rootNode = await global<ChatNode>(root);
+    final rootNode = await global<ChatN>(root);
     if (rootNode == null) return "";
-    if (rootNode is GroupNode) {
+    if (rootNode is GroupN) {
       return "${g.self.firstName} reacted to your message!";
     } else {
       return "reacted to your message!";
@@ -605,9 +604,9 @@ class Snip extends Down4Message
 
   @override
   Future<String> makeBody() async {
-    final rootNode = await global<ChatNode>(root);
+    final rootNode = await global<ChatN>(root);
     if (rootNode == null) return "";
-    if (rootNode is GroupNode) {
+    if (rootNode is GroupN) {
       return "${g.self.firstName} sniped!";
     } else {
       return "sniped!";
@@ -637,6 +636,9 @@ class Snip extends Down4Message
       data: jsonEncode(jsonData),
     ).process();
   }
+
+  @override
+  bool get isRead => _isRead!;
 }
 
 class Chat extends Down4Message
@@ -664,11 +666,11 @@ class Chat extends Down4Message
     super.tempMediaID,
     super.tempMediaTS,
     super.isSent = false,
-    super.isRead,
+    super.isRead = false,
     super.forwardedFromID,
     super.nodes,
     super.replies,
-  });
+  }) : super(timestamp: timestamp, root: root);
 
   bool get isSent => _isSent!;
 
@@ -679,7 +681,7 @@ class Chat extends Down4Message
           : text!;
 
   Future<List<Reaction>> get reactions async {
-    final raw = "SELECT * FROM _ WHERE messageID = '$id'";
+    final raw = "SELECT * FROM _ WHERE messageID = '${id.value}'";
     final q = await AsyncQuery.fromN1ql(reactionsDB, raw);
     final e = await q.execute();
     final r = await e.allResults();
@@ -711,9 +713,9 @@ class Chat extends Down4Message
 
   @override
   Future<String> makeBody() async {
-    final rootNode = await global<ChatNode>(root);
+    final rootNode = await global<ChatN>(root);
     if (rootNode == null) return "";
-    if (rootNode is GroupNode) {
+    if (rootNode is GroupN) {
       return "${g.self.firstName}: $messagePreview";
     } else {
       return messagePreview;
@@ -739,7 +741,7 @@ class Chat extends Down4Message
   Database get dbb => messagesDB;
 
   Chat copiedFor({required ComposedID root}) {
-    return Down4Message.fromJson(toJson(toLocal: false)
+    return Down4Message.fromJson(toJson(includeLocal: false)
       ..["id"] = ComposedID().value
       ..["timestamp"] = makeTimestamp().toString()
       ..["root"] = root.value) as Chat;
@@ -787,6 +789,9 @@ class Chat extends Down4Message
 
     onResponse?.call(targets);
   }
+
+  @override
+  bool get isRead => _isRead!;
 }
 
 class Payment extends Down4Message with Cash {

@@ -139,26 +139,32 @@ abstract mixin class Down4Object {
 }
 
 abstract mixin class Jsons {
-  Map<String, dynamic> toJson({bool toLocal = false});
+  Map<String, String> toJson();
 }
 
 abstract mixin class Locals implements Down4Object, Jsons {
   Database get dbb;
 
-  void cache() => gCache(this);
+  void cache({bool ifAbsent = false}) => gCache(this, ifAbsent: ifAbsent);
+  // Future<void> reload<T extends Locals>() async {
+  //   local<T>(id).then((value) => value?.cache());
+  // }
 
   Future<void> delete() async {
     print("Deleting $runtimeType from dbb: ${dbb.name}");
     unCache(id);
     await dbb.purgeDocumentById(id.value);
-    final ref = this;
-    if (ref is FireMedia && ref.isVideo) {
-      final f = ref.videoFile;
-      f?.delete();
-    }
+    // final ref = this;
+    // if (ref is Down4MediaMetadata && ref.isVideo) {
+    //   final f = ref.file;
+    //   f?.delete();
+    // }
   }
 
-  Future<void> merge([Map<String, Object?>? values]) async {
+  @override
+  Map<String, String> toJson({bool includeLocal = false});
+
+  Future<void> merge([Map<String, String>? values]) async {
     print("DBB NAME=${dbb.name}");
     // first, we get the current doc in the db
     var document = (await dbb.document(id.value))?.toMutable();
@@ -166,14 +172,14 @@ abstract mixin class Locals implements Down4Object, Jsons {
     // if it wasn't local, we create it
     if (!wasLocal) document = MutableDocument.withId(id.value);
 
-    Map<String, Object?> toMerge;
+    Map<String, String> toMerge;
     if (!wasLocal) {
       // then we need to merge the whole thing with the parameter values
-      toMerge = {...toJson(toLocal: true), ...?values};
+      toMerge = {...toJson(includeLocal: true), ...?values};
     } else {
       // we merge given values, or the values from the probably freshly
       // fetched object without the local values to not overwrite them
-      toMerge = (values ?? toJson(toLocal: false));
+      toMerge = values ?? toJson();
     }
 
     toMerge.forEach((key, value) {
@@ -186,9 +192,18 @@ abstract mixin class Locals implements Down4Object, Jsons {
 
 enum Region { america, europe, asia }
 
-mixin Temps on Locals {
-  set _tempTS(int? ts);
-  set _tempID(ComposedID newTempID);
+abstract class Temps extends Locals {
+  int? _tempTS;
+  ComposedID? _tempID;
+
+  int? get tempTS => _tempTS;
+  ComposedID? get tempID => _tempID;
+
+  Temps({
+    int? tempTS,
+    ComposedID? tempID,
+  })  : _tempTS = tempTS,
+        _tempID = tempID;
 
   Future<Map<String, String>?> temporaryUpload(Map<String, String> msg);
 
@@ -209,9 +224,6 @@ mixin Temps on Locals {
       "tempID": newTempID.value,
     });
   }
-
-  ComposedID? get tempID;
-  int? get tempTS;
 }
 
 class FireTheme extends Locals {
@@ -239,7 +251,7 @@ class FireTheme extends Locals {
   }
 
   @override
-  Map<String, dynamic> toJson({bool toLocal = false}) => {
+  Map<String, String> toJson({bool includeLocal = true}) => {
         "themeName": _themeName,
       };
 }
@@ -296,18 +308,18 @@ class ExchangeRate extends Locals {
   static Future<ExchangeRate> get exchangeRate async {
     final doc = await personalDB.document("exchangeRate");
     if (doc == null) return ExchangeRate(lastUpdate: 0, rate: 0)..merge();
-    return ExchangeRate.fromJson(doc.toPlainMap());
+    return ExchangeRate.fromJson(Map<String, String?>.from(doc.toPlainMap()));
   }
 
-  factory ExchangeRate.fromJson(Map<String, Object?> decodedJson) {
-    final lastUpdate = decodedJson["lastUpdate"] as int;
-    final rate = decodedJson["rate"] as double;
+  factory ExchangeRate.fromJson(Map<String, String?> decodedJson) {
+    final lastUpdate = int.parse(decodedJson["lastUpdate"] ?? "0");
+    final rate = double.parse(decodedJson["rate"] ?? "0.0");
     return ExchangeRate(lastUpdate: lastUpdate, rate: rate);
   }
 
   @override
-  Map<String, Object> toJson({bool toLocal = true}) => {
-        "rate": rate,
-        "lastUpdate": lastUpdate,
+  Map<String, String> toJson({bool includeLocal = true}) => {
+        "rate": rate.toString(),
+        "lastUpdate": lastUpdate.toString(),
       };
 }

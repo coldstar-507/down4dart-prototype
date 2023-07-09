@@ -55,7 +55,7 @@ class ProfileWidget extends StatelessWidget implements Down4Object {
           //     textAlign: TextAlign.center,
           //     maxLines: 1),
           const SizedBox(height: 8.0),
-          (node_ is PersonNode && (node_.description ?? "").isNotEmpty)
+          (node_ is PersonN && (node_.description ?? "").isNotEmpty)
               ? Container(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(node_.description!, textAlign: TextAlign.justify))
