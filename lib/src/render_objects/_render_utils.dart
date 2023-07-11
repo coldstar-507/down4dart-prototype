@@ -1247,6 +1247,11 @@ class _Down4ImageViewerState extends State<Down4ImageViewer> {
     if (im == null) loadFutureImage();
   }
 
+  Widget? tranformed() {
+    if (im == null) return null;
+    return Transform.flip(flipX: widget.image.isReversed, child: im!);
+  }
+
   void loadFutureImage() async {
     im = await widget.image.futureImage(widget.displaySize,
         forceSquare: widget.forceSquareAnyways);
@@ -1259,6 +1264,8 @@ class _Down4ImageViewerState extends State<Down4ImageViewer> {
       width: widget.displaySize.width,
       height: widget.displaySize.height,
       child: Stack(
+        fit: StackFit.expand,
+        alignment: AlignmentDirectional.center,
         children: [
           widget.image.tinyImage(widget.displaySize,
                   forceSquare: widget.forceSquareAnyways) ??
@@ -1266,8 +1273,9 @@ class _Down4ImageViewerState extends State<Down4ImageViewer> {
           AnimatedOpacity(
             curve: Curves.easeInExpo,
             duration: const Duration(milliseconds: 200),
-            opacity: im == null || !ImageCache().containsKey(im!.key!) ? 0 : 1,
-            child: im ?? const SizedBox.shrink(),
+            opacity: im == null ? 0 : 1,
+            //|| !ImageCache().containsKey(im!.key!) ? 0 : 1,
+            child: tranformed() ?? const SizedBox.shrink(),
           ),
         ],
       ),

@@ -1232,8 +1232,6 @@ mixin Camera2 on Pager2 {
         // elsewhere so...
         cameraInput = Down4Media.fromJson(tempInput!.toJson(includeLocal: true))
           ..mainCachedPath = tempInput!.mainCachedPath;
-        // Down4MediaMetadata.fromJson(tempInput!.toJson(includeLocal: true))
-        //   ..cachePath = tempInput!.cachePath;
 
         cameraController?.dispose();
         cameraController = null;
@@ -1973,6 +1971,7 @@ Down4Media makeCameraMedia({
       mainCachedPath: cachedPath,
       metadata: Down4MediaMetadata(
           ownerID: owner,
+          isReversed: isReversed,
           timestamp: makeTimestamp(),
           width: size.width,
           height: size.height,

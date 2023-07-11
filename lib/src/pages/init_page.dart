@@ -114,7 +114,10 @@ class _UserMakerPageState extends State<UserMakerPage>
     }
   }
 
-  double get imageSize => g.sizes.w * 0.3;
+  Size get imageSize => Size.square(g.sizes.w * 0.3);
+
+  Widget get userImage =>
+      cameraInput?.display(size: imageSize, forceSquare: true) ?? g.ph;
 
   Widget get imagePicker => GestureDetector(
         onTap: selectFile,
@@ -125,9 +128,7 @@ class _UserMakerPageState extends State<UserMakerPage>
           decoration: const BoxDecoration(
             borderRadius: BorderRadius.all(Radius.circular(5)),
           ),
-          child: cameraInput?.display(
-                  size: Size.square(imageSize), forceSquare: true) ??
-              g.ph,
+          child: userImage,
         ),
       );
 
@@ -294,6 +295,8 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   @override
   Widget build(BuildContext context) {
+    print(
+        "image id: ${cameraInput?.id.value}\nimage path: ${cameraInput?.mainCachedPath}\n");
     return Andrew(pages: [
       Down4Page(
         title: "Initialization",

@@ -179,7 +179,11 @@ Future<T?> fetch<T extends Locals>(
       return fetchNode();
     case Hyperchat:
       return fetchNode();
-    case Down4MediaMetadata:
+    case Down4Media:
+      return fetchMedia() as Future<T?>;
+    case Down4Video:
+      return fetchMedia() as Future<T?>;
+    case Down4Image:
       return fetchMedia() as Future<T?>;
     case Down4Payment:
       final data = tempID?.tempStoreRef.getData().toString();
@@ -215,7 +219,11 @@ Database gdb<T extends Locals>() {
       return nodesDB;
     case Hyperchat:
       return nodesDB;
-    case Down4MediaMetadata:
+    case Down4Media:
+      return mediasDB;
+    case Down4Video:
+      return mediasDB;
+    case Down4Image:
       return mediasDB;
     case Chat:
       return messagesDB;
@@ -310,8 +318,12 @@ T fromJson<T extends Locals>(Map<String, String?> json) {
       return Down4Node.fromJson(json) as T;
     case Hyperchat:
       return Down4Node.fromJson(json) as T;
-    case Down4MediaMetadata:
-      return Down4MediaMetadata.fromJson(json) as T;
+    case Down4Media:
+      return Down4Media.fromJson(json) as T;
+    case Down4Image:
+      return Down4Media.fromJson(json) as T;
+    case Down4Video:
+      return Down4Media.fromJson(json) as T;      
     case Chat:
       return Down4Message.fromJson(json) as T;
     case Snip:

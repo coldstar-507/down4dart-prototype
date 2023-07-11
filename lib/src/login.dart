@@ -81,6 +81,7 @@ class _Down4State extends State<Down4> {
     // and when it was calculated in the init user, we are not sure if
     // the ID was the proper one
     final goodMedia = media.userInitRecalculation(id)
+      ..cache()
       ..writeFromCachedPath()
       ..staticUpload();
 

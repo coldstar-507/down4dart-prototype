@@ -339,7 +339,7 @@ class _HomeState extends State<Home> {
       } else if (msg is Payment) {
         Down4Payment? payment = msg.payment ??
             await global<Down4Payment>(msg.paymentID,
-                doFetch: true, doMergeIfFetch: true);
+                doFetch: true, doMergeIfFetch: true, tempID: msg.tempPaymentID);
         if (payment == null) return;
         await payment.merge();
         if (page is MoneyPage) return setPage(moneyPage(payUpdate: payment));

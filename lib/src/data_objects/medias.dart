@@ -58,9 +58,7 @@ class Down4MediaMetadata implements Jsons {
   }
 
   factory Down4MediaMetadata.fromJson(Map<String, String?> decodedJson) {
-
     return Down4MediaMetadata(
-
         ownerID: ComposedID.fromString(decodedJson["ownerID"])!,
         timestamp: int.parse(decodedJson["timestamp"]!),
         mime: decodedJson["mime"]!,
@@ -95,6 +93,9 @@ abstract class Down4Media extends Temps {
   int? _lastUse;
   bool _isSaved;
   Down4MediaMetadata metadata;
+
+  String? mainCachedPath;
+
   Down4Media(
     this.id, {
     required this.metadata,
@@ -134,6 +135,7 @@ abstract class Down4Media extends Temps {
           tinyThumbnail: tinyThumbnail,
           lastUse: lastUse,
           isSaved: isSaved,
+          mainCachedPath: mainCachedPath,
           isPaidToView: isPaidToView,
           isPaidToOwn: isPaidToOwn,
           isLocked: isLocked);
@@ -142,6 +144,7 @@ abstract class Down4Media extends Temps {
           metadata: metadata,
           tempTS: tempTS,
           tempID: tempID,
+          mainCachedPath: mainCachedPath,
           tinyThumbnail: tinyThumbnail,
           lastUse: lastUse,
           isSaved: isSaved,
@@ -213,8 +216,6 @@ abstract class Down4Media extends Temps {
         cacheHeight: (s.height * golden).toInt());
   }
 
-  String? mainCachedPath;
-
   String get mainPath => "${g.appDirPath}${Platform.pathSeparator}${id.value}";
 
   File? get mainFile {
@@ -223,9 +224,11 @@ abstract class Down4Media extends Temps {
   }
 
   File? get mainCachedFile {
+    print("main cached path: $mainCachedPath");
+    File? f;
     if (mainCachedPath == null) return null;
-    if (!File(mainCachedPath!).existsSync()) return null;
-    return File(mainCachedPath!);
+    if (!(f = File(mainCachedPath!)).existsSync()) return null;
+    return f;
   }
 
   Future<void> use() async {
@@ -367,11 +370,13 @@ abstract class Down4Media extends Temps {
   @override
   Database get dbb => mediasDB;
 
+  // TODO, pretty sure this shit is broken
   Down4Media userInitRecalculation(ComposedID oid) {
     final metadataJson = metadata.toJson();
     metadataJson["ownerID"] = oid.value;
     return Down4Media.fromLocal(id,
-        metadata: metadata, tinyThumbnail: tinyThumbnail);
+        metadata: metadata, tinyThumbnail: tinyThumbnail)
+      ..mainCachedPath = mainCachedPath;
   }
 }
 
@@ -390,23 +395,37 @@ class Down4Image extends Down4Media {
     super.isLocked = false,
   });
 
+
   Image? readyImage(Size s, {bool forceSquare = false}) {
     File? f;
-    final int w = (s.width * golden).toInt();
-    final int h = (s.height * golden).toInt();
+    int? w, h;
 
+    // final int w = (s.width * golden).toInt();
+    // final int h = (s.height * golden).toInt();
+
+    if (size.aspectRatio < 1) {
+      w = (s.width * golden).toInt();
+    } else {
+      h = (s.height * golden).toInt();
+    }
+
+    return Image.file(mainCachedFile ?? mainFile!,
+        fit: BoxFit.cover, cacheHeight: h, cacheWidth: w);
+
+    // return Image.file(mainCachedFile ?? mainFile!,
+    //     cacheWidth: w, cacheHeight: h, fit: BoxFit.cover);
     if ((f = mainCachedFile ?? mainFile) != null) {
       if (isEncrypted) {
         final enc = EncryptedFileImage(f!);
         final res = ResizeImage(enc, width: w, height: h);
-        return Image(image: res);
+        return Image(image: res, fit: BoxFit.cover);
       } else {
         final res = ResizeImage(FileImage(f!), width: w, height: h);
-        return Image(image: res);
+        return Image(image: res, fit: BoxFit.cover);
       }
     } else if (_cachedUrl != null) {
       final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
-      return Image(image: res);
+      return Image(image: res, fit: BoxFit.cover);
     }
     return null;
   }
