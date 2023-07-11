@@ -335,9 +335,7 @@ class _HomeState extends State<Home> {
         final reaction = await global<Reaction>(msg.reactionID);
         if (reaction == null) return;
         await reaction.addReactor(reactor);
-        reloadReactions(msg.root, msg.messageID, () {
-          reloadChatWithID(msg.root);
-        });
+        reloadReactions(msg.root, msg.messageID);
       } else if (msg is Payment) {
         Down4Payment? payment = msg.payment ??
             await global<Down4Payment>(msg.paymentID,
@@ -347,9 +345,7 @@ class _HomeState extends State<Home> {
         if (page is MoneyPage) return setPage(moneyPage(payUpdate: payment));
       } else if (msg is Reaction) {
         await msg.merge();
-        reloadReactions(msg.root, msg.messageID, () {
-          reloadChatWithID(msg.root);
-        });
+        reloadReactions(msg.root, msg.messageID);
       } else {
         throw "connectToMessage has no implemented this type: ${msg.runtimeType}";
       }
@@ -685,18 +681,14 @@ class _HomeState extends State<Home> {
     }
   }
 
-  Future<void> reloadReactions(
-    ComposedID nodeID,
-    Down4ID messageID,
-    VoidCallback refreshChat,
-  ) async {
+  Future<void> reloadReactions(ComposedID nodeID, Down4ID messageID) async {
     final state = chatMessages(nodeID);
     print("state is null? $state");
     final msgRef = state?[messageID];
     print("msg ref is null? $msgRef");
     if (msgRef != null) {
       state![messageID] = msgRef.withReactions(await msgRef.message.reactions);
-      refreshChat();
+      reloadChatWithID(nodeID, msgRe: msgRef.message);
     } else {
       print("MESSAGE REF IS NULL");
     }
@@ -1654,7 +1646,7 @@ class _HomeState extends State<Home> {
               reactionID: cr.id,
               senderID: g.self.id)
           .processMessage();
-      reloadReactions(c.id, cr.messageID, rf);
+      reloadReactions(c.id, cr.messageID);
     }
 
     Future<void> reactToMsg(Chat msg) async =>
@@ -1792,7 +1784,7 @@ class _HomeState extends State<Home> {
           ..cache()
           ..merge()
           ..processMessage();
-        reloadReactions(c.id, msg.id, () => reloadChatWithID(c.id, msgRe: msg));
+        reloadReactions(c.id, msg.id);
       },
       openNode: opn,
       send: (chat) async {

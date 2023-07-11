@@ -6,22 +6,16 @@ import 'package:camera/camera.dart';
 import 'package:cbl/cbl.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:down4/src/_dart_utils.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'data_objects/couch.dart';
 import 'data_objects/_data_utils.dart';
-import 'data_objects/firebase.dart';
 import 'data_objects/medias.dart';
 import 'data_objects/messages.dart';
 import 'data_objects/nodes.dart';
 
-import 'package:flutter/cupertino.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'render_objects/_render_utils.dart';
@@ -31,8 +25,6 @@ import 'render_objects/palette.dart';
 import 'themes.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
-import 'web_requests.dart'
-    show MessageBatchResponse, MessageRequest, fetchNodes;
 
 // final masterDB = FirebaseDatabase.instanceFor(
 //   app: Firebase.app(),

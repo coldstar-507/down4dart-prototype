@@ -16,16 +16,14 @@ class Jeff {
   Jeff(this.lol);
 }
 
-
-
 void main() async {
-
   Jeff? jeff;
   if (2 % 4 == 1) jeff = Jeff(2);
 
-
   print(jeff == null || jeff.lol == 2);
 
+  print("jeff is a fuckint faggot");
+  print("And we all know this is true");
 
-
+    
 }

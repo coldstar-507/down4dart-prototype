@@ -639,30 +639,36 @@ class _AndrewState extends State<Andrew> {
           //     }
           //   },
           //   child:
-          Scaffold(
-        // primary: false,
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          toolbarHeight: g.sizes.headerHeight,
-          backgroundColor: g.theme.headerColor,
-          leading: pageHeader(),
-          leadingWidth: g.sizes.w,
-        ),
-        body: SafeArea(
-          child: Stack(
-            children: [
-              // ...widget.pages[curPos].stackWidgets ?? [],
-              pageBody2,
-              // Column(
-              //   children: [
-              // pageBody,
-              // pageBody2,
-              // curPage.console ?? const SizedBox.shrink(),
-              // ],
-              // ),
-              ...curPage.console.extraButtons,
-              // pageHeader,
-            ],
+          WillPopScope(
+        onWillPop: () async {
+          widget.backFunction?.call();
+          return false;
+        },
+        child: Scaffold(
+          // primary: false,
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            toolbarHeight: g.sizes.headerHeight,
+            backgroundColor: g.theme.headerColor,
+            leading: pageHeader(),
+            leadingWidth: g.sizes.w,
+          ),
+          body: SafeArea(
+            child: Stack(
+              children: [
+                // ...widget.pages[curPos].stackWidgets ?? [],
+                pageBody2,
+                // Column(
+                //   children: [
+                // pageBody,
+                // pageBody2,
+                // curPage.console ?? const SizedBox.shrink(),
+                // ],
+                // ),
+                ...curPage.console.extraButtons,
+                // pageHeader,
+              ],
+            ),
           ),
         ),
       ),
