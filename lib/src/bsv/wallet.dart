@@ -118,7 +118,7 @@ class Wallet extends Locals {
     // function again should solve the problem
     List<Down4TXOUT> outs = [];
     _ix = _ix + 1;
-    merge({"ix": _ix.toString()});
+    merge({"ix": _ix});
     // the goal here is simply having a unique id everytime
     final txSecret = makeUint32(_ix) + utf8.encode(selfID.unique);
     final d4Keys = DOWN4_NEUTER.derive(txSecret);
@@ -353,17 +353,17 @@ class Wallet extends Locals {
   })  : _keys = keys,
         _ix = ix ?? -1;
 
-  factory Wallet.fromJson(Map<String, String?> decodedJson) {
+  factory Wallet.fromJson(dynamic decodedJson) {
     return Wallet(
       keys: Down4Keys.fromYouKnow(decodedJson["keys"]!),
-      ix: int.parse(decodedJson["ix"]!),
+      ix: decodedJson["ix"],
     );
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = true}) => {
+  Map<String, Object> toJson({bool includeLocal = true}) => {
         "keys": _keys.toYouKnow(),
-        "ix": _ix.toString(),
+        "ix": _ix,
       };
 }
 

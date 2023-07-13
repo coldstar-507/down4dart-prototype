@@ -33,7 +33,7 @@ class Down4Payment extends Temps {
   final int timestamp;
 
   @override
-  Future<Map<String, String>?> temporaryUpload(Map<String, String> msg) async {
+  Future<Map<String, Object>?> temporaryUpload(Map<String, Object> msg) async {
     int? freshTS;
     ComposedID? freshID;
     try {
@@ -48,7 +48,7 @@ class Down4Payment extends Temps {
 
         final jsonPay = toJson();
         jsonPay["tempID"] = freshID.value;
-        jsonPay["tempTS"] = freshTS.toString();
+        jsonPay["tempTS"] = freshTS;
 
         await ref.putString(jsonEncode(jsonPay));
       } else {
@@ -56,7 +56,7 @@ class Down4Payment extends Temps {
       }
 
       msg["tempPaymentID"] = freshID?.value ?? tempID!.value;
-      msg["tempPaymentTS"] = freshTS?.toString() ?? tempTS!.toString();
+      msg["tempPaymentTS"] = freshTS ?? tempTS!;
 
       if (freshTS != null && freshID != null) {
         this
@@ -212,13 +212,13 @@ class Down4Payment extends Temps {
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = true}) => {
+  Map<String, Object> toJson({bool includeLocal = true}) => {
         "id": id.value,
         "tx": jsonEncode(txs.map((tx) => tx.toJson()).toList()),
-        "len": txs.length.toString(),
-        "safe": safe.toString(),
-        "ts": timestamp.toString(),
-        if (tempTS != null) "tempTS": tempTS!.toString(),
+        "len": txs.length,
+        "safe": safe,
+        "ts": timestamp,
+        if (tempTS != null) "tempTS": tempTS!,
         if (tempID != null) "tempID": tempID!.value,
         if (textNote.isNotEmpty) "txt": textNote,
       };
@@ -232,15 +232,15 @@ class Down4Payment extends Temps {
     return Down4Payment.fromJson(jsonDecoded);
   }
 
-  factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
+  factory Down4Payment.fromJson(dynamic decodedJson) {
     return Down4Payment(
-      List.from(jsonDecode(decodedJson["tx"]!))
-          .map((e) => Down4TX.fromJson(Map<String, String?>.from(e)))
+      List.from(decodedJson["tx"])
+          .map((e) => Down4TX.fromJson(e))
           .toList(),
-      safe: decodedJson["safe"] == "true",
-      tempTS: int.tryParse(decodedJson["tempTS"] ?? ""),
+      safe: decodedJson["safe"],
+      tempTS: decodedJson["tempTS"],
       tempID: ComposedID.fromString(decodedJson["tempID"]),
-      timestamp: int.parse(decodedJson["ts"]!),
+      timestamp: decodedJson["ts"],
       textNote: decodedJson["txt"] ?? "",
     );
   }
@@ -489,16 +489,16 @@ class Down4TXOUT extends Locals {
     this.outIndex,
   }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey.length);
 
-  factory Down4TXOUT.fromJson(Map<String, String?> decodedJson) => Down4TXOUT(
-        receiver: ComposedID.fromString(decodedJson["rc"])!,
+  factory Down4TXOUT.fromJson(dynamic decodedJson) => Down4TXOUT(
+        receiver: ComposedID.fromString(decodedJson["rc"]),
         secret: decodedJson["st"] != null
-            ? List<int>.from(base64Decode(decodedJson["st"]!))
+            ? List<int>.from(base64Decode(decodedJson["st"]))
             : null,
-        outIndex: int.parse(decodedJson["oi"]!),
-        txid: TXID.fromHex(decodedJson["id"]!),
-        sats: Sats(int.parse(decodedJson["s"]!)),
-        type: UtxoType.values.byName(decodedJson["t"]!),
-        scriptPubKey: hex.decode(decodedJson["sc"]!),
+        outIndex: decodedJson["oi"],
+        txid: TXID.fromHex(decodedJson["id"]),
+        sats: Sats(decodedJson["s"]),
+        type: UtxoType.values.byName(decodedJson["t"]),
+        scriptPubKey: base64Decode(decodedJson["sc"]),
       );
 
   @override
@@ -568,14 +568,14 @@ class Down4TXOUT extends Locals {
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = true}) => {
+  Map<String, Object> toJson({bool includeLocal = true}) => {
         "t": type.name,
         if (receiver != null) "rc": receiver!.value,
         "st": secret!.toBase64(),
-        "oi": outIndex!.toString(),
+        "oi": outIndex!,
         "id": txid!.asHex,
-        "s": sats.asInt.toString(),
-        "sc": hex.encode(scriptPubKey),
+        "s": sats.asInt,
+        "sc": scriptPubKey.toBase64(),
       };
 }
 

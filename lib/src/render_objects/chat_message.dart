@@ -66,11 +66,12 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   final ChatMediaInfo? mediaInfo;
   final List<ChatReplyInfo>? repliesInfo;
   final List<Down4Node>? nodes;
-  final List<Reaction>? reactions;
+
+  List<Reaction> get reactions => message.reactions.values.toList();
 
   final Future<void> Function(Chat message) react;
 
-  final Future<void> Function(Reaction) increment;
+  final Future<void> Function(Chat, Down4ID) increment;
 
   bool get videoIsPlaying =>
       mediaInfo?.videoController?.value.isPlaying ?? false;
@@ -89,7 +90,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     required this.mediaInfo,
     required this.openNode,
     required this.repliesInfo,
-    this.reactions,
     this.isPost = false,
     this.selected = false,
     required this.select,
@@ -105,7 +105,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       nodeRef: nodeRef,
       mediaInfo: mediaInfo,
       react: react,
-      reactions: reactions,
       increment: increment,
       openNode: open,
       nodes: nodes,
@@ -126,7 +125,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       openNode: openNode,
       react: react,
       increment: increment,
-      reactions: reactions,
       nodes: nodes,
       nodeRef: nodeRef,
       isPost: isPost,
@@ -147,7 +145,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       nodes: nodes,
       increment: increment,
       react: react,
-      reactions: reactions,
       mediaInfo: mediaInfo,
       openNode: openNode,
       hasHeader: hasHeader,
@@ -166,7 +163,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       mediaInfo: mediaInfo,
       openNode: openNode,
       react: react,
-      reactions: reactions,
       increment: increment,
       nodes: pNodes,
       isPost: isPost,
@@ -178,25 +174,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
-  ChatMessage withReactions(List<Reaction>? pReactions) {
-    return ChatMessage(
-        message: message,
-        repliesInfo: repliesInfo,
-        nodeRef: nodeRef,
-        mediaInfo: mediaInfo,
-        openNode: openNode,
-        react: react,
-        increment: increment,
-        reactions: pReactions,
-        nodes: nodes,
-        isPost: isPost,
-        myMessage: myMessage,
-        hasGap: hasGap,
-        hasHeader: hasHeader,
-        select: select,
-        selected: selected);
-  }
-
   ChatMessage invertedSelection() {
     return ChatMessage(
       message: message,
@@ -206,7 +183,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       react: react,
       nodes: nodes,
       increment: increment,
-      reactions: reactions,
       mediaInfo: mediaInfo,
       openNode: openNode,
       hasHeader: hasHeader,
@@ -225,7 +201,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         nodeRef: nodeRef,
         repliesInfo: repliesInfo,
         react: react,
-        reactions: reactions,
         increment: increment,
         mediaInfo: mediaInfo
           ?..videoController?.pause()
@@ -679,7 +654,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
             // height: reactionWidth,
             padding: const EdgeInsets.all(2),
             child: GestureDetector(
-              onTap: () => increment(r),
+              onTap: () => increment(message, r.id),
               child: Container(
                 decoration:
                     BoxDecoration(borderRadius: BorderRadius.circular(4)),

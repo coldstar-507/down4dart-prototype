@@ -159,8 +159,10 @@ abstract class Down4Media extends Temps {
   double get aspectRatio => metadata.aspectRatio;
   Size get size => Size(metadata.width, metadata.height);
 
+  // needs to be Map<String, String> for firebase bucket metadata...
   @override
   Map<String, String> toJson({bool includeLocal = true}) => {
+        ...metadata.toJson(),
         "id": id.value,
         "isPaidToView": _isPaidToView.toString(),
         "isPaidToOwn": _isPaidToOwn.toString(),
@@ -168,7 +170,6 @@ abstract class Down4Media extends Temps {
         if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
         if (_lastUse != null) "lastUse": _lastUse!.toString(),
         "isSaved": _isSaved.toString(),
-        "metadata": jsonEncode(metadata),
         if (tempID != null) "tempID": tempID!.value,
         if (tempTS != null) "tempTS": tempTS!.toString(),
       };
@@ -182,8 +183,9 @@ abstract class Down4Media extends Temps {
     final isSaved = decodedJson["isSaved"] == "true";
     final tempID = ComposedID.fromString(decodedJson["tempID"]);
     final tempTS = int.tryParse(decodedJson["tempTS"] ?? "");
-    final metadata = Down4MediaMetadata.fromJson(
-        Map<String, String?>.from(jsonDecode(decodedJson["metadata"]!)));
+
+    // metadata is in the same json of the rest, see toJson
+    final metadata = Down4MediaMetadata.fromJson(decodedJson);
 
     if (metadata.isVideo) {
       return Down4Video(id,
@@ -231,6 +233,8 @@ abstract class Down4Media extends Temps {
     return f;
   }
 
+
+  // in medias, to follow json as Map<String,String> merge values are also str
   Future<void> use() async {
     _lastUse = u.makeTimestamp();
     await merge({"lastUse": _lastUse.toString()});
@@ -246,23 +250,24 @@ abstract class Down4Media extends Temps {
     }
   }
 
+  // in medias, to follow json as Map<String,String> merge values are also str
   Future<void> updateSaveStatus(bool newSaveStatus) async {
     _isSaved = newSaveStatus;
     await merge({"isSaved": _isSaved.toString()});
   }
 
-  Down4MediaMetadata updated({
-    required ComposedID newTempID,
-    required int newTempTS,
-  }) {
-    final json = toJson(includeLocal: true);
-    json["onlineID"] = newTempID.value;
-    json["onlineTimestamp"] = newTempTS.toString();
-    return Down4MediaMetadata.fromJson(json);
-  }
+  // Down4MediaMetadata updated({
+  //   required ComposedID newTempID,
+  //   required int newTempTS,
+  // }) {
+  //   final json = toJson(includeLocal: true);
+  //   json["onlineID"] = newTempID.value;
+  //   json["onlineTimestamp"] = newTempTS.toString();
+  //   return Down4MediaMetadata.fromJson(json);
+  //  }
 
   @override // Temporary uploads are always part of a message
-  Future<Map<String, String>?> temporaryUpload(Map<String, String> msg) async {
+  Future<Map<String, Object>?> temporaryUpload(Map<String, Object> msg) async {
     int? freshTS;
     ComposedID? freshID;
     try {
@@ -299,7 +304,7 @@ abstract class Down4Media extends Temps {
       }
 
       msg["tempMediaID"] = freshID?.value ?? tempID!.value;
-      msg["tempMediaTS"] = freshTS?.toString() ?? tempTS!.toString();
+      msg["tempMediaTS"] = freshTS ?? tempTS!;
 
       if (freshTS != null && freshID != null) {
         this
@@ -394,7 +399,6 @@ class Down4Image extends Down4Media {
     super.isPaidToOwn = false,
     super.isLocked = false,
   });
-
 
   Image? readyImage(Size s, {bool forceSquare = false}) {
     File? f;

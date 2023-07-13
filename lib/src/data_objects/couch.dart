@@ -604,7 +604,7 @@ extension WalletManager on Wallet {
   }
 
   Future<void> setSpent(Down4ID id, bool spent) async {
-    await merge({id.value: spent.toString()});
+    await merge({id.value: spent});
   }
 
   static Future<Wallet?> load() async {

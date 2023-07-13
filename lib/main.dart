@@ -97,12 +97,6 @@ Future<void> main() async {
     // TODO kIsWeb
   }
 
-  // initialized textInputClient
-  // {
-  //   await SystemChannels.textInput.invokeMethod(
-  //       "TextInput.setClient", [3, const TextInputConfiguration().toJson()]);
-  // }
-
   // Initializing couchdb
   {
     await CouchbaseLiteFlutter.init();
@@ -133,7 +127,6 @@ Future<void> main() async {
     final lg = await rootBundle.load("assets/images/down4_inverted_white.png");
     g.lg = Image.memory(lg.buffer.asUint8List(),
         fit: BoxFit.cover, gaplessPlayback: true);
-
     g.d1 = Image.memory(d1.buffer.asUint8List(),
         fit: BoxFit.cover, gaplessPlayback: true);
     g.d2 = Image.memory(d2.buffer.asUint8List(),
@@ -170,7 +163,7 @@ Future<void> main() async {
   // INIT THE THEME
   {
     g.loadTheme(await FireTheme.currentTheme);
-
+    
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,

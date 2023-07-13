@@ -1,29 +1,41 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
-Map<String, dynamic> gCache = {
-  "jeff": {"name": "jeff"},
-  "andrew": {"name": "andrew"},
-};
-
-final ll = [
-  {"jeff": "jeff"},
-  {"andrew": "andrew"},
-];
-
 class Jeff {
-  int lol;
-  Jeff(this.lol);
+  int i;
+  Jeff(this.i);
 }
 
 void main() async {
-  Jeff? jeff;
-  if (2 % 4 == 1) jeff = Jeff(2);
+  const n = 100000;
+  final l = List<Jeff>.generate(n, (i) => Jeff(i));
+  final m = l.asMap().map((k, e) => MapEntry(e.i, e));
+  final s = Set<Jeff>.from(l);
+  const k = 10000;
+  List<int> lt = List<int>.filled(k, 0, growable: false);
+  List<int> lm = List<int>.filled(k, 0, growable: false);
+  List<int> ls = List<int>.filled(k, 0, growable: false);
+  int r, t1, t2;
+  Jeff j;
+  for (int i = 0; i < 10000; i++) {
+    r = math.Random().nextInt(100000);
+    t1 = DateTime.now().microsecond;
+    j = l.singleWhere((j) => j.i == r);
+    t2 = DateTime.now().microsecond;
+    lt[i] = t2 - t1;
 
-  print(jeff == null || jeff.lol == 2);
+    t1 = DateTime.now().microsecond;
+    j = m[r]!;
+    t2 = DateTime.now().microsecond;
+    lm[i] = t2 - t1;
 
-  print("jeff is a fuckint faggot");
-  print("And we all know this is true");
+    t1 = DateTime.now().microsecond;
+    j = s.singleWhere((j) => j.i == r);
+    t2 = DateTime.now().microsecond;
+    ls[i] = t2 - t1;
+  }
 
-    
+  print("Sum list access time=${lt.reduce((p, e) => p + e)}");
+  print("Sum map  access time=${lm.reduce((p, e) => p + e)}");
+  print("Sum set  access time=${ls.reduce((p, e) => p + e)}");
 }

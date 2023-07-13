@@ -26,17 +26,7 @@ import 'themes.dart';
 import 'bsv/types.dart';
 import 'bsv/wallet.dart';
 
-// final masterDB = FirebaseDatabase.instanceFor(
-//   app: Firebase.app(),
-//   databaseURL: "https://down4-26ee1-default-rtdb.firebaseio.com/",
-// );
-
 final g = Singletons.instance;
-
-// final db = FirebaseDatabase.instance.ref();
-// final _fs = FirebaseFirestore.instance;
-// final _st = FirebaseStorage.instanceFor(bucket: "down4-26ee1-messages");
-// final _st_node = FirebaseStorage.instanceFor(bucket: "down4-26ee1-nodes");
 
 /// Determine the current position of the device.
 ///
@@ -431,12 +421,17 @@ class ViewManager {
     views[view.id] ??= view;
   }
 
-  ViewState? pop() {
+  // returns the view we are popping
+  // because of possible cycles, we don't actually remove a view
+  // from the views if it's still in the route. The boolean
+  // stands for "view was removed from views"
+  (ViewState, bool) pop() {
     final popped = route.removeLast();
     if (!route.contains(popped)) {
-      return views.remove(popped);
+      return (views.remove(popped)!, true);
+//      return views.remove(popped)!;
     }
-    return null;
+    return (views[popped]!, false);
   }
 
   void popUntilHome() {
@@ -482,16 +477,22 @@ class ViewState {
   // A view can have maps of special references, ex: messagesWithVideos
   Map<String, Set<Down4ID>> notableReferences;
 
+  List<Down4Object> _forwardingObjects;
+
+  List<Down4Object> get fo => _forwardingObjects;
+
   Set<Down4ID> refs(String name) =>
       notableReferences[name] ??= Set<Down4ID>.identity();
 
   ViewState({
     required this.id,
     required this.pages,
+    List<Down4Object>? fo,
     int? ix,
     this.node,
     this.chat,
-  })  : currentIndex = ix ?? 0,
+  })  : _forwardingObjects = fo ?? [],
+        currentIndex = ix ?? 0,
         notableReferences = {};
 
   PageState get currentPage => pages[currentIndex];
@@ -783,7 +784,7 @@ Future<ChatMessage?> getChatMessage({
   required void Function(Down4Node)? openNode,
   required void Function() refreshCallback,
   required Future<void> Function(Chat message) react,
-  required Future<void> Function(Reaction) increment,
+  required Future<void> Function(Chat, Down4ID) increment,
 }) async {
   final msg = await global<Chat>(msgID);
   if (msg == null) return null;
@@ -817,10 +818,6 @@ Future<ChatMessage?> getChatMessage({
   final bool hasHeader =
       !senderIsSelf && ch is GroupN && nextMsg?.senderID != msg.senderID;
 
-  // load the reactions, from disk always
-  final reactions = await msg.reactions;
-  // then cache all the local medias
-  await globall<Down4Media>(reactions.map((e) => e.mediaID));
   final cm = ChatMessage(
       key: GlobalKey(),
       hasGap: hasGap,
@@ -833,7 +830,6 @@ Future<ChatMessage?> getChatMessage({
       repliesInfo: await ChatMessage.generateRepliesInfo(msg, (replyID) {
         print("TODO, GO TO REPLY ID = $replyID");
       }),
-      reactions: reactions,
       hasHeader: hasHeader,
       openNode: openNode,
       myMessage: g.self.id == msg.senderID,
@@ -872,7 +868,7 @@ Future<void> writeMessages({
   required void Function(Down4Node)? openNode,
   int limit = 20,
   required Future<void> Function(Chat message) react,
-  required Future<void> Function(Reaction) increment,
+  required Future<void> Function(Chat, Down4ID) increment,
 }) async {
   final orderedSet = ordered.toSet();
   final loadedSet = state.keys.toSet();

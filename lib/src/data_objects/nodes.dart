@@ -66,11 +66,11 @@ class MessageTarget with Jsons {
     this.success = false,
   });
   @override
-  Map<String, String> toJson({bool includeLocal = false}) => {
+  Map<String, Object> toJson({bool includeLocal = false}) => {
         "userID": userID.value,
         "device": device,
         "token": token,
-        "success": success.toString(),
+        "success": success,
       };
 
   factory MessageTarget.fromJson(dynamic json) {
@@ -78,7 +78,7 @@ class MessageTarget with Jsons {
       userID: ComposedID.fromString(json["userID"])!,
       device: json["device"],
       token: json["token"],
-      success: json["success"] == "true",
+      success: json["success"],
     );
   }
 }
@@ -152,21 +152,20 @@ abstract class Down4Node extends Locals with PaletteN {
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = true}) {
+  Map<String, Object> toJson({bool includeLocal = true}) {
     return {
       "id": id.value,
       "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
       "name": _name,
       "connection": _connection,
       if (includeLocal) "unique": id.unique,
-      if (_messagingTokens != null)
-        "messagingTokens": jsonEncode(_messagingTokens),
+      if (_messagingTokens != null) "messagingTokens": _messagingTokens!,
       if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID!,
-      if (_treeHash != null) "treeHash": jsonEncode(_treeHash),
+      if (_treeHash != null) "treeHash": _jsonTreeHash!,
       if (_ownerID != null) "ownerID": _ownerID!.value,
       if (_lastName != null) "lastName": _lastName!,
-      if (_longitude != null) "longitude": _longitude!.toString(),
-      if (_latitude != null) "latitude": _latitude!.toString(),
+      if (_longitude != null) "longitude": _longitude!,
+      if (_latitude != null) "latitude": _latitude!,
       if (_mediaID != null) "mediaID": _mediaID!.value,
       if (_children != null) "children": _children!.values,
       if (_posts != null) "posts": _posts!.values,
@@ -175,9 +174,8 @@ abstract class Down4Node extends Locals with PaletteN {
       if (_neuter != null) "neuter": _neuter!.toYouKnow(),
       if (_group != null) "group": _group!.values,
       if (includeLocal && _deviceID != null) "deviceID": _deviceID!,
-      if (includeLocal && _isConnected != null)
-        "isFriend": _isConnected!.toString(),
-      if (includeLocal) "activity": _activity.toString(),
+      if (includeLocal && _isConnected != null) "isFriend": _isConnected!,
+      if (includeLocal) "activity": _activity,
     };
   }
 
@@ -396,35 +394,34 @@ abstract class Down4Node extends Locals with PaletteN {
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? makeTimestamp();
-    merge({"activity": _activity.toString()});
+    merge({"activity": _activity});
   }
 
-  factory Down4Node.fromJson(Map<String, String?> json) {
-    final (_, blueH, lastO) = parseConnection(json["connection"]!);
+  factory Down4Node.fromJson(dynamic json) {
+    final (_, blueH, lastO) = parseConnection(json["connection"]);
 
-    final id = Down4ID.fromString(json["id"]!);
+    final id = Down4ID.fromString(json["id"]);
     final deviceID = json["deviceID"];
     final mainDeviceID = json["mainDeviceID"];
-    final activity = int.parse(json["activity"] ?? "0");
-    final type = Nodes.values.byName(json["type"]!);
+    final activity = json["activity"] ?? 0;
+    final type = Nodes.values.byName(json["type"]);
     final mediaID = ComposedID.fromString(json["mediaID"]);
-    final latitude = double.tryParse(json["latitude"] ?? "");
-    final longitude = double.tryParse(json["longitude"] ?? "");
+    final latitude = json["latitude"];
+    final longitude = json["longitude"];
     final ownerID = ComposedID.fromString(json["ownerID"]);
-    final name = json["name"]!;
-    final isConnected = json["isConnected"] == "true";
-    final isFriend = json["isFriend"] == "true";
-    final isPrivate = json["isPrivate"] == "true";
+    final name = json["name"];
+    final isConnected = json["isConnected"];
+    final isFriend = json["isFriend"];
+    final isPrivate = json["isPrivate"];
     final lastName = json["lastName"];
-    final tokensStr = json["messagingTokens"] ?? '{}';
-    final messagingTokens = Map<String, String>.from(jsonDecode(tokensStr));
+    final messagingTokens = json["messagingTokens"];
     final description = json["description"];
     final children = json["children"]?.toComposedIDs();
     final privates = json["privates"]?.toComposedIDs();
     final admins = json["admins"]?.toComposedIDs();
     final group = json["group"]?.toComposedIDs();
     final neuter = json["neuter"] != null
-        ? Down4Keys.fromYouKnow(json["neuter"] as String)
+        ? Down4Keys.fromYouKnow(json["neuter"])
         : null;
 
     switch (type) {
@@ -524,7 +521,7 @@ mixin ConnectN on RemoteN, Down4Node {
   bool get isConnected;
   Future<void> updateConnectionStatus(bool isConnected) async {
     _isConnected = isConnected;
-    await merge({"isConnected": isConnected.toString()});
+    await merge({"isConnected": isConnected});
   }
 
   Stream<DatabaseEvent> get connection {
@@ -555,7 +552,7 @@ mixin BranchN on ConnectN, Down4Node {
         }
       }
     }
-    await merge({"treeHash": jsonEncode(treeHash = tree)});
+    await merge({"treeHash": treeHash = tree});
   }
 
   @override
@@ -723,12 +720,12 @@ mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
   Future<void> updateLastOnline(int? lastOnline) async {
     if (lastOnline == null) return;
     _lastOnline = lastOnline;
-    await merge({"lastOnline": _lastOnline.toString()});
+    await merge({"lastOnline": _lastOnline});
   }
 
   Future<void> updateMessagingToken(Map<String, String> newToken) async {
     _messagingTokens = {...?_messagingTokens, ...newToken};
-    await merge({"messagingTokens": jsonEncode(messagingTokens)});
+    await merge({"messagingTokens": messagingTokens});
   }
 
   @override
@@ -765,7 +762,7 @@ mixin GeoN on Geo, Down4Node {
   Future<void> updateLocation(double lon, double lat) async {
     _longitude = lon;
     _latitude = lat;
-    await merge({"longitude": lon.toString(), "latitude": lat.toString()});
+    await merge({"longitude": lon, "latitude": lat});
   }
 }
 
@@ -1032,7 +1029,7 @@ class Group extends Down4Node
 
   Future<void> addMembersRef(Iterable<ComposedID> memberIDs) async {
     _group!.addAll(memberIDs);
-    await merge({"group": group.join(" ")});
+    await merge({"group": group.values});
   }
 
   bool get isPrivate => _isPrivate!;

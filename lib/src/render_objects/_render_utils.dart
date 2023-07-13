@@ -442,7 +442,8 @@ extension MediaDisplay on Down4Media {
           autoPlay: true,
           displaySize: g.sizes.fullSize);
     } else {
-      final image = (this as Down4Image).readyImage(g.sizes.fullSize)!;
+      final image = (this as Down4Image).readyImage(g.sizes.fullSize);
+      if (image == null) return const SizedBox.shrink();
       await precacheImage(image.image, context);
       return Center(
         child: Transform(

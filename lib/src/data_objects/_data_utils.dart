@@ -2,18 +2,15 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:cbl/cbl.dart';
-import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../_dart_utils.dart';
 import '../data_objects/couch.dart';
 
 import '../globals.dart';
 import '../themes.dart';
-import 'medias.dart';
 import 'nodes.dart';
 
 String XORedStrings(List<String> strings) {
@@ -30,6 +27,7 @@ String XORedStrings(List<String> strings) {
     }
   }
   return String.fromCharCodes(hash);
+
 }
 
 class Down4ID {
@@ -139,7 +137,7 @@ abstract mixin class Down4Object {
 }
 
 abstract mixin class Jsons {
-  Map<String, String> toJson();
+  Map<String, Object> toJson();
 }
 
 abstract mixin class Locals implements Down4Object, Jsons {
@@ -162,9 +160,9 @@ abstract mixin class Locals implements Down4Object, Jsons {
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = false});
+  Map<String, Object> toJson({bool includeLocal = false});
 
-  Future<void> merge([Map<String, String>? values]) async {
+  Future<void> merge([Map<String, Object>? values]) async {
     print("DBB NAME=${dbb.name}");
     // first, we get the current doc in the db
     var document = (await dbb.document(id.value))?.toMutable();
@@ -172,7 +170,7 @@ abstract mixin class Locals implements Down4Object, Jsons {
     // if it wasn't local, we create it
     if (!wasLocal) document = MutableDocument.withId(id.value);
 
-    Map<String, String> toMerge;
+    Map<String, Object> toMerge;
     if (!wasLocal) {
       // then we need to merge the whole thing with the parameter values
       toMerge = {...toJson(includeLocal: true), ...?values};
@@ -205,7 +203,7 @@ abstract class Temps extends Locals {
   })  : _tempTS = tempTS,
         _tempID = tempID;
 
-  Future<Map<String, String>?> temporaryUpload(Map<String, String> msg);
+  Future<Map<String, Object>?> temporaryUpload(Map<String, Object> msg);
 
   Future<void> updateTempReferences(
     ComposedID newTempID,
@@ -220,7 +218,7 @@ abstract class Temps extends Locals {
     _tempID = newTempID;
     _tempTS = newTempTS;
     await merge({
-      "tempTS": newTempTS.toString(),
+      "tempTS": newTempTS,
       "tempID": newTempID.value,
     });
   }
@@ -251,7 +249,7 @@ class FireTheme extends Locals {
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = true}) => {
+  Map<String, Object> toJson({bool includeLocal = true}) => {
         "themeName": _themeName,
       };
 }
@@ -311,15 +309,15 @@ class ExchangeRate extends Locals {
     return ExchangeRate.fromJson(Map<String, String?>.from(doc.toPlainMap()));
   }
 
-  factory ExchangeRate.fromJson(Map<String, String?> decodedJson) {
-    final lastUpdate = int.parse(decodedJson["lastUpdate"] ?? "0");
-    final rate = double.parse(decodedJson["rate"] ?? "0.0");
+  factory ExchangeRate.fromJson(dynamic decodedJson) {
+    final lastUpdate = decodedJson["lastUpdate"] ?? 0;
+    final rate = decodedJson["rate"] ?? 0.0;
     return ExchangeRate(lastUpdate: lastUpdate, rate: rate);
   }
 
   @override
-  Map<String, String> toJson({bool includeLocal = true}) => {
-        "rate": rate.toString(),
-        "lastUpdate": lastUpdate.toString(),
+  Map<String, Object> toJson({bool includeLocal = true}) => {
+        "rate": rate,
+        "lastUpdate": lastUpdate,
       };
 }
