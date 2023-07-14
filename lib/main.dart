@@ -29,15 +29,18 @@ late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  print("initialization was ensured");
+  
   if (!kIsWeb) {
     await Firebase.initializeApp();
+    print("firebase was initialized");
     channel = const AndroidNotificationChannel(
       'Down4AndroidNotificationChannel', // id
       'Default Importance Notifications for Down4AndroidNotificationChannel',
       // title // description
       importance: Importance.defaultImportance,
     );
+    print("created notification channel");
 
     flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -110,6 +113,7 @@ Future<void> main() async {
     billsDB = await Database.openAsync("bills");
     await loadIndexes();
   }
+  print("initialized couch db");
 
   // loading some asset in memory, not having those assets in memory cause
   // stutter in transitions for example, loading image from assets is
@@ -143,6 +147,7 @@ Future<void> main() async {
         fit: BoxFit.contain, gaplessPlayback: true);
     g.background = bg.buffer.asUint8List();
   }
+  print("loaded assets");
 
   // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -150,6 +155,7 @@ Future<void> main() async {
   {
     await g.loadAppDirPath();
   }
+  print("loaded app dir");
 
   // initializing cameras
   {
@@ -175,6 +181,10 @@ Future<void> main() async {
     );
   }
 
+  print("loaded theme");
+
   final cred = await FirebaseAuth.instance.signInAnonymously();
+  print("loaded firebase auth");
+  print("RUNNING THE APP");
   runApp(MaterialApp(home: Material(child: Down4(user: cred.user))));
 }

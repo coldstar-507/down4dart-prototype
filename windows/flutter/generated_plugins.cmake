@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   cbl_flutter_ce
+  firebase_core
   geolocator_windows
 )
 

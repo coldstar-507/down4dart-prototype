@@ -153,13 +153,18 @@ abstract class Down4Node extends Locals with PaletteN {
 
   @override
   Map<String, Object> toJson({bool includeLocal = true}) {
+    String? messagingTokens;
+    if (_messagingTokens != null) {
+      messagingTokens = jsonEncode(_messagingTokens!);
+    }
+
     return {
       "id": id.value,
       "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
       "name": _name,
       "connection": _connection,
       if (includeLocal) "unique": id.unique,
-      if (_messagingTokens != null) "messagingTokens": _messagingTokens!,
+      if (_messagingTokens != null) "messagingTokens": messagingTokens!,
       if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID!,
       if (_treeHash != null) "treeHash": _jsonTreeHash!,
       if (_ownerID != null) "ownerID": _ownerID!.value,
@@ -352,7 +357,6 @@ abstract class Down4Node extends Locals with PaletteN {
     bool isConnected = false,
     int? lastOnline,
     String? lastName,
-    bool? isFriend,
     bool? isHidden,
     bool? isPrivate,
     String? description,
@@ -397,31 +401,37 @@ abstract class Down4Node extends Locals with PaletteN {
     merge({"activity": _activity});
   }
 
-  factory Down4Node.fromJson(dynamic json) {
-    final (_, blueH, lastO) = parseConnection(json["connection"]);
+  factory Down4Node.fromJson(Map<String, Object?> json) {
+    final (_, blueH, lastO) = parseConnection(json["connection"] as String);
 
-    final id = Down4ID.fromString(json["id"]);
-    final deviceID = json["deviceID"];
-    final mainDeviceID = json["mainDeviceID"];
-    final activity = json["activity"] ?? 0;
-    final type = Nodes.values.byName(json["type"]);
-    final mediaID = ComposedID.fromString(json["mediaID"]);
-    final latitude = json["latitude"];
-    final longitude = json["longitude"];
-    final ownerID = ComposedID.fromString(json["ownerID"]);
-    final name = json["name"];
-    final isConnected = json["isConnected"];
-    final isFriend = json["isFriend"];
-    final isPrivate = json["isPrivate"];
-    final lastName = json["lastName"];
-    final messagingTokens = json["messagingTokens"];
-    final description = json["description"];
-    final children = json["children"]?.toComposedIDs();
-    final privates = json["privates"]?.toComposedIDs();
-    final admins = json["admins"]?.toComposedIDs();
-    final group = json["group"]?.toComposedIDs();
+    final encTokens = json["messagingTokens"] as String?;
+    Map<String, String>? messagingTokens;
+    if (encTokens != null) {
+      final jsonTokens = jsonDecode(encTokens);
+      messagingTokens = Map.from(jsonTokens).map((k, v) => MapEntry(k, v as String));
+    }
+
+    final id = Down4ID.fromString(json["id"] as String);
+    final deviceID = json["deviceID"] as String?;
+    final mainDeviceID = json["mainDeviceID"] as String?;
+    final activity = json["activity"] as int? ?? 0;
+    final type = Nodes.values.byName(json["type"] as String);
+    final mediaID = ComposedID.fromString(json["mediaID"] as String?);
+    final latitude = json["latitude"] as double?;
+    final longitude = json["longitude"] as double?;
+    final ownerID = ComposedID.fromString(json["ownerID"] as String?);
+    final name = json["name"] as String;
+    final isConnected = json["isConnected"] as bool? ?? false;
+    final isFriend = json["isFriend"] as bool? ?? false;
+    final isPrivate = json["isPrivate"] as bool?;
+    final lastName = json["lastName"] as String?;
+    final description = json["description"] as String?;
+    final children = (json["children"] as String?)?.toComposedIDs();
+    final privates = (json["privates"] as String?)?.toComposedIDs();
+    final admins = (json["admins"] as String?)?.toComposedIDs();
+    final group = (json["group"] as String?)?.toComposedIDs();
     final neuter = json["neuter"] != null
-        ? Down4Keys.fromYouKnow(json["neuter"])
+        ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
 
     switch (type) {
@@ -434,8 +444,8 @@ abstract class Down4Node extends Locals with PaletteN {
             lastOnline: lastO,
             lastName: lastName,
             mediaID: mediaID,
-            messagingTokens: messagingTokens,
-            isConnected: isFriend,
+            messagingTokens: messagingTokens!,
+            isConnected: isFriend!,
             children: children!,
             neuter: neuter!,
             description: description,
@@ -451,15 +461,15 @@ abstract class Down4Node extends Locals with PaletteN {
             firstWord: name,
             secondWord: lastName!,
             group: group!,
-            isConnected: isConnected);
+            isConnected: isConnected!);
 
       case Nodes.group:
         return Group(id as ComposedID,
-            isPrivate: isPrivate,
+            isPrivate: isPrivate!,
             activity: activity,
             ownerID: ownerID!,
             blueArrowHash: blueH,
-            isConnected: isConnected,
+            isConnected: isConnected!,
             name: name,
             mediaID: mediaID!,
             group: group!);
@@ -473,7 +483,7 @@ abstract class Down4Node extends Locals with PaletteN {
             blueArrowHash: blueH,
             lastOnline: lastO,
             description: description,
-            messagingTokens: messagingTokens,
+            messagingTokens: messagingTokens!,
             lastName: lastName,
             mediaID: mediaID!,
             children: children!,
@@ -788,13 +798,13 @@ mixin RemoteN on Down4Node {
     }
   }
 
-  Future<bool> remoteMerge({Map<String, dynamic>? data}) async {
+  Future<bool> remoteMerge({Map<String, Object>? data}) async {
     if (isRemoteMutable) {
       try {
         await id.userRef.update(data ?? toJson(includeLocal: false));
         return true;
       } catch (e) {
-        print("error remoteMerge node id=${id.unique}");
+        print("error remoteMerge node id=${id.unique}\nerror=$e\n");
         return false;
       }
     } else {
@@ -832,7 +842,6 @@ class User extends Down4Node
             isConnected: isConnected,
             mainDeviceID: mainDeviceID,
             messagingTokens: messagingTokens,
-            isFriend: isConnected,
             children: children,
             neuter: neuter);
 

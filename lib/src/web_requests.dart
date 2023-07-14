@@ -180,15 +180,18 @@ Future<List<Chat>?> getPosts(List<String> ids) async {
 }
 
 Future<Iterable<PersonN>?> getUsers(Iterable<String> uniques) async {
+  print("\nGETTING USERS: $uniques\n");
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
   );
   final response = await http.post(url, body: uniques.join(" "));
   if (response.statusCode != 200) return null;
   return List.from(jsonDecode(response.body)).map((e) {
+    print("JSON NODE=${e['node']}");
     final person = Down4Node.fromJson(e["node"])..cache();
     // final data = Uint8List.fromList(base64Decode((e["data"])));
     Down4Media.fromJson(e["metadata"]).cache();
+    print("METADATA=${e['metadata']}");
     return person as PersonN;
   });
 }
