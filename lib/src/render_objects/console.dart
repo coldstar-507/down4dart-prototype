@@ -1,5 +1,4 @@
 import 'dart:ui' as ui;
-import 'dart:typed_data';
 
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:flutter/rendering.dart';
@@ -8,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
 import '../data_objects/medias.dart';
 
@@ -502,7 +500,7 @@ class Console extends StatelessWidget {
 
   final Widget? previewMedia;
   final List<dynamic>? forwardingObjects;
-  final List<Palette2>? forwardingPalette;
+  final List<Palette>? forwardingPalette;
   final bool invertedColors, initializationConsole;
   final ConsoleMedias2? medias;
   final CameraController? cameraController;
@@ -730,75 +728,75 @@ class Console extends StatelessWidget {
 
   double get mediaCelSize => trueWidth / mediaPerRow;
 
-  Widget consoleMedias() {
-    if (medias == null) return const SizedBox.shrink();
-    final ids = medias!.images ? g.savedImageIDs : g.savedVideoIDs;
-    final nRows = (ids.length / mediaPerRow).ceil();
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
-          color: g.theme.consoleBorderColor,
-          border: Border.all(
-              color: g.theme.consoleBorderColor, width: borderWidth)),
-      child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxHeight: maximumMediaRows * mediaCelSize, maxWidth: trueWidth),
-          child: ListView.builder(
-              itemCount: nRows,
-              itemBuilder: ((context, index) {
-                Widget f(int i) {
-                  if (i < ids.length) {
-                    final cachedMedia = cache<Down4Media>(ids[i]);
-                    if (cachedMedia != null) {
-                      return GestureDetector(
-                          onTap: () => medias!.onSelect(cachedMedia),
-                          child: (cachedMedia.display(
-                              size: Size.square(mediaCelSize),
-                              forceSquare: true)));
-                    }
-                    return FutureBuilder(
-                      future: global<Down4Media>(ids[i]),
-                      builder: (ctx, ans) {
-                        if (ans.connectionState == ConnectionState.done &&
-                            ans.hasData) {
-                          return GestureDetector(
-                              onTap: () => ans.data != null
-                                  ? medias!.onSelect(ans.data!)
-                                  : null,
-                              child: (ans.requireData?.display(
-                                      size: Size.square(mediaCelSize),
-                                      forceSquare: true)) ??
-                                  SizedBox.square(dimension: mediaCelSize));
-                        } else {
-                          return SizedBox.square(dimension: mediaCelSize);
-                        }
-                      },
-                    );
-                  } else {
-                    return SizedBox.square(dimension: mediaCelSize);
-                  }
-                }
+  // Widget consoleMedias() {
+  //   if (medias == null) return const SizedBox.shrink();
+  //   final ids = medias!.images ? g.savedImageIDs : g.savedVideoIDs;
+  //   final nRows = (ids.length / mediaPerRow).ceil();
+  //   return Container(
+  //     clipBehavior: Clip.hardEdge,
+  //     decoration: BoxDecoration(
+  //         borderRadius: BorderRadius.vertical(top: Radius.circular(consoleRad)),
+  //         color: g.theme.consoleBorderColor,
+  //         border: Border.all(
+  //             color: g.theme.consoleBorderColor, width: borderWidth)),
+  //     child: ConstrainedBox(
+  //         constraints: BoxConstraints(
+  //             maxHeight: maximumMediaRows * mediaCelSize, maxWidth: trueWidth),
+  //         child: ListView.builder(
+  //             itemCount: nRows,
+  //             itemBuilder: ((context, index) {
+  //               Widget f(int i) {
+  //                 if (i < ids.length) {
+  //                   final cachedMedia = cache<Down4Media>(ids[i]);
+  //                   if (cachedMedia != null) {
+  //                     return GestureDetector(
+  //                         onTap: () => medias!.onSelect(cachedMedia),
+  //                         child: (cachedMedia.display(
+  //                             size: Size.square(mediaCelSize),
+  //                             forceSquare: true)));
+  //                   }
+  //                   return FutureBuilder(
+  //                     future: global<Down4Media>(ids[i]),
+  //                     builder: (ctx, ans) {
+  //                       if (ans.connectionState == ConnectionState.done &&
+  //                           ans.hasData) {
+  //                         return GestureDetector(
+  //                             onTap: () => ans.data != null
+  //                                 ? medias!.onSelect(ans.data!)
+  //                                 : null,
+  //                             child: (ans.requireData?.display(
+  //                                     size: Size.square(mediaCelSize),
+  //                                     forceSquare: true)) ??
+  //                                 SizedBox.square(dimension: mediaCelSize));
+  //                       } else {
+  //                         return SizedBox.square(dimension: mediaCelSize);
+  //                       }
+  //                     },
+  //                   );
+  //                 } else {
+  //                   return SizedBox.square(dimension: mediaCelSize);
+  //                 }
+  //               }
 
-                return Row(
-                  key: Key(medias!.images.toString() + index.toString()),
-                  children: [
-                    f((index * 5)),
-                    f((index * 5) + 1),
-                    f((index * 5) + 2),
-                    f((index * 5) + 3),
-                    f((index * 5) + 4)
-                  ],
-                );
-              }))),
-    );
-  }
+  //               return Row(
+  //                 key: Key(medias!.images.toString() + index.toString()),
+  //                 children: [
+  //                   f((index * 5)),
+  //                   f((index * 5) + 1),
+  //                   f((index * 5) + 2),
+  //                   f((index * 5) + 3),
+  //                   f((index * 5) + 4)
+  //                 ],
+  //               );
+  //             }))),
+  //   );
+  // }
 
   Widget forwardingPalettes() {
     if (forwardingObjects == null) return const SizedBox.shrink();
 
     Widget individualObject(Down4Object obj) {
-      if (obj is Palette2) {
+      if (obj is Palette) {
         return Flexible(
             child: Container(
                 height: buttonHeight,
@@ -1035,7 +1033,7 @@ class Console extends StatelessWidget {
             // imagePreview(),
             // videoPreview(),
             // forwardingPalettes(),
-            consoleMedias(),
+            // consoleMedias(),
           ],
         ));
   }
@@ -1121,17 +1119,10 @@ class ConsoleRow {
   });
 }
 
-class Console3 extends StatelessWidget {
+class Console3 {
   final int currentPageIndex;
-  // final int? previousPageIndex;
   final List<String> currentConsolesName;
-  // final String currentConsoleName;
-  // final String? previousConsoleName;
   final List<Map<String, ConsoleRow>> rows;
-
-  // final double fullWidth;
-  // final List<Widget>? forwardingObjects;
-  // final List<double>? beginSizes, endSizes;
 
   String get currentConsoleName => currentConsolesName[currentPageIndex];
 
@@ -1184,12 +1175,6 @@ class Console3 extends StatelessWidget {
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(extraButtonsRad),
                 topRight: Radius.circular(extraButtonsRad),
-                // topLeft: Radius.circular(nExtraButtons == nConsoleLayers - 1
-                //     ? Console.consoleRad
-                //     : 0),
-                // topRight: Radius.circular(nExtraButtons > nConsoleLayers - 1
-                //     ? Console.consoleRad
-                //     : 0),
               ),
             ),
             child: AnimatedSize(
@@ -1213,322 +1198,223 @@ class Console3 extends StatelessWidget {
   ConsoleRow rowAt(int pageIndex) =>
       rows[pageIndex][currentConsolesName[pageIndex]]!;
 
-  // late List<Map<String, (List<double>, List<double>)>> _sizes;
-
-  // final List<Widget> widgets;
-  // final AnimationController? ctrl;
-
   const Console3({
     required this.rows,
-    // required String currentConsole,
     required this.currentConsolesName,
     required this.currentPageIndex,
     String? lastConsole,
     int? lastIndex,
-    // required List<Widget> widgets,
-    // this.forwardingObjects,
-    // double? maxHeight,
-    // this.beginSizes,
-    // this.endSizes,
-    // this.ctrl,
     double? fullWidth,
-    Key? key,
-  })
-  // previousConsoleName = lastConsole ?? currentConsole,
-  // previousPageIndex = lastIndex ?? currentPageIndex,
-  // widgets = widgets
-  //     .asMap()
-  //     .map((i, w) {
-  //       Widget w_;
-  //       if (w is ConsoleButton) {
-  //         w_ = w.withKey(bottomButtonsKey[i]);
-  //       } else if (w is ConsoleInput2) {
-  //         w_ = AnimatedContainer(
-  //             duration: const Duration(milliseconds: 100),
-  //             height: maxHeight ?? Console.buttonHeight,
-  //             child: w);
-  //       } else {
-  //         w_ = w;
-  //       }
-  //       return MapEntry(i, w_);
-  //     })
-  //     .values
-  //     .toList(),
-  : super(key: key);
-  // {
-  //   int i = 0;
-  //   for (var (k, e) in consoles.indexed) {
-  //     for (var j in e.entries) {
-  //       for (var w in j.value.widgets) {
-  //         if (w is ConsoleButton) {
-  //           w = w.withKey(bottomButtonsKey[i]);
-  //         } else if (w is ConsoleInput2) {
-  //           w = AnimatedContainer(
-  //               duration: const Duration(milliseconds: 100),
-  //               height: maxHeight ?? Console.buttonHeight,
-  //               child: w);
-  //           i++;
-  //         }
-  //         i++;
-  //       }
-  //       i++;
-  //     }
-  //   }
-  // consoles.forEach((element) {
-  //   element.forEach((key, value) {
-  //     value.widgets.forEach((element) {
-  //       Widget w_;
-  //       if (w is ConsoleButton) {
-  //         w_ = w.withKey(bottomButtonsKey[i]);
-  //       } else if (w is ConsoleInput2) {
-  //         w_ = AnimatedContainer(
-  //             duration: const Duration(milliseconds: 100),
-  //             height: maxHeight ?? Console.buttonHeight,
-  //             child: w);
-  //       } else {
-  //         w_ = w;
-  //       }
-  //     })
-  //
-  //     return MapEntry(i, w_);
-  //   })
-  // })
-  // }
+    // Key? key,
+  });
+  // : super(key: key);
 
-  // double get currentConsoleHeight =>
-  //     Tween<double>(begin: 0.0, end: Console.buttonHeight).animate(ctrl!).value;
-  // double get unactivatedConsoleHeight =>
-  //     Tween<double>(begin: Console.buttonHeight, end: 0.0).animate(ctrl!).value;
-
-  // double currentConsoleButtonWidth(double maxWidth) =>
-  //     Tween<double>(begin: 0.0, end: g.sizes.w * maxWidth).animate(ctrl!).value;
-  // double notCurrentConsoleButtonWidth(double maxWidth) =>
-  //     Tween<double>(begin: g.sizes.w * maxWidth, end: 0.0).animate(ctrl!).value;
-
-  // late final List<double> sizes = widgets
-  //     .asMap()
-  //     .map((i, w) {
-  //       if (ctrl != null) {
-  //         return MapEntry(
-  //             i,
-  //             Tween<double>(
-  //                     begin: fullWidth * beginSizes![i],
-  //                     end: fullWidth * endSizes![i])
-  //                 .animate(ctrl!)
-  //                 .value);
-  //       } else {
-  //         return MapEntry(
-  //             i, fullWidth * (beginSizes?[i] ?? (1 / widgets.length)));
-  //       }
-  //     })
-  //     .values
-  //     .toList();
-
-  Widget rowOfPage({required int index}) {
-    final extension = extensionOfPage(index: index);
-    final ex = extension?.$1;
-    final h = extension?.$2;
+  static Widget staticRow(ConsoleRow r) {
+    final defaultWidth = 1 / r.widgets.length;
+    final currentHeight = Console.buttonHeight;
+    final inputHeight = r.inputMaxHeight;
     return Column(children: [
       AnimatedOpacity(
-        opacity: extension == null ? 0 : 1,
+        opacity: r.extension == null ? 0 : 1,
         duration: Console.animationDuration,
         child: AnimatedContainer(
           duration: Console.animationDuration,
-          height: h ?? 0,
-          // constraints: BoxConstraints(
-          //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
-          child: ex ?? const SizedBox.shrink(),
+          height: r.extension?.$2 ?? 0,
+          child: r.extension?.$1 ?? const SizedBox.shrink(),
         ),
       ),
-      ...rows[index]
-          .map((name, c) {
-            double currentHeight;
-            if (currentConsolesName.contains(name)) {
-              currentHeight = Console.buttonHeight;
+      Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: r.widgets.indexed.map((e) {
+            final i = e.$1;
+            final w = e.$2;
+            final width = (r.widths?[i] ?? defaultWidth) * g.sizes.w;
+
+            double height;
+            if (w is ConsoleButton) {
+              height = currentHeight;
             } else {
-              currentHeight = 0;
+              height = currentHeight == 0
+                  ? currentHeight
+                  : inputHeight ?? Console.buttonHeight;
             }
 
-            final defaultWidth = 1 / c.widgets.length;
-            final inputHeight = c.inputMaxHeight;
+            final Widget w_ = AnimatedContainer(
+                    duration: Andrew.pageSwitchAnimationDuration,
+                    width: width,
+                    height: height,
+                    child: w);
 
-            final row = Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: c.widgets.indexed.map((e) {
-                final i = e.$1;
-                final w = e.$2;
+            return w_;
+          }).toList()),
+    ]);
+  }
 
-                final width = (c.widths?[i] ?? defaultWidth) * g.sizes.w;
-
-                double height;
-                if (w is ConsoleButton) {
-                  height = currentHeight;
+  Widget rowOfPage({required int index, bool staticRow = false}) {
+    final extension = extensionOfPage(index: index);
+    final ex = extension?.$1;
+    final h = extension?.$2;
+    return AnimatedOpacity(
+        duration: Andrew.pageSwitchOpacityDuration,
+        opacity: staticRow ? 0 : 1,
+        // ci == currentPageIndex ? 1 : 0,
+        child: Column(children: [
+          AnimatedOpacity(
+            opacity: extension == null ? 0 : 1,
+            duration: Console.animationDuration,
+            child: AnimatedContainer(
+              duration: Console.animationDuration,
+              height: h ?? 0,
+              child: ex ?? const SizedBox.shrink(),
+            ),
+          ),
+          ...rows[index]
+              .map((name, c) {
+                double currentHeight;
+                if (currentConsolesName.contains(name)) {
+                  currentHeight = Console.buttonHeight;
                 } else {
-                  height = currentHeight == 0
-                      ? currentHeight
-                      : inputHeight ?? Console.buttonHeight;
+                  currentHeight = 0;
                 }
 
-                final Widget w_ = AnimatedOpacity(
-                    duration: Andrew.pageSwitchOpacityDuration,
-                    opacity: 1, // ci == currentPageIndex ? 1 : 0,
-                    child: AnimatedContainer(
+                final defaultWidth = 1 / c.widgets.length;
+                final inputHeight = c.inputMaxHeight;
+
+                final row = Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: c.widgets.indexed.map((e) {
+                    final i = e.$1;
+                    final w = e.$2;
+
+                    final width = (c.widths?[i] ?? defaultWidth) * g.sizes.w;
+
+                    double height;
+                    if (w is ConsoleButton) {
+                      height = currentHeight;
+                    } else {
+                      height = currentHeight == 0
+                          ? currentHeight
+                          : inputHeight ?? Console.buttonHeight;
+                    }
+
+                    final Widget w_ = AnimatedContainer(
                         duration: Andrew.pageSwitchAnimationDuration,
                         width: width,
                         height: height,
-                        child: w));
+                        child: w);
 
-                return w_;
-              }).toList(),
-            );
+                    return w_;
+                  }).toList(),
+                );
 
-            return MapEntry(name, row);
-          })
-          .values
-          .toList(),
-    ]);
+                return MapEntry(name, row);
+              })
+              .values
+              .toList(),
+        ]));
   }
 
   (Widget, double?)? extensionOfPage({required int index}) {
     return rows[index][currentConsolesName[index]]?.extension;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // first row means the different pages consoles
-    // pages consoles animate from left to right (width)
+  // @override
+  // Widget build(BuildContext context) {
+  //   // first row means the different pages consoles
+  //   // pages consoles animate from left to right (width)
 
-    // for each pages, we have a column of consoles
-    // column consoles animate from top to bottom (height)
+  //   // for each pages, we have a column of consoles
+  //   // column consoles animate from top to bottom (height)
 
-    // we have a row of columns of rows
-    // the rows in the colum are the actual consoles
-    // which can have different animated states aswell (holy shit)
+  //   // we have a row of columns of rows
+  //   // the rows in the colum are the actual consoles
+  //   // which can have different animated states aswell (holy shit)
 
-    // the row that embeds the columns
-    // ci is the index
-    return ColoredBox(
-      color: g.theme.buttonColor(isActivated: true, isInverted: false),
-      child: GestureDetector(
-        onHorizontalDragUpdate: (_) {},
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedOpacity(
-              opacity: currentExtension == null ? 0 : 1,
-              duration: Console.animationDuration,
-              child: AnimatedContainer(
-                duration: Console.animationDuration,
-                height: currentExtensionHeight ?? 0,
-                // constraints: BoxConstraints(
-                //     maxHeight: currentExtension == null ? 0 : g.sizes.w),
-                child: currentExtension ?? const SizedBox.shrink(),
-              ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.start,
-              mainAxisSize: MainAxisSize.max,
-              children: rows.indexed.map((c) {
-                final ci = c.$1;
-                final cInfo = c.$2;
-                return Column(
-                    children: cInfo
-                        .map((name, c) {
-                          double currentHeight;
-                          if (currentConsolesName.contains(name)) {
-                            currentHeight = Console.buttonHeight;
-                          } else {
-                            currentHeight = 0;
-                          }
+  //   // the row that embeds the columns
+  //   // ci is the index
+  //   return ColoredBox(
+  //     color: g.theme.buttonColor(isActivated: true, isInverted: false),
+  //     child: GestureDetector(
+  //       onHorizontalDragUpdate: (_) {},
+  //       child: Column(
+  //         mainAxisAlignment: MainAxisAlignment.end,
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           AnimatedOpacity(
+  //             opacity: currentExtension == null ? 0 : 1,
+  //             duration: Console.animationDuration,
+  //             child: AnimatedContainer(
+  //               duration: Console.animationDuration,
+  //               height: currentExtensionHeight ?? 0,
+  //               child: currentExtension ?? const SizedBox.shrink(),
+  //             ),
+  //           ),
+  //           Row(
+  //             crossAxisAlignment: CrossAxisAlignment.end,
+  //             mainAxisAlignment: MainAxisAlignment.start,
+  //             mainAxisSize: MainAxisSize.max,
+  //             children: rows.indexed.map((c) {
+  //               final ci = c.$1;
+  //               final cInfo = c.$2;
+  //               return Column(
+  //                   children: cInfo
+  //                       .map((name, c) {
+  //                         double currentHeight;
+  //                         if (currentConsolesName.contains(name)) {
+  //                           currentHeight = Console.buttonHeight;
+  //                         } else {
+  //                           currentHeight = 0;
+  //                         }
 
-                          final defaultWidth = 1 / c.widgets.length;
-                          final inputHeight = c.inputMaxHeight;
+  //                         final defaultWidth = 1 / c.widgets.length;
+  //                         final inputHeight = c.inputMaxHeight;
 
-                          final row = Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: c.widgets.indexed.map((e) {
-                              final i = e.$1;
-                              final w = e.$2;
+  //                         final row = Row(
+  //                           crossAxisAlignment: CrossAxisAlignment.end,
+  //                           children: c.widgets.indexed.map((e) {
+  //                             final i = e.$1;
+  //                             final w = e.$2;
 
-                              double width;
-                              if (ci != currentPageIndex) {
-                                width = 0;
-                              } else {
-                                width =
-                                    (c.widths?[i] ?? defaultWidth) * g.sizes.w;
-                              }
+  //                             double width;
+  //                             if (ci != currentPageIndex) {
+  //                               width = 0;
+  //                             } else {
+  //                               width =
+  //                                   (c.widths?[i] ?? defaultWidth) * g.sizes.w;
+  //                             }
 
-                              double height;
-                              if (w is ConsoleButton) {
-                                height = currentHeight;
-                              } else {
-                                height = currentHeight == 0
-                                    ? currentHeight
-                                    : inputHeight ?? Console.buttonHeight;
-                              }
+  //                             double height;
+  //                             if (w is ConsoleButton) {
+  //                               height = currentHeight;
+  //                             } else {
+  //                               height = currentHeight == 0
+  //                                   ? currentHeight
+  //                                   : inputHeight ?? Console.buttonHeight;
+  //                             }
 
-                              final Widget w_ = AnimatedOpacity(
-                                  duration: Andrew.pageSwitchOpacityDuration,
-                                  opacity: ci == currentPageIndex ? 1 : 0,
-                                  child: AnimatedContainer(
-                                      duration:
-                                          Andrew.pageSwitchAnimationDuration,
-                                      width: width,
-                                      height: height,
-                                      child: w));
+  //                             final Widget w_ = AnimatedOpacity(
+  //                                 duration: Andrew.pageSwitchOpacityDuration,
+  //                                 opacity: ci == currentPageIndex ? 1 : 0,
+  //                                 child: AnimatedContainer(
+  //                                     duration:
+  //                                         Andrew.pageSwitchAnimationDuration,
+  //                                     width: width,
+  //                                     height: height,
+  //                                     child: w));
 
-                              return w_;
-                            }).toList(),
-                          );
+  //                             return w_;
+  //                           }).toList(),
+  //                         );
 
-                          return MapEntry(name, row);
-                        })
-                        .values
-                        .toList());
-                // return MapEntry(i, SizedBox(width: sizes[i], child: value));
-              }).toList(),
-            )
-          ],
-        ),
-      ),
-    );
-  }
+  //                         return MapEntry(name, row);
+  //                       })
+  //                       .values
+  //                       .toList());
+  //             }).toList(),
+  //           )
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 }
-
-// class ConsoleRow extends StatefulWidget {
-//   final List<({int begin, int end, Widget w})> rowWidgets;
-//   const ConsoleRow(this.rowWidgets, Key? key) : super(key: key);
-//
-//   @override
-//   State<ConsoleRow> createState() => _ConsoleRowState();
-// }
-//
-// class _ConsoleRowState extends State<ConsoleRow>
-//     with SingleTickerProviderStateMixin {
-//   late AnimationController _ctrl;
-//   late List<Animation> _animations;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _ctrl =
-//         AnimationController(duration: Console.animationDuration, vsync: this);
-//     _animations = widget.rowWidgets
-//         .map((e) => IntTween(begin: e.begin, end: e.end).animate(_ctrl))
-//         .toList();
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Row(
-//       children: widget.rowWidgets
-//           .asMap()
-//           .map((key, value) => MapEntry(
-//               key, Expanded(flex: _animations[key].value, child: value.w)))
-//           .values
-//           .toList(),
-//     );
-//   }
-// }

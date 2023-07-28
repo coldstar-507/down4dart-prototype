@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' show Size;
 
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
@@ -10,7 +9,6 @@ import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:mime/mime.dart';
-import 'package:flutter/material.dart' show Color, Image, Widget;
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../_dart_utils.dart';
@@ -21,7 +19,7 @@ import 'package:cbl/cbl.dart';
 import '_data_utils.dart';
 import 'couch.dart';
 
-class Down4MediaMetadata implements Jsons {
+class Down4MediaMetadata with Jsons {
   final bool isReversed, isSquared;
   final String mime;
   final bool isEncrypted;
@@ -60,7 +58,7 @@ class Down4MediaMetadata implements Jsons {
   factory Down4MediaMetadata.fromJson(Map<String, String?> decodedJson) {
     return Down4MediaMetadata(
         ownerID: ComposedID.fromString(decodedJson["ownerID"])!,
-        timestamp: int.parse(decodedJson["timestamp"]!),
+        timestamp: int.parse(decodedJson["timestamp"] ?? "0"),
         mime: decodedJson["mime"]!,
         isReversed: decodedJson["isReversed"] == "true",
         isSquared: decodedJson["isSquared"] == "true",
@@ -83,33 +81,54 @@ class Down4MediaMetadata implements Jsons {
       };
 }
 
-abstract class Down4Media extends Temps {
-  @override
-  ComposedID id;
-
+abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   bool _isPaidToView, _isPaidToOwn, _isLocked;
-
   String? tinyThumbnail, _cachedUrl;
-  int? _lastUse;
+  int _lastUse;
   bool _isSaved;
   Down4MediaMetadata metadata;
 
   String? mainCachedPath;
 
+  set cachedUrl(String? u) => _cachedUrl = u;
+
+  @override
+  final ComposedID id;
+  ComposedID? _tempID;
+  int? _tempTS;
+
+  @override
+  ComposedID? get tempID => _tempID;
+
+  @override
+  int? get tempTS => _tempTS;
+
+  @override
+  Future<void> updateTempReferences(ComposedID newTempID, int newTempTS) async {
+    final currentTS = tempTS ?? 0;
+    if (currentTS > newTempTS) return;
+    await merge({
+      "tempTS": (_tempTS = newTempTS).toString(),
+      "tempID": (_tempID = newTempID).value,
+    });
+  }
+
   Down4Media(
     this.id, {
+    ComposedID? tempID,
+    int? tempTS,
     required this.metadata,
-    super.tempID,
-    super.tempTS,
     this.tinyThumbnail,
     this.mainCachedPath,
-    int? lastUse,
+    int lastUse = 0,
     bool isSaved = false,
     bool isPaidToView = false,
     bool isPaidToOwn = false,
     bool isLocked = false,
   })  : _isSaved = isSaved,
         _lastUse = lastUse,
+        _tempID = tempID,
+        _tempTS = tempTS,
         _isPaidToView = isPaidToView,
         _isPaidToOwn = isPaidToOwn,
         _isLocked = isLocked;
@@ -121,7 +140,7 @@ abstract class Down4Media extends Temps {
     int? tempTS,
     String? tinyThumbnail,
     String? mainCachedPath,
-    int? lastUse,
+    int lastUse = 0,
     bool isSaved = false,
     bool isPaidToView = false,
     bool isPaidToOwn = false,
@@ -167,9 +186,9 @@ abstract class Down4Media extends Temps {
         "isPaidToView": _isPaidToView.toString(),
         "isPaidToOwn": _isPaidToOwn.toString(),
         "isLocked": _isLocked.toString(),
-        if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
-        if (_lastUse != null) "lastUse": _lastUse!.toString(),
         "isSaved": _isSaved.toString(),
+        if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
+        "lastUse": _lastUse.toString(),
         if (tempID != null) "tempID": tempID!.value,
         if (tempTS != null) "tempTS": tempTS!.toString(),
       };
@@ -221,7 +240,10 @@ abstract class Down4Media extends Temps {
   String get mainPath => "${g.appDirPath}${Platform.pathSeparator}${id.value}";
 
   File? get mainFile {
-    if (!File(mainPath).existsSync()) return null;
+    if (!File(mainPath).existsSync()) {
+      print("main file == null");
+      return null;
+    }
     return File(mainPath);
   }
 
@@ -232,7 +254,6 @@ abstract class Down4Media extends Temps {
     if (!(f = File(mainCachedPath!)).existsSync()) return null;
     return f;
   }
-
 
   // in medias, to follow json as Map<String,String> merge values are also str
   Future<void> use() async {
@@ -256,68 +277,58 @@ abstract class Down4Media extends Temps {
     await merge({"isSaved": _isSaved.toString()});
   }
 
-  // Down4MediaMetadata updated({
-  //   required ComposedID newTempID,
-  //   required int newTempTS,
-  // }) {
-  //   final json = toJson(includeLocal: true);
-  //   json["onlineID"] = newTempID.value;
-  //   json["onlineTimestamp"] = newTempTS.toString();
-  //   return Down4MediaMetadata.fromJson(json);
-  //  }
+  // @override // Temporary uploads are always part of a message
+  // Future<Map<String, String>?> temporaryUpload(Map<String, String> msg) async {
+  //   int? freshTS;
+  //   ComposedID? freshID;
+  //   try {
+  //     print("MEDIA TEMP TIMESTAMP = $tempTS");
 
-  @override // Temporary uploads are always part of a message
-  Future<Map<String, Object>?> temporaryUpload(Map<String, Object> msg) async {
-    int? freshTS;
-    ComposedID? freshID;
-    try {
-      print("MEDIA TEMP TIMESTAMP = $tempTS");
+  //     final uploadMedia = tempID == null || tempTS.shouldBeUpdated;
 
-      final uploadMedia = tempID == null || tempTS.shouldBeUpdated;
+  //     if (uploadMedia) {
+  //       print("(RE)-uploading media!");
+  //       freshID = ComposedID();
+  //       freshTS = makeTimestamp();
 
-      if (uploadMedia) {
-        print("(RE)-uploading media!");
-        freshID = ComposedID();
-        freshTS = makeTimestamp();
+  //       final jsonMedia = toJson(includeLocal: false);
+  //       jsonMedia["tempID"] = freshID.value;
+  //       jsonMedia["tempTS"] = freshTS.toString();
 
-        final jsonMedia = toJson(includeLocal: false);
-        jsonMedia["tempID"] = freshID.value;
-        jsonMedia["tempTS"] = freshTS.toString();
+  //       final ref = freshID.server.temporaryStore.ref(freshID.value);
+  //       final setMetadata = SettableMetadata(customMetadata: jsonMedia);
 
-        final ref = freshID.server.temporaryStore.ref(freshID.value);
-        final setMetadata = SettableMetadata(customMetadata: jsonMedia);
+  //       File? f;
+  //       if ((f = mainCachedFile ?? mainFile) != null) {
+  //         if (metadata.isEncrypted) {
+  //           final d = f!.readAsBytesSync();
+  //           final dec = Cy4.decrypt(d);
+  //           await ref.putData(dec, setMetadata);
+  //         } else {
+  //           await ref.putFile(f!, setMetadata);
+  //         }
+  //       } else {
+  //         print("PROBLEM: NO MEDIA TO UPLOAD BRO");
+  //       }
+  //     } else {
+  //       print("OK: NO NEED TO UPDATE MEDIA");
+  //     }
 
-        File? f;
-        if ((f = mainCachedFile ?? mainFile) != null) {
-          if (metadata.isEncrypted) {
-            final d = f!.readAsBytesSync();
-            final dec = Cy4.decrypt(d);
-            await ref.putData(dec, setMetadata);
-          } else {
-            await ref.putFile(f!, setMetadata);
-          }
-        } else {
-          print("PROBLEM: NO MEDIA TO UPLOAD BRO");
-        }
-      } else {
-        print("OK: NO NEED TO UPDATE MEDIA");
-      }
+  //     msg["tempMediaID"] = freshID?.value ?? tempID!.value;
+  //     msg["tempMediaTS"] = (freshTS ?? tempTS!).toString();
 
-      msg["tempMediaID"] = freshID?.value ?? tempID!.value;
-      msg["tempMediaTS"] = freshTS ?? tempTS!;
+  //     if (freshTS != null && freshID != null) {
+  //       this
+  //         ..updateTempReferences(freshID, freshTS)
+  //         ..cache();
+  //     }
 
-      if (freshTS != null && freshID != null) {
-        this
-          ..updateTempReferences(freshID, freshTS)
-          ..cache();
-      }
-
-      return msg;
-    } catch (e) {
-      print("ERROR uploadMessageMedia,  message id: $id, error: $e");
-      return null;
-    }
-  }
+  //     return msg;
+  //   } catch (e) {
+  //     print("ERROR uploadMessageMedia,  message id: $id, error: $e");
+  //     return null;
+  //   }
+  // }
 
   Future<bool> staticUpload() async {
     final ref = id.staticStoreRef;
@@ -352,6 +363,13 @@ abstract class Down4Media extends Temps {
     }
   }
 
+  Future<void> downloadAndWriteIfNeeded() async {
+    if (mainFile != null) return;
+    final ref = tempID == null ? id.staticStoreRef : id.tempStoreRef;
+    final data = await ref.getData();
+    if (data != null) await write(data);
+  }
+
   Future<String?> get url async {
     if (_cachedUrl != null) return _cachedUrl;
     if (!tempTS.isExpired && tempID != null) {
@@ -373,9 +391,16 @@ abstract class Down4Media extends Temps {
   }
 
   @override
+  Map<String, String> get tempPayloadMetadata => toJson(includeLocal: false);
+
+  @override
+  Uint8List? get tempPayload {
+    return mainCachedFile?.readAsBytesSync() ?? mainFile?.readAsBytesSync();
+  }
+
+  @override
   Database get dbb => mediasDB;
 
-  // TODO, pretty sure this shit is broken
   Down4Media userInitRecalculation(ComposedID oid) {
     final metadataJson = metadata.toJson();
     metadataJson["ownerID"] = oid.value;
@@ -400,6 +425,22 @@ class Down4Image extends Down4Media {
     super.isLocked = false,
   });
 
+  Image? readySnipImage() {
+    File? f;
+    if ((f = mainCachedFile ?? mainFile) != null) {
+      return Image(image: FileImage(f!), fit: BoxFit.cover);
+    } else if (_cachedUrl != null) {
+      return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
+    }
+    return null;
+  }
+
+  Future<Image?> futureSnipImage() async {
+    await url;
+    if (_cachedUrl == null) return null;
+    return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
+  }
+
   Image? readyImage(Size s, {bool forceSquare = false}) {
     File? f;
     int? w, h;
@@ -407,17 +448,13 @@ class Down4Image extends Down4Media {
     // final int w = (s.width * golden).toInt();
     // final int h = (s.height * golden).toInt();
 
+    // we want cached (w or h) to be (golden * longest diplaySize side)
     if (size.aspectRatio < 1) {
       w = (s.width * golden).toInt();
     } else {
       h = (s.height * golden).toInt();
     }
 
-    return Image.file(mainCachedFile ?? mainFile!,
-        fit: BoxFit.cover, cacheHeight: h, cacheWidth: w);
-
-    // return Image.file(mainCachedFile ?? mainFile!,
-    //     cacheWidth: w, cacheHeight: h, fit: BoxFit.cover);
     if ((f = mainCachedFile ?? mainFile) != null) {
       if (isEncrypted) {
         final enc = EncryptedFileImage(f!);
@@ -481,13 +518,20 @@ class Down4Video extends Down4Media {
     if ((mainCachedFile ?? mainFile) != null) {
       return VideoPlayerController.file((mainCachedFile ?? mainFile)!);
     }
-    if (_cachedUrl != null) return VideoPlayerController.network(_cachedUrl!);
+    if (_cachedUrl != null) {
+      final uri = Uri.parse(_cachedUrl!);
+      return VideoPlayerController.networkUrl(uri);
+    }
+
     return null;
   }
 
   Future<VideoPlayerController?> futureController() async {
     final url_ = await url;
-    if (url_ != null) return VideoPlayerController.network(url_);
+    if (url_ != null) {
+      final uri = Uri.parse(url_);
+      return VideoPlayerController.networkUrl(uri);
+    }
     return null;
   }
 

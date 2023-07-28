@@ -7,7 +7,6 @@ import 'package:camera/camera.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
 
-import '../data_objects/_data_utils.dart';
 import '../render_objects/_render_utils.dart'
     show Down4PageWidget, InvertedSize;
 import '../render_objects/console.dart';
@@ -18,10 +17,7 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "snip";
 
-  // final CameraController ctrl;
-  // final double minZoom, maxZoom;
-  // final int camNum;
-  final void Function() cameraBack; //, nextRes, flip;
+  final void Function() cameraBack;
   final void Function({
     required String mimetype,
     required String path,
@@ -32,14 +28,8 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
   final bool enableVideo;
 
   const SnipCamera({
-    // required this.maxZoom,
-    // required this.minZoom,
-    // required this.camNum,
-    // required this.ctrl,
     required this.cameraBack,
     required this.cameraCallBack,
-    // required this.nextRes,
-    // required this.flip,
     this.enableVideo = true,
     Key? key,
   }) : super(key: key);
@@ -154,8 +144,8 @@ class _SnipCameraState extends State<SnipCamera>
       await ctrl.startVideoRecording();
       setState(() {});
     } catch (e) {
-      throw "ERROR TRYING TO RECORD VIDEO $e";
       widget.cameraBack();
+      throw "ERROR TRYING TO RECORD VIDEO $e";
     }
   }
 
@@ -207,287 +197,10 @@ class _SnipCameraState extends State<SnipCamera>
         child: child,
       ));
 
-  // Widget capturingPage([bool extra = false]) {
-  //   // final cscal = 1.143;
-  //   // final cal = 1 / (ctrl.value.aspectRatio * g.sizes.fullAspectRatio);
-  //   // print("full = ${g.sizes.fullAspectRatio}");
-  //   // print("cam = ${ctrl.value.aspectRatio}");
-  //   // print("cscal = $cscal");
-  //   // print("calll = $cal");
-  //   // print("CAMERA IS READY? $readyCamera");
-  //   return Stack(children: [
-  //     !readyCamera
-  //         ? Container(color: Colors.black)
-  //         : GestureDetector(
-  //             onTap: () => print("LALALALALAL"),
-  //             onScaleStart: (details) => _baseScale = _scale,
-  //             onScaleUpdate: (details) {
-  //               if (_baseScale * details.scale < minZoom) {
-  //                 _scale = minZoom;
-  //               } else if (_baseScale * details.scale > maxZoom) {
-  //                 _scale = maxZoom;
-  //               } else {
-  //                 _scale = _baseScale * details.scale;
-  //               }
-  //               if (_scale >= minZoom && _scale <= maxZoom) {
-  //                 ctrl.setZoomLevel(_scale);
-  //               }
-  //             },
-  //             child: previewsContainer(
-  //               child: CameraPreview(ctrl),
-  //             ),
-  //           ),
-  //     consoleBody(Console3(
-  //             rows: [
-  //           {
-  //             "base": ConsoleRow(widgets: [
-  //               ConsoleButton(name: "BACK", onPress: widget.cameraBack),
-  //               ConsoleButton(
-  //                   name: ctrl.value.flashMode.name.toUpperCase(),
-  //                   onPress: _nextFlashMode,
-  //                   isMode: true),
-  //               ConsoleButton(
-  //                   isMode: true,
-  //                   name: camNum == 0 ? "REAR" : "FRONT",
-  //                   onPress: flip),
-  //               ConsoleButton(
-  //                   shouldBeDownButIsnt: ctrl.value.isRecordingVideo,
-  //                   name: "CAPTURE",
-  //                   isSpecial: widget.enableVideo,
-  //                   onPress: _takePicture,
-  //                   onLongPress: widget.enableVideo ? _startRecording : null,
-  //                   onLongPressUp: widget.enableVideo ? _stopRecording : null),
-  //             ], extension: null, widths: null, inputMaxHeight: null)
-  //           }
-  //         ],
-  //             currentConsolesName: currentConsolesName,
-  //             currentPageIndex: currentPageIndex)
-  //         // Console3(
-  //         //
-  //         //   invertedColors: true,
-  //         //   topButtons: [],
-  //         //   bottomButtons: [
-  //         //
-  //         //
-  //         //
-  //         //   ],
-  //         //   // consoleRow: Console3(
-  //         //   //   widgets: [
-  //         //   //     ConsoleButton(name: "BACK", onPress: widget.cameraBack),
-  //         //   //     ConsoleButton(
-  //         //   //         isMode: true,
-  //         //   //         name: camNum == 0 ? "REAR" : "FRONT",
-  //         //   //         onPress: flip),
-  //         //   //     ConsoleButton(
-  //         //   //         shouldBeDownButIsnt: ctrl.value.isRecordingVideo,
-  //         //   //         name: "CAPTURE",
-  //         //   //         isSpecial: widget.enableVideo,
-  //         //   //         onPress: _takePicture,
-  //         //   //         onLongPress: widget.enableVideo ? _startRecording : null,
-  //         //   //         onLongPressUp: widget.enableVideo ? _stopRecording : null),
-  //         //   //   ],
-  //         //   // ),
-  //         // ),
-  //         ),
-  //   ]);
-  // }
-
-  // void videoPreview() {
-  //   _preview = Stack(children: [
-  //     previewsContainer(
-  //       child: VideoPlayer(vpc),
-  //       reverse: toReverse,
-  //     ),
-  //     inputBody(hasInput),
-  //     consoleBody(Console3(
-  //             rows: [
-  //           {
-  //             "base": ConsoleRow(widgets: [
-  //               ConsoleButton(
-  //                 name: "BACK",
-  //                 onPress: () => setState(() {
-  //                   File(filePath).delete();
-  //                   tec.clear();
-  //                   vpc.dispose();
-  //                   setState(() {
-  //                     _preview = null;
-  //                   });
-  //                 }),
-  //               ),
-  //               ConsoleButton(
-  //                 name: "TEXT",
-  //                 onPress: () => videoPreview(
-  //                   vpc,
-  //                   filePath,
-  //                   mimetype,
-  //                   toReverse,
-  //                   text,
-  //                   !hasInput,
-  //                 ),
-  //               ),
-  //               ConsoleButton(
-  //                 name: "ACCEPT",
-  //                 onPress: () {
-  //                   vpc.dispose();
-  //                   widget.cameraCallBack(
-  //                     path: filePath,
-  //                     mimetype: mimetype,
-  //                     isReversed: toReverse,
-  //                     text: tec.value.text,
-  //                     size: ctrl.value.previewSize!.inverted,
-  //                   );
-  //                 },
-  //               ),
-  //             ], extension: null, widths: null, inputMaxHeight: null)
-  //           }
-  //         ],
-  //             currentConsolesName: currentConsolesName,
-  //             currentPageIndex: currentPageIndex)
-  //         // Console(
-  //         //   invertedColors: true,
-  //         //   topButtons: [],
-  //         //   bottomButtons: [
-  //         //     ConsoleButton(
-  //         //       name: "BACK",
-  //         //       onPress: () => setState(() {
-  //         //         File(filePath).delete();
-  //         //         tec.clear();
-  //         //         vpc.dispose();
-  //         //         setState(() {
-  //         //           _preview = null;
-  //         //         });
-  //         //       }),
-  //         //     ),
-  //         //     ConsoleButton(
-  //         //       name: "TEXT",
-  //         //       onPress: () => videoPreview(
-  //         //         vpc,
-  //         //         filePath,
-  //         //         mimetype,
-  //         //         toReverse,
-  //         //         text,
-  //         //         !hasInput,
-  //         //       ),
-  //         //     ),
-  //         //     ConsoleButton(
-  //         //       name: "ACCEPT",
-  //         //       onPress: () {
-  //         //         vpc.dispose();
-  //         //         widget.cameraCallBack(
-  //         //           path: filePath,
-  //         //           mimetype: mimetype,
-  //         //           isReversed: toReverse,
-  //         //           text: tec.value.text,
-  //         //           size: ctrl.value.previewSize!.inverted,
-  //         //         );
-  //         //       },
-  //         //     ),
-  //         //   ],
-  //         //   // consoleRow: Console3(
-  //         //   //   widgets: [
-  //         //   //
-  //         //   //   ],
-  //         //   // ),
-  //         // ),
-  //         ),
-  //   ]);
-  //   setState(() {});
-  // }
-
-  // void imagePreview() {
-  //   _preview = Stack(children: [
-  //     previewsContainer(reverse: toReverse, child: Image.file(File(filePath))),
-  //     inputBody(hasInput),
-  //     consoleBody(
-  //       Console3(
-  //           rows: [
-  //             {
-  //               "base": ConsoleRow(widgets: [
-  //                 ConsoleButton(
-  //                   name: "BACK",
-  //                   onPress: () => setState(() {
-  //                     tec.clear();
-  //                     File(filePath).delete();
-  //                     setState(() {
-  //                       _preview = null;
-  //                     });
-  //                   }),
-  //                 ),
-  //                 ConsoleButton(
-  //                   name: "TEXT",
-  //                   isMode: false,
-  //                   onPress: () => imagePreview(
-  //                     filePath,
-  //                     mimetype,
-  //                     toReverse,
-  //                     text,
-  //                     !hasInput,
-  //                   ),
-  //                 ),
-  //                 ConsoleButton(
-  //                   name: "ACCEPT",
-  //                   onPress: () => widget.cameraCallBack(
-  //                       path: filePath,
-  //                       mimetype: mimetype,
-  //                       isReversed: toReverse,
-  //                       text: tec.value.text,
-  //                       size: ctrl.value.previewSize!.inverted),
-  //                 ),
-  //               ], extension: null, widths: null, inputMaxHeight: null)
-  //             }
-  //           ],
-  //           currentConsolesName: currentConsolesName,
-  //           currentPageIndex: currentPageIndex),
-  //     )
-  //     // Console(
-  //     //   invertedColors: true,
-  //     //   topButtons: [],
-  //     //   // consoleRow: Console3(
-  //     //   //   widgets: [
-  //     //   //
-  //     //   //   ],
-  //     //   // ),
-  //     //   bottomButtons: [
-  //     //     ConsoleButton(
-  //     //       name: "BACK",
-  //     //       onPress: () => setState(() {
-  //     //         tec.clear();
-  //     //         File(filePath).delete();
-  //     //         setState(() {
-  //     //           _preview = null;
-  //     //         });
-  //     //       }),
-  //     //     ),
-  //     //     ConsoleButton(
-  //     //       name: "TEXT",
-  //     //       isMode: false,
-  //     //       onPress: () => imagePreview(
-  //     //         filePath,
-  //     //         mimetype,
-  //     //         toReverse,
-  //     //         text,
-  //     //         !hasInput,
-  //     //       ),
-  //     //     ),
-  //     //     ConsoleButton(
-  //     //       name: "ACCEPT",
-  //     //       onPress: () => widget.cameraCallBack(
-  //     //           path: filePath,
-  //     //           mimetype: mimetype,
-  //     //           isReversed: toReverse,
-  //     //           text: tec.value.text,
-  //     //           size: ctrl.value.previewSize!.inverted),
-  //     //     ),
-  //     //   ],
-  //     // )),
-  //   ]);
-  //   setState(() {});
-  // }
-
   @override
-  Future<void> dispose() async {
+  void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    await ctrl.dispose();
+    ctrl.dispose();
     super.dispose();
   }
 
@@ -522,7 +235,7 @@ class _SnipCameraState extends State<SnipCamera>
                     ),
                   ),
         hasInput ? input.snipInput : const SizedBox.shrink(),
-        consoleBody(console),
+        consoleBody(console.rowOfPage(index: 0)),
       ],
     );
 

@@ -4,9 +4,7 @@ import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
 import '../data_objects/_data_utils.dart';
-import '../data_objects/firebase.dart';
 import '../data_objects/medias.dart';
-import '../data_objects/nodes.dart';
 import '../render_objects/chat_message.dart';
 import '_page_utils.dart';
 
@@ -18,18 +16,16 @@ import '../globals.dart';
 class ForwardingPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "forward";
-  final ViewState viewState;
-  final List<Down4Object> fObjects;
-  final void Function() back;
-  final void Function(List<Down4Object>, ChatN) openChat;
-  final void Function(List<Down4Object>, Transition) hyper;
+  ViewState get viewState => g.vm.currentView;
+
+  final void Function() back, openPreview;
+  final void Function() hyper;
   final Future<void> Function(Iterable<Chat>) forward;
+  Set<Down4Object> get fObjects => g.vm.forwardingObjects;
 
   const ForwardingPage({
-    required this.viewState,
-    required this.openChat,
+    required this.openPreview,
     required this.hyper,
-    required this.fObjects,
     required this.forward,
     required this.back,
     Key? key,
@@ -47,27 +43,16 @@ class _ForwadingPageState extends State<ForwardingPage>
         Camera2,
         Medias2,
         Sender2,
-        ForwardSender2,
+        Compose2,
         Hyper2 {
-  // final _tec = TextEditingController();
-  @override
-  List<Down4Object> get fo => widget.fObjects;
+
+  Set<Down4Object> get fo => widget.fObjects;
 
   late ScrollController scroller =
       ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
         ..addListener(() {
           widget.viewState.pages[0].scroll = scroller.offset;
         });
-
-  // @override
-  // late final aCtrl =
-  //     AnimationController(duration: Console.animationDuration, vsync: this)
-  //       ..addListener(() {
-  //         loadBaseConsole();
-  //       });
-
-  // @override
-  // late FocusNode focusNode = FocusNode()..addListener(onFocusChange);
 
   @override
   void initState() {
@@ -79,54 +64,31 @@ class _ForwadingPageState extends State<ForwardingPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     scroller.dispose();
-    // focusNode.dispose();
-    // aCtrl?.dispose();
     super.dispose();
   }
 
-  Map<ComposedID, Palette2> get _forwardState =>
-      widget.viewState.pages[0].objects.cast();
+  Map<Down4ID, Palette> get _forwardState => widget.viewState.pages[0].state.cast();
 
-  Iterable<Palette2> get _fList => _forwardState.values;
+  Iterable<Palette> get _fList => _forwardState.values;
 
-  Iterable<Palette2> get selection => _fList.where((p) => p.selected);
+  Iterable<Palette> get selection => _fList.where((p) => p.selected);
 
-  // @override
-  // late ConsoleInput mainInput = ConsoleInput(
-  //     tec: _tec,
-  //     placeHolder: "",
-  //     focus: focusNode,
-  //     maxLines: 8,
-  //     inputCallBack: (_) => loadBaseConsole());
-
-  Transition hyperTransition() {
-    return selectionTransition(
-        originalList: _fList.toList(),
-        state: _forwardState,
-        scrollOffset: widget.viewState.currentPage.scroll);
-  }
-
-  // @override
-  // FireMedia? cameraInput;
-  //
-  // bool sendButtonExtra = false;
-  // GlobalKey sendButtonKey = GlobalKey();
+  ConsoleRow get baseRow => ConsoleRow(
+          inputMaxHeight: input.hasFocus ? input.height : null,
+          extension: null,
+          widths: input.hasFocus ? [.20, .0, .60, .20] : null,
+          widgets: [
+            mediasButton.withExtra(mediaExtra, [cameraButton]),
+            hyperButton,
+            input.consoleInput,
+            sendButton
+          ]);
 
   @override
   Console3 get console => Console3(
           rows: [
             {
-              "base": ConsoleRow(
-                widths: hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
-                inputMaxHeight: hasFocus ? input.height : Console.buttonHeight,
-                extension: null,
-                widgets: [
-                  forwardingObjectsWidget,
-                  mediasButton,
-                  input.consoleInput,
-                  sendButton.withExtra(sendExtra, [cameraButton, hyperButton]),
-                ],
-              ),
+              "base": baseRow,
               basicCameraRowName: basicCameraRow,
               cameraConfirmationRowName: cameraConfirmationRow,
               basicMediaRowName: basicMediasRow,
@@ -134,17 +96,6 @@ class _ForwadingPageState extends State<ForwardingPage>
           ],
           currentConsolesName: currentConsolesName,
           currentPageIndex: widget.viewState.currentIndex);
-  //
-  // @override
-  // late Console console;
-
-  // @override
-  // void back() => widget.back();
-
-  // @override
-  // void loadBaseConsole() {
-  //   // loadForwardingConsole();
-  // }
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode => [
@@ -160,13 +111,9 @@ class _ForwadingPageState extends State<ForwardingPage>
           (m) {
             m.updateSaveStatus(false);
             setState(() {});
-            // loadMediasConsole(!m.isVideo, true);
           }
         ),
       ];
-
-  // @override
-  // ID get selfID => g.self.id;
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
@@ -181,7 +128,7 @@ class _ForwadingPageState extends State<ForwardingPage>
         root: root,
         text: input.value,
         messages: fo.whereType<ChatMessage>().asIDs().toSet(),
-        nodes: fo.whereType<Palette2>().asComposedIDs().toSet(),
+        nodes: fo.whereType<Palette>().asComposedIDs().toSet(),
         timestamp: makeTimestamp(),
         mediaID: media?.id)
       ..cache()
@@ -193,23 +140,18 @@ class _ForwadingPageState extends State<ForwardingPage>
     setState(() {});
   }
 
-  // @override
-  // VideoPlayerController? videoPreview;
-
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   loadBaseConsole();
-  // }
-
   @override
-  void hyper() => widget.hyper(fo, hyperTransition());
+  void hyper() => widget.hyper();
 
   @override
   Widget build(BuildContext context) {
     final ps = _fList.toList(growable: false);
     return Andrew(
-      backFunction: widget.back,
+      previewFunction: widget.openPreview,
+      backFunction: () {
+        g.vm.mode = Modes.def;
+        widget.back();
+      },
       pages: [
         Down4Page(
             staticList: true,
@@ -246,5 +188,5 @@ class _ForwadingPageState extends State<ForwardingPage>
   @override
   late List<Extra> extras = [Extra(setTheState: setTheState)];
 
-  Extra get sendExtra => extras[0];
+  Extra get mediaExtra => extras[0];
 }

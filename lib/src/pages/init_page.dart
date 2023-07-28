@@ -1,18 +1,14 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 import '../data_objects/_data_utils.dart';
 import '../data_objects/firebase.dart';
 import '../data_objects/medias.dart';
 import '_page_utils.dart';
-
-import '../web_requests.dart' as r;
 
 import '../globals.dart';
 

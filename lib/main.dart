@@ -1,108 +1,74 @@
+import 'dart:async';
+
 import 'package:cbl_flutter/cbl_flutter.dart';
 import 'package:cbl/cbl.dart';
+
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/data_objects/_data_utils.dart';
-import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:down4/src/_dart_utils.dart';
-import 'dart:async';
+
 import 'package:camera/camera.dart';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import 'src/login.dart';
 import 'src/globals.dart';
 
-// Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-//   // If you're going to use other Firebase services in the background, such as Firestore,
-//   // make sure you call `initializeApp` before using other Firebase services.
-//   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-//   var messageQueue = await Hive.openBox("MessageQueue");
-//   messageQueue.add(message.data);
-//   messageQueue.close();
-// }
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  showMessageNotification(message);
+  if (message.data.isNotEmpty) {
+    final doc = MutableDocument.withId(Down4ID().unique);
+    doc.setData(message.data);
+    tempDB.saveDocument(doc);
+  }
+}
 
-late AndroidNotificationChannel channel;
-late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+Future<void> _initNotificationPlugin() async {
+  channel = const AndroidNotificationChannel(
+    'Down4AndroidNotificationChannel',
+    'Default Importance Notifications for Down4AndroidNotificationChannel',
+    importance: Importance.defaultImportance,
+  );
+
+  flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  const initializationSettingsAndroid = AndroidInitializationSettings(
+    "@mipmap/ic_down4_inverted_white",
+  );
+
+  const initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  print("initialization was ensured");
-  
-  if (!kIsWeb) {
-    await Firebase.initializeApp();
-    print("firebase was initialized");
-    channel = const AndroidNotificationChannel(
-      'Down4AndroidNotificationChannel', // id
-      'Default Importance Notifications for Down4AndroidNotificationChannel',
-      // title // description
-      importance: Importance.defaultImportance,
-    );
-    print("created notification channel");
 
-    flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
-    /// Create an Android Notification Channel.
-    ///
-    /// We use this channel in the `AndroidManifest.xml` file to override the
-    /// default FCM channel to enable heads up notifications.
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
-
-    const initializationSettingsAndroid = AndroidInitializationSettings(
-      "@mipmap/ic_down4_inverted_white",
-    ); // <- default icon name is @mipmap/ic_launcher
-    // var initializationSettingsIOS = IOSInitializationSettings(
-    //     onDidReceiveLocalNotification: onDidReceiveLocalNotification);
-    const initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    ); // , initializationSettingsIOS);
-
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-    // ,onSelectNotification: onSelectNotification); // TODO onSelect
-
-    /// Update the iOS foreground notification presentation options to allow
-    /// heads up notifications.
-    await FirebaseMessaging.instance
-        .setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      RemoteNotification? notification = message.notification;
-      AndroidNotification? android = message.notification?.android;
-
-      // If `onMessage` is triggered with a notification, construct our own
-      // local notification to show to users using the created channel.
-      if (notification != null && android != null) {
-        flutterLocalNotificationsPlugin.show(
-            notification.hashCode,
-            notification.title,
-            notification.body,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                channel.id,
-                channel.name,
-                channelDescription: channel.description,
-                icon: android.smallIcon,
-                // other properties...
-              ),
-            ));
-      }
-    });
-  } else {
-    // TODO kIsWeb
-  }
+  await Firebase.initializeApp();
 
   // Initializing couchdb
   {
     await CouchbaseLiteFlutter.init();
+    tempDB = await Database.openAsync("temp");
     nodesDB = await Database.openAsync("nodes");
     mediasDB = await Database.openAsync("medias");
     messagesDB = await Database.openAsync("messages");
@@ -113,7 +79,12 @@ Future<void> main() async {
     billsDB = await Database.openAsync("bills");
     await loadIndexes();
   }
-  print("initialized couch db");
+
+  // Init notifications settings and background message listener
+  {
+    _initNotificationPlugin();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
 
   // loading some asset in memory, not having those assets in memory cause
   // stutter in transitions for example, loading image from assets is
@@ -147,15 +118,11 @@ Future<void> main() async {
         fit: BoxFit.contain, gaplessPlayback: true);
     g.background = bg.buffer.asUint8List();
   }
-  print("loaded assets");
-
-  // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // load application directory folder
   {
     await g.loadAppDirPath();
   }
-  print("loaded app dir");
 
   // initializing cameras
   {
@@ -169,7 +136,7 @@ Future<void> main() async {
   // INIT THE THEME
   {
     g.loadTheme(await FireTheme.currentTheme);
-    
+
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -181,10 +148,6 @@ Future<void> main() async {
     );
   }
 
-  print("loaded theme");
-
   final cred = await FirebaseAuth.instance.signInAnonymously();
-  print("loaded firebase auth");
-  print("RUNNING THE APP");
   runApp(MaterialApp(home: Material(child: Down4(user: cred.user))));
 }

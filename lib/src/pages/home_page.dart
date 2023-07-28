@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 
 import '../data_objects/_data_utils.dart';
-import '../data_objects/firebase.dart';
 import '../data_objects/medias.dart';
 import '../data_objects/nodes.dart';
 import '../render_objects/console.dart';
@@ -19,22 +18,22 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "home";
   final String? promptMessage;
-  final ViewState homeState;
-  // final List<Palette2> palettes;
+  ViewState get homeState => g.vm.currentView;
+
   final void Function(String text) ping;
   final void Function(ChatN, List<Locals>) openChat; // TODO what is this?
   final void Function(Iterable<Chat>) send;
-  final void Function(List<Palette2>) forward;
-  final void Function() hyperchat, themes;
+  final void Function() forward;
+  final void Function() hyperchat, themes, openPreview;
   final void Function() group, money, search, delete, snip;
   const HomePage({
     required this.themes,
-    required this.homeState,
     required this.hyperchat,
     required this.group,
     required this.money,
     required this.snip,
     required this.ping,
+    required this.openPreview,
     required this.search,
     required this.delete,
     required this.send,
@@ -56,10 +55,12 @@ class _HomePageState extends State<HomePage>
         Input2,
         Medias2,
         Camera2,
-        Forwarder2,
+        Forward2,
         Compose2,
         Hyper2,
-        Money2 {
+        Money2,
+        Boost2,
+        Append2 {
   late String placeHolder = widget.promptMessage ?? ":)";
 
   late ScrollController scroller =
@@ -71,8 +72,8 @@ class _HomePageState extends State<HomePage>
   @override
   void setTheState() => setState(() {});
 
-  Map<ComposedID, Palette2> get palettes =>
-      widget.homeState.currentPage.objects.cast();
+  Map<ComposedID, Palette> get palettes =>
+      widget.homeState.currentPage.state.cast();
 
   @override
   void initState() {
@@ -90,6 +91,8 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     return Andrew(
+      previewFunction: widget.openPreview,
+      staticRow: g.vm.mode == Modes.append ? basicAppendRow : null,
       addFriends: widget.search,
       themes: widget.themes,
       pages: [
@@ -108,12 +111,9 @@ class _HomePageState extends State<HomePage>
       ConsoleButton(name: "GROUP", onPress: widget.group)
           .withExtra(extraGroup, [
         ConsoleButton(name: "DELETE", onPress: widget.delete),
-        ConsoleButton(
-            name: "FORWARD",
-            onPress: () => widget.forward(
-                  palettes.values.selected().toList(),
-                )),
+        ConsoleButton(name: "FORWARD", onPress: widget.forward),
         ConsoleButton(name: "COMPOSE", onPress: () => changeConsole("compose")),
+        appendButton,
       ]);
 
   ConsoleButton get closeButton =>
@@ -172,10 +172,11 @@ class _HomePageState extends State<HomePage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
+    final fo = g.vm.forwardingObjects;
     final media = mediaInput ?? cameraInput
       ?..cache()
       ..merge();
-    if (media == null && input.value.isEmpty) return;
+    if (media == null && input.value.isEmpty && fo.isEmpty) return;
     final messages = palettes.values
         .selected()
         .asNodes<ChatN>()
@@ -183,6 +184,8 @@ class _HomePageState extends State<HomePage>
         .map((root) => Chat(Down4ID(),
             senderID: g.self.id,
             root: root,
+            nodes: fo.palettes().asComposedIDs().toSet(),
+            messages: fo.chatMsgs().asIDs().toSet(),
             text: input.value,
             timestamp: makeTimestamp(),
             mediaID: media?.id)
@@ -191,6 +194,7 @@ class _HomePageState extends State<HomePage>
 
     widget.send(messages);
 
+    g.vm.forwardingObjects.clear();
     input.clear();
   }
 
@@ -232,6 +236,15 @@ class _HomePageState extends State<HomePage>
 
   @override
   void forward() {
-    widget.forward(palettes.values.toList());
+    final sel = g.vm.currentView.allPageSelection();
+    g.vm.forwardingObjects.addAll(sel);
+    g.vm.mode = Modes.forward;
+    widget.forward();
   }
+  
+  @override
+  void boost() {
+    print("TODO, IMPLEMENT BOOST FUNC");
+  }
+
 }

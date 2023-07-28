@@ -1,9 +1,7 @@
 import 'dart:typed_data';
 import 'dart:math';
-import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 import 'package:pointycastle/digests/sha256.dart' as s256;
 import 'package:pointycastle/digests/ripemd160.dart' as r160;
 import 'package:pointycastle/digests/md5.dart' as hash_md5;

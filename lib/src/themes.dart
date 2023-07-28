@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'data_objects/_data_utils.dart';
 import 'data_objects/nodes.dart';
 
 /// Flutter icons Down4Icon
@@ -49,6 +48,7 @@ abstract class Down4Theme {
   Color get chatReactionCounterColor;
   TextStyle get chatReactionCounterTextStyle;
 
+  Color get chatPaletteColor;
   Color get down4IconForLoadingScreenColor;
   Color get down4IconForPaletteColor;
   Color get paletteColor;
@@ -157,6 +157,9 @@ class BlackTheme extends Down4Theme {
 
   @override
   Icon down4Icon(Color color) => Icon(Down4Icon.down4Inverted, color: color);
+
+  @override
+  Color get chatPaletteColor => Colors.white10;
 
   @override
   TextStyle get consoleTextStyle => TextStyle(
@@ -434,6 +437,9 @@ class PinkTheme extends Down4Theme {
 
   @override
   String get font => "Alice";
+
+  @override
+  Color get chatPaletteColor => paletteColor;
 
   @override
   TextStyle get consoleTextStyle => TextStyle(

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:down4/src/bsv/_bsv_utils.dart';
-import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/themes.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -51,7 +50,7 @@ enum NodesColor {
   self,
 }
 
-class MessageTarget with Jsons {
+class MessageTarget implements Jsons {
   final ComposedID userID;
   final String device;
   final String token;
@@ -66,19 +65,19 @@ class MessageTarget with Jsons {
     this.success = false,
   });
   @override
-  Map<String, Object> toJson({bool includeLocal = false}) => {
+  Map<String, String> toJson({bool includeLocal = false}) => {
         "userID": userID.value,
         "device": device,
         "token": token,
-        "success": success,
+        "success": success.toString(),
       };
 
-  factory MessageTarget.fromJson(dynamic json) {
+  factory MessageTarget.fromJson(Map<String, String?> json) {
     return MessageTarget(
       userID: ComposedID.fromString(json["userID"])!,
-      device: json["device"],
-      token: json["token"],
-      success: json["success"],
+      device: json["device"]!,
+      token: json["token"]!,
+      success: json["success"] == "true",
     );
   }
 }
@@ -92,7 +91,7 @@ mixin PaletteN on Down4Object {
   int get activity;
 }
 
-abstract class Down4Node extends Locals with PaletteN {
+abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
   @override
   Database get dbb => nodesDB;
 
@@ -125,14 +124,13 @@ abstract class Down4Node extends Locals with PaletteN {
       ].join("~");
   String _blueArrowHash;
   int _lastOnline;
-  String get publicHash => md5(publicData.asUtf8()).toBase64();
+  String get publicHash => md5(publicData.toUtf8()).toBase64();
 
   Map<String, String>? get _jsonTreeHash =>
       _treeHash?.map((key, value) => MapEntry(key.value, value));
 
   static (String, String b, int) parseConnection(String conn) {
     final s = conn.split("~");
-    print(s);
     return (s[0], s[1], int.parse(s[2]));
   }
 
@@ -152,10 +150,10 @@ abstract class Down4Node extends Locals with PaletteN {
   }
 
   @override
-  Map<String, Object> toJson({bool includeLocal = true}) {
+  Map<String, String> toJson({bool includeLocal = true}) {
     String? messagingTokens;
     if (_messagingTokens != null) {
-      messagingTokens = jsonEncode(_messagingTokens!);
+      messagingTokens = youKnowEncode(_messagingTokens!);
     }
 
     return {
@@ -166,11 +164,12 @@ abstract class Down4Node extends Locals with PaletteN {
       if (includeLocal) "unique": id.unique,
       if (_messagingTokens != null) "messagingTokens": messagingTokens!,
       if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID!,
-      if (_treeHash != null) "treeHash": _jsonTreeHash!,
+      if (_treeHash != null) "treeHash": youKnowEncode(_jsonTreeHash!),
       if (_ownerID != null) "ownerID": _ownerID!.value,
       if (_lastName != null) "lastName": _lastName!,
-      if (_longitude != null) "longitude": _longitude!,
-      if (_latitude != null) "latitude": _latitude!,
+      if (_isPrivate != null) "isPrivate": _isPrivate!.toString(),
+      if (_longitude != null) "longitude": _longitude!.toString(),
+      if (_latitude != null) "latitude": _latitude!.toString(),
       if (_mediaID != null) "mediaID": _mediaID!.value,
       if (_children != null) "children": _children!.values,
       if (_posts != null) "posts": _posts!.values,
@@ -179,173 +178,11 @@ abstract class Down4Node extends Locals with PaletteN {
       if (_neuter != null) "neuter": _neuter!.toYouKnow(),
       if (_group != null) "group": _group!.values,
       if (includeLocal && _deviceID != null) "deviceID": _deviceID!,
-      if (includeLocal && _isConnected != null) "isFriend": _isConnected!,
-      if (includeLocal) "activity": _activity,
+      if (includeLocal && _isConnected != null)
+        "isConnected": _isConnected!.toString(),
+      if (includeLocal) "activity": _activity.toString(),
     };
   }
-
-  // everything but the localValue we can see in toJson
-  void mergeWith(Down4Node? other) {
-    if (other == null) return;
-    _lastOnline = other._lastOnline;
-    _name = other._name;
-    _lastName = other._lastName;
-    _description = other._description;
-    _messagingTokens = other._messagingTokens;
-    _mediaID = other._mediaID;
-    _isPrivate = other._isPrivate;
-    _longitude = other._longitude;
-    _latitude = other._latitude;
-    _treeHash = other._treeHash;
-  }
-
-  // @override
-  // Map<String, dynamic> toJson({
-  //   bool includeLocal = true,
-  //   bool includePublic = true,
-  //   bool includePrivate = true,
-  //   bool includeConnection = true,
-  // }) {
-  //   return {
-  //     if (includeConnection)
-  //       "connection": {
-  //         if (_lastOnline != null) "lastOnline": _lastOnline,
-  //         "publicHash": publicHash,
-  //       },
-  //     if (includePublic)
-  //       "public": {
-  //         "id": id.value,
-  //         "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
-  //         "name": _name,
-  //         if (_messagingTokens != null) "messagingTokens": _messagingTokens,
-  //         if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID,
-  //         if (_treeHash != null) "treeHash": _jsonTreeHash,
-  //         if (_ownerID != null) "ownerID": _ownerID!.value,
-  //         if (_lastName != null) "lastName": _lastName,
-  //         if (_longitude != null) "longitude": _longitude,
-  //         if (_latitude != null) "latitude": _latitude,
-  //         if (_mediaID != null) "mediaID": _mediaID!.value,
-  //         if (_children != null) "children": _children!.values,
-  //         if (_posts != null) "posts": _posts!.values,
-  //         if (_privates != null) "privates": _privates!.values,
-  //         if (_admins != null) "admins": _admins!.values,
-  //         if (_neuter != null) "neuter": _neuter!.toYouKnow(),
-  //         if (_group != null) "group": _group!.values,
-  //       },
-  //     if (includePrivate)
-  //       "private": {
-  //         if (_privates != null) "privates": _privates!,
-  //       },
-  //     if (includeLocal)
-  //       "local": {
-  //         if (_deviceID != null) "deviceID": _deviceID,
-  //         if (_isConnected != null) "isConnected": _isConnected,
-  //         "unique": id.unique,
-  //         "activity": _activity,
-  //       }
-  //   };
-  // }
-
-  // factory Down4Node.fromJson(dynamic json) {
-  //   final connection = json["connection"];
-  //   final private = json["private"];
-  //   final public = json["public"];
-  //   final local = json["local"];
-  //
-  //   final id = Down4ID.fromString(public["id"]);
-  //   final mainDeviceID = public["mainDeviceID"];
-  //   final type = Nodes.values.byName(public["type"]);
-  //   final mediaID = ComposedID.fromString(public["mediaID"]);
-  //   final latitude = public["latitude"];
-  //   final longitude = public["longitude"];
-  //   final ownerID = ComposedID.fromString(public["ownerID"]);
-  //   final name = public["name"];
-  //   final isPrivate = public["isPrivate"];
-  //   final lastName = public["lastName"];
-  //   final messagingTokens = public["messagingTokens"];
-  //   final description = public["description"];
-  //   final children = (public["children"] as String?)?.toComposedIDs();
-  //   final privates = (public["privates"] as String?)?.toComposedIDs();
-  //   final admins = (public["admins"] as String?)?.toComposedIDs();
-  //   final group = (public["group"] as String?)?.toComposedIDs();
-  //   final neuter = public["neuter"] != null
-  //       ? Down4Keys.fromYouKnow(public["neuter"] as String)
-  //       : null;
-  //
-  //   final deviceID = local["deviceID"];
-  //   final activity = local["activity"];
-  //   final isConnected = local["isConnected"];
-  //
-  //   final lastOnline = connection["lastOnline"];
-  //
-  //   switch (type) {
-  //     case Nodes.user:
-  //       return User(id as ComposedID,
-  //           activity: activity,
-  //           name: name,
-  //           lastOnline: lastOnline,
-  //           mainDeviceID: mainDeviceID,
-  //           messagingTokens: messagingTokens,
-  //           isConnected: isConnected ?? false,
-  //           children: children!,
-  //           description: description,
-  //           lastName: lastName,
-  //           mediaID: mediaID,
-  //           neuter: neuter!);
-  //     case Nodes.hyperchat:
-  //       return Hyperchat(id as ComposedID,
-  //           activity: activity,
-  //           mediaID: mediaID!,
-  //           ownerID: ownerID!,
-  //           firstWord: name,
-  //           isConnected: isConnected ?? false,
-  //           secondWord: lastName,
-  //           group: group!);
-  //     case Nodes.self:
-  //       return Self(id as ComposedID,
-  //           deviceID: deviceID,
-  //           activity: activity,
-  //           name: name,
-  //           lastOnline: lastOnline,
-  //           description: description,
-  //           lastName: lastName,
-  //           mainDeviceID: mainDeviceID,
-  //           messagingTokens: messagingTokens,
-  //           neuter: neuter!,
-  //           mediaID: mediaID!,
-  //           children: children!,
-  //           privates: privates!);
-  //     case Nodes.group:
-  //       return Group(id as ComposedID,
-  //           activity: activity,
-  //           name: name,
-  //           mediaID: mediaID!,
-  //           ownerID: ownerID!,
-  //           isConnected: isConnected ?? false,
-  //           isPrivate: isPrivate,
-  //           group: group!);
-  //     case Nodes.root:
-  //     // TODO: Handle this case.
-  //     case Nodes.market:
-  //     // TODO: Handle this case.
-  //     case Nodes.checkpoint:
-  //     // TODO: Handle this case.
-  //     case Nodes.journal:
-  //     // TODO: Handle this case.
-  //     case Nodes.item:
-  //     // TODO: Handle this case.
-  //     case Nodes.event:
-  //     // TODO: Handle this case.
-  //     case Nodes.ticket:
-  //     // TODO: Handle this case.
-  //     case Nodes.payment:
-  //     // TODO: Handle this case.
-  //     case Nodes.theme:
-  //     // TODO: Handle this case.
-  //   }
-  //
-  //   throw 'Down4Node fromJson not yet implemented for type: $type';
-  // }
 
   Down4Node(
     Down4ID id, {
@@ -398,38 +235,36 @@ abstract class Down4Node extends Locals with PaletteN {
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? makeTimestamp();
-    merge({"activity": _activity});
+    merge({"activity": _activity.toString()});
   }
 
-  factory Down4Node.fromJson(Map<String, Object?> json) {
-    final (_, blueH, lastO) = parseConnection(json["connection"] as String);
+  factory Down4Node.fromJson(Map<String, String?> json) {
+    final (_, blueH, lastO) = parseConnection(json["connection"]!);
 
-    final encTokens = json["messagingTokens"] as String?;
+    final encTokens = json["messagingTokens"];
     Map<String, String>? messagingTokens;
     if (encTokens != null) {
-      final jsonTokens = jsonDecode(encTokens);
-      messagingTokens = Map.from(jsonTokens).map((k, v) => MapEntry(k, v as String));
+      messagingTokens = Map<String, String>.from(youKnowDecode(encTokens));
     }
 
-    final id = Down4ID.fromString(json["id"] as String);
-    final deviceID = json["deviceID"] as String?;
-    final mainDeviceID = json["mainDeviceID"] as String?;
-    final activity = json["activity"] as int? ?? 0;
-    final type = Nodes.values.byName(json["type"] as String);
-    final mediaID = ComposedID.fromString(json["mediaID"] as String?);
-    final latitude = json["latitude"] as double?;
-    final longitude = json["longitude"] as double?;
-    final ownerID = ComposedID.fromString(json["ownerID"] as String?);
-    final name = json["name"] as String;
-    final isConnected = json["isConnected"] as bool? ?? false;
-    final isFriend = json["isFriend"] as bool? ?? false;
-    final isPrivate = json["isPrivate"] as bool?;
-    final lastName = json["lastName"] as String?;
-    final description = json["description"] as String?;
-    final children = (json["children"] as String?)?.toComposedIDs();
-    final privates = (json["privates"] as String?)?.toComposedIDs();
-    final admins = (json["admins"] as String?)?.toComposedIDs();
-    final group = (json["group"] as String?)?.toComposedIDs();
+    final id = Down4ID.fromString(json["id"])!;
+    final deviceID = json["deviceID"];
+    final mainDeviceID = json["mainDeviceID"];
+    final activity = int.parse(json["activity"] ?? "0");
+    final type = Nodes.values.byName(json["type"]!);
+    final mediaID = ComposedID.fromString(json["mediaID"]);
+    final latitude = double.tryParse(json["latitude"] ?? "");
+    final longitude = double.tryParse(json["longitude"] ?? "");
+    final ownerID = ComposedID.fromString(json["ownerID"]);
+    final name = json["name"]!;
+    final isConnected = json["isConnected"] == "true";
+    final isPrivate = json["isPrivate"] == "true";
+    final lastName = json["lastName"];
+    final description = json["description"];
+    final children = json["children"]?.toComposedIDs();
+    final privates = json["privates"]?.toComposedIDs();
+    final admins = json["admins"]?.toComposedIDs();
+    final group = json["group"]?.toComposedIDs();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
@@ -445,7 +280,7 @@ abstract class Down4Node extends Locals with PaletteN {
             lastName: lastName,
             mediaID: mediaID,
             messagingTokens: messagingTokens!,
-            isConnected: isFriend!,
+            isConnected: isConnected,
             children: children!,
             neuter: neuter!,
             description: description,
@@ -461,15 +296,15 @@ abstract class Down4Node extends Locals with PaletteN {
             firstWord: name,
             secondWord: lastName!,
             group: group!,
-            isConnected: isConnected!);
+            isConnected: isConnected);
 
       case Nodes.group:
         return Group(id as ComposedID,
-            isPrivate: isPrivate!,
+            isPrivate: isPrivate,
             activity: activity,
             ownerID: ownerID!,
             blueArrowHash: blueH,
-            isConnected: isConnected!,
+            isConnected: isConnected,
             name: name,
             mediaID: mediaID!,
             group: group!);
@@ -531,11 +366,26 @@ mixin ConnectN on RemoteN, Down4Node {
   bool get isConnected;
   Future<void> updateConnectionStatus(bool isConnected) async {
     _isConnected = isConnected;
-    await merge({"isConnected": isConnected});
+    await merge({"isConnected": isConnected.toString()});
   }
 
   Stream<DatabaseEvent> get connection {
     return id.userRef.child("connection").onChildChanged;
+  }
+
+  // everything but the localValue we can see in toJson
+  void mergeWith(Down4Node? other) {
+    if (other == null) return;
+    _lastOnline = other._lastOnline;
+    _name = other._name;
+    _lastName = other._lastName;
+    _description = other._description;
+    _messagingTokens = other._messagingTokens;
+    _mediaID = other._mediaID;
+    _isPrivate = other._isPrivate;
+    _longitude = other._longitude;
+    _latitude = other._latitude;
+    _treeHash = other._treeHash;
   }
 }
 
@@ -543,7 +393,7 @@ mixin BranchN on ConnectN, Down4Node {
   @override
   ComposedID get id => _id as ComposedID;
 
-  String get blueArrowHash => _blueArrowHash ??= "";
+  String get blueArrowHash => _blueArrowHash;
 
   Map<ComposedID, String>? get treeHash;
   set treeHash(Map<ComposedID, String>? t) => _treeHash = t;
@@ -562,7 +412,7 @@ mixin BranchN on ConnectN, Down4Node {
         }
       }
     }
-    await merge({"treeHash": treeHash = tree});
+    await merge({"treeHash": jsonEncode(treeHash = tree)});
   }
 
   @override
@@ -599,7 +449,6 @@ mixin ChatN on Down4Node {
   Future<List<MessageTarget>> allTargets() async {
     final nodeRef = this;
     List<MessageTarget> targets = [];
-    // List<MessageTarget> selfTargets = [];
     final people = nodeRef is GroupN
         ? (await globall<PersonN>(nodeRef.group))
         : nodeRef.id == g.self.id
@@ -610,20 +459,14 @@ mixin ChatN on Down4Node {
       for (final token in person.messagingTokens.entries) {
         if (person.id == g.self.id && token.key == g.self.deviceID) continue;
         targets.add(MessageTarget(
-            userID: person.id, device: token.key, token: token.value));
-        // if (person.id == g.self.id) {
-        //   if (token.key != g.self.deviceID) continue;
-        //   selfTargets.add(MessageTarget(
-        //       userID: g.self.id, device: token.key, token: token.value));
-        // } else {
-        //   targets.add(MessageTarget(
-        //       userID: person.id, device: token.key, token: token.value));
-        // }
+          userID: person.id,
+          device: token.key,
+          token: token.value,
+        ));
       }
     }
 
     return targets;
-    // return (selfTargets, targets);
   }
 
   Future<Pair<Iterable<Down4ID>, AsyncListenStream<QueryChange<ResultSet>>>>
@@ -645,7 +488,7 @@ mixin ChatN on Down4Node {
   Future<Iterable<ComposedID>> unreadSnipIDs() async {
     final raw = """
         SELECT META().id AS id FROM _
-        WHERE root = '${id.value}' AND type = 'snip' AND isRead = false
+        WHERE root = '${id.value}' AND type = 'snip' AND isRead = 'false'
         ORDER BY id ASC
         """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -655,11 +498,12 @@ mixin ChatN on Down4Node {
   }
 
   Stream<Snip> loadSnips() async* {
-    final raw = "SELECT * FROM _ WHERE type = 'snip' AND root = '${id.value}'";
+    final raw =
+        "SELECT * FROM _ AS m WHERE type = 'snip' AND root = '${id.value}'";
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
     final r = await q.execute();
     await for (final a in r.asStream()) {
-      final json = a.toPlainMap()["messages"] as Map<String, String?>;
+      final json = Map<String, String?>.from(a.toPlainMap()["m"] as Map);
       yield Down4Message.fromJson(json) as Snip;
     }
   }
@@ -675,7 +519,8 @@ mixin ChatN on Down4Node {
     final a = await r.allResults();
 
     if (a.isEmpty) return null;
-    final json = a.single.toPlainMap()["m"] as Map<String, Object?>;
+    final single = a.single.toPlainMap()["m"] as Map;
+    final json = Map<String, String?>.from(single);
     return Down4Message.fromJson(json) as Chat;
   }
 
@@ -694,15 +539,6 @@ mixin ChatN on Down4Node {
 
     return a.isNotEmpty;
   }
-
-  // Future<(Chat?, Iterable<ComposedID>, bool)> homeChatInfo() async {
-  //   final val = await Future.wait([
-  //     lastChatMessage(),
-  //     unreadSnipIDs(),
-  //     lastChatFromOtherIsUnread(),
-  //   ]);
-  //   return (val[0] as Chat?, val[1] as Iterable<ComposedID>, val[2] as bool);
-  // }
 }
 
 mixin GroupN on ChatN, ChildN {
@@ -730,12 +566,12 @@ mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
   Future<void> updateLastOnline(int? lastOnline) async {
     if (lastOnline == null) return;
     _lastOnline = lastOnline;
-    await merge({"lastOnline": _lastOnline});
+    await merge({"lastOnline": _lastOnline.toString()});
   }
 
   Future<void> updateMessagingToken(Map<String, String> newToken) async {
     _messagingTokens = {...?_messagingTokens, ...newToken};
-    await merge({"messagingTokens": messagingTokens});
+    await merge({"messagingTokens": jsonEncode(messagingTokens)});
   }
 
   @override
@@ -772,7 +608,7 @@ mixin GeoN on Geo, Down4Node {
   Future<void> updateLocation(double lon, double lat) async {
     _longitude = lon;
     _latitude = lat;
-    await merge({"longitude": lon, "latitude": lat});
+    await merge({"longitude": lon.toString(), "latitude": lat.toString()});
   }
 }
 
@@ -813,9 +649,10 @@ mixin RemoteN on Down4Node {
   }
 
   Future<RemoteN?> remoteFetch() async {
-    final data = (await id.userRef.get()).value as Map<String, String>?;
+    final data = (await id.userRef.get()).value;
     if (data == null) return null;
-    return fromJson<RemoteN>(data);
+    final jsn = Map<String, String?>.from(data as Map);
+    return fromJson<RemoteN>(jsn);
   }
 }
 
@@ -845,21 +682,13 @@ class User extends Down4Node
             children: children,
             neuter: neuter);
 
-  // Future<void> updateFriendStatus(bool newFriendStatus) async {
-  //   _isConnected = newFriendStatus;
-  //   Map<String, String> mergeInfo = {};
-  //   mergeInfo["isFriend"] = _isConnected.toString();
-  //   if (_isConnected) mergeInfo["isHidden"] = false.toString();
-  //   await merge(mergeInfo);
-  // }
-
   @override
   Map<String, String> get messagingTokens => _messagingTokens!;
 
   Future<bool> hasMessages() async {
     final raw_ = """
       SELECT META().id FROM _ AS m 
-      WHERE m.root = '$id'
+      WHERE m.root = '${id.value}'
       LIMIT 1
       """;
 
@@ -868,8 +697,6 @@ class User extends Down4Node
     final e_ = await r_.allResults();
     return e_.isNotEmpty;
   }
-
-  // bool get isFriend => _isConnected!;
 
   @override
   Iterable<ComposedID> get children => _children!;
@@ -913,9 +740,6 @@ class User extends Down4Node
 
   @override
   int get lastOnline => _lastOnline;
-
-  // @override
-  // bool get isConnected => _isConnected;
 }
 
 class Self extends Down4Node
@@ -983,9 +807,9 @@ class Self extends Down4Node
     final r = await e.allResults();
 
     if (r.isEmpty) return null;
-    final json = r.single.toPlainMap();
-    final jsonNode = Map<String, String?>.from(json["n"] as Map);
-    final self = fromJson<Self>(jsonNode)..cache();
+    final full = r.single.toPlainMap();
+    final sMap = Map<String, String?>.from(full["n"] as Map);
+    final self = fromJson<Self>(sMap)..cache();
     await global<Down4Media>(self.mediaID);
     return self;
   }
@@ -1116,16 +940,7 @@ class Hyperchat extends Down4Node
   bool get isConnected => _isConnected!;
 }
 
-class PaymentNode with Down4Object, PaletteN {
-  // @override
-  // Database get dbb => throw "Don't merge palette payment";
-  //
-  // @override
-  // int get activity => _payment.timestamp;
-  //
-  // @override
-  // ComposedID? get mediaID => null;
-
+class PaymentNode with Down4Object implements PaletteN {
   final Down4Payment _payment;
   final ComposedID selfID;
   PaymentNode({
@@ -1162,7 +977,7 @@ class PaymentNode with Down4Object, PaletteN {
   int get activity => payment.timestamp;
 }
 
-class NodeTheme with Down4Object, PaletteN {
+class NodeTheme with Down4Object implements PaletteN {
   final Down4Theme theme;
   NodeTheme(this.theme);
 

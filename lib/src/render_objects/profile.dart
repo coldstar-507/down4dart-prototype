@@ -7,7 +7,7 @@ import 'palette.dart';
 
 import '../globals.dart';
 
-class ProfileWidget extends StatelessWidget implements Down4Object {
+class ProfileWidget extends StatelessWidget implements Down4Widget {
   @override
   Down4ID get id => node.id;
 

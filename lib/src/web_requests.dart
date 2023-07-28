@@ -40,8 +40,8 @@ Future<bool> initUser(String encodedJson) async {
   return res.statusCode == 200;
 }
 
-Future<List<Pair<Down4Node, Down4MediaMetadata?>>>
-    fetchNodes<T extends Down4Node>(Iterable<String> ids) async {
+Future<List<Pair<Down4Node, Down4Media?>>> fetchNodes<T extends Down4Node>(
+    Iterable<String> ids) async {
   if (ids.isEmpty) return [];
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
@@ -51,36 +51,20 @@ Future<List<Pair<Down4Node, Down4MediaMetadata?>>>
   final jsonList = List<Map<String, Object?>>.from(jsonDecode(res.body));
   if (res.statusCode == 200) {
     return jsonList.map((e) {
-      final nodeJson = e["node"] as Map<String, String?>;
-      final mediaJson = e["media"] as Map<String, String?>?;
+      final nodeJson = e["node"] as Map<String, String?>?;
+      final mediaJson = e["metadata"] as Map<String, String>?;
+      final link = e["link"] as String?;
+      if (nodeJson == null) return null;
       final node = Down4Node.fromJson(nodeJson);
-      final media =
-          mediaJson == null ? null : Down4MediaMetadata.fromJson(mediaJson);
+      if (mediaJson == null) {
+        return Pair(node, null);
+      }
+      final media = Down4Media.fromJson(mediaJson)..cachedUrl = link;
       return Pair(node, media);
-    }).toList();
+    }).nonNulls.toList();
   }
   return [];
 }
-
-// Future<MediaMetadata?> getMediaMetadata(String id) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/GetMediaMetadata",
-//   );
-//   final res = await http.post(url, body: id);
-//   if (res.statusCode != 200) {
-//     return null;
-//   }
-//   return MediaMetadata.fromJson(jsonDecode(res.body));
-// }
-
-// Future<Media?> getMessageMedia(String id) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/GetMessageMedia",
-//   );
-//   final res = await http.post(url, body: id);
-//   if (res.statusCode != 200) return null;
-//   return FireMedia.fromJson(jsonDecode(res.body));
-// }
 
 Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
   List<String> pairs,
@@ -180,18 +164,14 @@ Future<List<Chat>?> getPosts(List<String> ids) async {
 }
 
 Future<Iterable<PersonN>?> getUsers(Iterable<String> uniques) async {
-  print("\nGETTING USERS: $uniques\n");
   final url = Uri.parse(
     "https://us-east1-down4-26ee1.cloudfunctions.net/GetNodes",
   );
   final response = await http.post(url, body: uniques.join(" "));
   if (response.statusCode != 200) return null;
   return List.from(jsonDecode(response.body)).map((e) {
-    print("JSON NODE=${e['node']}");
     final person = Down4Node.fromJson(e["node"])..cache();
-    // final data = Uint8List.fromList(base64Decode((e["data"])));
     Down4Media.fromJson(e["metadata"]).cache();
-    print("METADATA=${e['metadata']}");
     return person as PersonN;
   });
 }
@@ -212,13 +192,15 @@ class MessageRequest {
 
   Future<MessageBatchResponse> process() async {
     final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest2",
+      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleMessageRequest",
     );
 
     final res = await http.post(url, body: jsonEncode(this));
     if (res.statusCode == 200) {
+      print("Successful Message request!");
       return MessageBatchResponse.fromJson(jsonDecode(res.body));
     } else {
+      print("Unsuccessful Message request!");
       return MessageBatchResponse(0, tokens.length,
           tokens.map((e) => SendResponse(false, "", "Unknown")).toList());
     }
@@ -231,70 +213,6 @@ class MessageRequest {
         "b": body,
         "d": data,
         if (notifThumbnail != null) "n": base64Encode(notifThumbnail!),
-      };
-}
-
-class PushRequest {
-// sender can be used to see if user is blocked
-  final ComposedID sender;
-  final List<String> targets;
-  final String data;
-  PushRequest(
-      {required this.sender, required this.targets, required this.data});
-
-  Future<bool> process() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandlePushRequest",
-    );
-
-    final res = await http.post(url, body: jsonEncode(this));
-    if (res.statusCode == 200) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  Map toJson() => {
-        "s": sender.value,
-        "t": targets,
-        "d": data,
-      };
-}
-
-class NotificationRequest {
-// sender can be used to see if blocked
-  final ComposedID sender;
-  final String header, body;
-  final String? thumbnail;
-  final List<String> targets;
-  NotificationRequest({
-    required this.sender,
-    required this.header,
-    required this.body,
-    required this.targets,
-    this.thumbnail,
-  });
-
-  Future<bool> process() async {
-    final url = Uri.parse(
-      "https://us-east1-down4-26ee1.cloudfunctions.net/HandleNotificationRequest",
-    );
-
-    final res = await http.post(url, body: jsonEncode(this));
-    if (res.statusCode == 200) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  Map toJson() => {
-        "s": sender.value,
-        "t": targets,
-        "h": header,
-        "b": body,
-        if (thumbnail != null) "n": thumbnail,
       };
 }
 

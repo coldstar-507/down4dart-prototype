@@ -1,17 +1,11 @@
-import 'dart:math' show max;
-
 import 'package:down4/src/render_objects/_render_utils.dart';
-import 'package:flutter/foundation.dart';
+import 'package:down4/src/render_objects/chat_message.dart';
+import 'package:down4/src/render_objects/palette.dart';
 import 'package:flutter/material.dart';
-// import 'package:pull_to_refresh/pull_to_refresh.dart';
-import '../_dart_utils.dart';
 import '../data_objects/_data_utils.dart';
 import '../globals.dart';
-import '../themes.dart';
 
 import 'lists.dart';
-import 'palette.dart';
-import 'chat_message.dart';
 import 'console.dart';
 
 class KeepAlivePage extends StatefulWidget {
@@ -82,8 +76,8 @@ class Andrew extends StatefulWidget {
   final int initialPageIndex;
   final void Function()? addFriends, themes;
   final Function(int)? onPageChange;
-  final void Function()? backFunction;
-
+  final void Function()? backFunction, previewFunction;
+  final ConsoleRow? staticRow;
   static Duration get pageSwitchAnimationDuration =>
       const Duration(milliseconds: 200);
   static Duration get pageSwitchOpacityDuration =>
@@ -91,8 +85,10 @@ class Andrew extends StatefulWidget {
 
   const Andrew({
     this.themes,
+    this.staticRow,
     this.addFriends,
     this.backFunction,
+    this.previewFunction,
     required this.pages,
     this.onPageChange,
     this.initialPageIndex = 0,
@@ -128,6 +124,23 @@ class _AndrewState extends State<Andrew> {
     }
   }
 
+  int get nForwardingMessages =>
+      g.vm.forwardingObjects.whereType<ChatMessage>().length;
+
+  int get nForwardingPalettes =>
+      g.vm.forwardingObjects.whereType<Palette>().length;
+
+  Widget? get forwardingIndicator {
+    final nForw = nForwardingMessages + nForwardingPalettes; 
+    if (nForw == 0 || widget.previewFunction == null) return null;
+    return GestureDetector(
+        onTap: widget.previewFunction,
+        child: Container(
+            alignment: AlignmentDirectional.centerEnd,
+            child: Text("$nForwardingMessages:$nForwardingPalettes",
+                style: g.theme.headerTextStyle(activated: true))));
+  }
+
   @override
   void dispose() {
     pageCtrl.dispose();
@@ -140,14 +153,6 @@ class _AndrewState extends State<Andrew> {
 
   List<String> get titles {
     return widget.pages.map((page) => page.title).toList(growable: false);
-    // final unTransformed =
-    // final maxLen = unTransformed.fold<int>(0, (prev, q) => max(prev, q.length));
-    // return unTransformed.map((e) {
-    //   final toPad = maxLen - e.length;
-    //   // final padLeft = (toPad / 2).ceil();
-    //   // final padRight = (toPad / 2).floor();
-    //   return e.padLeft(toPad); // .padRight(padRight);
-    // }).toList(growable: false);
   }
 
   late double pageOffset = widget.initialPageIndex.toDouble();
@@ -197,21 +202,6 @@ class _AndrewState extends State<Andrew> {
       rightBox = 0;
     }
 
-    // print("""
-    // RIGHT PADDING = $rightPadding
-    // LEFT PADDING = $leftPadding
-    // ALPHA = $alpha
-    // TITLE SPACE = $titleSpace
-    // GAP SPACE = $gapSpace
-    // FULL SIZE = $full
-    // AVAIL SIZE = $availableSpace
-    // FULL SPACE = $fullSpace
-    // LEFT BOX = $leftBox
-    // RIGHT BOX = $rightBox
-    // CENTER BOX = $centerBox
-    // centerBox + leftBox + rightBox + headerSize = full? = ${centerBox + leftBox + rightBox + fullPadding}
-    // """);
-
     return (
       SizedBox(
         height: g.sizes.headerHeight,
@@ -243,14 +233,10 @@ class _AndrewState extends State<Andrew> {
                               .theme.headerTextColor
                               .withOpacity(pageTweenValue(i))))),
                 ),
-                SizedBox(width: gapW),
+                // so this is the padding after the titles until the top-right icons / right pad
+                SizedBox(width: gapW, height: headerHeight),
               ],
             );
-
-            // return Center(
-            //     child: Text("  $text  ",
-            //         style: g.theme.headerTextStyle2(g.theme.headerTextColor
-            //             .withOpacity(pageTweenValue(pageIndex)))));
           }).toList(),
         ),
       ),
@@ -259,180 +245,21 @@ class _AndrewState extends State<Andrew> {
     );
   }
 
-  (Widget, double, double) titleList2(double leftPadding, double rightPadding) {
-    final fullPadding = leftPadding + rightPadding;
-    final full = g.sizes.w;
-    const double gapWidth = 10;
-    final gapSpace = gapWidth * (titles.length - 1);
-    final availableSpace = full - fullPadding;
+  double get lateralHeaderPad => g.sizes.w * 0.02;
+  double get mainHeaderIconWidth => g.sizes.headerHeight;
+  double get headerHeight => g.sizes.headerHeight;
 
-    final titlesPaints = titles
-        .map((e) => TextPainter(
-            textDirection: TextDirection.ltr,
-            text: TextSpan(
-                text: " $e ", style: g.theme.headerTextStyle2(Colors.white)))
-          ..layout())
-        .toList();
+  Widget pageHeader([List<Widget?>? topRightWidgets]) {
+    // final lateralPads = g.sizes.w * 0.02;
+    // final leftPad = lateralPads + g.sizes.headerHeight;
 
-    final titleSpace = titlesPaints.fold(0.0, (p, i) => i.width + p);
-    final fullSpace = gapSpace + titleSpace;
+    final topRightWgts = topRightWidgets?.whereType<Widget>() ?? [];
 
-    double alpha = 1;
-    double leftBox, rightBox, centerBox;
-    if (fullSpace > availableSpace) {
-      leftBox = 0;
-      rightBox = 0;
-      centerBox = availableSpace;
-      alpha = (availableSpace - gapSpace) / titleSpace;
-    } else {
-      rightBox = (full / 2) - (fullSpace / 2) - rightPadding;
-      leftBox = (full / 2) - (fullSpace / 2) - leftPadding;
-      centerBox = fullSpace;
-      if (leftBox < 0) {
-        rightBox += leftBox;
-        leftBox = 0;
-      } else if (rightBox < 0) {
-        leftBox += rightBox;
-        rightBox = 0;
-      }
-    }
-
-    // print("""
-    // RIGHT PADDING = $rightPadding
-    // LEFT PADDING = $leftPadding
-    // ALPHA = $alpha
-    // TITLE SPACE = $titleSpace
-    // GAP SPACE = $gapSpace
-    // FULL SIZE = $full
-    // AVAIL SIZE = $availableSpace
-    // FULL SPACE = $fullSpace
-    // LEFT BOX = $leftBox
-    // RIGHT BOX = $rightBox
-    // CENTER BOX = $centerBox
-    // centerBox + leftBox + rightBox + headerSize = full? = ${centerBox + leftBox + rightBox + fullPadding}
-    // """);
-
-    return (
-      SizedBox(
-        height: g.sizes.headerHeight,
-        width: centerBox - 2,
-        child: ListView(
-          physics: const NeverScrollableScrollPhysics(),
-          controller: titleScroller,
-          scrollDirection: Axis.horizontal,
-          shrinkWrap: true,
-          children: titles.indexed.map((e) {
-            final String text = e.$2;
-            final int i = e.$1;
-
-            final double tWidth = alpha * titlesPaints[i].width;
-            final double gapW = i == titles.length - 1 ? 0.0 : gapWidth;
-
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: tWidth,
-                  height: g.sizes.headerHeight,
-                  child: Center(
-                      child: Text(" $text ",
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.ellipsis,
-                          style: g.theme.headerTextStyle2(g
-                              .theme.headerTextColor
-                              .withOpacity(pageTweenValue(i))))),
-                ),
-                SizedBox(width: gapW),
-              ],
-            );
-
-            // return Center(
-            //     child: Text("  $text  ",
-            //         style: g.theme.headerTextStyle2(g.theme.headerTextColor
-            //             .withOpacity(pageTweenValue(pageIndex)))));
-          }).toList(),
-        ),
-      ),
-      leftBox + 1,
-      rightBox + 1,
-    );
-  }
-
-  (Widget, double, double) titleList(double leftPadding) {
-    final lay = TextPainter(
-        textDirection: TextDirection.ltr,
-        text: TextSpan(
-            text: titles.map((e) => "  $e  ").join(),
-            style: g.theme.headerTextStyle2(g.theme.headerTextColor)))
-      ..layout();
-    final iconSize = g.sizes.headerHeight;
-    final full = g.sizes.w;
-    final availableSpace = full - leftPadding;
-    final layWidth = lay.width;
-
-    double leftBox, rightBox, centerBox;
-    if (layWidth > availableSpace) {
-      leftBox = 0;
-      rightBox = 0;
-      centerBox = availableSpace;
-    } else {
-      rightBox = (full - layWidth) / 2;
-      leftBox = rightBox - leftPadding;
-      if (leftBox > 0) {
-        centerBox = layWidth + 2;
-        leftBox -= 1;
-        rightBox -= 1;
-      } else {
-        leftBox = 0;
-        rightBox = 0;
-        centerBox = availableSpace;
-      }
-    }
-
-    print("""
-    HEADER SIZE = $iconSize
-    FULL SIZE = $full
-    AVAIL SIZE = ${full - iconSize}
-    LAY WIDTH = $layWidth
-    LEFT BOX = $leftBox
-    RIGHT BOX = $rightBox
-    CENTER BOX = $centerBox
-    centerBox + leftBox + rightBox + headerSize = full = $full
-    """);
-
-    return (
-      SizedBox(
-        height: iconSize,
-        width: centerBox,
-        child: ListView(
-            physics: const NeverScrollableScrollPhysics(),
-            controller: titleScroller,
-            scrollDirection: Axis.horizontal,
-            shrinkWrap: true,
-            children: [
-              ...titles.indexed.map((e) {
-                final String text = e.$2;
-                final int pageIndex = e.$1;
-
-                return Center(
-                    child: Text("  $text  ",
-                        style: g.theme.headerTextStyle2(g.theme.headerTextColor
-                            .withOpacity(pageTweenValue(pageIndex)))));
-              }).toList(),
-            ]),
-      ),
-      leftBox,
-      rightBox,
-    );
-  }
-
-  Widget pageHeader([List<Widget>? topRightWidgets]) {
-    final lateralPads = g.sizes.w * 0.02;
-    final leftPad = lateralPads + g.sizes.headerHeight;
-    final rightIconsWidth =
-        (topRightWidgets?.length ?? 0) * g.sizes.headerHeight;
-    double rightPad = lateralPads + rightIconsWidth;
+    // this is the pad + the backArrow or down4Icon width
+    final leftPad = lateralHeaderPad + mainHeaderIconWidth;
+    final nTopRightIcons = topRightWgts.length;
+    final rightIconsWidth = nTopRightIcons * mainHeaderIconWidth;
+    double rightPad = lateralHeaderPad + rightIconsWidth;
 
     final (titleWidget, leftBoxWidth, rightBoxWidth) =
         titleList3(leftPad, rightPad);
@@ -445,14 +272,16 @@ class _AndrewState extends State<Andrew> {
         mainAxisSize: MainAxisSize.max,
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          // SizedBox(width: lateralPads),
           GestureDetector(
               onHorizontalDragUpdate: (_) {},
               behavior: HitTestBehavior.opaque,
               onTap: widget.backFunction ?? widget.addFriends,
               onLongPress: widget.themes,
               child: Row(children: [
-                SizedBox(width: lateralPads, height: g.sizes.headerHeight),
+                // left pad
+                SizedBox(width: lateralHeaderPad, height: headerHeight),
+
+                // (main icon / back arrow)
                 SizedBox.square(
                   dimension: g.sizes.headerHeight,
                   child: widget.backFunction != null
@@ -463,37 +292,19 @@ class _AndrewState extends State<Andrew> {
                             child: g.theme.down4Icon(g.theme.backArrowColor),
                           ),
                         ),
-                  // down4Logo(g.sizes.headerHeight / 2),
                 ),
               ])),
-          SizedBox(width: leftBoxWidth),
-          titleWidget,
-          SizedBox(width: rightBoxWidth),
-          ...(topRightWidgets ?? []),
-          SizedBox(width: lateralPads, height: g.sizes.headerHeight),
 
-          // const SizedBox.shrink(),
-          // Row(
-          //   children: titles.indexed.map((e) {
-          //     final String text = e.$2;
-          //     final int pageIndex = e.$1;
-          //
-          //     return Text("  $text  ",
-          //         style: g.theme.headerTextStyle2(g.theme.headerTextColor
-          //             .withOpacity(pageTweenValue(pageIndex))));
-          //   }).toList(),
-          // ),
-          // Row(
-          //     children: titles
-          //         .asMap()
-          //         .entries
-          //         .map((e) => AnimatedDefaultTextStyle(
-          //             duration: Andrew.pageSwitchAnimationDuration,
-          //             style:
-          //                 g.theme.headerTextStyle(activated: curPos == e.key),
-          //             child: Text("  ${e.value}  ")))
-          //         .toList(growable: false)),
-          // SizedBox.square(dimension: g.sizes.headerHeight),
+          // padding before reaching first title
+          SizedBox(width: leftBoxWidth),
+          // all the titles
+          titleWidget,
+          // padding until the righ pad
+          SizedBox(width: rightBoxWidth),
+          // top right widgets if there are
+          ...topRightWgts,
+          // the right pad
+          SizedBox(width: lateralHeaderPad, height: headerHeight),
         ],
       ),
     );
@@ -510,20 +321,28 @@ class _AndrewState extends State<Andrew> {
   )..addListener(() {
       if (pageCtrl.page != null) {
         pageOffset = pageCtrl.page!;
-        print("PAGE OFFSET =$pageOffset");
         final percent =
             pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
-        print("PERCENT = $percent");
         titleScroller.jumpTo(titleScroller.position.maxScrollExtent * percent);
       }
-      // print("PAGE CONTROLER PAGE = ${pageCtrl.page}");
-      // print("PAGE CONTROLLER OFFSET = ${pageCtrl.offset}");
       setState(() {});
     });
 
-  Widget get pageBody2 =>
-      // Expanded(child:
-      PageView(
+  Widget get staticConsole {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      child: AnimatedOpacity(
+        duration: Console.animationDuration,
+        opacity: widget.staticRow == null ? 0 : 1,
+        child: widget.staticRow != null
+        ? Console3.staticRow(widget.staticRow!)
+        : SizedBox(width: g.sizes.w),
+      ),
+    );
+  }
+
+  Widget get pageBody2 => PageView(
         controller: pageCtrl,
         onPageChanged: widget.onPageChange,
         children: widget.pages.indexed.map((e) {
@@ -560,8 +379,8 @@ class _AndrewState extends State<Andrew> {
                                     iterableLen: page.iterableLen,
                                     list: page.list),
                       ),
-                      page.console.rowOfPage(index: index),
-                      // page.console,
+                      page.console.rowOfPage(
+                          index: index, staticRow: g.vm.mode == Modes.append),
                     ],
                   ),
                 ],
@@ -569,53 +388,6 @@ class _AndrewState extends State<Andrew> {
             ),
           );
         }).toList(growable: false),
-        // ),
-      );
-
-  Widget get pageBody => Expanded(
-        child:
-            // Stack(
-            //     alignment: widget.pages[curPos].centerStackItems
-            //         ? AlignmentDirectional.center
-            //         : AlignmentDirectional.topStart,
-            //     children: [
-            //       ...widget.pages[curPos].stackWidgets ?? [],
-            Row(
-          children: widget.pages
-              .asMap()
-              .entries
-              .map((page) => AnimatedOpacity(
-                  opacity: curPos == page.key ? 1 : 0,
-                  duration: Andrew.pageSwitchOpacityDuration,
-                  curve: Curves.easeInOut,
-                  child: AnimatedContainer(
-                    duration: Andrew.pageSwitchAnimationDuration,
-                    curve: Curves.easeInOut,
-                    width: curPos == page.key ? g.sizes.w : 0,
-                    child: page.value.staticList
-                        ? StaticList(
-                            trueLen: page.value.trueLen,
-                            reversed: page.value.reversedList,
-                            scrollController: page.value.scrollController,
-                            topPadding: page.value.isChatPage ? 4 : null,
-                            list: page.value.list)
-                        : page.value.stream != null
-                            ? FutureList(stream: page.value.stream!)
-                            : DynamicList(
-                                onRefresh: page.value.onRefresh,
-                                reversed: page.value.reversedList,
-                                asMap: page.value.asMap,
-                                orderedKeys: page.value.orderedKeys,
-                                scrollController: page.value.scrollController,
-                                topPadding: page.value.isChatPage ? 4 : null,
-                                iterables: page.value.iterables,
-                                iterableLen: page.value.iterableLen,
-                                list: page.value.list),
-                  )))
-              .toList(growable: false),
-        ),
-        // ),
-        // ]
         // ),
       );
 
@@ -627,114 +399,30 @@ class _AndrewState extends State<Andrew> {
         // image: DecorationImage(
         //     image: MemoryImage(g.background), fit: BoxFit.cover),
       ),
-      child:
-          // GestureDetector(
-          //   onHorizontalDragUpdate: (DragUpdateDetails details) {
-          //     if ((details.primaryDelta ?? 0) > 0) {
-          //       print("go left!");
-          //       goLeft();
-          //     } else if ((details.primaryDelta ?? 0) < 0) {
-          //       print("go right!");
-          //       goRight();
-          //     }
-          //   },
-          //   child:
-          WillPopScope(
+      child: WillPopScope(
         onWillPop: () async {
           widget.backFunction?.call();
           return false;
         },
         child: Scaffold(
-          // primary: false,
           backgroundColor: Colors.transparent,
           appBar: AppBar(
             toolbarHeight: g.sizes.headerHeight,
             backgroundColor: g.theme.headerColor,
-            leading: pageHeader(),
+            leading: pageHeader([forwardingIndicator]),
             leadingWidth: g.sizes.w,
           ),
           body: SafeArea(
             child: Stack(
               children: [
-                // ...widget.pages[curPos].stackWidgets ?? [],
                 pageBody2,
-                // Column(
-                //   children: [
-                // pageBody,
-                // pageBody2,
-                // curPage.console ?? const SizedBox.shrink(),
-                // ],
-                // ),
                 ...curPage.console.extraButtons,
-                // pageHeader,
+                staticConsole
               ],
             ),
           ),
         ),
       ),
-      // ),
     );
   }
 }
-
-// class TestAnimation extends StatefulWidget {
-//
-//   @override
-//   _TestAnimationState createState() => _TestAnimationState();
-// }
-
-// class _TestAnimationState extends State<TestAnimation> with SingleTickerProviderStateMixin {
-//   late AnimationController _animationController;
-//   late List<Animation> _animation;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     _animationController =
-//         AnimationController(duration: Duration(seconds: 2), vsync: this);
-//     _animation = widget. IntTween(begin: 100, end: 0).animate(_animationController);
-//     _animation.addListener(() => setState(() {}));
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: Scaffold(
-//         body: Center(
-//           child: Row(
-//             children: <Widget>[
-//               Expanded(
-//                 flex: 100,
-//                 child: TouchableOpacity(
-//                   onPress: () {
-//                     if (_animationController.value == 0.0) {
-//                       _animationController.forward();
-//                     } else {
-//                       _animationController.reverse();
-//                     }
-//                   },
-//                   child: const Text("Left"),
-//                 ),
-//               ),
-//               Expanded(
-//                 flex: _animation.value,
-//                 // Uses to hide widget when flex is going to 0
-//                 child: SizedBox(
-//                   width: 0.0,
-//                   child: TouchableOpacity(
-//                     child: const FittedBox( //Add this
-//                       child: Text(
-//                         "Right",
-//                       ),
-//                     ),
-//                     onPress: () {},
-//                   ),
-//                 ),
-//               )
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }

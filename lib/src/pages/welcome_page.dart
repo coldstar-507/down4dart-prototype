@@ -1,20 +1,16 @@
-import 'package:down4/src/themes.dart';
+import 'package:down4/src/data_objects/_data_utils.dart';
+import 'package:down4/src/render_objects/palette.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../data_objects/_data_utils.dart';
-import '../data_objects/nodes.dart';
-import '../globals.dart';
 
 import '../render_objects/_render_utils.dart';
 import '../render_objects/console.dart';
-import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '_page_utils.dart';
 
 class ThemePage extends StatefulWidget implements Down4PageWidget {
   final void Function() back, onSwap;
-  final Map<Down4ID, Palette2> themes;
+  final Map<Down4ID, Palette> themes;
   const ThemePage({
     required this.back,
     required this.onSwap,
@@ -32,31 +28,6 @@ class ThemePage extends StatefulWidget implements Down4PageWidget {
 class _ThemePageState extends State<ThemePage> with Pager2 {
   @override
   List<Extra> extras = [];
-  //
-  // void swapTheme(Down4Theme theme) async {
-  //   g.myTheme.changeTheme(theme.name);
-  //   for (final t in widget.themes.values.asNodes<NodeTheme>()) {
-  //     await writePalette<NodeTheme>(t, widget.themes, bGen, setTheState);
-  //   }
-  //   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-  //     statusBarColor: Colors.transparent,
-  //     statusBarBrightness: g.theme.topStatusIconBrightness,
-  //     systemNavigationBarColor: g.theme.bottomNavigationBarColor,
-  //     systemNavigationBarIconBrightness: g.theme.bottonNavigationIconBrightness,
-  //   ));
-  //
-  //   widget.onSwap.call();
-  //   setState(() {});
-  // }
-
-  // List<ButtonsInfo2> bGen(NodeTheme t) {
-  //   return [
-  //     ButtonsInfo2(
-  //         asset: g.noMessageArrow,
-  //         pressFunc: () => swapTheme(t.theme),
-  //         rightMost: true)
-  //   ];
-  // }
 
   ConsoleButton get purchaseButton =>
       ConsoleButton(name: "PURCHASE", onPress: () {});

@@ -1,14 +1,10 @@
 import 'dart:async';
 
-import 'package:cbl/cbl.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
-// import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 
 import '../_dart_utils.dart';
 import '../data_objects/_data_utils.dart';
-import '../data_objects/firebase.dart';
 import '../data_objects/medias.dart';
 import '../data_objects/messages.dart';
 import '../data_objects/nodes.dart';
@@ -25,22 +21,23 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "chat-${viewState.node!.id}";
 
-  final ViewState viewState;
-  final List<Down4Object>? fo;
+  ViewState get viewState => g.vm.currentView;
+
   final void Function(int) onPageChange;
-  final void Function() back, add, money, hyper;
+  final void Function() back, add, money, hyper, openPreview;
   final Future<void> Function([int limit]) loadMore;
   final void Function(BranchN) openNode;
   final void Function(Chat) send;
-  final void Function(List<Down4Object> fo) forward;
+  final void Function() forward;
   final Chat? reactingTo;
-  final Future<void> Function(ComposedID, Chat) react;
+  final void Function(ComposedID, Chat) react;
+
+  Set<Down4Object> get fo => g.vm.forwardingObjects;
 
   const ChatPage({
     required this.add,
     required this.money,
     required this.hyper,
-    required this.viewState,
     required this.loadMore,
     required this.onPageChange,
     required this.back,
@@ -48,8 +45,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
     required this.openNode,
     required this.forward,
     required this.react,
+    required this.openPreview,
     this.reactingTo,
-    this.fo,
     Key? key,
   }) : super(key: key);
 
@@ -66,11 +63,15 @@ class _ChatPageState extends State<ChatPage>
         Medias2,
         Sender2,
         Add2,
+        Compose2,
         Hyper2,
         Money2,
-        ForwardSender2,
         Saver2,
-        Forwarder2 {
+        Forward2,
+        Boost2,
+        Append2 {
+
+  // TODO: this threw an error once
   ChatN get node => widget.viewState.node as ChatN;
   List<Down4ID> get orderedChats => widget.viewState.chat?.first ?? [];
 
@@ -88,13 +89,10 @@ class _ChatPageState extends State<ChatPage>
           (m) {
             m.updateSaveStatus(false);
             setState(() {});
-            // loadBaseConsole();
-            // loadMediasConsole(!m.isVideo, true);
           }
         ),
       ];
-  @override
-  List<Down4Object>? get fo => widget.fo;
+
   @override
   void setTheState() => setState(() {});
 
@@ -112,9 +110,9 @@ class _ChatPageState extends State<ChatPage>
       : null;
 
   Map<Down4ID, ChatMessage> get _messages =>
-      widget.viewState.pages[0].objects.cast();
-  Map<ComposedID, Palette2> get _group =>
-      widget.viewState.pages[1].objects.cast();
+      widget.viewState.pages[0].state.cast();
+  Map<ComposedID, Palette> get _group =>
+      widget.viewState.pages[1].state.cast();
 
   var lastOffsetUpdate = 0.0;
 
@@ -124,19 +122,12 @@ class _ChatPageState extends State<ChatPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // console = theConsole;
-    // if (fo != null) {
-    //   loadForwardingConsole();
-    // } else {
-    //   loadBaseConsole();
-    // }
   }
 
   @override
   void dispose() {
     scroller0.dispose();
     scroller1?.dispose();
-    // aCtrl?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -152,11 +143,7 @@ class _ChatPageState extends State<ChatPage>
 
       changeConsole(basicMediaRowName);
     }
-
     print("UPDATED WIDGET");
-    // if (forwardingConsoles.contains(console.name) && fo == null) {
-    //   loadBaseConsole();
-    // }
   }
 
   void unselectSelectedMessage() {
@@ -178,14 +165,14 @@ class _ChatPageState extends State<ChatPage>
       ?..cache()
       ..merge();
 
-    if (input.value == "" && media != null && fo != null) return;
+    if (input.value == "" && media != null && widget.fo.isEmpty) return;
 
     final p = Chat(Down4ID(),
         text: input.value,
         mediaID: media?.id,
-        nodes: fo?.whereType<Palette2>().asComposedIDs().toSet(),
+        nodes: widget.fo.palettes().asComposedIDs().toSet(),
         replies: _messages.values.selected().asIDs().toSet(),
-        messages: fo?.whereType<ChatMessage>().asIDs().toSet(),
+        messages: widget.fo.chatMsgs().asIDs().toSet(),
         senderID: g.self.id,
         root: node.id,
         timestamp: makeTimestamp())
@@ -196,6 +183,8 @@ class _ChatPageState extends State<ChatPage>
 
     unselectSelectedMessage();
     input.clear();
+    g.vm.forwardingObjects.clear();
+    g.vm.mode = Modes.def;
     cameraInput = null;
     turnOffExtras();
     setTheState();
@@ -209,63 +198,25 @@ class _ChatPageState extends State<ChatPage>
 
   Extra get mediaButtonExtra => extras[0];
 
-  List<double> get baseConsoleWidth {
-    if (forwarding) {
-      if (hasFocus) {
-        return [0.0, 0.2, 0.0, 0.6, 0.2];
-      } else {
-        return [0.25, 0.25, 0.0, 0.25, 0.25];
-      }
-    } else {
-      if (hasFocus) {
-        return [0.0, 0.2, 0.0, 0.6, 0.2];
-      } else {
-        return [0.0, 0.25, 0.25, 0.25, 0.25];
-      }
-    }
-  }
-
-  bool get forwarding => (fo ?? []).isNotEmpty;
+  ConsoleRow get baseRow => ConsoleRow(
+        inputMaxHeight: input.hasFocus ? input.height : null,
+        widths: input.hasFocus ? [0.2, 0.0, 0.6, 0.2] : null,
+        extension: null,
+        widgets: [
+          mediasButton.withExtra(
+              mediaButtonExtra, [appendButton, forwardButton, saveButton]),
+          cameraButton,
+          input.consoleInput,
+          sendButton,
+        ],
+      );
 
   @override
   Console3 get console {
     return Console3(
       rows: [
         {
-          "base": ConsoleRow(
-            widgets: [
-              forwardingObjectsWidget,
-              mediasButton.withExtra(mediaButtonExtra, [
-                forwarding ? cameraButton : forwardButton,
-                saveButton,
-              ]),
-              cameraButton,
-              inputs.single.consoleInput,
-              sendButton,
-            ],
-            extension: null,
-            widths: baseConsoleWidth, // goes to default even size
-            inputMaxHeight: hasFocus ? input.ctrl.height : Console.buttonHeight,
-          ),
-          // "forward": ConsoleRow(
-          //   inputMaxHeight: inputHeight,
-          //   extension: null,
-          //   widgets: [
-          //     forwardingObjectsWidget,
-          //     mediasButton,
-          //     input,
-          //     forwardButton.withExtra(
-          //       buttons: [cameraButton],
-          //       showExtra: showForwardButtonExtra,
-          //       onLongPress: () {
-          //         setState(() {
-          //           showForwardButtonExtra = !showForwardButtonExtra;
-          //         });
-          //       },
-          //     ),
-          //   ],
-          //   widths: focusNode.hasFocus ? [0.0, 0.2, 0.6, 0.2] : null,
-          // ),
+          "base": baseRow,
           basicMediaRowName: basicMediasRow,
           basicCameraRowName: basicCameraRow,
           cameraConfirmationRowName: cameraConfirmationRow,
@@ -316,6 +267,8 @@ class _ChatPageState extends State<ChatPage>
           ];
 
     return Andrew(
+      staticRow: g.vm.mode == Modes.append ? basicAppendRow : null,
+      previewFunction: widget.openPreview,
       backFunction: widget.back,
       pages: pages,
       initialPageIndex: widget.viewState.currentIndex,
@@ -349,17 +302,17 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void forward() {
-    if (currentPageIndex == 0) {
-      widget.forward(_messages.values.selected().toList(growable: false));
-    } else {
-      widget.forward(_group.values.selected().toList(growable: false));
-    }
+    final sel = g.vm.currentView.allPageSelection();
+    g.vm.forwardingObjects.addAll(sel);
+    g.vm.mode = Modes.forward;
+    widget.forward();
   }
 
   @override
   void saveToMedias() {
     final selectedMedias = _messages.values
         .selected()
+        .messages()
         .where((chat) => chat.hasMedia)
         .map((chat) => chat.mediaInfo!.media);
     for (final media in selectedMedias) {
@@ -371,7 +324,7 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void saveToMessages() {
-    for (var chat in _messages.values.selected()) {
+    for (var chat in _messages.values.selected().messages()) {
       chat.message.copiedFor(root: g.self.id)
         ..cache()
         ..merge();
@@ -388,4 +341,9 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void money() => widget.money();
+
+  @override
+  void boost() {
+    print("TODO: BOOST IMPLEMENTATION");
+  }
 }

@@ -23,7 +23,7 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
 
 enum UtxoType { fee, change, gets, tip, tax }
 
-class Down4Payment extends Temps {
+class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
   Database get dbb => paymentsDB;
 
@@ -33,54 +33,40 @@ class Down4Payment extends Temps {
   final int timestamp;
 
   @override
-  Future<Map<String, Object>?> temporaryUpload(Map<String, Object> msg) async {
-    int? freshTS;
-    ComposedID? freshID;
-    try {
-      final uploadPayment = tempID == null || tempTS.shouldBeUpdated;
+  Uint8List? get tempPayload => compressed.toUint8List();
 
-      if (uploadPayment) {
-        print("(RE)-uploading payment!");
-        freshID = ComposedID();
-        freshTS = makeTimestamp();
+  @override
+  Map<String, String>? get tempPayloadMetadata => null;
 
-        final ref = freshID.tempStoreRef;
-
-        final jsonPay = toJson();
-        jsonPay["tempID"] = freshID.value;
-        jsonPay["tempTS"] = freshTS;
-
-        await ref.putString(jsonEncode(jsonPay));
-      } else {
-        print("OK: NO NEED TO UPDATE PAYMENT");
-      }
-
-      msg["tempPaymentID"] = freshID?.value ?? tempID!.value;
-      msg["tempPaymentTS"] = freshTS ?? tempTS!;
-
-      if (freshTS != null && freshID != null) {
-        this
-          ..updateTempReferences(freshID, freshTS)
-          ..cache();
-      }
-
-      // we remove the payment from the message, since it's too big which
-      // is the reason why we just uploaded the payment
-      return msg..remove("payment");
-    } catch (e) {
-      print("ERROR uploadMessageMedia,  message id: $id, error: $e");
-      return null;
-    }
+  @override
+  Future<void> updateTempReferences(ComposedID newTempID, int newTempTS) async {
+    final currentTS = tempTS ?? 0;
+    if (currentTS > newTempTS) return;
+    await merge({
+      "tempTS": (_tempTS = newTempTS).toString(),
+      "tempID": (_tempID = newTempID).value,
+    });
   }
+
+  ComposedID? _tempID;
+  int? _tempTS;
+
+  @override
+  ComposedID? get tempID => _tempID;
+
+  @override
+  int? get tempTS => _tempTS;
 
   Down4Payment(
     this.txs, {
     required this.safe,
     required this.textNote,
-    super.tempTS,
-    super.tempID,
+    int? tempTS,
+    ComposedID? tempID,
     int? timestamp,
-  }) : timestamp = timestamp ?? makeTimestamp();
+  })  : timestamp = timestamp ?? makeTimestamp(),
+        _tempTS = tempTS,
+        _tempID = tempID;
 
   int get independentGets =>
       txs.last.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
@@ -108,9 +94,9 @@ class Down4Payment extends Temps {
   }
 
   @override
-  Down4ID get id {
+  ComposedID get id {
     final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    return Down4ID(unique: sha1(idFold.toUint8List()).toBase58());
+    return ComposedID(unique: sha1(idFold.toUint8List()).toBase58());
     // final tsPart = makePrefix(timeStamp);
     // return "$tsPart-$dataPart";
   }
@@ -211,14 +197,28 @@ class Down4Payment extends Temps {
     return listData;
   }
 
+  factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
+    final txsJsn = List.from(youKnowDecode(decodedJson["tx"]!));
+    final txs = txsJsn.map((tx) {
+      final jsn = Map<String, String?>.from(tx as Map);
+      return Down4TX.fromJson(jsn);
+    }).toList();
+
+    return Down4Payment(txs,
+        safe: decodedJson["safe"] == "true",
+        tempTS: int.tryParse(decodedJson["tempTS"] ?? ""),
+        tempID: ComposedID.fromString(decodedJson["tempID"]),
+        timestamp: int.parse(decodedJson["ts"]!),
+        textNote: decodedJson["txt"] ?? "");
+  }
+
   @override
-  Map<String, Object> toJson({bool includeLocal = true}) => {
-        "id": id.value,
-        "tx": jsonEncode(txs.map((tx) => tx.toJson()).toList()),
-        "len": txs.length,
-        "safe": safe,
-        "ts": timestamp,
-        if (tempTS != null) "tempTS": tempTS!,
+  Map<String, String> toJson({bool includeLocal = true}) => {
+        "tx": youKnowEncode(txs.map((tx) => tx.toJson()).toList()),
+        "len": txs.length.toString(),
+        "safe": safe.toString(),
+        "ts": timestamp.toString(),
+        if (tempTS != null) "tempTS": tempTS!.toString(),
         if (tempID != null) "tempID": tempID!.value,
         if (textNote.isNotEmpty) "txt": textNote,
       };
@@ -230,19 +230,6 @@ class Down4Payment extends Temps {
     final utf8Decoded = utf8.decode(base64Decoded);
     final jsonDecoded = jsonDecode(utf8Decoded);
     return Down4Payment.fromJson(jsonDecoded);
-  }
-
-  factory Down4Payment.fromJson(dynamic decodedJson) {
-    return Down4Payment(
-      List.from(decodedJson["tx"])
-          .map((e) => Down4TX.fromJson(e))
-          .toList(),
-      safe: decodedJson["safe"],
-      tempTS: decodedJson["tempTS"],
-      tempID: ComposedID.fromString(decodedJson["tempID"]),
-      timestamp: decodedJson["ts"],
-      textNote: decodedJson["txt"] ?? "",
-    );
   }
 }
 
@@ -357,7 +344,7 @@ class Sats {
   bool operator <=(Sats s) => asInt <= s.asInt;
 }
 
-class Down4TXIN {
+class Down4TXIN with Jsons {
   Down4ID? spender;
   VarInt? _scriptSigLen;
   TXID utxoTXID;
@@ -421,17 +408,28 @@ class Down4TXIN {
 
   Down4ID get utxoID => down4UtxoID(utxoTXID, utxoIndex);
 
-  factory Down4TXIN.fromJson(dynamic decodedJson) => Down4TXIN(
-        utxoTXID: TXID.fromBase64(decodedJson["id"]),
-        utxoIndex: FourByteInt(decodedJson["ix"]),
-        spender: decodedJson["sp"],
-        sequenceNo: decodedJson["sn"],
-        scriptSigLen: decodedJson["sl"],
-        scriptSig: hex.decode(decodedJson["sc"]),
+  factory Down4TXIN.fromJson(Map<String, String?> decodedJson) => Down4TXIN(
+        utxoTXID: TXID.fromBase64(decodedJson["id"]!),
+        utxoIndex: FourByteInt(int.parse(decodedJson["ix"]!)),
+        spender: Down4ID.fromString(decodedJson["sp"]),
+        sequenceNo: int.parse(decodedJson["sn"]!),
+        scriptSigLen: int.tryParse(decodedJson["sl"] ?? ""),
+        scriptSig: hex.decode(decodedJson["sc"]!),
         dependance: decodedJson["dp"] != null
-            ? TXID.fromBase64(decodedJson["dp"])
+            ? TXID.fromBase64(decodedJson["dp"]!)
             : null,
       );
+
+  @override
+  Map<String, String> toJson() => {
+        "id": utxoTXID.asBase64,
+        "ix": utxoIndex.asInt.toString(),
+        if (spender != null) "sp": spender!.value,
+        "sn": sequenceNo.asInt.toString(),
+        "sl": _scriptSigLen!.asInt.toString(),
+        "sc": _scriptSig!.toHex(),
+        if (dependance != null) "dp": dependance!.asBase64,
+      };
 
   List<int> get raw => [
         ...utxoTXID.data,
@@ -452,27 +450,15 @@ class Down4TXIN {
     _scriptSig = script;
     _scriptSigLen = VarInt.fromInt(script.length);
   }
-
-  Map<String, dynamic> toJson() => {
-        "id": utxoTXID.asBase64,
-        "ix": utxoIndex.asInt,
-        "sp": spender,
-        "sn": sequenceNo.asInt,
-        "sl": _scriptSigLen?.asInt,
-        "sc": _scriptSig!.toHex(),
-        if (dependance != null) "dp": dependance?.asBase64,
-      };
 }
 
-class Down4TXOUT extends Locals {
+class Down4TXOUT with Down4Object, Jsons, Locals {
   @override
   Database get dbb => utxosDB;
 
   final List<int> scriptPubKey;
   final VarInt scriptPubKeyLen;
   final UtxoType type;
-  // final bool isChange;
-  // final bool isFee;
   ComposedID? receiver;
   int? outIndex;
   List<int>? secret;
@@ -489,23 +475,31 @@ class Down4TXOUT extends Locals {
     this.outIndex,
   }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey.length);
 
-  factory Down4TXOUT.fromJson(dynamic decodedJson) => Down4TXOUT(
+  factory Down4TXOUT.fromJson(Map<String, String?> decodedJson) => Down4TXOUT(
         receiver: ComposedID.fromString(decodedJson["rc"]),
         secret: decodedJson["st"] != null
-            ? List<int>.from(base64Decode(decodedJson["st"]))
+            ? List<int>.from(base64Decode(decodedJson["st"]!))
             : null,
-        outIndex: decodedJson["oi"],
-        txid: TXID.fromHex(decodedJson["id"]),
-        sats: Sats(decodedJson["s"]),
-        type: UtxoType.values.byName(decodedJson["t"]),
-        scriptPubKey: base64Decode(decodedJson["sc"]),
+        outIndex: int.parse(decodedJson["oi"]!),
+        txid: TXID.fromHex(decodedJson["id"]!),
+        sats: Sats(int.parse(decodedJson["s"]!)),
+        type: UtxoType.values.byName(decodedJson["t"]!),
+        scriptPubKey: base64Decode(decodedJson["sc"]!),
       );
 
   @override
-  Down4ID get id => down4UtxoID(txid!, FourByteInt(outIndex!));
+  Map<String, String> toJson({bool includeLocal = true}) => {
+        if (receiver != null) "rc": receiver!.value,
+        "st": secret!.toBase64(),
+        "oi": outIndex!.toString(),
+        "id": txid!.asHex,
+        "s": sats.asInt.toString(),
+        "t": type.name,
+        "sc": scriptPubKey.toBase64(),
+      };
 
-  // @override
-  // String get id => down4UtxoID(txid!, FourByteInt(outIndex!));
+  @override
+  Down4ID get id => down4UtxoID(txid!, FourByteInt(outIndex!));
 
   bool get isGets => type == UtxoType.gets;
 
@@ -566,17 +560,6 @@ class Down4TXOUT extends Locals {
 
     return Pair(txout, curOffset + 1 + receiverLen + 1);
   }
-
-  @override
-  Map<String, Object> toJson({bool includeLocal = true}) => {
-        "t": type.name,
-        if (receiver != null) "rc": receiver!.value,
-        "st": secret!.toBase64(),
-        "oi": outIndex!,
-        "id": txid!.asHex,
-        "s": sats.asInt,
-        "sc": scriptPubKey.toBase64(),
-      };
 }
 
 class Down4TX {

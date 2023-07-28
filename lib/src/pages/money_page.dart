@@ -17,11 +17,7 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../render_objects/qr.dart';
 import '../render_objects/_render_utils.dart'
-    show
-        Down4PageWidget,
-        IterablePalette2Extensions,
-        Palette2Extensions,
-        backArrow;
+    show Down4PageWidget, IterablePalette2Extensions;
 import '_page_utils.dart';
 
 final base85 = Base85Codec(Alphabets.z85);
@@ -57,9 +53,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   int listIndex = 0;
   var qrs = <Widget Function(int)>[];
   var qrs2 = <Widget>[];
-  // var tec = TextEditingController();
-  // late var input = ConsoleInput(placeHolder: "(Text Note)", tec: tec);
-  // late Console theConsole = aConsole;
 
   @override
   void initState() {
@@ -235,7 +228,9 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
 class MoneyPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "money";
-  final Transition? transition;
+  final List<Palette>? initPalettes;
+  final double? initScroll;
+  // final Transition? transition;
   final PersonN? single;
   final ViewState viewState;
   // final List<Palette2> payments;
@@ -250,8 +245,10 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
     required this.back,
     required this.makePayment,
     required this.viewState,
+    this.initPalettes,
+    this.initScroll,
     // required this.payments,
-    this.transition,
+    // this.transition,
     this.single,
     Key? key,
   }) : super(key: key);
@@ -261,42 +258,17 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
 }
 
 class _MoneyPageState extends State<MoneyPage>
-    with WidgetsBindingObserver, Pager2, Input2, Scanner2 {
-  // late final _ctrl =
-  //     AnimationController(duration: Console.animationDuration, vsync: this)
-  //       ..addListener(() {
-  //         print("RELOADING MAINVIEWCONSOLE!");
-  //         loadMainViewConsole();
-  //       });
+    with
+        TickerProviderStateMixin,
+        WidgetsBindingObserver,
+        Pager2,
+        Input2,
+        Scanner2,
+        Transition2 {
+  @override
+  TickerProvider get ticker => this;
 
-  // bool _scanning = false;
-  // bool _extra = false;
-  // bool _extraPay = false;
-  // late FocusNode _focusNode = FocusNode()..addListener(_onFocusChange);
-
-  // void _onFocusChange() {
-  //   if (!_focusNode.hasFocus) {
-  //     _ctrl.reverse();
-  //     reloadInputsAndConsole();
-  //   } else {
-  //     if (_console.key == emptyViewConsoleKey) {
-  //       print("SQUEEZING");
-  //       _ctrl.forward();
-  //       loadEmptyViewConsole(doSqueeze: true);
-  //     } else if (_console.key == mainViewConsoleKey) {
-  //       print("SQUEEZING");
-  //       _ctrl.forward();
-  //       // loadMainViewConsole(doSqueeze: true);
-  //     }
-  //   }
-  // }
-
-  // final emptyViewConsoleKey = GlobalKey();
-  // final mainViewConsoleKey = GlobalKey();
-  // final inputKey = GlobalKey();
-  // GlobalKey backButttonKey = GlobalKey();
-
-  // var tec = TextEditingController();
+  late Set<PersonN> trueTargets;
 
   int _satsInput = 0;
   int _importAmount = 0;
@@ -306,13 +278,6 @@ class _MoneyPageState extends State<MoneyPage>
   int get _discountAmount => (_discountPercentage / 100 * _satsInput).toInt();
   int get _tipAmount => (_tipPercentage / 100 * _satsInput).toInt();
   int get _totalAmount => _satsInput + _tipAmount - _discountAmount;
-
-  // @override
-  // void changeConsole(String c) {
-  //   currentConsolesName[currentPageIndex] = c;
-  //   _extraPay = false;
-  //   setTheState();
-  // }
 
   void balanceRoutine() async {
     _balance = await g.wallet.balance;
@@ -426,52 +391,6 @@ class _MoneyPageState extends State<MoneyPage>
   MyTextEditor get tipInput => inputs[4];
   MyTextEditor get filterInput => inputs[5];
 
-  // final InputController mainIC = InputController(placeHolder: "...");
-  // final FocusNode mainFN = FocusNode();
-  // late final mainTec = MyTextEditor(
-  //     input: mainIC,
-  //     textAlign: TextAlign.center,
-  //     numberPad: true,
-  //     onInputChange: (text, height) {},
-  //     maxWidth: 0.5,
-  //     maxLines: 1,
-  //     fn: mainFN);
-  // ConsoleInput2 get mainInput => ConsoleInput2(mainTec);
-  //
-  // final InputController importIC = InputController();
-  // final FocusNode importFN = FocusNode();
-  // late final importTec = MyTextEditor(
-  //     input: importIC,
-  //     onInputChange: (text, height) {},
-  //     maxWidth: 0.6,
-  //     maxLines: 1,
-  //     fn: importFN);
-  // ConsoleInput2 get importInput => ConsoleInput2(importTec);
-  //
-  // final InputController textNoteIC = InputController();
-  // final FocusNode textNodeFN = FocusNode();
-  // late final textNoteTec = MyTextEditor(
-  //     input: textNoteIC,
-  //     onInputChange: (text, height) {},
-  //     maxWidth: 0.6,
-  //     maxLines: 4,
-  //     fn: textNodeFN);
-  // ConsoleInput2 get textNodeInput => ConsoleInput2(textNoteTec);
-  //
-  // final InputController filterIC = InputController();
-  // final FocusNode filterFN = FocusNode();
-  // late final filterTec = MyTextEditor(
-  //     input: textNoteIC,
-  //     onInputChange: (text, height) {},
-  //     maxWidth: 0.6,
-  //     maxLines: 4,
-  //     fn: textNodeFN);
-  // ConsoleInput2 get filterInput => ConsoleInput2(textNoteTec);
-
-  // late Console _console;
-
-  // MobileScannerController? scanner;
-
   Map<int, String> scannedData = {};
   int scannedDataLength = -1;
   final Map<String, dynamic> _currencies = {
@@ -482,18 +401,14 @@ class _MoneyPageState extends State<MoneyPage>
     "l": ["EACH", "SPLIT"],
     "i": 0,
   };
-  late var palettes = widget.transition != null
-      ? widget.transition!.preTransition
-      : _users.values.toList(growable: false);
 
-  late final _offset = (widget.transition?.nHidden ?? 0) * Palette2.fullHeight;
+  late var palettes =
+      widget.initPalettes ?? _users.values.toList(growable: false);
+
   late ScrollController scroller0 = ScrollController(
-    initialScrollOffset: widget.transition != null
-        ? widget.transition!.scroll
-        : widget.single != null
-            ? 0
-            : widget.viewState.pages[0].scroll,
-  )..addListener(() {
+      initialScrollOffset:
+          widget.initScroll ?? g.vm.currentView.pages[0].scroll)
+    ..addListener(() {
       widget.viewState.pages[0].scroll = scroller0.offset;
     });
   late ScrollController scroller1 = ScrollController(
@@ -502,48 +417,53 @@ class _MoneyPageState extends State<MoneyPage>
       widget.viewState.pages[1].scroll = scroller1.offset;
     });
 
-  Map<Down4ID, Palette2> get _payments =>
-      widget.viewState.pages[1].objects.cast();
+  @override
+  ScrollController get mainScroll => scroller0;
 
-  Map<ComposedID, Palette2> get _users =>
-      widget.viewState.pages[0].objects.cast();
+  Map<Down4ID, Palette> get _payments => widget.viewState.pages[1].state.cast();
 
-  List<PersonN> get people => _users.values.asNodes<PersonN>().toList();
+  Map<ComposedID, Palette> get _users => widget.viewState.pages[0].state.cast();
+
+  Set<PersonN> get people => _users.values.asNodes<PersonN>().toSet();
+
+  @override
+  void animatedTransition(List<Palette>? ogs, double? ogOffset) {
+    if (ogs == null && ogOffset == null) return;
+    final (transited, nHidden, tt) = transitionPalettes(ogs!);
+    trueTargets = tt;
+    Future(() {
+      final offset = nHidden * Palette.fullHeight;
+      transitedPalettes = transited;
+      mainScroll.jumpTo(ogOffset! + offset);
+      mainScroll.animateTo(0, duration: transDuration, curve: Curves.easeInOut);
+      foldAnim.forward();
+      fadeAnim.forward();
+      setTheState();
+      Future(() {
+        // we write true targets to users, and will render
+        // them for display and true targets if we comeback from payments
+        for (final t in tt) {
+          writePalette(t, _users, null, null, home: false);
+        }
+      });
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     balanceRoutine();
-    if (widget.transition != null) animatedTransition();
-    // if (people.isEmpty) {
-    //   loadEmptyViewConsole();
-    // } else {
-    //   loadMainViewConsole();
-    // }
-    // reloadInputsAndConsole();
-  }
-
-  // Future<void> reloadInputsAndConsole() async {
-  //   await loadBalance();
-  //   loadMainViewInput();
-  //   if (!_focusNode.hasFocus) {
-  //     if (_console.key == emptyViewConsoleKey) {
-  //       loadEmptyViewConsole();
-  //     } else if (_console.key == mainViewConsoleKey) {
-  //       loadMainViewConsole();
-  //     }
-  //   }
-  // }
-
-  Future<void> animatedTransition() async {
-    Future(() => setState(() {
-          palettes = widget.transition!.postTransition;
-          scroller0.jumpTo(widget.transition!.scroll + _offset);
-          scroller0.animateTo(0,
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeInOut);
-        }));
+    // this means no transition (back from payments), so we can use people
+    if (widget.initPalettes == null) {
+      if (widget.single == null) {
+        trueTargets = people;
+      } else {
+        trueTargets = {widget.single!};
+        writePalette(widget.single!, _users, null, null, home: false);
+      }
+    }
+    animatedTransition(widget.initPalettes, widget.initScroll);
   }
 
   @override
@@ -561,7 +481,6 @@ class _MoneyPageState extends State<MoneyPage>
   void didUpdateWidget(MoneyPage old) {
     super.didUpdateWidget(old);
     balanceRoutine();
-    // reloadInputsAndConsole();
   }
 
   int usdToSatoshis(double usds) =>
@@ -634,31 +553,15 @@ class _MoneyPageState extends State<MoneyPage>
 
       final payment = Down4Payment.fromCompressed(base85DecodedData);
 
-      // if (people.isEmpty) {
-      //   loadEmptyViewConsole();
-      // } else {
-      //   loadMainViewConsole();
-      // }
       widget.onScan(payment);
 
       setState(() => scanning = false);
 
       print("RESETTING SCAN");
-      // scanner?.stop();
       scannedData = {};
       scannedDataLength = -1;
-      // _scanning = false;
     }
   }
-
-  // ConsoleInput get temporaryInput => ConsoleInput(
-  //       textAlign: TextAlign.center,
-  //       // flex: 4,
-  //       placeHolder: "...",
-  //       tec: tec,
-  //       maxLines: 1,
-  //       type: TextInputType.number,
-  //     );
 
   @override
   Console3 get console => Console3(
@@ -900,7 +803,7 @@ class _MoneyPageState extends State<MoneyPage>
 
   void confirmPayment() async {
     final pay = await g.wallet.payPeople(
-        people: people,
+        people: trueTargets.toList(),
         selfID: g.self.id,
         amount: Sats(_satsInput),
         textNote: textNoteInput.value);
@@ -911,10 +814,7 @@ class _MoneyPageState extends State<MoneyPage>
     }
   }
 
-  // final GlobalKey _extraKey = GlobalKey();
-  // bool extraB = false;
-
-  ConsoleRow get baseRow => people.isEmpty
+  ConsoleRow get baseRow => trueTargets.isEmpty
       ? ConsoleRow(
           widgets: [
             scanButton.withExtra(extraButton, [
@@ -930,7 +830,7 @@ class _MoneyPageState extends State<MoneyPage>
           inputMaxHeight: null,
         )
       : ConsoleRow(
-          widgets: people.length == 1
+          widgets: trueTargets.length == 1
               ? [
                   payButton.withExtra(extraButton, [
                     openImportButton,
@@ -960,335 +860,6 @@ class _MoneyPageState extends State<MoneyPage>
                   : null,
           inputMaxHeight: null);
 
-  // void loadMainViewInput() {
-  //   final sats = formattedSats(_balance!);
-  //   _cachedMainViewInput = ConsoleInput(
-  //     focus: _focusNode,
-  //     textAlign: TextAlign.center,
-  //     maxLines: 1,
-  //     type: TextInputType.number,
-  //     placeHolder: currency == "USD" ? "$usds \$" : "$sats sat",
-  //     tec: tec,
-  //   );
-  //   setState(() {});
-  // }
-
-  // void loadEmptyViewConsole({bool doSqueeze = false}) {
-  //   if (_scanning) {
-  //     scanner = MobileScannerController();
-  //   } else {
-  //     scanner?.dispose();
-  //     scanner = null;
-  //   }
-  //   _console = Console(
-  //     key: emptyViewConsoleKey,
-  //     scanner: !_scanning
-  //         ? null
-  //         : MobileScanner(onDetect: onScan, controller: scanner),
-  //     bottomInputs: [],
-  //     topButtons: [],
-  //     bottomButtons: [
-  //       ConsoleButton(
-  //         key: backButttonKey,
-  //         name: "BACK",
-  //         isSpecial: true,
-  //         showExtra: _extra,
-  //         onPress: () {
-  //           if (_extra) {
-  //             _extra = false;
-  //             loadEmptyViewConsole();
-  //           } else {
-  //             widget.back();
-  //           }
-  //         },
-  //         //  extraBack
-  //         //     ? loadEmptyViewConsole(scanning: scanning, extraBack: !extraBack)
-  //         //     : widget.back(),
-  //         onLongPress: () {
-  //           _extra = !_extra;
-  //           loadEmptyViewConsole();
-  //         },
-  //         extraButtons: [
-  //           ConsoleButton(
-  //             name: "IMPORT",
-  //             onPress: loadImportConsole,
-  //           )
-  //         ],
-  //       ),
-  //       ConsoleButton(
-  //         isMode: true,
-  //         name: currency,
-  //         onPress: () {
-  //           rotateCurrency();
-  //           loadMainViewInput();
-  //           loadEmptyViewConsole(
-  //               // scanning: scanning,
-  //               // extraBack: extraBack,
-  //               // reloadInput: true,
-  //               );
-  //         },
-  //       ),
-  //       _cachedMainViewInput ?? temporaryInput,
-  //       ConsoleButton(
-  //         name: "SCAN",
-  //         onPress: () {
-  //           _scanning = !_scanning;
-  //           loadEmptyViewConsole();
-  //         },
-  //       ),
-  //     ],
-  //   );
-  //   setState(() {});
-  // }
-
-  // void loadMainViewConsole() {
-  //   _console = Console(
-  //     key: mainViewConsoleKey,
-  //     bottomInputs: [],
-  //     topButtons: [],
-  //     bottomButtons: [
-  //       ConsoleButton(
-  //           name: currency,
-  //           isMode: true,
-  //           onPress: () {
-  //             rotateCurrency();
-  //             if (tec.value.text.isEmpty) loadMainViewInput();
-  //             loadMainViewConsole();
-  //           }),
-  //       ConsoleButton(
-  //           name: method,
-  //           isMode: true,
-  //           onPress: () {
-  //             rotateMethod();
-  //             loadMainViewConsole();
-  //           }),
-  //       _cachedMainViewInput ?? temporaryInput,
-  //       ConsoleButton(
-  //         name: "PAY",
-  //         onPress: () {
-  //           if (_extraPay) {
-  //             _extraPay = !_extraPay;
-  //             loadMainViewConsole();
-  //           } else if (tec.value.text.isNotEmpty) {
-  //             loadConfirmationConsole(currency);
-  //           }
-  //         },
-  //         onLongPress: () {
-  //           _extraPay = !_extraPay;
-  //           loadMainViewConsole();
-  //         },
-  //         isSpecial: true,
-  //         showExtra: _extraPay,
-  //         extraButtons: [
-  //           ConsoleButton(
-  //               name: "BILL", onPress: () => print("TODO"), isGreyedOut: true),
-  //         ],
-  //       ),
-  //     ],
-  //     // consoleRow: Console3(
-  //     //   ctrl: _ctrl,
-  //     //   beginSizes: const [.20, .20, .40, .20],
-  //     //   endSizes: const [0, .20, .60, .20],
-  //     //   widgets: [
-  //     //
-  //     //   ],
-  //     // ),
-  //     // bottomButtons: [
-  //     //   // ConsoleButton(
-  //     //   //   key: backButttonKey,
-  //     //   //   name: "BACK",
-  //     //   //   flex: doSqueeze ? 3 : 9,
-  //     //   //   isSpecial: true,
-  //     //   //   showExtra: _extra,
-  //     //   //   onPress: () {
-  //     //   //     if (_extra) {
-  //     //   //       _extra = false;
-  //     //   //       loadMainViewConsole();
-  //     //   //     } else {
-  //     //   //       widget.back();
-  //     //   //     }
-  //     //   //   },
-  //     //   //   onLongPress: () {
-  //     //   //     _extra = !_extra;
-  //     //   //     loadMainViewConsole();
-  //     //   //   },
-  //     //   //   extraButtons: [
-  //     //   //     ConsoleButton(name: "IMPORT", onPress: loadImportConsole),
-  //     //   //   ],
-  //     //   // ),
-  //     //   ConsoleButton(
-  //     //       name: currency,
-  //     //       // flex: doSqueeze ? 0 : 4,
-  //     //       maxWidth: Console.consoleWidth / 4,
-  //     //       width: doSqueeze ? 0 : Console.consoleWidth / 4,
-  //     //       isMode: true,
-  //     //       onPress: () {
-  //     //         rotateCurrency();
-  //     //         if (tec.value.text.isEmpty) loadMainViewInput();
-  //     //         loadMainViewConsole(
-  //     //             // reloadInput: tec.value.text.isEmpty ? true : false,
-  //     //             );
-  //     //       }),
-  //     //   ConsoleButton(
-  //     //       name: method,
-  //     //       maxWidth: Console.consoleWidth / 4,
-  //     //       width: Console.consoleWidth / 4,
-  //     //       isMode: true,
-  //     //       onPress: () {
-  //     //         rotateMethod();
-  //     //         loadMainViewConsole();
-  //     //       }),
-  //     //   ConsoleInput(
-  //     //     key: inputKey,
-  //     //     maxWidth: Console.consoleWidth / 4,
-  //     //     width:
-  //     //         doSqueeze ? Console.consoleWidth / 2 : Console.consoleWidth / 4,
-  //     //     focus: _focusNode,
-  //     //     maxLines: 1,
-  //     //     type: TextInputType.number,
-  //     //     placeHolder: "LOL", // currency == "USD" ? "$usds \$" : "$sats sat",
-  //     //     tec: tec,
-  //     //   ),
-  //     //
-  //     //   // _cachedMainViewInput ?? temporaryInput,
-  //     //   ConsoleButton(
-  //     //     name: "PAY",
-  //     //     maxWidth: Console.consoleWidth / 2,
-  //     //     width: Console.consoleWidth / 4,
-  //     //     onPress: () {
-  //     //       if (_extraPay) {
-  //     //         _extraPay = !_extraPay;
-  //     //         loadMainViewConsole();
-  //     //       } else if (tec.value.text.isNotEmpty) {
-  //     //         loadConfirmationConsole(currency);
-  //     //       }
-  //     //     },
-  //     //     onLongPress: () {
-  //     //       _extraPay = !_extraPay;
-  //     //       loadMainViewConsole();
-  //     //     },
-  //     //     isSpecial: true,
-  //     //     showExtra: _extraPay,
-  //     //     extraButtons: [
-  //     //       ConsoleButton(
-  //     //           name: "BILL", onPress: () => print("TODO"), isGreyedOut: true),
-  //     //     ],
-  //     //   ),
-  //     // ],
-  //   );
-  //   setState(() {});
-  // }
-
-  // void loadConfirmationConsole(String inputCurrency) {
-  //   double asUSD;
-  //   int asSats;
-  //   if (inputCurrency == "USD") {
-  //     asUSD = num.parse(tec.value.text).toDouble() *
-  //         (method == "Split" ? 1.0 : people.length);
-  //     asSats = usdToSatoshis(asUSD);
-  //   } else {
-  //     asSats = num.parse(tec.value.text).toInt() *
-  //         (method == "Split" ? 1 : people.length);
-  //     asUSD = satoshisToUSD(asSats);
-  //   }
-  //
-  //   void confirmPayment() async {
-  //     final pay = await g.wallet.payPeople(
-  //         people: people,
-  //         selfID: g.self.id,
-  //         amount: Sats(asSats),
-  //         textNote: textNoteTec.value.text);
-  //     // print("The pay: ${pay?.toJson()}");
-  //     if (pay != null) {
-  //       await widget.makePayment(pay);
-  //       tec.clear();
-  //       textNoteTec.clear();
-  //       // await loadPayment(pay.id);
-  //       // await loadInputsAndConsole();
-  //       // widget.refreshMoneyPage();
-  //     }
-  //   }
-  //
-  //   final satsString = "${formattedSats(asSats)} sat";
-  //   final usdString = "${asUSD.toStringAsFixed(4)} \$";
-  //
-  //   _console = Console(
-  //     bottomInputs: [
-  //       ConsoleInput(placeHolder: "(Text Note)", tec: textNoteTec)
-  //     ],
-  //     topButtons: [
-  //       ConsoleButton(
-  //           name: "-${currency == "USD" ? usdString : satsString}",
-  //           onPress: confirmPayment),
-  //     ],
-  //     bottomButtons: [
-  //       ConsoleButton(name: "Back", onPress: loadMainViewConsole),
-  //       ConsoleButton(
-  //         name: currency,
-  //         isMode: true,
-  //         onPress: () {
-  //           rotateCurrency();
-  //           loadConfirmationConsole(inputCurrency);
-  //         },
-  //       ),
-  //     ],
-  //   );
-  //   setState(() {});
-  // }
-
-  // void loadImportConsole([Iterable<Down4TXOUT>? utxos]) {
-  //   ConsoleInput input;
-  //   if (utxos == null) {
-  //     input = ConsoleInput(placeHolder: "WIF / PK", tec: importTec);
-  //   } else {
-  //     final sats = utxos.fold<int>(0, (prev, utxo) => prev + utxo.sats.asInt);
-  //     final ph = "Found ${formattedSats(sats)} sat";
-  //     input = ConsoleInput(placeHolder: ph, tec: textNoteTec, activated: false);
-  //   }
-  //
-  //   void import() async {
-  //     final payment =
-  //         await g.wallet.importMoney(importTec.value.text, g.self.id);
-  //
-  //     if (payment == null) return;
-  //     widget.onScan(payment);
-  //     _extra = false;
-  //     if (people.isEmpty) {
-  //       loadEmptyViewConsole();
-  //     } else {
-  //       loadMainViewConsole();
-  //     }
-  //   }
-  //
-  //   _console = Console(
-  //     bottomInputs: [input],
-  //     topButtons: [
-  //       ConsoleButton(name: "Import", onPress: import),
-  //     ],
-  //     bottomButtons: [
-  //       ConsoleButton(
-  //         name: "Back",
-  //         onPress: () {
-  //           _extra = false;
-  //           if (people.isEmpty) {
-  //             loadEmptyViewConsole();
-  //           } else {
-  //             loadMainViewConsole();
-  //           }
-  //         },
-  //       ),
-  //       ConsoleButton(
-  //         name: "Check",
-  //         onPress: () async {
-  //           final fetchedUtxos = await checkPrivateKey(importTec.value.text);
-  //           loadImportConsole(fetchedUtxos?.values);
-  //         },
-  //       ),
-  //     ],
-  //   );
-  //   setState(() {});
-  // }
-
   @override
   Widget build(BuildContext context) {
     print("PALLETSN = ${_payments.length}");
@@ -1303,8 +874,7 @@ class _MoneyPageState extends State<MoneyPage>
             scrollController: scroller0,
             staticList: true,
             title: "Money",
-            list: palettes,
-            trueLen: people.length,
+            list: transitedPalettes ?? widget.initPalettes ??  _users.values.toList(),
             console: console),
         Down4Page(
             onRefresh: widget.loadMorePayments,

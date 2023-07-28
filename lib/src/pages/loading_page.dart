@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../data_objects/_data_utils.dart';
 import '../globals.dart';
 import '../render_objects/_render_utils.dart' show down4Logo, Down4PageWidget;
 

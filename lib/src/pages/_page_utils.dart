@@ -1,8 +1,7 @@
 import 'dart:io';
-import 'dart:ui';
-
 import 'package:camera/camera.dart';
-import 'package:down4/src/data_objects/firebase.dart';
+import 'package:down4/src/data_objects/nodes.dart';
+import 'package:down4/src/render_objects/palette.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -21,9 +20,7 @@ import '../data_objects/messages.dart';
 import '../globals.dart';
 
 import '../render_objects/_render_utils.dart';
-import '../render_objects/chat_message.dart';
 import '../render_objects/console.dart';
-import '../render_objects/palette.dart';
 
 class Caret extends CustomPainter {
   Rect caret;
@@ -35,7 +32,7 @@ class Caret extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter old) {
+  bool shouldRepaint(CustomPainter oldDelegate) {
     return true;
   }
 }
@@ -44,7 +41,6 @@ class InputController implements Listenable {
   String value = "";
   String _placeHolder;
   final TextEditingController _tec;
-  // final TextInputConfiguration config;
 
   void clear() {
     value = "";
@@ -470,54 +466,6 @@ class _MyTextEditorState extends State<MyTextEditor> {
   }
 }
 
-// mixin Pager {
-//   ID get selfID;
-//   ConsoleInput get mainInput;
-//   Console get console;
-//   set console(Console c);
-//   void setTheState();
-//   void loadBaseConsole();
-//   AnimationController? get aCtrl => null;
-//   FocusNode? get focusNode => null;
-//   void onFocusChange() {
-//     if (!focusNode!.hasFocus) {
-//       aCtrl!.reverse();
-//     } else {
-//       aCtrl!.forward();
-//     }
-//     loadBaseConsole();
-//   }
-//
-//   Future<void> focusRoutine() async {
-//     print("NOT DOING ANYTHING");
-//   }
-//
-//   double inputHeight({maxWidth = 0.5}) {
-//     final text = mainInput.tec.value.text;
-//     final val = text.isEmpty ? " " : text;
-//
-//     final tp = TextPainter(
-//       text: TextSpan(text: val, style: g.theme.inputTextStyle),
-//       textDirection: TextDirection.ltr,
-//       maxLines: 8,
-//     );
-//     tp.layout(maxWidth: (g.sizes.w * maxWidth) - (24 + 2));
-//     final textHeight = tp.height;
-//     final nLines = tp.computeLineMetrics().length;
-//     final oneLineHeight = tp.height / nLines;
-//     final paddingHeight = Console.buttonHeight / 2;
-//     final inputHeight = Console.buttonHeight - paddingHeight;
-//     final greyNoText = inputHeight - oneLineHeight;
-//     final trueHeight = greyNoText + paddingHeight + textHeight;
-//
-//     return trueHeight;
-//   }
-// }
-//
-// mixin Backable {
-//   void back();
-// }
-
 class Extra {
   final GlobalKey key = GlobalKey();
   bool show = false;
@@ -532,6 +480,8 @@ class Extra {
 
 mixin Pager2 {
   int get currentPageIndex => 0;
+
+  String get currentConsoleName => currentConsolesName[currentPageIndex];
 
   List<String> get currentConsolesName;
   set currentConsolesName(List<String> currentConsolesName);
@@ -569,309 +519,49 @@ mixin Pager2 {
 mixin Sender2 {
   void send({Down4Media? mediaInput});
 
-  final GlobalKey _sendButtonKey = GlobalKey();
-  ConsoleButton get sendButton =>
-      ConsoleButton(name: "SEND", onPress: send, key: _sendButtonKey);
+  ConsoleButton get sendButton => ConsoleButton(name: "SEND", onPress: send);
 }
 
-mixin ForwardSender2 on Sender2 {
-  List<Down4Object>? get fo;
+mixin Boost2 {
+  void boost();
+  ConsoleButton get boostButton => ConsoleButton(name: "BOOST", onPress: boost);
+}
 
-  Widget individualObject(Down4Object obj) {
-    if (obj is Palette2) {
-      return Row(
-          textDirection: TextDirection.ltr,
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              clipBehavior: Clip.hardEdge,
-              decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.circular(5))),
-              child: obj.node
-                  .nodeImage(Size.square(Console.buttonHeight - (2 * 4))),
-            ),
-            Flexible(
-                child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Center(
-                        child: Text(obj.node.displayName,
-                            style: g.theme
-                                .palettePreviewTextStyle(selected: false),
-                            overflow: TextOverflow.clip,
-                            maxLines: 1))))
-          ]);
-    } else if (obj is ChatMessage) {
-      return Container(
-          color: obj.messageColor,
-          padding: const EdgeInsets.symmetric(horizontal: 4.0),
-          constraints: BoxConstraints(maxWidth: Console.consoleWidth / 4),
-          child: Center(
-              child: Text(
-                  (obj.message.text ?? "").isEmpty
-                      ? "&attachment"
-                      : obj.message.text!,
-                  style: g.theme.chatBubbleTextStyle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis)));
-    }
-
-    return const SizedBox.shrink();
+mixin Append2 on Pager2, Forward2, Boost2 {
+  void clearForwards() {
+    g.vm.forwardingObjects.clear();
+    g.vm.mode = Modes.def;
+    setTheState();
   }
 
-  List<Widget> get _foWidgets =>
-      (fo ?? []).map((e) => individualObject(e)).toList();
+  void append() {
+    turnOffExtras();
+    g.vm.forwardingObjects.addAll(g.vm.currentView.allPageSelection());
+    g.vm.currentView.unselectEverything();
+    g.vm.mode = Modes.append;
+    setTheState();
+  }
 
-  Widget get forwardingObjectsWidget => Container(
-        padding: const EdgeInsets.all(4),
-        height: Console.buttonHeight,
-        child: ListView(
-          // shrinkWrap: true,
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(0),
-          children: _foWidgets,
-        ),
+  ConsoleButton get cancelButton =>
+      ConsoleButton(name: "CANCEL", onPress: clearForwards);
+
+  ConsoleButton get appendButton =>
+      ConsoleButton(name: "APPEND", onPress: append);
+
+  ConsoleRow get basicAppendRow => ConsoleRow(
+        widths: null,
+        extension: null,
+        inputMaxHeight: null,
+        widgets: [appendButton, cancelButton, boostButton, forwardButton],
       );
 }
 
-mixin Forwarder2 {
-  // void Function()? get hyper => null;
-
-  // List<String> get forwardingConsoles => [
-  //       "ForwardingConsole",
-  //       "ForwardingMediasConsole",
-  //       "ForwardingCameraConsole",
-  //       "ForwardingPreviewConsole",
-  //     ];
-
+mixin Forward2 {
   void forward();
 
   ConsoleButton get forwardButton =>
       ConsoleButton(name: "FORWARD", onPress: forward);
-
-// void loadForwardingConsole([bool extra = false]) {
-//   console = Console(
-//     name: "ForwardingConsole",
-//     // bottomInputs: [mainInput],
-//     // forwardingObjects: fo,
-//     bottomButtons: [],
-//     consoleRow: Console3(
-//       ctrl: aCtrl,
-//       maxHeight: Console.buttonHeight,
-//       beginSizes: const [0.25, 0.25, 0.25, 0.25],
-//       endSizes: const [0.0, 0.25, 0.50, 0.25],
-//       widgets: [
-//         Container(
-//           padding: const EdgeInsets.all(4),
-//           height: Console.buttonHeight,
-//           child: ListView(
-//             // shrinkWrap: true,
-//             scrollDirection: Axis.horizontal,
-//             padding: const EdgeInsets.all(0),
-//             children: _foWidgets,
-//           ),
-//         ),
-//         ConsoleButton(name: "MEDIAS", onPress: loadMediasConsole),
-//         mainInput,
-//         ConsoleButton(
-//           name: "FORWARD",
-//           onPress: () => extra ? loadForwardingConsole(!extra) : send(),
-//           onLongPress: () => loadForwardingConsole(!extra),
-//           isSpecial: true,
-//           showExtra: extra,
-//           extraButtons: [
-//             ConsoleButton(
-//               name: cameraInput == null ? "CAMERA" : "@CAMERA",
-//               onPress: loadSquaredCameraConsole,
-//             ),
-//             ...(hyper != null
-//                 ? [ConsoleButton(name: "HYPER", onPress: hyper!)]
-//                 : [])
-//           ],
-//         )
-//       ],
-//     ),
-//     // bottomButtons: [
-//     //   ConsoleButton(name: "BACK", onPress: back),
-//     //   ConsoleButton(name: "MEDIAS", onPress: loadForwardingMediasConsole),
-//     //   ConsoleButton(
-//     //     name: "FORWARD",
-//     //     onPress: () => extra ? loadForwardingConsole(!extra) : send(),
-//     //     onLongPress: () => loadForwardingConsole(!extra),
-//     //     isSpecial: true,
-//     //     showExtra: extra,
-//     //     extraButtons: [
-//     //       ConsoleButton(
-//     //         name: cameraInput == null ? "Camera" : "@Camera",
-//     //         onPress: loadForwardingCameraConsole,
-//     //       ),
-//     //       ...(hyper != null
-//     //           ? [ConsoleButton(name: "Hyper", onPress: hyper!)]
-//     //           : [])
-//     //     ],
-//     //   )
-//     // ],
-//   );
-//
-//   setTheState();
-// }
-
-// void loadForwardingMediasConsole([bool images = true]) {
-//   console = Console(
-//     name: "ForwardingMediasConsole",
-//     // bottomInputs: [mainInput],
-//     medias: ConsoleMedias2(
-//       images: images,
-//       onSelect: (m) => send(mediaInput: m),
-//     ),
-//     // forwardingObjects: fo,
-//     bottomButtons: [
-//       ConsoleButton(name: "BACK", onPress: loadForwardingConsole),
-//       ConsoleButton(
-//           name: images ? "IMAGES" : "VIDEOS",
-//           onPress: () => loadForwardingMediasConsole(!images))
-//     ],
-//   );
-//   setTheState();
-// }
-
-// Future<void> loadForwardingCameraConsole([
-//   CameraController? ctrl,
-//   int cam = 0,
-// ]) async {
-//   if (ctrl == null) {
-//     try {
-//       ctrl = CameraController(g.cameras[cam], ResolutionPreset.high);
-//       await ctrl.initialize();
-//     } catch (e) {
-//       loadBaseConsole();
-//     }
-//   }
-//   final bool isReversed = cam == 1;
-//
-//   console = Console(
-//     name: "ForwardingCameraConsole",
-//     // bottomInputs: [mainInput],
-//     cameraController: ctrl,
-//     // forwardingObjects: fo,
-//     bottomButtons: [],
-//     consoleRow: ConsoleRow(
-//       widgets: [
-//         ConsoleButton(name: "BACK", onPress: loadForwardingCameraConsole),
-//         ConsoleButton(
-//             name: cam == 0 ? "REAR" : "FRONT",
-//             onPress: () => loadForwardingCameraConsole(null, (cam + 1) % 2),
-//             isMode: true),
-//         ConsoleButton(
-//           name: "CAPTURE",
-//           isSpecial: true,
-//           shouldBeDownButIsnt: ctrl!.value.isRecordingVideo,
-//           onPress: () async {
-//             final XFile f = await ctrl!.takePicture();
-//             final media = makeCameraMedia(
-//                 cachedPath: f.path,
-//                 size: ctrl.value.previewSize!,
-//                 isReversed: isReversed,
-//                 owner: selfID,
-//                 isSquared: true);
-//             loadForwardingPreviewConsole(media);
-//           },
-//           onLongPress: () async {
-//             await ctrl!.startVideoRecording();
-//             loadForwardingCameraConsole(ctrl, cam);
-//           },
-//           onLongPressUp: () async {
-//             final XFile f = await ctrl!.stopVideoRecording();
-//             final media = makeCameraMedia(
-//                 cachedPath: f.path,
-//                 size: ctrl.value.previewSize!,
-//                 isReversed: isReversed,
-//                 owner: selfID,
-//                 isSquared: true);
-//             loadForwardingPreviewConsole(media);
-//           },
-//         ),
-//       ],
-//     ),
-//   );
-//
-//   setTheState();
-// }
-//
-// void loadForwardingPreviewConsole(FireMedia m) async {
-//   final vpc = await _loopingController(m);
-//   console = Console(
-//     name: "ForwardingPreviewConsole",
-//     bottomInputs: [mainInput],
-//     previewMedia: m.display(size: _squaredCamSize, controller: vpc),
-//     forwardingObjects: fo,
-//     bottomButtons: [
-//       ConsoleButton(
-//         name: "Back",
-//         onPress: () {
-//           vpc?.dispose();
-//           loadForwardingCameraConsole(null, m.isReversed ? 1 : 0);
-//         },
-//       ),
-//       ConsoleButton(
-//           name: "Cancel",
-//           onPress: () {
-//             vpc?.dispose();
-//             loadForwardingConsole();
-//           }),
-//       ConsoleButton(
-//           name: "Accept",
-//           onPress: () {
-//             vpc?.dispose();
-//             cameraInput = m;
-//             loadForwardingConsole();
-//           }),
-//     ],
-//   );
-//
-//   setTheState();
-// }
 }
-//
-// class FullInput {
-//   final FocusNode focusNode;
-//   final int maxInputLines;
-//   final double maxInputWidth;
-//   // final InputController tec;
-//   final bool numberPad;
-//   TextAlign textAlign;
-//   double inputHeight;
-//   late final MyTextEditor editor;
-//
-//   String get value => tec.value;
-//
-//   FullInput({
-//     this.numberPad = false,
-//     String? placeHoder,
-//     required void Function(String, double) onInput,
-//     this.textAlign = TextAlign.start,
-//     double? maxInputWidth,
-//     int? maxInputLines,
-//     double? inputHeight,
-//   })  : maxInputWidth = maxInputWidth ?? 0.6,
-//         maxInputLines = maxInputLines ?? 20,
-//         inputHeight = inputHeight ?? Console.buttonHeight,
-//         focusNode = FocusNode() {
-//     editor = MyTextEditor(
-//         input: InputController(placeHolder: placeHoder),
-//         textAlign: textAlign,
-//         numberPad: numberPad,
-//         onInputChange: (s, h) {
-//           inputHeight = h;
-//           onInput.call(s, h);
-//         },
-//         maxWidth: this.maxInputWidth,
-//         maxLines: this.maxInputLines,
-//         fn: focusNode);
-//   }
-//
-//   ConsoleInput2 get widget => ConsoleInput2(editor);
-// }
 
 mixin Input2 on Pager2, WidgetsBindingObserver {
   List<MyTextEditor> get inputs;
@@ -883,10 +573,6 @@ mixin Input2 on Pager2, WidgetsBindingObserver {
   Iterable<FocusNode> get focusNodes => inputs.map((e) => e.fn);
 
   bool get hasFocus => focusNodes.any((element) => element.hasFocus);
-
-  // static void connectInput(InputController ctrl) {
-  //   connection = TextInput.attach(ctrl, ctrl.config);
-  // }
 
   @override
   void onPageSwitch() {
@@ -992,14 +678,99 @@ mixin Input2 on Pager2, WidgetsBindingObserver {
 //   }
 // }
 
+// class Trans {
+//   final Set<PersonN> trueTargets;
+//   final List<Palette> animatedPalettes;
+//   final int nHidden;
+//   Trans(this.animatedPalettes, this.nHidden, this.trueTargets);
+// }
+
+mixin Transition2 on Pager2 {
+  List<Down4Widget>? transitedPalettes;
+  set trueTargets(Set<PersonN> tt);
+
+  TickerProvider get ticker;
+
+  Duration get transDuration => const Duration(milliseconds: 600);
+
+  ScrollController get mainScroll;
+
+  final Tween<double> oneToZero = Tween<double>(begin: 1.0, end: 0.0);
+  late final CurvedAnimation curved = CurvedAnimation(
+    parent: foldAnim,
+    curve: Curves.easeInOut,
+  );
+
+  late final AnimationController foldAnim = AnimationController(
+      vsync: ticker, duration: const Duration(milliseconds: 600));
+  late final AnimationController fadeAnim = AnimationController(
+      vsync: ticker, duration: const Duration(milliseconds: 100));
+
+  (List<Palette>, int, Set<PersonN>) transitionPalettes(
+      List<Palette> originals) {
+    Iterable<Palette> selection = originals.selected();
+    Iterable<GroupN> sGroup = selection.asNodes<GroupN>();
+    Iterable<Down4ID> userSel = selection.whereNodeIs<PersonN>().asIDs();
+    Iterable<Down4ID> ofGroup = sGroup.map((g) => g.group).expand((e) => e);
+    Set<Down4ID> fullSel = userSel.followedBy(ofGroup).toSet();
+
+    final sizeAnim_ = oneToZero.animate(curved);
+    final fadeAnim_ = oneToZero.animate(fadeAnim);
+
+    int nHidden = 0;
+    Set<PersonN> trueTargets = {};
+    final animatedPalettes = originals.map((p) {
+      final inSel = fullSel.contains(p.id);
+      final there = p.node is PersonN && inSel;
+      final stayHid = !p.show && !inSel;
+      final wasHid = !p.show && inSel;
+      if (there) trueTargets.add(p.node as PersonN);
+      if (wasHid) nHidden++;
+      return Palette(
+          node: p.node,
+          sizeAnim: there ? null : sizeAnim_,
+          fadeAnim: there ? null : fadeAnim_,
+          bFadeAnim: fadeAnim_,
+          buttonsInfo2: p.buttonsInfo2.thatDoesNothing(),
+          show: !stayHid);
+    }).toList();
+
+    return (animatedPalettes, nHidden, trueTargets);
+  }
+
+  void animatedTransition(List<Palette>? ogs, double? ogOffset) {
+    if (ogs == null && ogOffset == null) return;
+    final (transited, nHidden, tt) = transitionPalettes(ogs!);
+    trueTargets = tt;
+    Future(() {
+      final offset = nHidden * Palette.fullHeight;
+      transitedPalettes = transited;
+      mainScroll.jumpTo(ogOffset! + offset);
+      mainScroll.animateTo(0, duration: transDuration, curve: Curves.easeInOut);
+      foldAnim.forward();
+      fadeAnim.forward();
+      setTheState();
+    });
+  }
+}
+
 mixin Medias2 on Pager2 {
   int get _mediasPerRow => 5;
   int get _nRows => 3;
   double get _mediaCelSize => Console.trueWidth / _mediasPerRow;
   double get mediaExtensionHeight => _mediaCelSize * _nRows;
 
-  bool _images =
-      true; // or videos, but will change from bool to allow more types
+  MediaType t = MediaType.images;
+  void nextType({MediaType? specificType}) {
+    if (specificType != null) {
+      t = specificType;
+    } else {
+      final int ix = MediaType.values.indexOf(t);
+      final int nx = (ix + 1) % MediaType.values.length;
+      t = MediaType.values.elementAt(nx);
+    }
+    setTheState();
+  }
 
   (String, void Function(Down4Image))? forMediaMode;
   Chat? reactingTo;
@@ -1034,11 +805,7 @@ mixin Medias2 on Pager2 {
             forMediaMode!.$2.call(nodeMedia);
           }
         } else {
-          await importConsoleMedias(
-              images: _images,
-              reload: () {
-                setTheState();
-              });
+          await importConsoleMedias(type: t, reload: setTheState);
         }
       });
 
@@ -1046,11 +813,8 @@ mixin Medias2 on Pager2 {
       isMode: true,
       isActivated: forMediaMode == null,
       isGreyedOut: forMediaMode != null,
-      name: _images ? "IMAGES" : "VIDEOS",
-      onPress: () {
-        _images = !_images;
-        setTheState();
-      });
+      name: t.name.toUpperCase(),
+      onPress: nextType);
 
   ConsoleButton get mediasModeButton => ConsoleButton(
       name: forMediaMode?.$1 ?? curMode.$1,
@@ -1062,7 +826,7 @@ mixin Medias2 on Pager2 {
       });
 
   Widget get mediasExtension {
-    final ids = _images ? g.savedImageIDs : g.savedVideoIDs;
+    final ids = g.savedMediasIDs[t]!;
     final nRows = (ids.length / _mediasPerRow).ceil();
     return Container(
       clipBehavior: Clip.hardEdge,
@@ -1086,9 +850,10 @@ mixin Medias2 on Pager2 {
                           onTap: () => forMediaMode != null
                               ? forMediaMode!.$2.call(cachedMedia as Down4Image)
                               : curMode.$2(cachedMedia),
-                          child: (cachedMedia.display(
+                          child: cachedMedia.display(
+                              key: Key("console-${cachedMedia.id.value}"),
                               size: Size.square(_mediaCelSize),
-                              forceSquare: true)));
+                              forceSquare: true));
                     }
                     return FutureBuilder(
                       future: global<Down4Media>(ids[i]),
@@ -1099,9 +864,11 @@ mixin Medias2 on Pager2 {
                               onTap: () => ans.data != null
                                   ? curMode.$2(ans.data!)
                                   : null,
-                              child: (ans.requireData?.display(
+                              child: ans.requireData?.display(
+                                      key: Key(
+                                          "console-${ans.requireData?.id.value}"),
                                       size: Size.square(_mediaCelSize),
-                                      forceSquare: true)) ??
+                                      forceSquare: true) ??
                                   SizedBox.square(dimension: _mediaCelSize));
                         } else {
                           return SizedBox.square(dimension: _mediaCelSize);
@@ -1114,18 +881,11 @@ mixin Medias2 on Pager2 {
                 }
 
                 return Row(
-                  key: Key(_images.toString() + index.toString()),
+                  key: Key(t.name + index.toString()),
                   children: List.generate(
                     _mediasPerRow,
                     (j) => f((index * _mediasPerRow) + j),
                   ),
-                  // [
-                  //   f((index * 5)),
-                  //   f((index * 5) + 1),
-                  //   f((index * 5) + 2),
-                  //   f((index * 5) + 3),
-                  //   f((index * 5) + 4)
-                  // ],
                 );
               }))),
     );
@@ -1402,7 +1162,7 @@ mixin Scanner2 on Pager2 {
 }
 
 // abstract class BasicRows
-//     with Pager2, Medias2, Sender2, Forwarder2, Input2, Camera2 {
+//     with Pager2, Medias2, Sender2, Forward2, Input2, Camera2 {
 //   ({String name, ConsoleRow row}) get basicCameraRow => (
 //         name: "camera",
 //         row: ConsoleRow(
@@ -1965,26 +1725,15 @@ Down4Media makeCameraMedia({
 }) {
   final mime = lookupMimeType(cachedPath)!;
   final data = File(cachedPath).readAsBytesSync();
-  // final id = deterministicMediaID(data, owner);
-  return Down4Media.fromLocal(
-      ComposedID(region: owner.region), // hack for init
+  return Down4Media.fromLocal(ComposedID(region: owner.region), // hack for init
       mainCachedPath: cachedPath,
       metadata: Down4MediaMetadata(
           ownerID: owner,
+          isSquared: isSquared,
           isReversed: isReversed,
           timestamp: makeTimestamp(),
           width: size.width,
           height: size.height,
           mime: mime),
       tinyThumbnail: makeTiny(data));
-
-  // ownerID: owner,
-  // timestamp: makeTimestamp(),
-  // width: size.width,
-  // height: size.height,
-  // cachePath: cachedPath,
-
-  // isSquared: isSquared,
-  // isReversed: isReversed,
-  // mime: mime);
 }

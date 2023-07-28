@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../data_objects/_data_utils.dart';
+
 import '../globals.dart';
+
 import '../render_objects/console.dart';
-import '_page_utils.dart';
 import '../render_objects/_render_utils.dart' show Down4PageWidget;
+
+import '_page_utils.dart';
 
 class SnipViewPage extends StatelessWidget
     with Pager2
@@ -55,15 +57,7 @@ class SnipViewPage extends StatelessWidget
         left: 0,
         child: SizedBox(
           width: g.sizes.w,
-          child: console,
-          // Console3(
-          //   // consoleRow: Console3(
-          //   //   widgets: [
-          //   //
-          //   //   ],
-          //   // ),
-          //   bottomButtons: [],
-          // ),
+          child: console.rowOfPage(index: 0),
         ),
       ),
     ]);

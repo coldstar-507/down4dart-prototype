@@ -16,10 +16,74 @@ import 'data_objects/nodes.dart';
 const golden = 1.618;
 
 const videoExtensions = ["mp4", "3gp", "webm", "mkv", "m4a", "mov"];
+const videoMimes = [
+  "video/mp4",
+  "video/3pg",
+  "video/webm",
+  "video/mkv",
+  "video/m4a",
+  "video/mov"
+];
 
-const imageExtensions = ["jpeg", "jpg", "png", "gif", "bmp", "webp", "apng"];
+const imageExtensions = ["jpeg", "jpg", "png", "gif", "bmp", "webp"];
+const imageMimes = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/bmp",
+  "image/webp"
+];
 
 const animatedImageExtensions = ["apng", "gif"];
+const animatedImageMimes = ["image/apng", "image/gif"];
+
+String youKnowEncode(dynamic j) {
+  final valid = j is List || j is Map;
+  if (!valid) throw '${j.runtimeType} is not valid type for youKnowEncoding';
+  return base64Encode(utf8.encode(jsonEncode(j)));
+}
+
+dynamic youKnowDecode(String yk) {
+  return jsonDecode(utf8.decode(base64Decode(yk)));
+}
+
+enum MediaType { images, gifs, videos }
+
+const Map<MediaType, List<String>> extMap = {
+  MediaType.videos: videoExtensions,
+  MediaType.images: imageExtensions,
+  MediaType.gifs: animatedImageExtensions,
+};
+
+const Map<MediaType, List<String>> mimeMap = {
+  MediaType.videos: videoMimes,
+  MediaType.images: imageMimes,
+  MediaType.gifs: animatedImageMimes,
+};
+
+extension Caster on Object {
+  T asType<T>() => this as T;
+}
+
+extension StringListFormattedForSQL on Iterable<String> {
+  String get sqlFmt => map((e) => "'$e'").toString();
+}
+
+extension TrySingleWhere<T> on Iterable<T> {
+  T? find(T e) {
+    for (final e_ in this) {
+      if (e == e_) return e_;
+    }
+    return null;
+  }
+
+  T? findWhere(bool Function(T) f) {
+    for (final e in this) {
+      if (f(e)) return e;
+    }
+    return null;
+  }
+}
 
 double calcDistance(num x1, num y1, num x2, num y2) {
   return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
@@ -31,10 +95,6 @@ String makePrefix(int ms) {
   final diffed = differ - inSeconds;
   return diffed.toRadixString(36);
 }
-
-// extension TrimmedExtensions on List<String> {
-//   List<String> withoutDots() => map((e) => e.substring(1)).toList();
-// }
 
 final listEqual = const ListEquality().equals;
 
@@ -56,11 +116,6 @@ Future<bool> hasNetwork() async {
 String generateMessageID(String senderID, num timeStamp) {
   return sha1(utf8.encode(senderID + timeStamp.toString())).toBase58();
 }
-
-// ComposedID deterministicMediaID(Uint8List mediaData, Down4ID selfID) {
-//   final selfData = utf8.encode(selfID.unique);
-//   return ComposedID(sha1(mediaData + selfData).toBase58());
-// }
 
 Uint8List randomBytes({int size = 16}) {
   return Uint8List.fromList(
@@ -108,13 +163,12 @@ extension ByteEncoding on List<int> {
 }
 
 extension StringExtension on String {
-  List<int> asUtf8() => utf8.encode(this);
-  List<int> asUtf16() => codeUnits;
+  List<int> toUtf8() => utf8.encode(this);
+  List<int> toUtf16() => codeUnits;
   String capitalize() =>
       "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   String mime() => lookupMimeType(this)!;
   String extension() => extensionFromMime(mime());
-  // String extension() => p.extension(this);
   bool isVideoExtension() => videoExtensions.contains(this);
   bool isImageExtension() => imageExtensions.contains(this);
 }

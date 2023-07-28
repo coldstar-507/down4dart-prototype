@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import '../_dart_utils.dart' show Pair, golden;
+import '../_dart_utils.dart' show golden;
 
 import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
@@ -12,7 +12,7 @@ import '../data_objects/nodes.dart';
 import '../globals.dart';
 
 import '_render_utils.dart';
-import 'palette.dart' show Palette, Palette2;
+import 'palette.dart' show Palette;
 
 class ChatReplyInfo {
   final Down4ID messageRefID;
@@ -51,14 +51,21 @@ class ChatTextInfo {
   });
 }
 
-class ChatMessage extends StatelessWidget implements Down4Object {
+class ChatMessage extends StatelessWidget
+    with Down4Object, Down4Widget, Down4SelectionWidget {
   @override
   Down4ID get id => message.id;
 
   static const double headerHeight = 18.0;
   final ComposedID nodeRef;
-  final bool myMessage, selected, isPost;
-  final void Function(Down4ID id)? select;
+  final bool myMessage, isPost;
+
+  @override
+  final bool selected;
+
+  @override
+  final void Function()? select;
+
   final Chat message;
   final bool hasGap, hasHeader;
   final void Function(Down4Node)? openNode;
@@ -67,7 +74,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   final List<ChatReplyInfo>? repliesInfo;
   final List<Down4Node>? nodes;
 
-  List<Reaction> get reactions => message.reactions.values.toList();
+  List<Reaction> get reactions => message.reactions;
 
   final Future<void> Function(Chat message) react;
 
@@ -76,9 +83,9 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   bool get videoIsPlaying =>
       mediaInfo?.videoController?.value.isPlaying ?? false;
 
-  bool get hasReactions => (reactions ?? []).isNotEmpty;
+  bool get hasReactions => reactions.isNotEmpty;
 
-  const ChatMessage({
+  ChatMessage({
     required this.increment,
     required this.react,
     required this.nodeRef,
@@ -93,8 +100,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     this.isPost = false,
     this.selected = false,
     required this.select,
-    Key? key,
-  }) : super(key: key);
+  }) : super(key: GlobalKey());
 
   ChatMessage withOpenNode({
     required void Function(Down4Node)? open,
@@ -174,6 +180,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     );
   }
 
+  @override
   ChatMessage invertedSelection() {
     return ChatMessage(
       message: message,
@@ -220,9 +227,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
   static double get maxMessageWidth => g.sizes.w * 0.8;
 
-  static double get textPadding => 9.0;
-
-  // static double get messageBorder => 4.0;
+  static double get textPadding => 10.0;
 
   static double get maxTextWidth =>
       maxMessageWidth - (2 * textPadding) - lateralBorderWidth;
@@ -244,7 +249,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   double get bodyHeight {
     final double bubbleHeight = bubble?.calcHeight ?? 0.0;
     final double mediaHeight = mediaInfo?.precalculatedMediaSize.height ?? 0.0;
-    // final double repliesHeight = (repliesInfo?.length ?? 0.0) * headerHeight;
     final double palettesHeight = (nodes?.length ?? 0.0) * nodeHeight;
     if (bubbleHeight > 0) {
       return bubbleHeight + mediaHeight + palettesHeight + textPadding;
@@ -332,23 +336,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     }
 
     return chatReplies;
-
-    // print("GENERATING REPLIES INFO");
-    // return message.replies!
-    //     .map((replyID) async {
-    //       final replyMsg = await replyID.getLocalMessage();
-    //       if (replyMsg == null) return null;
-    //       final String replyBody = replyMsg.text?.isNotEmpty ?? false
-    //           ? replyMsg.text!
-    //           : "&attachment";
-    //       return ChatReplyInfo(
-    //           onPressReply: () => goToReply.call(replyID),
-    //           senderID: replyMsg.senderID,
-    //           messageRefID: replyMsg.id,
-    //           body: replyBody);
-    //     })
-    //     .whereType<ChatReplyInfo>()
-    //     .toList(growable: false);
   }
 
   static bool displayGap(Chat msg, Chat prevMsg) {
@@ -426,7 +413,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         height: headerHeight * 0.8,
         child: Row(children: [
           const Spacer(),
-          Text("-${message.senderID}   ",
+          Text("-${message.senderID.unique}   ",
               style: g.theme.messageSenderTextStyle),
         ]));
   }
@@ -437,13 +424,13 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         height: headerHeight * 0.8,
         child: Row(children: [
           Text(
-            "   >> ${message.forwardedFromID}",
+            "   >> ${message.forwardedFromID!.unique}",
             style: g.theme.messageForwarderTextStyle,
           ),
         ]));
   }
 
-  double get nodeHeight => Palette2.paletteHeight / golden;
+  double get nodeHeight => Palette.paletteHeight / golden;
 
   Widget? get messagePalettes {
     if (!hasPalettes && (message.nodes ?? {}).isEmpty) return null;
@@ -455,9 +442,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         child: Row(
           children: [
             g.theme.down4Icon(g.theme.down4IconForPaletteColor),
-            // Image.asset("assets/images/down4_inverted.png",
-            //     cacheHeight: (nodeHeight * 2).toInt(),
-            //     cacheWidth: (nodeHeight * 2).toInt()),
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 12.0, left: 12.0),
@@ -471,10 +455,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       return Container(
         key: GlobalKey(),
         height: nodeHeight,
-        color: Colors.white10,
-        // n.id == g.self.id
-        //     ? g.theme.nodeColors[NodesColor.self]
-        //     : g.theme.nodeColors[n.colorCode],
+        color: g.theme.chatPaletteColor,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -504,7 +485,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
     }
 
     return GestureDetector(
-      onTap: () => select?.call(message.id),
+      onTap: select,
       onLongPress: () => react(message),
       child: Container(
           clipBehavior: Clip.hardEdge,
@@ -529,7 +510,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
     Widget mediaBody({required Widget child}) {
       return GestureDetector(
-          onTap: () => select?.call(message.id),
+          onTap: select,
           onLongPress: () => react(message),
           child: Container(
               clipBehavior: Clip.hardEdge,
@@ -556,7 +537,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   Widget? get text {
     if (!hasText) return null;
     return GestureDetector(
-        onTap: () => select?.call(message.id),
+        onTap: select,
         onLongPress: () => react(message),
         child: Container(
             padding: EdgeInsets.all(textPadding),
@@ -616,7 +597,7 @@ class ChatMessage extends StatelessWidget implements Down4Object {
   double get smallestReactionSize =>
       smallestBubbleHeight + lateralBorderWidth + (2 * textPadding);
 
-  int get nReactions => reactions?.length ?? 0;
+  int get nReactions => reactions.length;
 
   int get maxReactionForThisMessage {
     int nReaction = 0;
@@ -631,12 +612,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
 
     if (media == null) return null;
 
-    // TextStyle style() => TextStyle(
-    //     fontSize: 10,
-    //     fontFamily: g.theme.font,
-    //     color: Colors.white,
-    //     fontWeight: FontWeight.bold);
-
     final tp = TextPainter(
         textDirection: TextDirection.ltr,
         text: TextSpan(
@@ -650,8 +625,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       child: Stack(
         children: [
           Padding(
-            // width: reactionWidth,
-            // height: reactionWidth,
             padding: const EdgeInsets.all(2),
             child: GestureDetector(
               onTap: () => increment(message, r.id),
@@ -686,43 +659,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
         ],
       ),
     );
-
-    // return SizedBox.square(
-    //   dimension: rad * 2,
-    //   child: Stack(
-    //     children: [
-    //       Container(
-    //         // width: rad * 2,
-    //         // height: rad * 2,
-    //         decoration: BoxDecoration(
-    //             borderRadius: BorderRadius.circular(rad), color: messageColor),
-    //         clipBehavior: Clip.hardEdge,
-    //         child: Center(
-    //           child: Container(
-    //             width: (rad - messageBorder) * 2,
-    //             height: (rad - messageBorder) * 2,
-    //             decoration: BoxDecoration(
-    //                 borderRadius: BorderRadius.circular(rad - messageBorder)),
-    //             clipBehavior: Clip.hardEdge,
-    //             child: media.displayImage(
-    //               forceSquare: true,
-    //               size: Size.square((rad - messageBorder) * 2),
-    //             ),
-    //           ),
-    //         ),
-    //       ),
-    //       Positioned(
-    //         bottom: 0,
-    //         right: 0,
-    //         child: Text(
-    //           r.reactionCount.toString(),
-    //           style: g.theme.inputTextStyle,
-    //           softWrap: false,
-    //         ),
-    //       )
-    //     ],
-    //   ),
-    // );
   }
 
   Widget get chatMessage {
@@ -780,7 +716,6 @@ class ChatMessage extends StatelessWidget implements Down4Object {
                       : reactionsRow,
             ],
           ),
-          // hasReactions ? const SizedBox(height: 2.0) : const SizedBox.shrink(),
           ConstrainedBox(
             constraints: BoxConstraints(maxWidth: messageWidth),
             child: header2 ?? const SizedBox.shrink(),
@@ -811,56 +746,31 @@ class ChatMessage extends StatelessWidget implements Down4Object {
       ? nReactions
       : maxReactionForThisMessage;
 
-  Widget get reactionsRow =>
-      // AnimatedContainer(
-      // duration: Console.animationDuration,
-      // constraints: BoxConstraints(maxWidth: messageWidth),
-      // decoration: BoxDecoration(
-      //     // color: messageColor.withOpacity(0.7),
-      //     borderRadius: const BorderRadius.all(Radius.circular(6.0))),
-      // child:
-      ConstrainedBox(
+  Widget get reactionsRow => ConstrainedBox(
         constraints: BoxConstraints(maxWidth: widthForReactions),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List<Widget?>.generate(maxReactionForThisMessage,
-                  (index) => reaction(reactions![index]))
+                  (index) => reaction(reactions[index]))
               .whereType<Widget>()
               .toList(),
         ),
         // ),
       );
 
-  Widget get reactionsColumn =>
-      // AnimatedContainer(
-      // duration: Console.animationDuration,
-      // constraints: BoxConstraints(maxWidth: messageWidth),
-      // decoration: BoxDecoration(
-      //     // color: messageColor.withOpacity(0.7),
-      //     borderRadius: const BorderRadius.all(Radius.circular(6.0))),
-      // child:
-      ConstrainedBox(
+  Widget get reactionsColumn {
+    final rs = List<Widget?>.generate(
+            maxReactionForThisMessage, (index) => reaction(reactions[index]))
+        .whereType<Widget>()
+        .toList();
+
+    return ConstrainedBox(
         constraints: BoxConstraints(maxWidth: heightForReaction),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: List<Widget?>.generate(maxReactionForThisMessage,
-                  (index) => reaction(reactions![index]))
-              .whereType<Widget>()
-              .toList(),
-        ),
-        // ),
-      );
-
-  // Widget get reactionsWidget => Row(children: [
-  //       SizedBox(width: reactionGapWidth),
-  //       ...List<Widget?>.generate(
-  //               nDisplayReaction, (index) => reaction(reactions![index]))
-  //           .whereType<Widget>()
-  //           .map((element) =>
-  //               Row(children: [element, SizedBox(width: reactionGapWidth)]))
-  //           .toList()
-  //     ]);
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: rs));
+  }
 
   @override
   Widget build(BuildContext context) {

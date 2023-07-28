@@ -1,12 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data' show Uint8List;
 
-import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:down4/src/_dart_utils.dart';
 
 import '_data_utils.dart';
-import 'firebase.dart';
 import 'medias.dart';
 import 'messages.dart';
 import 'nodes.dart';
@@ -18,6 +15,7 @@ import '../bsv/wallet.dart';
 import 'package:cbl/cbl.dart';
 
 late AsyncDatabase nodesDB,
+    tempDB,
     personalDB,
     mediasDB,
     reactionsDB,
@@ -98,44 +96,17 @@ Future<T?> fetch<T extends Locals>(
     if (id == null) return null;
     final ss = await id.userRef.get();
     if (!ss.exists) return null;
-    final node = Down4Node.fromJson(ss.value as Map<String, String?>)..cache();
+    final jsn = Map<String, String?>.from(ss.value as Map);
+    final node = Down4Node.fromJson(jsn)..cache();
     if (doMerge) node.merge();
-    // print("==== RETRIVED $T ID =${id.value} FROM FETCH");
     return node as T;
-
-    // final snapshot = await _firestore
-    //     .collection("Nodes")
-    //     .doc(id)
-    //     .get(const firestore.GetOptions(source: firestore.Source.server));
-    // if (!snapshot.exists) return null;
-    // final node = Down4Node.fromJson(snapshot.data()!.cast());
-    // if (doMerge) {
-    //   print("MERGING NODE ID=$id");
-    //   await node.merge();
-    // }
-    // print("===RETRIEVED NODE ID=$id FROM FETCH===");
-    // return node as T;
   }
-
-  // Future<T?> fetchMessage() async {
-  //   final snapshot = await _realtime.child("Messages").child(id).get();
-  //   if (!snapshot.exists) return null;
-  //   final json = Map<String, Object?>.from(snapshot.value as Map);
-  //   if (json["root"] == g.self.id) json["root"] = json["senderID"];
-  //   final message = fromJson<T>(json);
-  //   if (doMerge) {
-  //     print("MERGING MESSAGE ID: $id");
-  //     await message.merge();
-  //   }
-  //   // print("===RETRIEVED MESSAGE ID=$id FROM FETCH===");
-  //   return message;
-  // }
 
   Future<Down4Media?> fetchMedia() async {
     if (id == null && tempID == null) return null;
     final fromNodes = tempID == null;
-    print(
-        "FETCHING MEDIA ID = ${tempID?.value ?? id?.value} FROM NODES = $fromNodes");
+    final idValue = tempID?.value ?? id?.value;
+    print("FETCHING MEDIA ID = $idValue FROM NODES = $fromNodes");
     final ref = fromNodes ? id!.staticStoreRef : tempID.tempStoreRef;
     try {
       final futureMedia = ref.getMetadata();
@@ -157,7 +128,7 @@ Future<T?> fetch<T extends Locals>(
       return null;
     }
   }
-
+  
   switch (T) {
     case Down4Node:
       return fetchNode();
@@ -186,10 +157,6 @@ Future<T?> fetch<T extends Locals>(
     case Down4Image:
       return fetchMedia() as Future<T?>;
     case Down4Payment:
-      final data = tempID?.tempStoreRef.getData().toString();
-      final json = data != null ? jsonDecode(data) : null;
-      if (json != null) return Down4Payment.fromJson(json) as Future<T>;
-      return null;
   }
 
   throw 'Unsupported type for fetching $T';
@@ -246,14 +213,12 @@ Future<T?> local<T extends Locals>(Down4ID id) async {
   final doc = await gdb<T>().document(id.value);
   if (doc == null) return null;
   final element = fromJson<T>(doc.toPlainMap().cast());
-  // print("===RETRIEVED $T WITH ID=$id FROM LOCAL===");
   return element;
 }
 
 T? cache<T extends Locals>(Down4ID? id) {
   final element = id == null ? null : _globalCache[id] as T?;
   if (element != null) {
-    // print("===RETRIEVED $T WITH ID=$id FROM CACHE===");
     return element;
   }
   return null;
@@ -266,33 +231,27 @@ Future<T?> global<T extends Locals>(
   bool doMergeIfFetch = false,
   ComposedID? tempID,
 }) async {
-  // if (T is FireMedia && id != null) {
-  //   if (mediaInfo?.withData == true) {
-  //     final localMedia = cache<FireMedia>(id) ?? (await local<FireMedia>(id));
-  //     final
-  //   }
-  // }
-
   if (id == null) return null;
   final cached = cache<T>(id);
   if (cached != null) {
-    print("RETRIEVED $T ID: $id FROM CACHE");
+    print("RETRIEVED $T ID: ${id.value} FROM CACHE");
     return cached;
   }
   final localed = await local<T>(id);
   if (localed != null) {
-    print("RETRIEVED $T ID: $id FROM LOCAL");
+    print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
     return doCache ? _globalCache[id] = localed : localed;
   }
   if (!doFetch) return null;
   final fetched =
       await fetch<T>(id as ComposedID, doMerge: doMergeIfFetch, tempID: tempID);
   if (fetched != null) {
-    print("RETRIEVED $T ID: $id FROM FETCH");
+    print("RETRIEVED $T ID: ${id.value} FROM FETCH");
     return doCache ? _globalCache[id] = fetched : fetched;
   }
   return null;
 }
+
 
 T fromJson<T extends Locals>(Map<String, String?> json) {
   switch (T) {
@@ -323,7 +282,7 @@ T fromJson<T extends Locals>(Map<String, String?> json) {
     case Down4Image:
       return Down4Media.fromJson(json) as T;
     case Down4Video:
-      return Down4Media.fromJson(json) as T;      
+      return Down4Media.fromJson(json) as T;
     case Chat:
       return Down4Message.fromJson(json) as T;
     case Snip:
@@ -338,7 +297,7 @@ T fromJson<T extends Locals>(Map<String, String?> json) {
       return Wallet.fromJson(json) as T;
   }
 
-  throw 'Cannot create FireObject from json for this type: $T';
+  throw 'Cannot create Down4Object from json for this type: $T';
 }
 
 Future<List<Chat>> unsentMessages() async {
@@ -352,46 +311,24 @@ Future<List<Chat>> unsentMessages() async {
   final r = await e.allResults();
 
   return r.map((e) {
-    final json = e.toPlainMap()["m"] as Map<String, Object?>;
-    return Down4Message.fromJson(json) as Chat;
+    final jsn = Map<String, String?>.from(e.toPlainMap()["m"] as Map);
+    return Down4Message.fromJson(jsn) as Chat;
   }).toList();
 }
-
-// Future<List<User>> hiddenUsers() async {
-//   const raw = """
-//         SELECT * FROM _ AS n
-//         WHERE n.type = 'user' AND n.isFriend = 'false'
-//         """;
-//
-//   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
-//   final r = await q.execute();
-//   final e = await r.allResults();
-//   final trulyHidden = <User>[];
-//   final users = e.map((e) {
-//     final json = e.toPlainMap()["n"] as Map<String, Object?>;
-//     return fromJson<User>(json);
-//   }).toList();
-//
-//   for (final u in users) {
-//
-//   }
-//
-//   return trulyHidden;
-// }
 
 Future<List<PersonN>> searchLocalsByUnique(Iterable<String> uniques) async {
   final raw = """
     SELECT * FROM _ as n
     WHERE n.unique IN ${uniques.map((e) => "'$e'").toString()} 
-  """;
+    """;
 
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
   final e = await q.execute();
   final r = await e.allResults();
 
   return r.map((e) {
-    final json = e.toPlainMap()["n"] as Map<String, String?>;
-    return fromJson<PersonN>(json);
+    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
+    return fromJson<PersonN>(jsn);
   }).toList();
 }
 
@@ -414,43 +351,70 @@ Future<Set<ComposedID>> allMediaReferences() async {
   const nq = "SELECT mediaID FROM _";
   final q1 = await AsyncQuery.fromN1ql(messagesDB, nq);
   final q2 = await AsyncQuery.fromN1ql(nodesDB, nq);
-  final e1 = q1.execute();
-  final e2 = q2.execute();
+  final e1 = await q1.execute();
+  final e2 = await q2.execute();
+  final a1 = await e1.allResults();
+  final a2 = await e2.allResults();
 
-  return (await (await e1).allResults())
-      .followedBy(await (await e2).allResults())
-      .map((e) => e.string("mediaID"))
-      .whereType<String>()
-      .map((e) => ComposedID.fromString(e)!)
+  const rq = "SELECT reactions FROM _";
+  final qr = await AsyncQuery.fromN1ql(messagesDB, rq);
+  final er = await qr.execute();
+  final ar = await er.allResults();
+  final rs = ar
+      .map((e) {
+        final jsn = List.from(jsonDecode(e.string("reactions")!));
+        return jsn.map((e) => Down4Message.fromJson(e) as Reaction);
+      })
+      .expand((e) => e)
+      .map((e) => e.mediaID);
+
+  return a1
+      .followedBy(a2)
+      .map((a) => ComposedID.fromString(a.string("mediaID")))
+      .whereType<ComposedID>()
+      .followedBy(rs)
       .toSet();
 }
 
-Future<void> mediaDeletingRoutine() async {
-  final fourDaysAgo = DateTime.now()
-      .toUtc()
-      .subtract(const Duration(days: 4))
-      .millisecondsSinceEpoch;
+Future<void> messagesDeletingRoutine() async {
+  final fourDaysAgo = DateTime.now().subtract(const Duration(days: 4));
   final raw = """
-      SELECT Meta.id() AS id FROM _
-      WHERE TONUMBER(timestamp) < $fourDaysAgo AND isSaved = 'false'
-      """;
+    SELECT * FROM _ AS m
+    WHERE TONUMBER(m.timestamp) < ${fourDaysAgo.millisecondsSinceEpoch}
+      AND m.isSaved = 'false'
+      AND m.root != '${g.self.id.value}'
+    """;
+  final q = await AsyncQuery.fromN1ql(messagesDB, raw);
+  final e = await q.execute();
+  await for (final m in e.asStream()) {
+    final jsn = Map<String, String?>.from(m.toPlainMap()["m"] as Map);
+    final msg = Down4Message.fromJson(jsn) as Locals;
+    msg.delete();
+  }
+}
 
+// This should be called after messages and palettes routine
+Future<void> mediaDeletingRoutine() async {
+  const raw = "SELECT * FROM _ AS m WHERE isSaved = 'false'";
   final allMediaRefs = await allMediaReferences();
-
   final q = await AsyncQuery.fromN1ql(mediasDB, raw);
   final e = await q.execute();
   await for (final r in e.asStream()) {
-    final pot = r.toPlainMap()["id"] as String;
-    if (!allMediaRefs.contains(pot)) {
-      await mediasDB.purgeDocumentById(pot);
-      final videoPath = "${g.appDirPath}/$pot";
-      try {
-        File(videoPath).delete();
-      } catch (_) {
-        continue;
-      }
-    }
+    final jsn = Map<String, String?>.from(r.toPlainMap()["m"] as Map);
+    final media = Down4Media.fromJson(jsn);
+    if (!allMediaRefs.contains(media.id)) media.delete();
   }
+}
+
+Future<List<Down4Message>> getBackgroundMessages() async {
+  const raw = "SELECT * FROM _ AS k";
+  final q = await AsyncQuery.fromN1ql(tempDB, raw);
+  final r = await q.execute();
+  final a = await r.allResults();
+  return a.map((e) {
+    final jsn = Map<String, String?>.from(e.toPlainMap()["k"] as Map);
+    return Down4Message.fromJson(jsn);
+  }).toList();
 }
 
 Future<List<ChatN>> loadHome() async {
@@ -461,11 +425,12 @@ Future<List<ChatN>> loadHome() async {
 
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
   final r = await q.execute();
-  return Future.wait((await r.allResults()).map((e) async {
-    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
-    print("Loading home node id =${nodeJson["id"]}");
-    return fromJson<ChatN>(nodeJson)..cache();
-  }).toList());
+  final a = await r.allResults();
+  return a.map((e) {
+    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
+    print("Loading home node id =${jsn['id']}");
+    return fromJson<ChatN>(jsn)..cache();
+  }).toList();
 }
 
 Future<List<ConnectN>> loadConnectionNodes() async {
@@ -477,9 +442,9 @@ Future<List<ConnectN>> loadConnectionNodes() async {
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
   final r = await q.execute();
   return Future.wait((await r.allResults()).map((e) async {
-    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
-    print("Loading home node id =${nodeJson["id"]}");
-    return fromJson<ConnectN>(nodeJson)..cache();
+    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
+    print("Loading home node id = '${jsn['id']}'");
+    return fromJson<ConnectN>(jsn)..cache();
   }).toList());
 }
 
@@ -488,60 +453,25 @@ Future<List<Down4Node>> loadAllNodes() async {
   final q = await AsyncQuery.fromN1ql(nodesDB, raw);
   final r = await q.execute();
   return Future.wait((await r.allResults()).map((e) async {
-    final nodeJson = e.toPlainMap()["n"] as Map<String, String?>;
-    print("Loading home node id =${nodeJson["id"]}");
-    return fromJson<Down4Node>(nodeJson)..cache();
+    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
+    print("Loading home node id = '${jsn['id']}'");
+    return fromJson<Down4Node>(jsn)..cache();
   }).toList());
 }
 
-Stream<Down4MediaMetadata> savedMedia(bool images) async* {
-  final isVideo = images ? "'false'" : "'true'";
-  final raw = """
-        SELECT * FROM _ AS im
-        WHERE im.isSaved = 'true' AND im.isVideo = $isVideo
-        ORDER BY im.lastUse DESC
-        """;
-  final query = await AsyncQuery.fromN1ql(mediasDB, raw);
-  final results = await query.execute();
-  await for (final r in results.asStream()) {
-    print("returning an image!");
-    final json = r.toPlainMap()["im"] as Map<String, String?>;
-    print("image ID=${json['id']}");
-    yield Down4MediaMetadata.fromJson(json);
-  }
-}
-
-Future<AsyncListenStream<QueryChange<ResultSet>>> savedMediaIDs({
-  required bool isVideo,
-}) async {
+Future<AsyncListenStream<QueryChange<ResultSet>>> savedMediaIDs(
+  MediaType t,
+) async {
   final raw = """
         SELECT META().id FROM _
-        WHERE isSaved = 'true' AND isVideo = '$isVideo'
+        WHERE mime IN ${mimeMap[t]!.sqlFmt} AND isSaved = 'true'
         ORDER BY lastUse DESC
         """;
-  print("RAW Q = $raw");
 
+  print("savedMediaIDs raw q = $raw");
   final query = await AsyncQuery.fromN1ql(mediasDB, raw);
   return query.changes();
 }
-
-// Stream<ID> savedMediaIDs(bool images) async* {
-//   final isVideo = images ? "'false'" : "'true'";
-//   final raw = """
-//         SELECT META().id FROM _ AS id
-//         WHERE im.isSaved = 'true' AND im.isVideo = $isVideo
-//         ORDER BY im.lastUse DESC
-//         """;
-//   final query = await AsyncQuery.fromN1ql(mediasDB, raw);
-//   final results = await query.execute();
-//   await for (final r in results.asStream()) {
-//     // print("returning an image!");
-//     yield r.string("id")!;
-//     // final json = r.toPlainMap()["im/id"]["id"] as Map<String, Object?>;
-//     // print("image ID=${json['id']}");
-//     // yield FireMedia.fromJson(json);
-//   }
-// }
 
 extension WalletManager on Wallet {
   Stream<Down4Payment> get payments async* {
@@ -549,7 +479,8 @@ extension WalletManager on Wallet {
     final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
     final r = await q.execute();
     await for (final p in r.asStream()) {
-      yield Down4Payment.fromJson(p.toPlainMap()["p"] as Map<String, String?>);
+      final jsn = Map<String, String?>.from(p.toPlainMap()["p"] as Map);
+      yield Down4Payment.fromJson(jsn);
     }
   }
 
@@ -562,7 +493,8 @@ extension WalletManager on Wallet {
     final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
     final r = await q.execute();
     await for (final p in r.asStream()) {
-      yield Down4Payment.fromJson(p.toPlainMap()["p"] as Map<String, String?>);
+      final jsn = Map<String, String?>.from(p.toPlainMap()["p"] as Map);
+      yield Down4Payment.fromJson(jsn);
     }
   }
 
@@ -571,7 +503,8 @@ extension WalletManager on Wallet {
     final q = await AsyncQuery.fromN1ql(utxosDB, raw);
     final r = await q.execute();
     await for (final u in r.asStream()) {
-      yield Down4TXOUT.fromJson(u.toPlainMap()["u"] as Map<String, String?>);
+      final jsn = Map<String, String?>.from(u.toPlainMap()["u"] as Map);
+      yield Down4TXOUT.fromJson(jsn);
     }
   }
 
@@ -604,41 +537,10 @@ extension WalletManager on Wallet {
   }
 
   Future<void> setSpent(Down4ID id, bool spent) async {
-    await merge({id.value: spent});
+    await merge({id.value: spent.toString()});
   }
 
   static Future<Wallet?> load() async {
     return local<Wallet>(Down4ID(unique: "wallet"));
   }
 }
-
-// Future<List<ChatMessage>> loadMessages(FireObject root,
-//     {required int take, required int skip}) async {
-//   final raw = '''
-//         SELECT * FROM messages
-//         LEFT JOIN ON medias.id = messages.media
-//         WHERE messages.root = ${root.id}
-//         LIMIT $take OFFSET $skip
-//         ORDER BY messages.timestamp DESC
-//     ''';
-//   final query = await Query.fromN1qlAsync(_messagesDB, raw);
-//   final results = await query.execute();
-//   final all = await results.allResults();
-//   return all.map((result) {
-//     Map<String, String?> nodeJson = result.toPlainMap().cast();
-//     Map<String, String?> mediaJson = result.toPlainMap().cast();
-//     final message = FireNode.fromJson(nodeJson)!;
-//     final media = FireMedia.fromJson(mediaJson);
-//     return ChatMessage(
-//         nodeRef: nodeRef,
-//         nodes: nodes,
-//         hasHeader: hasHeader,
-//         message: message,
-//         myMessage: myMessage,
-//         hasGap: hasGap,
-//         mediaInfo: mediaInfo,
-//         openNode: openNode,
-//         repliesInfo: repliesInfo,
-//         select: select);
-//   }).toList();
-// }

@@ -1,12 +1,10 @@
-import 'package:camera/camera.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/pages/_page_utils.dart';
 import 'package:flutter/material.dart';
 
-import '../data_objects/_data_utils.dart';
 import '../data_objects/nodes.dart';
 import '../render_objects/console.dart';
-import '../render_objects/_render_utils.dart' show Down4PageWidget, backArrow;
+import '../render_objects/_render_utils.dart' show Down4PageWidget;
 import '../render_objects/navigator.dart';
 import '../render_objects/profile.dart';
 
@@ -14,20 +12,20 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "node-${viewState.node!.id}";
 
-  final ViewState viewState;
-  // final FireNode node;
   final void Function(ChatN) openChat;
   final void Function(Down4Node) openNode;
   final void Function(PersonN) payNode;
-  final void Function() back;
+  final void Function() back, openPreview, forward;
+
+  ViewState get viewState => g.vm.currentView;
 
   const NodePage({
-    required this.viewState,
-    // required this.node,
+    required this.openPreview,
     required this.payNode,
     required this.openNode,
     required this.openChat,
     required this.back,
+    required this.forward,
     Key? key,
   }) : super(key: key);
 
@@ -35,8 +33,8 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   State<NodePage> createState() => _NodePageState();
 }
 
-class _NodePageState extends State<NodePage> with Pager2 {
-  Widget? _view;
+class _NodePageState extends State<NodePage>
+    with Pager2, Boost2, Forward2, Append2 {
   Down4Node get node => widget.viewState.node!;
 
   late final ScrollController scroller =
@@ -51,62 +49,11 @@ class _NodePageState extends State<NodePage> with Pager2 {
     super.dispose();
   }
 
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   // if (node is Personable) {
-  //   //   _view = Andrew(backButton: backArrow(back: widget.back), pages: [
-  //   //     Down4Page(
-  //   //       scrollController: scroller,
-  //   //       reversedList: false,
-  //   //       title: node.displayName,
-  //   //       console: userPaletteConsole,
-  //   //       list: [ProfileWidget(node: node)],
-  //   //     ),
-  //   //   ]);
-  //   // } // TODO other node types
-  // }
-  //
-  // Console get basicPaletteConsole => Console(
-  //       topButtons: [
-  //         ConsoleButton(
-  //           name: "Parent Depending Button TODO",
-  //           onPress: () => print("TODO"),
-  //         ),
-  //       ],
-  //       bottomButtons: [
-  //         ConsoleButton(name: "Back", onPress: widget.back),
-  //         ConsoleButton(name: "Forward", onPress: () => print("TODO")),
-  //       ],
-  //     );
-  //
-  // Console get userPaletteConsole => Console(
-  //       topButtons: [
-  //         ConsoleButton(
-  //           name: "Message",
-  //           onPress: () => widget.openChat(node as Chatable),
-  //         ),
-  //       ],
-  //       bottomButtons: [
-  //         ConsoleButton(name: "Back", onPress: widget.back),
-  //       ],
-  //       // consoleRow: Console3(
-  //       //   widgets: [
-  //       //     ConsoleButton(
-  //       //       name: "MESSAGE",
-  //       //       onPress: () => widget.openChat(node as Chatable),
-  //       //     ),
-  //       //     ConsoleButton(
-  //       //       name: "PAY",
-  //       //       onPress: () => widget.payNode(node as Personable),
-  //       //     ),
-  //       //   ],
-  //       // ),
-  //     );
-
   @override
   Widget build(BuildContext context) {
     return Andrew(
+      previewFunction: widget.openPreview,
+      staticRow: g.vm.mode == Modes.append ? basicAppendRow : null,
       backFunction: widget.back,
       pages: [
         Down4Page(
@@ -118,8 +65,6 @@ class _NodePageState extends State<NodePage> with Pager2 {
         ),
       ],
     );
-
-    return _view ?? const SizedBox.shrink();
   }
 
   @override
@@ -152,4 +97,18 @@ class _NodePageState extends State<NodePage> with Pager2 {
 
   @override
   late List<Extra> extras = [];
+
+
+  @override
+  void boost() {
+    // TODO: implement boost
+  }
+
+  @override
+  void forward() {
+    final sel = g.vm.currentView.allPageSelection();
+    g.vm.forwardingObjects.addAll(sel);
+    g.vm.mode = Modes.forward;
+    widget.forward();
+  }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:down4/src/pages/preview_page.dart';
 import 'package:down4/src/themes.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -32,7 +33,7 @@ import 'pages/snipview_page.dart';
 
 import 'render_objects/palette.dart';
 import 'render_objects/chat_message.dart';
-import 'render_objects/_render_utils.dart' as ru;
+import 'render_objects/_render_utils.dart';
 
 class Home extends StatefulWidget {
   const Home({Key? key}) : super(key: key);
@@ -51,30 +52,29 @@ class _HomeState extends State<Home> {
   // the page on top of the stack automatically.
   // To go to a page, we push it *push(page)*
 
-  ru.Down4PageWidget page = const LoadingPage2();
+  Down4PageWidget page = const LoadingPage2();
+  ViewManager get viewManager => g.vm;
 
-  // view manager getters
-  ViewManager viewManager = ViewManager()
-    ..push(ViewState(id: "home", pages: [PageState(), PageState()]));
-
+  Set<Down4Object> get forwardingObjects => viewManager.forwardingObjects;
   Iterable<String> get route => viewManager.route;
   ViewState get homeView => viewManager.home;
   PageState get homePageState => homeView.currentPage;
   ViewState get currentView => viewManager.currentView;
 
   // homestate getters
-  Map<Down4ID, Palette2> get _chats => homeView.pages[0].objects.cast();
-  Map<Down4ID, Palette2> get _otherConns => homeView.pages[0].objects.cast();
+  Map<Down4ID, Palette> get _chats => homeView.pages[0].state.cast();
+  Map<Down4ID, Palette> get _otherConns => homeView.pages[1].state.cast();
 
-  Iterable<Palette2> get chats => _chats.values.showing();
+  Iterable<Palette> get chats => _chats.values.cast()..showing();
   Iterable<ConnectN> get homeConnection =>
       _chats.values.asNodes<ConnectN>().where((n) => n.isConnected);
-  List<Palette2> get formattedHome => chats.toList().formatted();
+
+  List<Palette> get formattedHome => chats.toList().formatted();
   Map<Down4ID, ChatMessage>? chatMessages(ComposedID nodeID) {
-    return viewManager.views["chat-${nodeID.value}"]?.pages[0].objects.cast();
+    return viewManager.views["chat-${nodeID.value}"]?.pages[0].state.cast();
   }
 
-  void setPage(ru.Down4PageWidget p) {
+  void setPage(Down4PageWidget p) {
     page = p;
     setState(() {});
   }
@@ -87,7 +87,7 @@ class _HomeState extends State<Home> {
     final n = poppedView.node;
     if (pID.length > 1 && pp0 == "chat" && n is ChatN && wasPopped) {
       poppedView.chat?.second.cancel();
-      await writePalette(n, _chats, bGen, rfHome);
+      await writePalette(n, _chats, bGen, rfHome, home: true);
     }
     final id = currentView.id.split('-');
     final p0 = id.first;
@@ -96,7 +96,7 @@ class _HomeState extends State<Home> {
         return setPage(homePage());
       case 'chat':
         final node = currentView.node as ChatN;
-        return setPage(chatPage(node, fo: poppedView.fo, isReload: true));
+        return setPage(chatPage(node, isReload: true));
       case 'node':
         final node = currentView.node as Down4Node;
         return setPage(nodePage(node));
@@ -105,21 +105,14 @@ class _HomeState extends State<Home> {
       case 'search':
         return setPage(searchPage());
       case 'forward':
-        return setPage(forwardPage(poppedView.fo));
+        return setPage(await forwardPage());
     }
   }
 
-  Transition homeTransition() {
-    return selectionTransition(
-        originalList: formattedHome,
-        state: _chats,
-        scrollOffset: homePageState.scroll);
-  }
+  void openPreview() async => setPage(await previewPage(isPush: true));
 
-  StreamSubscription? _messageListener,
-      _savedImageIDs,
-      _savedVideoIDs,
-      _forgroundMessageListener;
+  final Map<MediaType, StreamSubscription> _mediasListeners = {};
+  StreamSubscription? _messageListener, _forgroundMessageListener;
 
   final Map<ComposedID, StreamSubscription> _nodeConnections = {};
 
@@ -139,9 +132,9 @@ class _HomeState extends State<Home> {
         }
         if (lastOnline != 0) (n as PersonN).updateLastOnline(lastOnline);
         if (n is ChatN) {
-          writePalette<ChatN>(n as ChatN, _chats, bGen, rfHome);
+          writePalette<ChatN>(n as ChatN, _chats, bGen, rfHome, home: true);
         } else {
-          writePalette(n, _otherConns, bGen2, rfHome);
+          writePalette(n, _otherConns, bGen2, rfHome, home: false);
         }
         if (page is HomePage) return setPage(homePage());
       });
@@ -152,27 +145,26 @@ class _HomeState extends State<Home> {
   void rfHome() => setPage(homePage());
 
   void loadSavedMediasListeners() async {
-    final imageIDs = await savedMediaIDs(isVideo: false);
-    _savedImageIDs = imageIDs.listen((event) async {
-      final ar = await event.results.allResults();
-      final ids = ar.map((e) => Down4ID.fromString(e.string("id"))!).toList();
-      g.savedImageIDs = ids;
-    });
-
-    final videoIDs = await savedMediaIDs(isVideo: true);
-    _savedVideoIDs = videoIDs.listen((event) async {
-      final ar = await event.results.allResults();
-      final ids = ar.map((e) => Down4ID.fromString(e.string("id"))!).toList();
-      g.savedVideoIDs = ids;
-    });
+    for (final m in MediaType.values) {
+      final idStream = await savedMediaIDs(m);
+      _mediasListeners[m] = idStream.listen((event) async {
+        final ar = await event.results.allResults();
+        final ids = ar.map((e) => Down4ID.fromString(e.string("id"))!).toList();
+        g.savedMediasIDs[m] = ids;
+      });
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    final homeChats = PageState();
+    final homeConns = PageState();
+    g.vm.push(ViewState(id: "home", pages: [homeChats, homeConns]));
     loadSavedMediasListeners();
     localPalettesRoutine(init: true);
-    ru.clearAppCache();
+    processBackgroundMessages();
+    clearAppCache();
     g.wallet.walletRoutine();
     g.wallet.printWalletInfo();
     connectToMessages2();
@@ -187,8 +179,9 @@ class _HomeState extends State<Home> {
     for (final nConn in _nodeConnections.values) {
       nConn.cancel();
     }
-    _savedImageIDs?.cancel();
-    _savedVideoIDs?.cancel();
+    for (final l in _mediasListeners.values) {
+      l.cancel();
+    }
     super.dispose();
   }
 
@@ -216,7 +209,7 @@ class _HomeState extends State<Home> {
     }
 
     for (final n in allHomeNodes) {
-      await writePalette(n, _chats, bGen, rfHome);
+      await writePalette(n, _chats, bGen, rfHome, home: true);
     }
 
     if (init) setPage(homePage());
@@ -232,7 +225,6 @@ class _HomeState extends State<Home> {
 
   Future<List<ButtonsInfo2>> bGen(ChatN n) async {
     final snips = await n.unreadSnipIDs();
-    // final (_, snips, hasUnread) = await n.homeChatInfo();
     if (snips.isNotEmpty) {
       return [
         ButtonsInfo2(
@@ -269,55 +261,70 @@ class _HomeState extends State<Home> {
     ];
   }
 
+  void _handleDown4Message(Down4Message msg) async {
+    if (msg is Messages) {
+      // Chats and Snips implements Messages which have a special function
+      // on receipts that returns the rootnode that needs to be update
+      msg.onReceipt((rootNode) async {
+        rootNode.updateActivity();
+        await writePalette(rootNode, _chats, bGen, rfHome, home: true);
+        if (page is HomePage) setPage(homePage());
+      });
+    } else if (msg is ReactionIncrement) {
+      final reactor = msg.senderID;
+      final targetMsg = await global<Chat>(msg.messageID);
+      final reactions = targetMsg?.reactions;
+      final reaction = reactions?.findWhere((r) => r.id == msg.reactionID);
+      reaction?.reactors.add(reactor);
+      if (reactions != null) {
+        targetMsg?.mergeReactions();
+        reloadChatWithID(msg.root, msgRe: targetMsg);
+      }
+    } else if (msg is Payment) {
+      Down4Payment? payment = msg.payment ??
+          await global<Down4Payment>(msg.paymentID,
+              doFetch: true, doMergeIfFetch: true, tempID: msg.tempPaymentID);
+      if (payment == null) return;
+      await payment.merge();
+      if (page is MoneyPage) return setPage(moneyPage(payUpdate: payment));
+    } else if (msg is Reaction) {
+      final cht = await global<Chat>(msg.messageID);
+      if (cht == null) return;
+      cht.addReaction(msg);
+      reloadChatWithID(msg.root, msgRe: cht);
+    } else {
+      throw "connectToMessage has no implemented this type: ${msg.runtimeType}";
+    }
+  }
+
+  void processBackgroundMessages() async {
+    final backgroundMessages = await getBackgroundMessages();
+    for (final msg in backgroundMessages) {
+      _handleDown4Message(msg);
+    }
+  }
+
   void connectToMessages2() {
     _forgroundMessageListener =
-        FirebaseMessaging.onMessage.listen((event) async {
-      final msg = Down4Message.fromJson(event.data);
-      if (msg is Messages) {
-        // Chats and Snips implements Messages which have a special function
-        // on receipts that returns the rootnode that needs to be update
-        msg.onReceipt((rootNode) async {
-          await writePalette(rootNode..updateActivity(), _chats, bGen, rfHome);
-          if (page is HomePage) setPage(homePage());
-        });
-      } else if (msg is ReactionIncrement) {
-        final reactor = msg.senderID;
-        final targetMsg = await global<Chat>(msg.messageID);
-        final reactions = targetMsg?.reactions;
-        final reaction = reactions?[msg.reactionID];
-        reaction?.reactors.add(reactor);
-        if (reactions != null) {
-          targetMsg?.mergeReactions();
-          reloadChatWithID(msg.root, msgRe: targetMsg);
-        }
-      } else if (msg is Payment) {
-        Down4Payment? payment = msg.payment ??
-            await global<Down4Payment>(msg.paymentID,
-                doFetch: true, doMergeIfFetch: true, tempID: msg.tempPaymentID);
-        if (payment == null) return;
-        await payment.merge();
-        if (page is MoneyPage) return setPage(moneyPage(payUpdate: payment));
-      } else if (msg is Reaction) {
-        final cht = await global<Chat>(msg.messageID);
-        if (cht == null) return;
-        cht.addReaction(msg);
-        reloadChatWithID(msg.root, msgRe: cht);
-      } else {
-        throw "connectToMessage has no implemented this type: ${msg.runtimeType}";
-      }
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      showMessageNotification(message);
+      if (message.data.isEmpty) return print("Message but not data!");
+      final jsn = Map<String, String?>.from(message.data);
+      final msg = Down4Message.fromJson(jsn);
+      return _handleDown4Message(msg);
     });
   }
 
   void rewriteHomePalettes() {
-    for (final p in _chats.values) {
-      writePalette(p.node as ChatN, _chats, bGen, rfHome);
+    for (final p in chats) {
+      writePalette(p.node as ChatN, _chats, bGen, rfHome, home: true);
     }
   }
 
   // =============================== UTILS ============================== //
 
   void reloadChatWithID(Down4ID chatableNodeID, {Chat? msgRe}) {
-    if (currentView.id == "chat-$chatableNodeID") {
+    if (currentView.id == "chat-${chatableNodeID.unique}") {
       setPage(chatPage(currentView.node as ChatN, msgRe: msgRe));
     }
   }
@@ -339,13 +346,14 @@ class _HomeState extends State<Home> {
   Future<void> unselectHomeSelection({bool updateActivity = true}) async {
     for (final p in List.of(chats)) {
       if (p.selected) {
-        await writePalette(p.node as ChatN, _chats, bGen, rfHome, sel: false);
+        await writePalette(p.node as ChatN, _chats, bGen, rfHome,
+            sel: false, home: true);
       }
     }
     return;
   }
 
-  List<Palette2> forwardables(List<Palette2> ps) {
+  List<Palette> forwardables(List<Palette> ps) {
     final idsInGroups = ps
         .asNodes<GroupN>()
         .map((e) => e.group)
@@ -356,10 +364,8 @@ class _HomeState extends State<Home> {
 
     final all = forwardables.followedBy(idsInGroups).toSet();
 
-    return all.map((id) => _chats[id]).whereType<Palette2>().toList();
+    return all.map((id) => _chats[id]).whereType<Palette>().toList();
   }
-
-  // =========================== PAGES FUNCTIONS ======================== //
 
   Future<void> processUnsentMessages() async {
     final unsents = await unsentMessages();
@@ -368,15 +374,13 @@ class _HomeState extends State<Home> {
     }
   }
 
-  void processChats(Iterable<Chat> chats) async {
-    for (final chat in chats) {
-      chat.processMessage(onResponse: (r) {
-        if (r.any((m) => m.success)) {
-          chat.markSent();
-          reloadChatWithID(chat.root, msgRe: chat);
-        }
-      });
-    }
+  // =========================== PAGES FUNCTIONS ======================== //
+
+  Future<void> processChats(Iterable<Chat> chats) async {
+    viewManager.forwardingObjects.clear();
+    await Future.wait(chats.map((c) => c.processMessage(onSent: () {
+          reloadChatWithID(c.root, msgRe: c);
+        })));
   }
 
   Future<void> sendSnip({
@@ -426,27 +430,29 @@ class _HomeState extends State<Home> {
 
   // ============================== PAGES ============================== //
 
-  ru.Down4PageWidget homePage({String? prompt}) {
+  Down4PageWidget homePage({String? prompt}) {
     return HomePage(
-      forward: (sel) => setPage(
-        forwardPage(sel.whereNodeIs<BranchN>().toList(), isPush: true),
-      ),
+      openPreview: openPreview,
+      forward: () async => setPage(await forwardPage(isPush: true)),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
       send: (chats) async {
         processChats(chats);
         await unselectHomeSelection(updateActivity: true);
+        setPage(homePage());
       },
-      homeState: homeView,
-      hyperchat: () => setPage(hyperchatPage()),
+      hyperchat: () =>
+          setPage(hyperchatPage(chats.formatted(), homePageState.scroll)),
       group: () => setPage(groupPage()),
-      money: () =>
-          setPage(moneyPage(transition: homeTransition(), isPush: true)),
+      money: () => setPage(moneyPage(
+          initPals: chats.formatted(),
+          initScroll: homePageState.scroll,
+          isPush: true)),
       ping: (text) => print("Deprecated"),
       snip: () => setPage(snipPage()),
       search: () => setPage(searchPage(isPush: true)),
       themes: () => setPage(themePage(isPush: true)),
       delete: () async {
-        for (final p in List<Palette2>.from(chats)) {
+        for (final p in List<Palette>.from(chats)) {
           if (p.selected && p.id != g.self.id) {
             _chats.remove(p.node.id);
             (p.node as Down4Node).delete();
@@ -458,49 +464,83 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget loadingPage({String? seed}) {
+  Down4PageWidget loadingPage({String? seed}) {
     return LoadingPage2(seed: seed);
   }
 
-  ru.Down4PageWidget forwardPage(List<Down4Object> fo, {bool isPush = false}) {
-    Map<Down4ID, Palette2> _fState() => currentView.currentPage.objects.cast();
-    void rf() => setPage(forwardPage(fo));
+  Future<Down4PageWidget> previewPage({required bool isPush}) async {
+    Set<Down4Object> fo() => viewManager.forwardingObjects;
+
+    Map<Down4ID, Down4SelectionWidget> s() => currentView.pages[0].state.cast();
+
+    void rf() async => setPage(await previewPage(isPush: false));
+
+    if (isPush) {
+      // we put our self in default mode for preview
+      g.vm.mode = Modes.def;
+      viewManager.push(ViewState(id: "preview", pages: [PageState()]));
+
+      for (final n in fo().palettes().map((p) => p.node)) {
+        await writePalette(n, s(), null, rf, home: false);
+      }
+
+      final fs = fo()
+          .chatMsgs()
+          .map((m) => m.message.forwarded(g.self.id, ComposedID()));
+      for (final m in fs) {
+        await writePost(
+            msg: m, refreshCallback: rf, state: s(), openNode: null);
+      }
+    }
+
+    return PreviewPage(back: () {
+      final wasForwarding = g.vm.route.contains("forward");
+      g.vm.mode = wasForwarding ? Modes.forward : Modes.append;
+      back();
+    });
+  }
+
+  Future<Down4PageWidget> forwardPage({bool isPush = false}) async {
+    PageState _fPage() => currentView.currentPage;
+    Map<Down4ID, Palette> _fState() => _fPage().state.cast();
+    List<Palette> _fs() => _fState().values.toList();
+
+    void rf() async => setPage(await forwardPage());
     List<ButtonsInfo2> fbGen(ChatN c) {
       return [
         ButtonsInfo2(
             asset: Icon(Icons.arrow_forward_ios_rounded,
                 color: g.theme.noMessageArrowColor),
             rightMost: true,
-            pressFunc: () => setPage(chatPage(c, fo: fo, isPush: true)))
+            pressFunc: () => setPage(chatPage(c, isPush: true)))
       ];
     }
 
     if (isPush) {
       viewManager.popUntilHome();
-      viewManager.push(ViewState(id: "forward", pages: [PageState()], fo: fo));
+      viewManager.push(ViewState(id: "forward", pages: [PageState()]));
       for (final c in formattedHome.asNodes<ChatN>()) {
-        writePalette<ChatN>(c, _fState(), fbGen, rf);
+        await writePalette<ChatN>(c, _fState(), fbGen, rf, home: false);
       }
     }
 
     return ForwardingPage(
-        viewState: viewManager.currentView,
-        fObjects: fo,
-        openChat: (fObjects, node) =>
-            setPage(chatPage(node, fo: fObjects, isPush: true)),
-        hyper: (fObjects, transition) =>
-            setPage(hyperchatPage(fObjects, transition)),
+        openPreview: openPreview,
+        hyper: () => setPage(hyperchatPage(_fs(), _fPage().scroll)),
         forward: (chats) async {
           processChats(chats);
-          await unselectHomeSelection();
+          await unselectHomeSelection(updateActivity: true);
           homeScrollToZero();
           viewManager.popUntilHome();
           setPage(homePage());
         },
-        back: back);
+        back: () {
+          viewManager.forwardingObjects.clear();
+          back();
+        });
   }
 
-  ru.Down4PageWidget paymentPage(Down4Payment payment) {
+  Down4PageWidget paymentPage(Down4Payment payment) {
     return PaymentPage(
       ok: () {
         viewManager.popUntilHome();
@@ -518,7 +558,7 @@ class _HomeState extends State<Home> {
                 device: e.mainDeviceID,
                 token: e.messagingTokens[e.mainDeviceID]!));
 
-        Payment(Down4ID(),
+        Payment(
                 senderID: g.self.id,
                 paymentID: pay.id,
                 payment: payment,
@@ -533,16 +573,18 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget themePage({bool isPush = false}) {
-    Map<Down4ID, Palette2> themes() =>
-        viewManager.at("themes").pages[0].objects.cast();
+  Down4PageWidget themePage({bool isPush = false}) {
+    Map<Down4ID, Palette> themes() =>
+        viewManager.at("themes").pages[0].state.cast();
+    Iterable<Palette> paletteThemes() => themes().values.cast();
     void refresh() => setPage(themePage());
 
     List<ButtonsInfo2> tGen(NodeTheme t) {
       void swapTheme() async {
         g.myTheme.changeTheme(t.displayName);
-        for (final t in themes().values.asNodes<NodeTheme>()) {
-          await writePalette<NodeTheme>(t, themes(), tGen, refresh);
+        for (final t in paletteThemes().asNodes<NodeTheme>()) {
+          await writePalette<NodeTheme>(t, themes(), tGen, refresh,
+              home: false);
         }
         SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -562,7 +604,7 @@ class _HomeState extends State<Home> {
     if (isPush) {
       viewManager.push(ViewState(id: "themes", pages: [PageState()]));
       for (final t in themesRegistry.entries) {
-        writePalette(NodeTheme(t.value), themes(), tGen, refresh);
+        writePalette(NodeTheme(t.value), themes(), tGen, refresh, home: false);
       }
     }
 
@@ -573,15 +615,16 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget moneyPage({
+  Down4PageWidget moneyPage({
     bool isPush = false,
     bool isReload = false,
-    Transition? transition,
+    List<Palette>? initPals,
+    double? initScroll,
     PersonN? single,
     Down4Payment? payUpdate,
   }) {
-    Map<ComposedID, Palette2> people() => currentView.pages[0].objects.cast();
-    Map<Down4ID, Palette2> payments() => currentView.pages[1].objects.cast();
+    Map<Down4ID, Palette> peopleState() => currentView.pages[0].state.cast();
+    Map<Down4ID, Palette> paymentState() => currentView.pages[1].state.cast();
     void rf() => setPage(moneyPage());
     void openPay(Down4Payment payment) => setPage(paymentPage(payment));
     List<ButtonsInfo2> payBGen(Down4Payment p) {
@@ -591,36 +634,31 @@ class _HomeState extends State<Home> {
         return [];
       }
     }
-    
 
     void scanOrReceivePayment(Down4Payment pay) {
       // this will put the payment at the begining of the list
       final p = PaymentNode(payment: pay, selfID: g.self.id);
-      currentView.pages[1].objects = {
-        pay.id: Palette2(
+      currentView.pages[1].state = {
+        pay.id: Palette(
             node: p,
             key: Key(p.id.unique),
             messagePreview: pay.textNote,
             buttonsInfo2: payBGen(pay)),
-        ...payments(),
+        ...paymentState(),
       };
       rf();
     }
 
     void loadSomePayments(int limit, [int ms = 0]) =>
         Future.delayed(Duration(milliseconds: ms), () async {
-          await writePayments(payments(), openPay, limit);
+          await writePayments(paymentState(), openPay, limit);
           rf();
         });
 
     if (isPush) {
-      viewManager.push(
-        ViewState(id: "money", pages: [PageState(), PageState()]),
-      );
-      final users = transition?.trueTargets ?? (single != null ? [single] : []);
-      for (final u in users) {
-        writePalette(u, people(), null, null);
-      }
+      final ppl = PageState();
+      final pay = PageState();
+      viewManager.push(ViewState(id: "money", pages: [ppl, pay]));
       loadSomePayments(5, 633);
     }
 
@@ -628,7 +666,8 @@ class _HomeState extends State<Home> {
 
     return MoneyPage(
         single: single,
-        transition: transition,
+        initPalettes: initPals,
+        initScroll: initScroll,
         viewState: currentView,
         loadMorePayments: () async => loadSomePayments(20),
         onScan: (payment) async {
@@ -644,19 +683,16 @@ class _HomeState extends State<Home> {
         back: back);
   }
 
-  ru.Down4PageWidget hyperchatPage([
-    List<Down4Object>? fObjects,
-    Transition? transition,
-  ]) {
+  Down4PageWidget hyperchatPage(List<Palette> initPals, double initScroll) {
     viewManager.push(ViewState(id: "hyperchat", pages: []));
 
-    final transition_ = transition ?? homeTransition();
     return HyperchatPage(
-      transition: transition_,
-      fo: fObjects,
-      makeHyperchat: (fo, media, text, group) async {
+      initialPalettes: initPals,
+      initialOffset: initScroll,
+      openPreview: openPreview,
+      makeHyperchat: (media, text, group) async {
         setPage(loadingPage());
-        final prompts = await ru.randomPrompts(10);
+        final prompts = await randomPrompts(10);
         final hc = await r.getHyperchat(prompts);
         if (hc == null) {
           viewManager.popUntilHome();
@@ -705,8 +741,8 @@ class _HomeState extends State<Home> {
               text: text,
               mediaID: media?.id,
               timestamp: makeTimestamp(),
-              messages: fo?.whereType<ChatMessage>().asIDs().toSet(),
-              nodes: fo?.whereType<Down4Node>().asComposedIDs().toSet())
+              messages: forwardingObjects.chatMsgs().asIDs().toSet(),
+              nodes: forwardingObjects.palettes().asComposedIDs().toSet())
             ..cache()
             ..merge();
 
@@ -718,60 +754,57 @@ class _HomeState extends State<Home> {
         setPage(chatPage(hyper, isPush: true));
         return;
       },
-      back: () => back(f: fObjects),
+      back: back,
       ping: (text) => print("Deprecated"),
     );
   }
 
-  ru.Down4PageWidget groupPage() {
-    final transition = homeTransition();
+  Down4PageWidget groupPage() {
     viewManager.push(ViewState(id: "group", pages: []));
     return GroupPage(
-        initialOffset: transition.scroll,
-        back: back,
-        makeGroup: (group, groupMedia, chat) async {
-          setPage(loadingPage());
+      initialOffset: homePageState.scroll,
+      initialPalettes: chats.formatted(),
+      back: back,
+      makeGroup: (group, groupMedia, chat) async {
+        setPage(loadingPage());
 
-          final uploads = [group.remoteMerge(), groupMedia.staticUpload()];
-          final success = Future.wait(uploads).then((u) => u.every((b) => b));
+        final uploads = [group.remoteMerge(), groupMedia.staticUpload()];
+        final success = Future.wait(uploads).then((u) => u.every((b) => b));
 
-          if (await success) {
-            group
-              ..cache()
-              ..merge();
+        if (await success) {
+          group
+            ..cache()
+            ..merge();
 
-            groupMedia
-              ..cache()
-              ..merge();
+          groupMedia
+            ..cache()
+            ..merge();
 
-            processChats([chat]);
+          processChats([chat]);
 
-            await unselectHomeSelection();
-            viewManager.popUntilHome();
-            setPage(chatPage(group, isPush: true));
-          } else {
-            group.remoteDelete();
-            groupMedia.staticDelete();
-            viewManager.popUntilHome();
-            setPage(homePage(prompt: "Failed to create group"));
-          }
-        },
-        palettesForTransition: transition.postTransition,
-        people: transition.trueTargets,
-        nHidden: transition.nHidden,
-        homePalettes: formattedHome);
+          await unselectHomeSelection();
+          viewManager.popUntilHome();
+          setPage(chatPage(group, isPush: true));
+        } else {
+          group.remoteDelete();
+          groupMedia.staticDelete();
+          viewManager.popUntilHome();
+          setPage(homePage(prompt: "Failed to create group"));
+        }
+      },
+    );
   }
 
-  ru.Down4PageWidget searchPage({bool isPush = false}) {
+  Down4PageWidget searchPage({bool isPush = false}) {
     if (isPush) {
       viewManager.push(ViewState(id: "search", pages: [PageState()]));
     }
 
     void rf() => setPage(searchPage());
-    Map<Down4ID, Palette2> searchs() => currentView.currentPage.objects.cast();
+    Map<Down4ID, Palette> searchs() => currentView.currentPage.state.cast();
 
     return AddFriendPage(
-        viewState: currentView,
+        openPreview: openPreview,
         search: (strIDs) async {
           final ids = strIDs.split(" ").toSet();
           final locals = await searchLocalsByUnique(ids);
@@ -779,33 +812,39 @@ class _HomeState extends State<Home> {
           final toFetch = ids.difference(localIDs);
           final futureNodes = r.getUsers(toFetch);
           for (final local in locals) {
-            await writePalette(local, searchs(), bGen2, rf);
+            await writePalette(local, searchs(), bGen2, rf, home: false);
           }
           final fetchedNodes = (await futureNodes) ?? [];
           for (final node in fetchedNodes) {
-            await writePalette(node..cache(), searchs(), bGen2, rf);
+            await writePalette(node..cache(), searchs(), bGen2, rf,
+                home: false);
           }
           rf();
         },
         onScan: (n) async {
-          await writePalette(n, searchs(), bGen2, rf);
+          await writePalette(n, searchs(), bGen2, rf, home: false);
           rf();
         },
         openNode: (node) => setPage(nodePage(node, isPush: true)),
         add: (selectedPals) async {
           for (final n in selectedPals) {
             if (n is User) await n.updateConnectionStatus(true);
-            await writePalette(n, searchs(), bGen2, rf, sel: false);
-            writePalette(n, _chats, bGen, rfHome);
+            await writePalette(n, searchs(), bGen2, rf,
+                sel: false, home: false);
+            writePalette(n, _chats, bGen, rfHome, home: true);
+            (await global<Down4Image>(n.mediaID))?.downloadAndWriteIfNeeded();
           }
           rf();
           localPalettesRoutine();
         },
-        forwardNodes: (pals) => setPage(forwardPage(pals, isPush: true)),
+        forwardNodes: (pals) async {
+          forwardingObjects.addAll(pals);
+          setPage(await forwardPage(isPush: true));
+        },
         back: back);
   }
 
-  ru.Down4PageWidget snipPage({
+  Down4PageWidget snipPage({
     CameraController? ctrl,
     int camera = 0,
     ResolutionPreset res = ResolutionPreset.high,
@@ -821,15 +860,15 @@ class _HomeState extends State<Home> {
     );
   }
 
-  ru.Down4PageWidget nodePage(Down4Node n, {bool isPush = false}) {
+  Down4PageWidget nodePage(Down4Node n, {bool isPush = false}) {
+    String pageID() => "node-${n.id.unique}";
     if (isPush) {
-      final id = "node-${n.id}";
       final r = List<String>.from(route);
-      if (r.contains(id)) {
+      if (r.contains(pageID())) {
         // if this state is already in route, which is possible
         // we allow cycles, we just add the id to the route
         // but we don't create a new state, we reuse the same sate
-        viewManager.route.add(id);
+        viewManager.route.add(pageID());
 
         // we don't allow cycles
         // while (route.last != id) {
@@ -840,39 +879,39 @@ class _HomeState extends State<Home> {
         //   print("POPPED $l");
         // }
       } else {
-        viewManager.push(
-          ViewState(id: "node-${n.id}", pages: [PageState()], node: n),
-        );
+        // TODO, there will be more possible states for nodePage no doubt
+        final ps = PageState();
+        viewManager.push(ViewState(id: "node-${n.id}", pages: [ps], node: n));
       }
     }
 
     return NodePage(
-        viewState: currentView,
+        openPreview: openPreview,
         openChat: (p_) => setPage(chatPage(p_, isPush: true)),
         openNode: (p_) => setPage(nodePage(p_, isPush: true)),
         payNode: (p_) => setPage(moneyPage(single: p_, isPush: true)),
+        forward: () async => setPage(await forwardPage(isPush: true)),
         back: back);
   }
 
-  ru.Down4PageWidget chatPage(
+  Down4PageWidget chatPage(
     ChatN c, {
     bool isPush = false,
     bool isReload = false,
     bool rewriteMsgWithNodes = false,
     Chat? msgRe,
-    List<Down4Object>? fo,
     Chat? reactingTo,
   }) {
-    String chatID() => "chat-${c.id.value}";
+    String chatID() => "chat-${c.id.unique}";
     ViewState chat() => viewManager.at(chatID());
 
     List<Down4ID> orderedMsgsIDs() => chat().chat?.first ?? [];
-    Map<Down4ID, ChatMessage> messages() => chat().pages[0].objects.cast();
-    Map<Down4ID, Palette2> members() => chat().pages[1].objects.cast();
+    Map<Down4ID, ChatMessage> messages() => chat().pages[0].state.cast();
+    Map<Down4ID, Palette> members() => chat().pages[1].state.cast();
     Set<Down4ID> msgsWithVideos() => chat().refs("messages_with_videos");
     Set<Down4ID> msgsWithNodes() => chat().refs("messages_with_nodes");
 
-    bool forwarding() => fo != null;
+    bool forwarding() => viewManager.mode == Modes.forward;
 
     void opn(Down4Node n_) => setPage(nodePage(n_, isPush: true));
     void Function(Down4Node)? openNode() => forwarding() ? null : opn;
@@ -882,21 +921,21 @@ class _HomeState extends State<Home> {
     void refreshChat({bool stopVid = false}) async {
       final pg = page;
       if (pg is! ChatPage || pg.viewState.node!.id != c.id) return;
-
       if (stopVid) {
         for (final v in msgsWithVideos()) {
           messages()[v] = messages()[v]!.onPageTransition();
         }
       }
-
-      setPage(chatPage(c, fo: pg.fo));
+      setPage(chatPage(c));
     }
 
     void writeGroupNodesIfGroup() async {
       final Down4Node ref = c;
       if (ref is GroupN) {
-        for (final n in _chats.those(ref.group).noNull().asNodes<PersonN>()) {
-          await writePalette(n, members(), cbGen, refreshChat);
+        final gIDs = ref.group;
+        final mems = _chats.those(gIDs).noNull().palettes();
+        for (final n in mems.asNodes<PersonN>()) {
+          await writePalette(n, members(), cbGen, refreshChat, home: false);
         }
       }
     }
@@ -904,7 +943,7 @@ class _HomeState extends State<Home> {
     void rf() => setPage(chatPage(c));
 
     Future<void> increment(Chat cht, Down4ID reactionID) async {
-      final reaction = cht.reactions[reactionID];
+      final reaction = cht.reactions.findWhere((r) => r.id == reactionID);
       if (reaction == null) return;
       if (reaction.reactors.contains(g.self.id)) return;
       reaction.reactors.add(g.self.id);
@@ -1013,37 +1052,39 @@ class _HomeState extends State<Home> {
         viewManager.route.add(chatID());
         reloadChat();
       } else {
-        viewManager.push(ViewState(
-            id: chatID(), pages: [PageState(), PageState()], node: c, fo: fo));
+        final ps1 = PageState();
+        final ps2 = PageState();
+        viewManager.push(ViewState(id: chatID(), pages: [ps1, ps2], node: c));
         initChat();
       }
     }
 
     if (msgRe != null) {
-      messages()[msgRe.id] = messages()[msgRe.id]!.reloaded(msgRe);
+      final ref = messages()[msgRe.id] as ChatMessage;
+      messages()[msgRe.id] = ref.reloaded(msgRe);
     }
 
     if (isReload) reloadChat();
 
     if (rewriteMsgWithNodes) {
       for (final id in msgsWithNodes()) {
-        messages()[id] = messages()[id]!.withOpenNode(open: openNode());
+        final ref = messages()[id] as ChatMessage;
+        messages()[id] = ref.withOpenNode(open: openNode());
       }
       writeGroupNodesIfGroup();
       refreshChat();
     }
 
     return ChatPage(
-      forward: (fo) => setPage(forwardPage(fo, isPush: true)),
+      openPreview: openPreview,
+      forward: () async => setPage(await forwardPage(isPush: true)),
       onPageChange: (ix) {
         refreshChat(stopVid: true);
         chat().currentIndex = ix;
       },
       loadMore: loadMore,
-      viewState: viewManager.at(chatID()),
-      fo: fo,
       reactingTo: reactingTo,
-      react: (ComposedID mediaID, Chat msg) async {
+      react: (ComposedID mediaID, Chat msg) {
         final r = Reaction(Down4ID(),
             senderID: g.self.id,
             root: c.id,
@@ -1055,7 +1096,7 @@ class _HomeState extends State<Home> {
         reloadChatWithID(c.id, msgRe: msg);
       },
       openNode: opn,
-      send: (chat) async {
+      send: (chat) {
         processChats([chat]);
         // poping the forwarding page
         if (forwarding()) viewManager.popInBetween();
@@ -1063,37 +1104,34 @@ class _HomeState extends State<Home> {
           chatPage(c, isReload: true, rewriteMsgWithNodes: chat.hadForwards),
         );
       }, // TODO, will need future nodes
-      back: () => back(f: fo),
+      back: back,
       add: () async {
-        for (final n in members().values.selected().asNodes<PersonN>()) {
+        final sel = members().values.selected();
+        for (final n in sel.asNodes<PersonN>()) {
           if (n is User) await n.updateConnectionStatus(true);
-          await writePalette(n, members(), bGen2, rf, sel: false);
-          writePalette(n, _chats, bGen, rfHome);
+          await writePalette(n, members(), bGen2, rf, sel: false, home: false);
+          writePalette(n, _chats, bGen, rfHome, home: true);
         }
         rf();
         localPalettesRoutine();
       },
       money: () {
+        final og = members().values.toList();
         return setPage(moneyPage(
             isPush: true,
-            transition: selectionTransition(
-                originalList: members().values.toList().reversed.toList(),
-                state: members(),
-                scrollOffset: chat().pages[1].scroll)));
+            initPals: og.reversed.toList(),
+            initScroll: chat().pages[1].scroll));
       },
       hyper: () {
-        return setPage(hyperchatPage(
-            fo,
-            selectionTransition(
-                originalList: members().values.toList().reversed.toList(),
-                state: members(),
-                scrollOffset: chat().pages[1].scroll)));
+        final og = members().values.toList().reversed.toList();
+        final ogScroll = chat().pages[1].scroll;
+        return setPage(hyperchatPage(og, ogScroll));
       },
     );
   }
 
   // this page doesn't work in theory, but it works in practice
-  Future<ru.Down4PageWidget> snipView(ChatN node, [List<Down4ID>? l]) async {
+  Future<Down4PageWidget> snipView(ChatN node, [List<Down4ID>? l]) async {
     // snip view can calls it self, so we do this for the universal back func
     if (viewManager.route.last != "snipView") {
       viewManager.push(ViewState(id: "snipView", pages: []));
@@ -1104,7 +1142,7 @@ class _HomeState extends State<Home> {
 
     void back_() async {
       vpc?.dispose();
-      await writePalette(node, _chats, bGen, rfHome);
+      await writePalette(node, _chats, bGen, rfHome, home: true);
       back();
     }
 
@@ -1119,35 +1157,15 @@ class _HomeState extends State<Home> {
 
     print("Unread snips=$unreadSnips");
     if (unreadSnips.isEmpty) {
-      await writePalette(node, _chats, bGen, rfHome);
+      await writePalette(node, _chats, bGen, rfHome, home: true);
       setPage(homePage());
     }
-    final s = await global<Chat>(unreadSnips.first, doCache: false);
+    final s = await global<Snip>(unreadSnips.first, doCache: false);
     await s!.markRead();
 
     final m = await global<Down4Media>(s.mediaID,
         doCache: false, doFetch: true, tempID: s.tempMediaID);
-    print("media JSON: \n${m?.toJson()}");
-
     if (m == null) return snipView(node);
-    // this will preload it in memory if it's there
-    // allowing it to be precached
-    // if (!await m.cachedAndReady) return snipView(node);
-
-    // final scale = m.aspectRatio * g.sizes.fullAspectRatio;
-    // Widget displayMediaBody(Widget child) => Center(
-    //       child: Transform(
-    //         alignment: Alignment.center,
-    //         transform: Matrix4.rotationY(m.isReversed ? math.pi : 0),
-    //         child: Transform.scale(
-    //           scale: scale > 1 ? scale : 1 / scale,
-    //           child: SizedBox(
-    //               height: m.aspectRatio * g.sizes.w,
-    //               width: g.sizes.w,
-    //               child: child),
-    //         ),
-    //       ),
-    //     );
 
     if (m is Down4Video) {
       vpc = m.newReadyController() ?? await m.futureController();
@@ -1158,8 +1176,6 @@ class _HomeState extends State<Home> {
     }
 
     final displayMedia = await m.displaySnip(context: context, controller: vpc);
-
-    print("FULL SIZE = ${g.sizes.fullSize}");
 
     return SnipViewPage(
         displayMedia: displayMedia,

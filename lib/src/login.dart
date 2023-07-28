@@ -107,18 +107,6 @@ class _Down4State extends State<Down4> {
       return true;
     });
 
-    // final ref = Down4Server.instance.masterDB.ref('/users/${id.unique}');
-    // final initResult = await ref.runTransaction((value) {
-    //   if (value != null) return Transaction.abort();
-    //   return Transaction.success({
-    //     "id": id.value,
-    //     "secret": secret.toBase58(),
-    //     "neuter": neuter.toYouKnow(),
-    //     "token": token,
-    //     "longitude": longitude,
-    //     "latitude": latitude,
-    //   });
-    // });
 
     if (!success) return onFailure("Please try again");
 
