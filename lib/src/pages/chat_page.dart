@@ -27,7 +27,7 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function() back, add, money, hyper, openPreview;
   final Future<void> Function([int limit]) loadMore;
   final void Function(BranchN) openNode;
-  final void Function(Chat) send;
+  final void Function(Iterable<Chat>) send;
   final void Function() forward;
   final Chat? reactingTo;
   final void Function(ComposedID, Chat) react;
@@ -70,7 +70,6 @@ class _ChatPageState extends State<ChatPage>
         Forward2,
         Boost2,
         Append2 {
-
   // TODO: this threw an error once
   ChatN get node => widget.viewState.node as ChatN;
   List<Down4ID> get orderedChats => widget.viewState.chat?.first ?? [];
@@ -111,8 +110,7 @@ class _ChatPageState extends State<ChatPage>
 
   Map<Down4ID, ChatMessage> get _messages =>
       widget.viewState.pages[0].state.cast();
-  Map<ComposedID, Palette> get _group =>
-      widget.viewState.pages[1].state.cast();
+  Map<ComposedID, Palette> get _group => widget.viewState.pages[1].state.cast();
 
   var lastOffsetUpdate = 0.0;
 
@@ -161,33 +159,50 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
-    final media = (cameraInput ?? mediaInput)
-      ?..cache()
-      ..merge();
+    final media = mediaInput ??
+        (cameraInput
+          ?..cache()
+          ..merge()
+          ..writeFromCachedPath());
 
-    if (input.value == "" && media != null && widget.fo.isEmpty) return;
+    var chts = <Chat>[];
 
-    final p = Chat(Down4ID(),
-        text: input.value,
-        mediaID: media?.id,
-        nodes: widget.fo.palettes().asComposedIDs().toSet(),
-        replies: _messages.values.selected().asIDs().toSet(),
-        messages: widget.fo.chatMsgs().asIDs().toSet(),
-        senderID: g.self.id,
-        root: node.id,
-        timestamp: makeTimestamp())
-      ..cache()
-      ..merge();
+    final fm = widget.fo
+        .whereType<ChatMessage>()
+        .map((e) => e.message)
+        .map((m) => m.forwarded(g.self.id, node.root_)
+          ..cache()
+          ..merge())
+        .toList();
 
-    widget.send(p);
+    chts.addAll(fm.reversed);
 
-    unselectSelectedMessage();
-    input.clear();
-    g.vm.forwardingObjects.clear();
-    g.vm.mode = Modes.def;
-    cameraInput = null;
-    turnOffExtras();
-    setTheState();
+    final fnds = widget.fo.palettes().asComposedIDs().toSet();
+    if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
+      final c = Chat(ComposedID(),
+          root: node.root_,
+          text: input.value,
+          mediaID: media?.id,
+          nodes: fnds,
+          replies: _messages.values.selected().asIDs().toSet(),
+          senderID: g.self.id,
+          timestamp: makeTimestamp())
+        ..cache()
+        ..merge();
+
+      chts.add(c);
+    }
+
+    if (chts.isNotEmpty) {
+      g.vm.mode = Modes.def;
+      g.vm.forwardingObjects.clear();
+      widget.send(chts);
+      unselectSelectedMessage();
+      input.clear();
+      cameraInput = null;
+      turnOffExtras();
+      setTheState();
+    }
   }
 
   @override
@@ -324,8 +339,9 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void saveToMessages() {
-    for (var chat in _messages.values.selected().messages()) {
-      chat.message.copiedFor(root: g.self.id)
+    final msgs = _messages.values.selected().messages().toList().reversed;
+    for (var chat in msgs) {
+      chat.message.copiedFor(g.self.root(g.self.id)) // crazy
         ..cache()
         ..merge();
     }

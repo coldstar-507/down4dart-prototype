@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
+import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -106,10 +107,12 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   @override
   Future<void> updateTempReferences(ComposedID newTempID, int newTempTS) async {
     final currentTS = tempTS ?? 0;
-    if (currentTS > newTempTS) return;
+    if (currentTS >= newTempTS) return;
+    _tempTS = newTempTS;
+    _tempID = newTempID;
     await merge({
-      "tempTS": (_tempTS = newTempTS).toString(),
-      "tempID": (_tempID = newTempID).value,
+      "tempTS": _tempTS!.toString(),
+      "tempID": _tempID!.value,
     });
   }
 
@@ -133,9 +136,10 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
         _isPaidToOwn = isPaidToOwn,
         _isLocked = isLocked;
 
-  factory Down4Media.fromLocal(
+  static Future<Down4Media> fromLocal2(
     ComposedID id, {
     required Down4MediaMetadata metadata,
+    required writeFromCachedPath,
     ComposedID? tempID,
     int? tempTS,
     String? tinyThumbnail,
@@ -145,9 +149,10 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     bool isPaidToView = false,
     bool isPaidToOwn = false,
     bool isLocked = false,
-  }) {
+  }) async {
+    Down4Media media;
     if (metadata.isVideo) {
-      return Down4Video(id,
+      media = Down4Video(id,
           metadata: metadata,
           tempTS: tempTS,
           tempID: tempID,
@@ -159,7 +164,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           isPaidToOwn: isPaidToOwn,
           isLocked: isLocked);
     } else {
-      return Down4Image(id,
+      media = Down4Image(id,
           metadata: metadata,
           tempTS: tempTS,
           tempID: tempID,
@@ -171,7 +176,52 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           isPaidToOwn: isPaidToOwn,
           isLocked: isLocked);
     }
+    if (writeFromCachedPath) {
+      await media.writeFromCachedPath();
+    }
+
+    return media;
   }
+
+  // factory Down4Media.fromLocal(
+  //   ComposedID id, {
+  //   required Down4MediaMetadata metadata,
+  //   ComposedID? tempID,
+  //   int? tempTS,
+  //   String? tinyThumbnail,
+  //   String? mainCachedPath,
+  //   int lastUse = 0,
+  //   bool isSaved = false,
+  //   bool isPaidToView = false,
+  //   bool isPaidToOwn = false,
+  //   bool isLocked = false,
+  // }) {
+  //   if (metadata.isVideo) {
+  //     return Down4Video(id,
+  //         metadata: metadata,
+  //         tempTS: tempTS,
+  //         tempID: tempID,
+  //         tinyThumbnail: tinyThumbnail,
+  //         lastUse: lastUse,
+  //         isSaved: isSaved,
+  //         mainCachedPath: mainCachedPath,
+  //         isPaidToView: isPaidToView,
+  //         isPaidToOwn: isPaidToOwn,
+  //         isLocked: isLocked);
+  //   } else {
+  //     return Down4Image(id,
+  //         metadata: metadata,
+  //         tempTS: tempTS,
+  //         tempID: tempID,
+  //         mainCachedPath: mainCachedPath,
+  //         tinyThumbnail: tinyThumbnail,
+  //         lastUse: lastUse,
+  //         isSaved: isSaved,
+  //         isPaidToView: isPaidToView,
+  //         isPaidToOwn: isPaidToOwn,
+  //         isLocked: isLocked);
+  //   }
+  // }
 
   bool get isSquared => metadata.isSquared;
   bool get isReversed => metadata.isReversed;
@@ -186,11 +236,11 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
         "isPaidToView": _isPaidToView.toString(),
         "isPaidToOwn": _isPaidToOwn.toString(),
         "isLocked": _isLocked.toString(),
-        "isSaved": _isSaved.toString(),
         if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
-        "lastUse": _lastUse.toString(),
-        if (tempID != null) "tempID": tempID!.value,
-        if (tempTS != null) "tempTS": tempTS!.toString(),
+        if (includeLocal) "isSaved": _isSaved.toString(),
+        if (includeLocal) "lastUse": _lastUse.toString(),
+        if (includeLocal && tempID != null) "tempID": tempID!.value,
+        if (includeLocal && tempTS != null) "tempTS": tempTS!.toString(),
       };
 
   factory Down4Media.fromJson(Map<String, String?> decodedJson) {
@@ -237,7 +287,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
         cacheHeight: (s.height * golden).toInt());
   }
 
-  String get mainPath => "${g.appDirPath}${Platform.pathSeparator}${id.value}";
+  String get mainPath => "${g.appDirPath}${Platform.pathSeparator}${id.unique}";
 
   File? get mainFile {
     if (!File(mainPath).existsSync()) {
@@ -255,7 +305,6 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     return f;
   }
 
-  // in medias, to follow json as Map<String,String> merge values are also str
   Future<void> use() async {
     _lastUse = u.makeTimestamp();
     await merge({"lastUse": _lastUse.toString()});
@@ -266,8 +315,14 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   Future<void> writeFromCachedPath() async {
     File? f;
     if ((f = mainCachedFile) != null) {
-      final Uint8List data = f!.readAsBytesSync();
-      await write(data);
+      if (metadata.isSquared && !metadata.isVideo) {
+        const idealSize = 512;
+        final to = File(mainPath);
+        await cropAndSaveToSquare(from: f!, to: to, size: idealSize);
+      } else {
+        final Uint8List data = f!.readAsBytesSync();
+        await write(data);
+      }
     }
   }
 
@@ -277,63 +332,10 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     await merge({"isSaved": _isSaved.toString()});
   }
 
-  // @override // Temporary uploads are always part of a message
-  // Future<Map<String, String>?> temporaryUpload(Map<String, String> msg) async {
-  //   int? freshTS;
-  //   ComposedID? freshID;
-  //   try {
-  //     print("MEDIA TEMP TIMESTAMP = $tempTS");
-
-  //     final uploadMedia = tempID == null || tempTS.shouldBeUpdated;
-
-  //     if (uploadMedia) {
-  //       print("(RE)-uploading media!");
-  //       freshID = ComposedID();
-  //       freshTS = makeTimestamp();
-
-  //       final jsonMedia = toJson(includeLocal: false);
-  //       jsonMedia["tempID"] = freshID.value;
-  //       jsonMedia["tempTS"] = freshTS.toString();
-
-  //       final ref = freshID.server.temporaryStore.ref(freshID.value);
-  //       final setMetadata = SettableMetadata(customMetadata: jsonMedia);
-
-  //       File? f;
-  //       if ((f = mainCachedFile ?? mainFile) != null) {
-  //         if (metadata.isEncrypted) {
-  //           final d = f!.readAsBytesSync();
-  //           final dec = Cy4.decrypt(d);
-  //           await ref.putData(dec, setMetadata);
-  //         } else {
-  //           await ref.putFile(f!, setMetadata);
-  //         }
-  //       } else {
-  //         print("PROBLEM: NO MEDIA TO UPLOAD BRO");
-  //       }
-  //     } else {
-  //       print("OK: NO NEED TO UPDATE MEDIA");
-  //     }
-
-  //     msg["tempMediaID"] = freshID?.value ?? tempID!.value;
-  //     msg["tempMediaTS"] = (freshTS ?? tempTS!).toString();
-
-  //     if (freshTS != null && freshID != null) {
-  //       this
-  //         ..updateTempReferences(freshID, freshTS)
-  //         ..cache();
-  //     }
-
-  //     return msg;
-  //   } catch (e) {
-  //     print("ERROR uploadMessageMedia,  message id: $id, error: $e");
-  //     return null;
-  //   }
-  // }
-
   Future<bool> staticUpload() async {
     final ref = id.staticStoreRef;
-    final setMetadata =
-        SettableMetadata(customMetadata: toJson(includeLocal: false));
+    final jsn = toJson(includeLocal: false);
+    final setMetadata = SettableMetadata(customMetadata: jsn);
     try {
       File? f;
       if ((f = mainCachedFile ?? mainFile) != null) {
@@ -370,6 +372,16 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     if (data != null) await write(data);
   }
 
+  Future<String?> get tempUrl async {
+    print("trying to get temp media url at ${tempID?.value}");
+    try {
+      return _cachedUrl = await tempID!.tempStoreRef.getDownloadURL();
+    } catch (e) {
+      print("error getting temp url: $e");
+      return null;
+    }
+  }
+
   Future<String?> get url async {
     if (_cachedUrl != null) return _cachedUrl;
     if (!tempTS.isExpired && tempID != null) {
@@ -401,12 +413,14 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   @override
   Database get dbb => mediasDB;
 
-  Down4Media userInitRecalculation(ComposedID oid) {
+  Future<Down4Media> userInitRecalculation(ComposedID oid) async {
     final metadataJson = metadata.toJson();
     metadataJson["ownerID"] = oid.value;
-    return Down4Media.fromLocal(id,
-        metadata: metadata, tinyThumbnail: tinyThumbnail)
-      ..mainCachedPath = mainCachedPath;
+    return Down4Media.fromLocal2(id,
+        writeFromCachedPath: true,
+        mainCachedPath: mainCachedPath,
+        metadata: metadata,
+        tinyThumbnail: tinyThumbnail);
   }
 }
 
@@ -436,17 +450,28 @@ class Down4Image extends Down4Media {
   }
 
   Future<Image?> futureSnipImage() async {
-    await url;
-    if (_cachedUrl == null) return null;
+    await tempUrl;
+    if (_cachedUrl == null) {
+      return null;
+    }
     return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
+  }
+
+  String get _profilePath => "${mainPath}_prf";
+
+  // returns or generate pofile image
+  Future<String?> get profilePath async {
+    final File to = File(_profilePath);
+    final File? from = mainFile;
+    if (to.existsSync()) return _profilePath;
+    if (from == null) return null;
+    await cropAndSaveToSquare(from: from, to: to);
+    return _profilePath;
   }
 
   Image? readyImage(Size s, {bool forceSquare = false}) {
     File? f;
     int? w, h;
-
-    // final int w = (s.width * golden).toInt();
-    // final int h = (s.height * golden).toInt();
 
     // we want cached (w or h) to be (golden * longest diplaySize side)
     if (size.aspectRatio < 1) {
@@ -465,6 +490,7 @@ class Down4Image extends Down4Media {
         return Image(image: res, fit: BoxFit.cover);
       }
     } else if (_cachedUrl != null) {
+      print("cached url: $_cachedUrl");
       final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
       return Image(image: res, fit: BoxFit.cover);
     }
@@ -481,7 +507,12 @@ class Down4Image extends Down4Media {
   @override
   Future<void> delete() async {
     await super.delete();
-    await mainFile?.delete();
+    try {
+      await mainFile?.delete();
+    } catch (_) {}
+    try {
+      await File(_profilePath).delete();
+    } catch (_) {}
   }
 
   @override
@@ -508,10 +539,17 @@ class Down4Video extends Down4Media {
 
   Image? thumbnail(Size s, {bool forceSquare = false}) {
     if (thumbnailFile == null) return null;
+    int? w, h;
+
+    // we want cached (w or h) to be (golden * longest diplaySize side)
+    if (size.aspectRatio < 1) {
+      w = (s.width * golden).toInt();
+    } else {
+      h = (s.height * golden).toInt();
+    }
+
     return Image.file(thumbnailFile!,
-        fit: BoxFit.cover,
-        cacheWidth: (s.width * golden).toInt(),
-        cacheHeight: (s.height * golden).toInt());
+        fit: BoxFit.cover, cacheWidth: w, cacheHeight: h);
   }
 
   VideoPlayerController? newReadyController() {

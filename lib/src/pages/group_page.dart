@@ -191,26 +191,17 @@ class _GroupPageState extends State<GroupPage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
-    final media = mediaInput ?? cameraInput
+    final media = mediaInput ?? (cameraInput
       ?..cache()
-      ..merge();
+      ..merge()
+      ..writeFromCachedPath());
+    
     final text = input.value;
     if (_groupImage == null || _groupName.isEmpty) return;
     if (text.isEmpty && media == null) return;
 
     final groupID = ComposedID();
-
-    final chat = Chat(Down4ID(),
-        text: text,
-        mediaID: media?.id,
-        senderID: g.self.id,
-        root: groupID,
-        timestamp: makeTimestamp())
-      ..cache()
-      ..merge();
-
     final members = Set<ComposedID>.from(trueTargets.cpIDs())..add(g.self.id);
-
     final group = Group(groupID,
         activity: makeTimestamp(),
         isConnected: true,
@@ -219,6 +210,15 @@ class _GroupPageState extends State<GroupPage>
         mediaID: _groupImage!.id,
         group: members,
         ownerID: g.self.id);
+
+    final chat = Chat(ComposedID(),
+        root: group.root_,
+        text: text,
+        mediaID: media?.id,
+        senderID: g.self.id,
+        timestamp: makeTimestamp())
+      ..cache()
+      ..merge();
 
     widget.makeGroup(group, _groupImage!, chat);
   }

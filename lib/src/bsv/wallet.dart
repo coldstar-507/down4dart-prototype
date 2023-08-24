@@ -183,11 +183,13 @@ class Wallet with Down4Object, Jsons, Locals {
   }
 
   Future<void> parsePayment(Down4ID selfID, Down4Payment pay) async {
+    print("parsing payment: ${pay.id}");
     for (final tx in pay.txs) {
       tx.writeTxInfosToUTXOs();
     }
     for (final utxo in pay.txs.last.txsOut) {
       final spent = await isSpent(utxo.id);
+      print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
       if (utxo.receiver == selfID && !spent) await setUtxo(utxo);
     }
     for (final txin in pay.txs.last.txsIn) {
@@ -261,7 +263,7 @@ class Wallet with Down4Object, Jsons, Locals {
 
     final theTx = Down4TX(txsIn: ins, txsOut: outs, down4Secret: txSecret);
 
-    return Down4Payment([theTx], safe: true, textNote: "Imported");
+    return Down4Payment([theTx], safe: false, textNote: "Imported");
   }
 
   Future<void> _trySettlement(Down4Payment payment) async {

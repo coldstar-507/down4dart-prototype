@@ -30,64 +30,13 @@
             {
               "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
               "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:141478909490:android:6bc20f0eb0b1daa4708e2b",
-        "android_client_info": {
-          "package_name": "com.example.flutter_testproject"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDGcwaJCbAb8VxzUPRMJiB5FWtASm-39d4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
+            },
             {
-              "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:141478909490:android:b4171fb7824e5693708e2b",
-        "android_client_info": {
-          "package_name": "com.newdown4"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDGcwaJCbAb8VxzUPRMJiB5FWtASm-39d4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "141478909490-bic6rbn7k74fls0mv8vn3ir5745bqjto.apps.googleusercontent.com",
-              "client_type": 3
+              "client_id": "141478909490-a0vb5iscin8uk97h19td7dh9kbv7of1u.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flutterTestproject"
+              }
             }
           ]
         }

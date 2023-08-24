@@ -200,7 +200,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
     final txsJsn = List.from(youKnowDecode(decodedJson["tx"]!));
     final txs = txsJsn.map((tx) {
-      final jsn = Map<String, String?>.from(tx as Map);
+      final jsn = Map<String, Object?>.from(tx as Map);
       return Down4TX.fromJson(jsn);
     }).toList();
 
@@ -520,10 +520,11 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
       ];
 
   List<int> get compressed {
-    final utf8Receiver = utf8.encode(receiver!.value);
+    final List<int>? utf8Receiver =
+        receiver == null ? null : utf8.encode(receiver!.value);
     return [
       ...raw,
-      ...receiver == null ? [0x00] : [utf8Receiver.length, ...utf8Receiver],
+      ...utf8Receiver == null ? [0x00] : [utf8Receiver.length, ...utf8Receiver],
       type.index,
     ];
   }
@@ -596,19 +597,32 @@ class Down4TX {
     ]));
   }
 
-  factory Down4TX.fromJson(dynamic decodedJson) => Down4TX(
-        maker: ComposedID.fromString(decodedJson["mk"]),
-        vNo: FourByteInt(decodedJson["vn"]),
-        nLock: FourByteInt(decodedJson["nl"]),
-        confirmations: decodedJson["cf"],
-        down4Secret: List<int>.from(decodedJson["sc"] ?? []),
-        txsIn: List.from(decodedJson["ti"])
-            .map((jsonIn) => Down4TXIN.fromJson(jsonIn))
-            .toList(),
-        txsOut: List.from(decodedJson["to"])
-            .map((jsonOut) => Down4TXOUT.fromJson(jsonOut))
-            .toList(),
+  factory Down4TX.fromJson(Map<String, Object?> decodedJson) => Down4TX(
+        maker: ComposedID.fromString(decodedJson["mk"] as String?),
+        vNo: FourByteInt(decodedJson["vn"] as int),
+        nLock: FourByteInt(decodedJson["nl"] as int),
+        confirmations: decodedJson["cf"] as int,
+        down4Secret: List<int>.from(decodedJson["sc"] as Iterable? ?? []),
+        txsIn: List.from(decodedJson["ti"] as Iterable).map((jsonIn) {
+          final jsns = Map<String, String?>.from(jsonIn as Map);
+          return Down4TXIN.fromJson(jsns);
+        }).toList(),
+        txsOut: List.from(decodedJson["to"] as Iterable).map((jsonOut) {
+          final jsns = Map<String, String?>.from(jsonOut as Map);
+          return Down4TXOUT.fromJson(jsns);
+        }).toList(),
       );
+
+  Map<String, Object?> toJson([bool withTxs = true]) => {
+        "sc": down4Secret,
+        if (maker != null) "mk": maker!.value,
+        "vn": versionNo.asInt,
+        "nl": nLockTime.asInt,
+        "id": txID.asHex,
+        "cf": confirmations,
+        if (withTxs) "ti": txsIn.map((txin) => txin.toJson()).toList(),
+        if (withTxs) "to": txsOut.map((txout) => txout.toJson()).toList(),
+      };
 
   List<int> get raw => [
         ...versionNo.data,
@@ -692,17 +706,6 @@ class Down4TX {
   }
 
   String get fullRawHex => hex.encode(raw);
-
-  Map<String, Object?> toJson([bool withTxs = true]) => {
-        "sc": down4Secret,
-        if (maker != null) "mk": maker!.value,
-        "vn": versionNo.asInt,
-        "nl": nLockTime.asInt,
-        "id": txID.asHex,
-        "cf": confirmations,
-        if (withTxs) "ti": txsIn.map((txin) => txin.toJson()).toList(),
-        if (withTxs) "to": txsOut.map((txout) => txout.toJson()).toList(),
-      };
 
   String get asQrData => jsonEncode(toJson());
 

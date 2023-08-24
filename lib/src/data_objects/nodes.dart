@@ -50,37 +50,42 @@ enum NodesColor {
   self,
 }
 
-class MessageTarget implements Jsons {
-  final ComposedID userID;
-  final String device;
-  final String token;
-  bool success;
+// extension Tokens on List<MessageTarget> {
+//   List<String> get tokens => map((mt) => mt.token).toList();
+// }
 
-  String get messageSuccessKey => "${userID.value}~$device~$token";
+// class MessageTarget implements Jsons {
+//   final ComposedID userID;
+//   final String device;
+//   final String token;
+//   bool success;
 
-  MessageTarget({
-    required this.userID,
-    required this.device,
-    required this.token,
-    this.success = false,
-  });
-  @override
-  Map<String, String> toJson({bool includeLocal = false}) => {
-        "userID": userID.value,
-        "device": device,
-        "token": token,
-        "success": success.toString(),
-      };
+//   String get messageSuccessKey => "${userID.value}~$device~$token";
 
-  factory MessageTarget.fromJson(Map<String, String?> json) {
-    return MessageTarget(
-      userID: ComposedID.fromString(json["userID"])!,
-      device: json["device"]!,
-      token: json["token"]!,
-      success: json["success"] == "true",
-    );
-  }
-}
+//   MessageTarget({
+//     required this.userID,
+//     required this.device,
+//     required this.token,
+//     this.success = false,
+//   });
+
+//   @override
+//   Map<String, String> toJson({bool includeLocal = false}) => {
+//         "userID": userID.value,
+//         "device": device,
+//         "token": token,
+//         "success": success.toString(),
+//       };
+
+//   factory MessageTarget.fromJson(Map<String, String?> json) {
+//     return MessageTarget(
+//       userID: ComposedID.fromString(json["userID"])!,
+//       device: json["device"]!,
+//       token: json["token"]!,
+//       success: json["success"] == "true",
+//     );
+//   }
+// }
 
 mixin PaletteN on Down4Object {
   Color get color;
@@ -370,7 +375,7 @@ mixin ConnectN on RemoteN, Down4Node {
   }
 
   Stream<DatabaseEvent> get connection {
-    return id.userRef.child("connection").onChildChanged;
+    return id.nodeRef.child("connection").onChildChanged;
   }
 
   // everything but the localValue we can see in toJson
@@ -435,45 +440,98 @@ mixin ChildN on Down4Node {
   ComposedID get ownerID;
 }
 
-mixin ChatN on Down4Node {
+ComposedID idOfRoot({required String root, ComposedID? selfID}) {
+  final sID = selfID ?? g.self.id;
+  print("the root: $root");
+  final cat = root.split("!");
+  if (cat.length == 1) return ComposedID.fromString(cat[0])!;
+  if (cat.every((element) => element == sID.value)) {
+    return sID;
+  } else {
+    final uStrID = cat.findWhere((strID) => strID != sID.value);
+    return ComposedID.fromString(uStrID)!;
+  }
+}
+
+mixin ChatN on Down4Node, Locals {
   @override
   ComposedID get id => _id as ComposedID;
 
-  // This includes the senders tokens, because we can be multi device
-  // we might send messages to ourselves
-  // For CHATS, we remove only remove the token of the sender current device
-  // this way, all participating devices will receive a message except sender's
-  // current device
-  // for CASH, we remove sender's tokens and receivers non-mainDevice tokens
-  // This is done in the messages sending functions
-  Future<List<MessageTarget>> allTargets() async {
-    final nodeRef = this;
-    List<MessageTarget> targets = [];
-    final people = nodeRef is GroupN
-        ? (await globall<PersonN>(nodeRef.group))
-        : nodeRef.id == g.self.id
-            ? [g.self]
-            : [g.self, nodeRef as PersonN];
+  @override
+  Future<void> delete() async {
+    print("DELETING ChatN, unique: ${id.unique}");
+    // must also delete all related chats
+    final raw = "SELECT * AS m FROM _ WHERE root = '$root_'";
+    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
+    final e = await q.execute();
+    final r = await e.allResults();
+    final msgs = r.map((m) {
+      final jsns = Map<String, String?>.from(m.toPlainMap()["m"] as Map);
+      return Down4Message.fromJson(jsns) as Messages;
+    });
 
-    for (final person in people) {
-      for (final token in person.messagingTokens.entries) {
-        if (person.id == g.self.id && token.key == g.self.deviceID) continue;
-        targets.add(MessageTarget(
-          userID: person.id,
-          device: token.key,
-          token: token.value,
-        ));
-      }
+    for (final m in msgs) {
+      await m.delete();
     }
-
-    return targets;
+    await super.delete();
   }
+
+  String root(ComposedID selfID) {
+    if (this is GroupN) return id.value;
+    final st = [selfID, id]..sort((a, b) => a.unique.compareTo(b.unique));
+    final cat = st.map((e) => e.value).join("!");
+    return cat;
+  }
+
+  String get root_ => root(g.self.id);
+
+  Future<List<PersonN>> get messageTargets async {
+    if (this is GroupN) {
+      final g = await globall<PersonN>(_group);
+      return g;
+    } else {
+      return [g.self, this as PersonN];
+    }
+  }
+
+  // // This includes the senders tokens, because we can be multi device
+  // // we might send messages to ourselves
+  // // For CHATS, we remove only remove the token of the sender current device
+  // // this way, all participating devices will receive a message except sender's
+  // // current device
+  // // for CASH, we remove sender's tokens and receivers non-mainDevice tokens
+  // // This is done in the messages sending functions
+  // /// A user can have multiple device, hence multiple tokens
+  // /// This returns all possible device tokens except the token
+  // /// of the device the user is using to send the message
+  // Future<List<MessageTarget>> allTargets() async {
+  //   final nodeRef = this;
+  //   List<MessageTarget> targets = [];
+  //   final people = nodeRef is GroupN
+  //       ? (await globall<PersonN>(nodeRef.group))
+  //       : nodeRef.id == g.self.id
+  //           ? [g.self]
+  //           : [g.self, nodeRef as PersonN];
+
+  //   for (final person in people) {
+  //     for (final token in person.messagingTokens.entries) {
+  //       if (person.id == g.self.id && token.key == g.self.deviceID) continue;
+  //       targets.add(MessageTarget(
+  //         userID: person.id,
+  //         device: token.key,
+  //         token: token.value,
+  //       ));
+  //     }
+  //   }
+
+  //   return targets;
+  // }
 
   Future<Pair<Iterable<Down4ID>, AsyncListenStream<QueryChange<ResultSet>>>>
       getTheChat() async {
     final raw = """
         SELECT META().id AS id FROM _
-        WHERE root = '${id.value}' AND type = 'chat'
+        WHERE root = '$root_' AND type = 'chat'
         ORDER BY id DESC
         """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -488,7 +546,7 @@ mixin ChatN on Down4Node {
   Future<Iterable<ComposedID>> unreadSnipIDs() async {
     final raw = """
         SELECT META().id AS id FROM _
-        WHERE root = '${id.value}' AND type = 'snip' AND isRead = 'false'
+        WHERE root = '$root_' AND type = 'snip' AND isRead = 'false'
         ORDER BY id ASC
         """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -498,8 +556,7 @@ mixin ChatN on Down4Node {
   }
 
   Stream<Snip> loadSnips() async* {
-    final raw =
-        "SELECT * FROM _ AS m WHERE type = 'snip' AND root = '${id.value}'";
+    final raw = "SELECT * FROM _ AS m WHERE type = 'snip' AND root = '$root_'";
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
     final r = await q.execute();
     await for (final a in r.asStream()) {
@@ -511,7 +568,7 @@ mixin ChatN on Down4Node {
   Future<Chat?> lastChatMessage() async {
     final raw = """
             SELECT * FROM _ AS m
-            WHERE root = '${id.value}' AND type = 'chat'
+            WHERE root = '$root_' AND type = 'chat'
             ORDER BY META(m).id DESC LIMIT 1
             """;
     final q = await AsyncQuery.fromN1ql(messagesDB, raw);
@@ -527,7 +584,7 @@ mixin ChatN on Down4Node {
   Future<bool> lastChatFromOtherIsUnread() async {
     final raw = """
             SELECT * FROM _
-            WHERE root = '${id.value}'
+            WHERE root = '$root_'
               AND type = 'chat'
               AND isRead = 'false'
               AND senderID != '${g.self.id.value}'
@@ -624,7 +681,7 @@ mixin RemoteN on Down4Node {
   Future<void> remoteDelete() async {
     if (isRemoteMutable) {
       try {
-        await id.userRef.remove();
+        await id.nodeRef.remove();
       } catch (e) {
         print(
             "error deleting node id=${id.value}, node type=$runtimeType, err=$e");
@@ -637,7 +694,7 @@ mixin RemoteN on Down4Node {
   Future<bool> remoteMerge({Map<String, Object>? data}) async {
     if (isRemoteMutable) {
       try {
-        await id.userRef.update(data ?? toJson(includeLocal: false));
+        await id.nodeRef.update(data ?? toJson(includeLocal: false));
         return true;
       } catch (e) {
         print("error remoteMerge node id=${id.unique}\nerror=$e\n");
@@ -649,7 +706,7 @@ mixin RemoteN on Down4Node {
   }
 
   Future<RemoteN?> remoteFetch() async {
-    final data = (await id.userRef.get()).value;
+    final data = (await id.nodeRef.get()).value;
     if (data == null) return null;
     final jsn = Map<String, String?>.from(data as Map);
     return fromJson<RemoteN>(jsn);
@@ -688,7 +745,7 @@ class User extends Down4Node
   Future<bool> hasMessages() async {
     final raw_ = """
       SELECT META().id FROM _ AS m 
-      WHERE m.root = '${id.value}'
+      WHERE m.root = '$root_'
       LIMIT 1
       """;
 
@@ -835,7 +892,7 @@ class Self extends Down4Node
   int get lastOnline => _lastOnline;
 
   @override
-  bool get isConnected => false;
+  bool get isConnected => true;
 }
 
 class Group extends Down4Node

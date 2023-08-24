@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:awesome_notifications_fcm/awesome_notifications_fcm.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+
+// import 'package:firebase_messaging/firebase_messaging.dart';
+// import 'package:push/push.dart';
 
 import 'data_objects/_data_utils.dart';
 import 'data_objects/medias.dart';
@@ -15,7 +19,7 @@ import 'home.dart';
 import 'bsv/_bsv_utils.dart';
 
 import 'pages/init_page.dart';
-import 'pages/loading_page.dart';
+// import 'pages/loading_page.dart';
 
 class Down4 extends StatefulWidget {
   final auth.User? user;
@@ -35,10 +39,12 @@ class _Down4State extends State<Down4> {
   }
 
   void loadTokenChangeListener() {
-    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-      final res = await r.refreshTokenRequest(newToken);
-      if (res == 200) g.self.updateMessagingToken({g.self.deviceID: newToken});
-    });
+    // // FirebaseMessaging.instance.onTokenRefresh.listen((newToken)
+    // Push.instance.onNewToken.listen((newToken)
+    //     async {
+    //   final res = await r.refreshTokenRequest(newToken);
+    //   if (res == 200) g.self.updateMessagingToken({g.self.deviceID: newToken});
+    // });
   }
 
   Future<void> login() async {
@@ -47,6 +53,8 @@ class _Down4State extends State<Down4> {
     if (await g.notYetInitialized) {
       createUser();
     } else {
+      // final isEnabled = await Push.instance.areNotificationsEnabled();
+      // if (!isEnabled) await Push.instance.requestPermission();
       await g.loadWallet();
       await widget.user?.updateDisplayName(g.self.id.value);
       home();
@@ -65,13 +73,15 @@ class _Down4State extends State<Down4> {
     // update login for database rules
     await widget.user?.updateDisplayName(id.value);
 
-    _view = const LoadingPage2();
+    _view = g.initLoadingScreen!;
     setState(() {});
 
     void onFailure(String msg) => createUser(errorMessage: msg);
 
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token == null) {
+    // final token = await FirebaseMessaging.instance.getToken();
+    final token = await AwesomeNotificationsFcm().requestFirebaseAppToken();
+    // final token = await Push.instance.token;
+    if (token.isEmpty) {
       print("error getting firebase messaging token");
       return onFailure("Check if valid internet connection!");
     }
@@ -80,9 +90,8 @@ class _Down4State extends State<Down4> {
     // this is because the mediaID is calculated with the userID
     // and when it was calculated in the init user, we are not sure if
     // the ID was the proper one
-    final goodMedia = media.userInitRecalculation(id)
+    final goodMedia = await media.userInitRecalculation(id)
       ..cache()
-      ..writeFromCachedPath()
       ..staticUpload();
 
     final seed1 = unsafeSeed(32);
@@ -107,18 +116,19 @@ class _Down4State extends State<Down4> {
       return true;
     });
 
-
     if (!success) return onFailure("Please try again");
 
+    final devHash = base64Encode(md5(utf8.encode(deviceID)));
+
     g.initSelf(Self(id,
-        deviceID: deviceID,
+        deviceID: devHash,
         activity: d4utils.makeTimestamp(),
         name: name,
         description: "",
         lastName: lastName,
         lastOnline: d4utils.makeTimestamp(),
-        mainDeviceID: deviceID,
-        messagingTokens: {deviceID: token},
+        mainDeviceID: devHash,
+        messagingTokens: {devHash: token},
         neuter: neuter,
         mediaID: goodMedia.id,
         children: {},
@@ -175,6 +185,6 @@ class _Down4State extends State<Down4> {
 
     ImageCache().maximumSize = 0;
 
-    return _view ?? const LoadingPage2();
+    return _view ?? g.initLoadingScreen!;
   }
 }

@@ -100,7 +100,8 @@ class _UserMakerPageState extends State<UserMakerPage>
     if (r?.files.single.path != null && r?.files.single.bytes != null) {
       final String p = r!.files.single.path!;
       final s = await decodeImageSize(r.files.single.bytes!);
-      cameraInput = makeCameraMedia(
+      cameraInput = await makeCameraMedia(
+          writeFromCachedPath: false,
           cachedPath: p,
           size: s,
           isReversed: false,
@@ -113,7 +114,9 @@ class _UserMakerPageState extends State<UserMakerPage>
   Size get imageSize => Size.square(g.sizes.w * 0.3);
 
   Widget get userImage =>
-      cameraInput?.display(size: imageSize, forceSquare: true) ?? g.ph;
+      cameraInput?.display(
+          key: GlobalKey(), size: imageSize, forceSquare: true) ??
+      g.ph;
 
   Widget get imagePicker => GestureDetector(
         onTap: selectFile,
@@ -130,6 +133,7 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   ConsoleButton get recoverButton => ConsoleButton(
       name: "RECOVER", isGreyedOut: true, onPress: () => print("TODO"));
+    
   ConsoleButton get proceedButton => ConsoleButton(
       isActivated: isReady,
       isGreyedOut: !isReady,
@@ -265,7 +269,8 @@ class _UserMakerPageState extends State<UserMakerPage>
         shouldBeDownButIsnt: cameraController?.value.isRecordingVideo ?? false,
         onPress: () async {
           final XFile f = await cameraController!.takePicture();
-          tempInput = makeCameraMedia(
+          tempInput = await makeCameraMedia(
+              writeFromCachedPath: false,
               cachedPath: f.path,
               size: cameraController!.value.previewSize!.inverted,
               isReversed: isReversed,
@@ -279,7 +284,8 @@ class _UserMakerPageState extends State<UserMakerPage>
         },
         onLongPressUp: () async {
           final XFile f = await cameraController!.stopVideoRecording();
-          tempInput = makeCameraMedia(
+          tempInput = await makeCameraMedia(
+              writeFromCachedPath: false,
               cachedPath: f.path,
               size: cameraController!.value.previewSize!.inverted,
               isReversed: isReversed,

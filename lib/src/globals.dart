@@ -1,17 +1,24 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:sqlite3/sqlite3.dart' as sql;
+
 import 'package:camera/camera.dart';
 import 'package:cbl/cbl.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/bsv/wallet.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:geolocator/geolocator.dart';
+
+// import 'package:firebase_messaging/firebase_messaging.dart';
+// import 'package:push/push.dart';
+
+import 'pages/loading_page.dart';
 
 import 'data_objects/couch.dart';
 import 'data_objects/_data_utils.dart';
@@ -28,28 +35,109 @@ import 'bsv/types.dart';
 
 final g = Singletons.instance;
 
-late AndroidNotificationChannel channel;
-late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+// Future<void> showMessageNotification(
+//   RemoteMessage rmt, {
+//   ComposedID? selfID,
+//   Database? mediaDB,
+//   Database? nodeDB,
+//   FlutterLocalNotificationsPlugin? plug,
+//   AndroidNotificationChannel? chan,
+//   ComposedID? currentRoot,
+// }) async {
+//   // final plugin = plug ?? globalPlugin;
+//   // final channel = chan ?? globalChannel;
+//   final nodesDatabase = nodeDB ?? nodesDB;
+//   final mediasDatabase = mediaDB ?? mediasDB;
+//   final self = selfID ?? g.self.id;
 
-void showMessageNotification(RemoteMessage message) {
-  RemoteNotification? notification = message.notification;
-  AndroidNotification? android = message.notification?.android;
+//   final sc = <Down4ID, Locals>{};
 
-  if (notification != null && android != null) {
-    flutterLocalNotificationsPlugin.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            channel.id,
-            channel.name,
-            channelDescription: channel.description,
-            icon: android.smallIcon,
-          ),
-        ));
-  }
-}
+//   final data = rmt.data ?? {};
+//   if (data.isEmpty) return;
+
+//   final header = data["h"] as String?;
+//   final body = data["b"] as String?;
+//   final root = data["r"] as String?;
+//   final rtID =
+//       root == null || root.isEmpty ? null : idOfRoot(root: root, selfID: self);
+//   final sdrID = ComposedID.fromString(data["s"] as String?);
+
+//   print("rtID: ${rtID?.value}, currentRoot: ${currentRoot?.value}");
+//   if (rtID != null && currentRoot == rtID) {
+//     print("no need to notify");
+//     return;
+//   }
+
+//   AndroidBitmap<String>? senderIcon, groupIcon;
+//   PersonN? sender;
+//   GroupN? group;
+//   Down4Image? senderImage, groupImage;
+
+//   print("### getting the sender");
+//   sender = await global<PersonN>(sdrID,
+//       sc: sc, sdb: nodesDatabase, doFetch: true, doMergeIfFetch: true);
+
+//   if (sender != null) {
+//     print("### getting senderMedia");
+//     senderImage = await global<Down4Image>(sender.mediaID,
+//         sc: sc, sdb: mediasDatabase, doFetch: true, doMergeIfFetch: true);
+//   }
+
+//   if (rtID != null) {
+//     final rootNode = await global<ChatN>(rtID,
+//         sc: sc, sdb: nodesDatabase, doFetch: true, doMergeIfFetch: true);
+//     if (rootNode is GroupN) {
+//       group = rootNode;
+//       print("### getting groupMedia");
+//       groupImage = await global<Down4Image>(group.mediaID,
+//           sc: sc, sdb: mediasDatabase, doFetch: true, doMergeIfFetch: true);
+//     }
+//   }
+
+//   if (senderImage != null) {
+//     print("### getting the sender Icon");
+//     final pf = await senderImage.profilePath;
+//     if (pf != null) {
+//       senderIcon = FilePathAndroidBitmap(pf);
+//     }
+//   }
+
+//   if (groupImage != null) {
+//     print("### getting the group Icon");
+//     final pf = await groupImage.profilePath;
+//     if (pf != null) {
+//       groupIcon = FilePathAndroidBitmap(pf);
+//     }
+//   }
+
+//   globalPlugin.show(
+//       rmt.hashCode,
+//       header,
+//       body,
+//       NotificationDetails(
+//           android: AndroidNotificationDetails(globalChannel.id, globalChannel.name,
+//               channelDescription: globalChannel.description, largeIcon: senderIcon)));
+// }
+
+// Future<void> initNotificationPlugin(
+//   FlutterLocalNotificationsPlugin plugin,
+//   AndroidNotificationChannel channel,
+// ) async {
+//   await plugin
+//       .resolvePlatformSpecificImplementation<
+//           AndroidFlutterLocalNotificationsPlugin>()
+//       ?.createNotificationChannel(channel);
+
+//   const initializationSettingsAndroid = AndroidInitializationSettings(
+//     "@mipmap/ic_down4_inverted_white",
+//   );
+
+//   const initializationSettings = InitializationSettings(
+//     android: initializationSettingsAndroid,
+//   );
+
+//   await plugin.initialize(initializationSettings);
+// }
 
 Future<GeoLoc?> requestGeoloc({required bool askPermission}) async {
   bool serviceEnabled;
@@ -236,9 +324,22 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
+  void initdb(sql.Database db) => _db = db;
+  sql.Database get db => _db;
+  late sql.Database _db;
+
+  // we use the same instance here for when we load login and home
+  // this way there is no wierd glitch be calling LoadingPage2() in both pages
+  // we set this to null after home is loaded
+  Down4PageWidget? initLoadingScreen = const LoadingPage2();
+
   final ViewManager vm = ViewManager();
 
   late FireTheme myTheme;
+
+  String makeMainMediaPath(String unique) {
+    return "${g.appDirPath}${Platform.pathSeparator}$unique";
+  }
 
   Down4Theme get theme => themesRegistry[myTheme.themeName]!;
   late String appDirPath;
@@ -247,7 +348,7 @@ class Singletons {
   late Sizes sizes;
   late ExchangeRate exchangeRate;
   final Map<MediaType, List<Down4ID>> savedMediasIDs = {};
-  late Image fifty, black, red, ph, d1, d2, d3, lg;
+  late Image ph, d1, d2, d3, lg;
   late Uint8List background;
   late List<CameraDescription> cameras;
 
@@ -259,6 +360,11 @@ class Singletons {
     } else {
       return true;
     }
+  }
+
+  DatabaseReference get messageQueue {
+    return self.id.server.realtimeDB
+        .ref("nodes/${g.self.id.unique}/queues/${g.self.deviceID}");
   }
 
   void loadExchangeRate(ExchangeRate er) => exchangeRate = er;
@@ -409,7 +515,7 @@ Future<ChatMessage?> getChatMessage({
         refreshCallback();
       });
 
-  await globall<Down4Media>(msg.reactions.map((e) => e.mediaID));
+  await globall<Down4Media>(msg.reactions.values.map((e) => e.mediaID));
 
   // Future for fetching the nodes attached to a message
   // It when done, it will callback and refresh the message with

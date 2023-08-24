@@ -1,11 +1,8 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:cbl/cbl.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 import '../bsv/types.dart';
 import '../_dart_utils.dart';
-import '../web_requests.dart';
 import '../globals.dart';
 
 import '_data_utils.dart';
@@ -15,18 +12,17 @@ import 'nodes.dart';
 
 enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
 
-abstract class Down4Message with Down4Object, Jsons {
+abstract class Down4Message with Jsons {
   final String? _text;
   final int? _timestamp;
-  final ComposedID? _mediaID, _forwardedFromID, _root;
+  final ComposedID? _mediaID, _forwardedFromID;
 
+  final String? _root;
   final Down4ID? _reactionID, _paymentID, _messageID;
 
   final Set<ComposedID>? _nodes, _reactors, _tips;
-  final Set<Down4ID>? _messages, _replies;
-  final Down4Payment? _payment;
-  List<MessageTarget>? _targets;
-  final List<Reaction>? _reactions;
+  final Set<Down4ID>? _replies;
+  final Map<Down4ID, Reaction>? _reactions;
 
   final ComposedID? _tempMediaID;
   final int? _tempMediaTS;
@@ -36,32 +32,27 @@ abstract class Down4Message with Down4Object, Jsons {
 
   bool? _isSent, _isRead;
 
-  @override
-  final Down4ID id;
-
   final ComposedID senderID;
 
-  Down4Message(
-    this.id, {
+  Down4ID? get id => null;
+
+  Down4Message({
     required this.senderID,
     int? timestamp,
-    ComposedID? root,
     Down4ID? reactionID,
     Set<Down4ID>? replies,
-    Set<Down4ID>? messages,
     Set<ComposedID>? nodes,
     Set<ComposedID>? reactors,
     Set<ComposedID>? tips,
-    List<Reaction>? reactions,
-    Down4Payment? payment,
+    Map<Down4ID, Reaction>? reactions,
     bool? isRead,
     bool? isSent,
     String? text,
     ComposedID? mediaID,
+    String? root,
     Down4ID? messageID,
     ComposedID? forwardedFromID,
     Down4ID? paymentID,
-    List<MessageTarget>? targets,
     int? tempMediaTS,
     ComposedID? tempMediaID,
     int? tempPaymentTS,
@@ -69,17 +60,14 @@ abstract class Down4Message with Down4Object, Jsons {
   })  : _reactionID = reactionID,
         _text = text,
         _root = root,
-        _targets = targets,
         _isSent = isSent,
         _isRead = isRead,
         _tempPaymentTS = tempPaymentTS,
         _tempPaymentID = tempPaymentID,
         _reactions = reactions,
         _mediaID = mediaID,
-        _messages = messages,
         _paymentID = paymentID,
         _messageID = messageID,
-        _payment = payment,
         _reactors = reactors,
         _timestamp = timestamp,
         _replies = replies,
@@ -89,18 +77,16 @@ abstract class Down4Message with Down4Object, Jsons {
         _tempMediaTS = tempMediaTS,
         _tempMediaID = tempMediaID;
 
-  Future<String> makeHeader();
-  Future<String> makeBody();
-
   MessageType get type;
 
-  Future<List<MessageTarget>?> get targets;
+  // Future<String> get pushString;
 
   factory Down4Message.fromJson(Map<String, String?> decodedJson) {
     final type = MessageType.values.byName(decodedJson["type"]!);
     final id = Down4ID.fromString(decodedJson["id"])!;
     final senderID = ComposedID.fromString(decodedJson["senderID"])!;
-    final root = ComposedID.fromString(decodedJson["root"]);
+
+    final root = decodedJson["root"];
 
     final nodes = decodedJson["nodes"].toComposedIDs();
 
@@ -115,10 +101,6 @@ abstract class Down4Message with Down4Object, Jsons {
     final forwardedFromID =
         ComposedID.fromString(decodedJson["forwardedFromID"]);
 
-    final payment = decodedJson["payment"] != null
-        ? Down4Payment.fromYouKnow(decodedJson["payment"]!)
-        : null;
-
     final timestamp = int.tryParse(decodedJson["timestamp"] ?? "");
     final text = decodedJson["text"];
     final mediaID = ComposedID.fromString(decodedJson["mediaID"]);
@@ -131,29 +113,21 @@ abstract class Down4Message with Down4Object, Jsons {
     final isSent = decodedJson["isSent"] == "true";
     final isRead = decodedJson["isRead"] == "true";
 
-    List<Reaction>? reactions;
+    Map<Down4ID, Reaction>? reactions;
     final ykEncodedReactions = decodedJson["reactions"];
     if (ykEncodedReactions != null) {
-      final yk = List.from(youKnowDecode(ykEncodedReactions));
-      reactions = yk.map((m) {
+      final yk = Map.from(youKnowDecode(ykEncodedReactions));
+      reactions = yk.map((k, m) {
         final jsn = Map<String, String?>.from(m as Map);
-        return Down4Message.fromJson(jsn) as Reaction;
-      }).toList();
-    }
-
-    List<MessageTarget>? targets;
-    final ykEncodedTargets = decodedJson["targets"];
-    if (ykEncodedTargets != null) {
-      final yk = List.from(youKnowDecode(ykEncodedTargets));
-      targets = yk.map((t) {
-        final jsn = Map<String, String?>.from(t as Map);
-        return MessageTarget.fromJson(jsn);
-      }).toList();
+        final r = Down4Message.fromJson(jsn) as Reaction;
+        final rid = Down4ID.fromString(k)!;
+        return MapEntry(rid, r);
+      });
     }
 
     switch (type) {
       case MessageType.chat:
-        return Chat(id,
+        return Chat(id as ComposedID,
             root: root!,
             senderID: senderID,
             timestamp: timestamp!,
@@ -168,7 +142,7 @@ abstract class Down4Message with Down4Object, Jsons {
             nodes: nodes,
             forwardedFromID: forwardedFromID);
       case MessageType.snip:
-        return Snip(id,
+        return Snip(id as ComposedID,
             root: root!,
             senderID: senderID,
             mediaID: mediaID!,
@@ -178,7 +152,6 @@ abstract class Down4Message with Down4Object, Jsons {
             text: text);
       case MessageType.reaction:
         return Reaction(id,
-            root: root!,
             senderID: senderID,
             messageID: messageID!,
             reactors: reactors!,
@@ -188,17 +161,12 @@ abstract class Down4Message with Down4Object, Jsons {
       case MessageType.payment:
         return Payment(
             paymentID: paymentID!,
-            payment: payment,
             tempPaymentID: tempPaymentID,
             tempPaymentTS: tempPaymentTS,
-            targets: targets ?? [],
             senderID: senderID);
       case MessageType.reactionInc:
-        return ReactionIncrement(id,
-            root: root!,
-            messageID: messageID!,
-            reactionID: reactionID!,
-            senderID: senderID);
+        return ReactionIncrement(
+            messageID: messageID!, reactionID: reactionID!, senderID: senderID);
       // TODO: Handle this case.
       case MessageType.bill:
       // TODO: Handle this case.
@@ -211,19 +179,16 @@ abstract class Down4Message with Down4Object, Jsons {
   @override
   Map<String, String> toJson({bool includeLocal = true}) {
     // objects are all strings, required by FCM notification data
-    final rs = _reactions?.map((r) => r.toJson()).toList();
-    final tg = _targets?.map((r) => r.toJson()).toList();
+    final rs = _reactions?.map((k, r) => MapEntry(k.value, r.toJson()));
 
     return {
-      if (includeLocal && _targets != null) "targets": youKnowEncode(tg),
-      "id": id.value,
+      if (id != null) "id": id!.value,
       "type": type.name,
       "senderID": senderID.value,
-      if (_reactions != null) "reactions": youKnowEncode(rs),
-      if (_root != null) "root": _root!.value,
+      if (_root != null) "root": _root!,
+      if (_reactions != null && includeLocal) "reactions": youKnowEncode(rs),
       if (_isSent != null && includeLocal) "isSent": _isSent!.toString(),
       if (_isRead != null && includeLocal) "isRead": _isRead!.toString(),
-      if (_payment != null) "payment": _payment!.toYouKnow(),
       if (_reactionID != null) "reactionID": _reactionID!.value,
       if (_forwardedFromID != null) "forwardedFromID": _forwardedFromID!.value,
       if (_paymentID != null) "paymentID": _paymentID!.value,
@@ -235,17 +200,14 @@ abstract class Down4Message with Down4Object, Jsons {
       if (_timestamp != null) "timestamp": _timestamp!.toString(),
       if (_mediaID != null) "mediaID": _mediaID!.value,
       if (_messageID != null) "messageID": _messageID!.value,
-      if (_tempMediaID != null) "onlineMediaID": _tempMediaID!.value,
+      if (_tempMediaID != null) "tempMediaID": _tempMediaID!.value,
       if (_tempMediaTS != null) "tempMediaTS": _tempMediaTS!.toString(),
       if (_tempPaymentID != null) "tempPaymentID": _tempPaymentID!.value,
       if (_tempPaymentTS != null) "tempPaymentTS": _tempPaymentTS!.toString(),
     };
   }
 
-  Future<void> processMessage({
-    void Function()? onError,
-    void Function()? onSent,
-  });
+  Future<String?> uploadRoutine();
 }
 
 mixin Reads on Down4Message, Locals {
@@ -261,22 +223,25 @@ mixin Medias on Down4Message {
   ComposedID? get tempMediaID => _tempMediaID;
   int? get tempMediaTS => _tempMediaTS;
 
-  // returns the dataPayload if routine was successful
-  Future<Map<String, String>?> _mediableRoutine({
-    Map<String, String>? preMsg,
-  }) async {
-    final media = await global<Down4Media>(mediaID);
-    final fullJson = preMsg ?? toJson();
-    if (media != null) {
-      final upload = await media.temporaryUpload();
-      if (upload == null) return null;
-      if (upload.freshID != null) {
-        fullJson["tempMediaID"] = upload.freshID.toString();
-        fullJson["tempMediaTS"] = upload.freshTS.toString();
-      }
-    }
-    return fullJson;
-  }
+  // // returns the dataPayload if routine was successful
+  // Future<Map<String, String>?> _mediableRoutine({
+  //   Map<String, String>? preMsg,
+  // }) async {
+  //   final media = await global<Down4Media>(mediaID);
+  //   final fullJson = preMsg ?? toJson(includeLocal: false);
+  //   if (media != null) {
+  //     final upload = await media.temporaryUpload();
+  //     if (upload == null) return null;
+  //     if (upload.freshID != null) {
+  //       fullJson["tempMediaID"] = upload.freshID!.value;
+  //       fullJson["tempMediaTS"] = upload.freshTS!.toString();
+  //     } else {
+  //       fullJson["tempMediaID"] = media.tempID!.value;
+  //       fullJson["tempMediaTS"] = media.tempTS!.toString();
+  //     }
+  //   }
+  //   return fullJson;
+  // }
 }
 
 mixin Texts on Down4Message {
@@ -285,62 +250,57 @@ mixin Texts on Down4Message {
 
 mixin Cash on Down4Message {
   Down4ID? get paymentID => _paymentID;
-  Down4Payment? get payment => _payment;
-  ComposedID? get tempPaymentID => payment?.tempID;
-  int? get tempPaymentTS => payment?.tempTS;
 
-  Future<Map<String, Object>?> _paymentUploadRoutine({
-    Map<String, String>? preMsg,
-  }) async {
-    final fullJson = preMsg ?? toJson(includeLocal: false);
-    final asData = jsonEncode(fullJson);
-    // only way to have over 4kb in payload is to have a payment
-    if (asData.length > 4000) {
-      if (payment != null) {
-        final upload = await payment!.temporaryUpload();
-        if (upload == null) return null;
-        if (upload.freshID != null) {
-          fullJson["tempPaymentID"] = upload.freshID.toString();
-          fullJson["tempPaymentTS"] = upload.freshTS.toString();
-        }
-        fullJson.remove("payment");
-      }
-    }
-    return fullJson;
+  Future<ComposedID?> get tempPaymentID async {
+    final payment = await global<Down4Payment>(paymentID);
+    return payment?.tempID;
   }
+
+  Future<int?> get tempPaymentTS async {
+    final payment = await global<Down4Payment>(paymentID);
+    return payment?.tempTS;
+  }
+
+  // Future<Map<String, String>?> _paymentUploadRoutine({
+  //   Map<String, String>? preMsg,
+  // }) async {
+  //   final fullJson = preMsg ?? toJson(includeLocal: false);
+  //   final payment = await global<Down4Payment>(paymentID);
+  //   if (payment != null) {
+  //     final upload = await payment.temporaryUpload();
+  //     if (upload == null) return null;
+  //     if (upload.freshID != null) {
+  //       fullJson["tempPaymentID"] = upload.freshID!.value;
+  //       fullJson["tempPaymentTS"] = upload.freshTS!.toString();
+  //     } else {
+  //       fullJson["tempPaymentID"] = payment.tempID!.value;
+  //       fullJson["tempPaymentTS"] = payment.tempTS!.toString();
+  //     }
+  //   }
+  //   return fullJson;
+  // }
 }
 
 mixin Roots on Down4Message {
-  ComposedID get root;
+  String get root => _root!;
 
-  Future<ChatN?> get rootNode => global<ChatN>(root);
-
-  @override
-  Future<String> makeHeader() async {
-    final rootNode = await global<ChatN>(root);
-    if (rootNode == null) return "";
-    if (rootNode is GroupN) {
-      return rootNode.displayName;
-    } else {
-      return g.self.displayName;
-    }
+  Future<ChatN?> rootNode(ComposedID selfID) async {
+    return global<ChatN>(idOfRoot(root: root, selfID: selfID));
   }
 
-  @override
-  Future<List<MessageTarget>?> get targets async {
-    if (_targets != null) return _targets;
-    return _targets = (await (await rootNode)?.allTargets());
-  }
+  ComposedID get idOfRoot_ => idOfRoot(root: root, selfID: g.self.id);
 }
 
 mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
   Future<void> onReceipt(void Function(ChatN rootNode) callback) async {
     // get the rootNode
+    final rootID = idOfRoot(root: root, selfID: g.self.id);
+
     final rootNode =
-        await global<ChatN>(root, doFetch: true, doMergeIfFetch: true);
+        await global<ChatN>(rootID, doFetch: true, doMergeIfFetch: true);
     if (rootNode == null) return;
 
-    User? senderNode = await global<User>(senderID);
+    PersonN? senderNode = await global<User>(senderID);
     Down4Media? msgMedia;
 
     if (senderNode != null && senderNode.isConnected) {
@@ -362,51 +322,62 @@ mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
 
     return callback(rootNode);
   }
+
+  @override
+  Future<String?> uploadRoutine() async {
+    final Map<String, String> msgData = toJson(includeLocal: false);
+    final media = await global<Down4Media>(mediaID);
+    if (media != null) {
+      final upld = await media.temporaryUpload();
+      if (upld == null) return null;
+      msgData["tempMediaID"] = media.tempID!.value;
+      msgData["tempMediaTS"] = media.tempTS!.toString();
+    }
+    final successfulMsgUpload = await uploadMessageData(msgData);
+    if (!successfulMsgUpload) return null;
+    return "m!${id.value}";
+  }
+
+  @override
+  ComposedID get id;
+
+  DatabaseReference get ref =>
+      id.server.realtimeDB.ref("messages/${id.unique}");
+
+  Future<bool> uploadMessageData(Map<String, String?> data) async {
+    try {
+      await ref.set(data);
+      return true;
+    } catch (e) {
+      print("error uploading message data: $e\n");
+      return false;
+    }
+  }
 }
 
-class ReactionIncrement extends Down4Message with Roots {
-  @override
-  ComposedID get root => _root!;
+class ReactionIncrement extends Down4Message {
   Down4ID get messageID => _messageID!;
   Down4ID get reactionID => _reactionID!;
 
-  ReactionIncrement(
-    super.id, {
+  ReactionIncrement({
     required super.senderID,
-    required ComposedID root,
     required Down4ID messageID,
     required Down4ID reactionID,
-  }) : super(root: root, messageID: messageID, reactionID: reactionID);
-
-  @override
-  Future<String> makeBody() async => "";
-
-  @override
-  Future<String> makeHeader() async => "";
+  }) : super(messageID: messageID, reactionID: reactionID);
 
   @override
   MessageType get type => MessageType.reactionInc;
 
   @override
-  Future<void> processMessage({
-    void Function()? onError,
-    void Function()? onSent,
-  }) async {
-    final allTargets = await (await rootNode)?.allTargets();
-    if (allTargets == null) return onError?.call();
-
-    final nonCurDev = allTargets.where((t) => t.device != g.self.deviceID);
-    await MessageRequest(
-            sender: g.self.id,
-            tokens: nonCurDev.map((e) => e.token).toList(),
-            header: await makeHeader(),
-            body: await makeBody(),
-            data: jsonEncode(toJson()))
-        .process();
+  Future<String> uploadRoutine() async {
+    return "i!${messageID.value}!${reactionID.value}!${senderID.value}";
   }
 }
 
-class Reaction extends Down4Message with Roots, Medias {
+class Reaction extends Down4Message with Medias {
+  @override
+  Down4ID id;
+
   @override
   bool operator ==(Object other) => other is Reaction && other.id == id;
 
@@ -416,106 +387,65 @@ class Reaction extends Down4Message with Roots, Medias {
   @override // override because non-nullable
   ComposedID get mediaID => _mediaID!;
 
-  @override
-  ComposedID get root => _root!;
-
   Down4ID get messageID => _messageID!;
   Set<ComposedID> get reactors => _reactors!;
 
+  factory Reaction.fromStrings(List<String> strs) {
+    // 0   1      2          3         4        5          6
+    // r!msgID!mediaID!tempMediaID!reactorID!reactionID!tempMediaTS
+    return Reaction(Down4ID.fromString(strs[5])!,
+        senderID: ComposedID.fromString(strs[4])!,
+        mediaID: ComposedID.fromString(strs[2])!,
+        messageID: ComposedID.fromString(strs[1])!,
+        tempMediaID: ComposedID.fromString(strs[3]),
+        tempMediaTS: int.tryParse(strs[6]),
+        reactors: {ComposedID.fromString(strs[4])!});
+  }
+
   Reaction(
-    super.id, {
+    this.id, {
     required super.senderID,
-    required ComposedID root,
     required ComposedID mediaID,
     super.tempMediaID,
     super.tempMediaTS,
     required Down4ID messageID,
     required Set<ComposedID> reactors,
-  }) : super(
-            root: root,
-            mediaID: mediaID,
-            messageID: messageID,
-            reactors: reactors);
+  }) : super(mediaID: mediaID, messageID: messageID, reactors: reactors);
 
   @override
   MessageType get type => MessageType.reaction;
 
   @override
-  Future<String> makeBody() async {
-    final rootNode = await global<ChatN>(root);
-    if (rootNode == null) return "";
-    if (rootNode is GroupN) {
-      return "${g.self.firstName} reacted to your message!";
-    } else {
-      return "reacted to your message!";
-    }
-  }
+  Future<String?> uploadRoutine() async {
+    final media = await global<Down4Image>(mediaID);
+    if (media == null) return null;
+    final upld = await media.temporaryUpload();
+    if (upld == null) return null;
 
-  @override
-  Future<void> processMessage({
-    void Function()? onSent,
-    void Function()? onError,
-    Map<String, String>? specificData,
-  }) async {
-    final jsonData = await _mediableRoutine();
-    final rMsg = await global<Chat>(messageID);
-    if (jsonData == null || rMsg == null) return;
-    // this is all the tokens, including all of the sender's devices
-    final targets = await (await rootNode)?.allTargets();
-    if (targets == null) return onError?.call();
-
-    // targets for notifications are all except current device
-    final targetsForData = targets
-        .where((t) => t.device != g.self.deviceID)
-        .map((e) => e.token)
-        .toList();
-
-    // targets for notification is the sender of the message we are reacting to
-    // if that sender is not ourself
-    final targetsForNotification = targets
-        .where((t) => t.userID != g.self.id && t.userID == rMsg.senderID)
-        .map((e) => e.token)
-        .toList();
-
-    final data = jsonEncode(jsonData);
-    List<MessageRequest> reqs = [];
-    if (targetsForNotification.isNotEmpty) {
-      reqs.add(MessageRequest(
-          sender: g.self.id,
-          tokens: targetsForNotification,
-          header: await makeHeader(),
-          body: await makeBody(),
-          data: ""));
-    }
-
-    if (targetsForData.isNotEmpty) {
-      reqs.add(MessageRequest(
-          sender: g.self.id,
-          tokens: targetsForData,
-          header: "",
-          body: "",
-          data: data));
-    }
-
-    await Future.wait(reqs.map((e) => e.process()));
+    final String msgID = messageID.value;
+    final String mID = mediaID.value;
+    final String tmpID = media.tempID!.value;
+    final String tmpTS = media.tempTS!.toString();
+    final String sender = senderID.value;
+    final String sid = id.value;
+    return "r!$msgID!$mID!$tmpID!$sender!$sid!$tmpTS";
   }
 }
 
 class Snip extends Down4Message
     with Down4Object, Locals, Roots, Medias, Reads, Texts, Messages {
   @override
-  ComposedID get mediaID => _mediaID!;
+  ComposedID id;
 
   @override
-  ComposedID get root => _root!;
+  ComposedID get mediaID => _mediaID!;
 
   Snip(
-    super.id, {
+    this.id, {
     required super.senderID,
-    required ComposedID root,
+    required String root,
     required ComposedID mediaID,
     required super.text,
-    super.targets,
     super.tempMediaID,
     super.tempMediaTS,
     bool isRead = false,
@@ -525,53 +455,25 @@ class Snip extends Down4Message
   MessageType get type => MessageType.snip;
 
   @override
-  Future<String> makeBody() async {
-    final rootNode = await global<ChatN>(root);
-    if (rootNode == null) return "";
-    if (rootNode is GroupN) {
-      return "${g.self.firstName} sniped!";
-    } else {
-      return "sniped!";
-    }
-  }
-
-  @override
   Database get dbb => messagesDB;
 
-  @override
-  Future<void> processMessage({
-    void Function()? onError,
-    void Function()? onSent,
-    Map<String, String>? specificData,
-  }) async {
-    final jsonData = await _mediableRoutine();
-    if (jsonData == null) return onError?.call();
-
-    final targets = await (await rootNode)?.allTargets();
-    if (targets == null) return onError?.call();
-
-    final tokens = targets
-        .where((t) => t.device != g.self.deviceID)
-        .map((t) => t.token)
-        .toList();
-
-    MessageRequest(
-      sender: g.self.id,
-      tokens: tokens,
-      header: await makeHeader(),
-      body: await makeBody(),
-      data: jsonEncode(jsonData),
-    ).process();
-  }
+  // @override
+  // Future<String?> uploadRoutine() async {
+  //   final r = await _mediableRoutine();
+  //   if (r == null) return null;
+  //   final successfulUpload = await uploadMessageData(r);
+  //   if (!successfulUpload) return null;
+  //   return "s!${mediaID.value}!${r["tempMediaID"]}";
+  // }
 
   @override
   bool get isRead => _isRead!;
 }
 
 class Chat extends Down4Message
-    with Locals, Roots, Medias, Texts, Reads, Messages {
+    with Down4Object, Locals, Roots, Medias, Texts, Reads, Messages {
   @override
-  ComposedID get root => _root!;
+  ComposedID id;
 
   Set<Down4ID>? get replies => _replies;
   Set<ComposedID>? get nodes => _nodes;
@@ -580,21 +482,17 @@ class Chat extends Down4Message
 
   ComposedID? get forwardedFromID => _forwardedFromID;
 
-  bool get hadForwards => (_messages ?? _nodes ?? {}).isNotEmpty;
-
   Future<void> mergeReactions() async {
-    final jsonRs = reactions.map((e) => e.toJson()).toList();
-    await merge({"reactions": jsonEncode(jsonRs)});
+    final jsonRs = reactions.map((k, e) => MapEntry(k.value, e.toJson()));
+    await merge({"reactions": youKnowEncode(jsonRs)});
   }
 
   Chat(
-    super.id, {
+    this.id, {
     required super.senderID,
-    required ComposedID root,
+    required String root,
     required int timestamp,
-    List<Reaction>? reactions,
-    super.targets,
-    super.messages,
+    Map<Down4ID, Reaction>? reactions,
     super.text,
     super.mediaID,
     super.tempMediaID,
@@ -604,7 +502,7 @@ class Chat extends Down4Message
     super.forwardedFromID,
     super.nodes,
     super.replies,
-  }) : super(reactions: reactions ?? [], timestamp: timestamp, root: root);
+  }) : super(root: root, reactions: reactions ?? {}, timestamp: timestamp);
 
   bool get isSent => _isSent!;
 
@@ -614,23 +512,25 @@ class Chat extends Down4Message
           ? "&attachment"
           : text!;
 
-  List<Reaction> get reactions => _reactions!;
+  Map<Down4ID, Reaction> get reactions => _reactions!;
 
   Future<void> addReaction(Reaction r) async {
-    final elementIsAlreadyThere = _reactions!.contains(r);
-    if (!elementIsAlreadyThere) {
-      reactions.add(r);
-      final jsonRs = reactions.map((r) => r.toJson()).toList();
-      await merge({"reactions": youKnowEncode(jsonRs)});
-    }
+    if (reactions[r.id] != null) return;
+    reactions[r.id] = r;
+    await mergeReactions();
+  }
+
+  Future<void> markSent() async {
+    _isSent = true;
+    await merge({"isSent": _isSent.toString()});
   }
 
   // Creates a new instance of a messages that will be uploaded
   // removes the replies and local data
   // puts a new timestamp and forwarderID as forwarder and a new ID
-  Chat forwarded(ComposedID newSenderID, ComposedID newRoot) {
+  Chat forwarded(ComposedID newSenderID, String newRoot) {
     return Chat(ComposedID(),
-        root: newRoot,
+        root: root,
         senderID: newSenderID,
         forwardedFromID: forwardedFromID ?? senderID,
         text: text,
@@ -645,128 +545,32 @@ class Chat extends Down4Message
   MessageType get type => MessageType.chat;
 
   @override
-  Future<String> makeBody() async {
-    final rootNode = await global<ChatN>(root);
-    if (rootNode == null) return "";
-    if (rootNode is GroupN) {
-      return "${g.self.firstName}: $messagePreview";
-    } else {
-      return messagePreview;
-    }
-  }
-
-  Future<void> _forwardMessagesRoutine({
-    void Function()? onSent,
-    void Function()? onError,
-  }) async {
-    for (final msgID in (_messages ?? {}).toList().reversed) {
-      final msg = await global<Chat>(msgID);
-      if (msg != null) {
-        msg.copiedFor(root: root)
-          ..cache()
-          ..markRead()
-          ..processMessage(onSent: onSent, onError: onError);
-      }
-    }
-  }
-
-  @override
   Database get dbb => messagesDB;
 
-  Chat copiedFor({required ComposedID root}) {
-    return Down4Message.fromJson(toJson(includeLocal: false)
+  Chat copiedFor(String root) {
+    final map = Map<String, String?>.from(toJson(includeLocal: false));
+    return Down4Message.fromJson(map
+      ..["replies"] = null
       ..["id"] = ComposedID().value
       ..["timestamp"] = makeTimestamp().toString()
-      ..["root"] = root.value) as Chat;
-  }
-
-  @override
-  Future<void> processMessage({
-    void Function()? onError,
-    void Function()? onSent,
-    Map<String, String>? specificData,
-  }) async {
-    _forwardMessagesRoutine(onError: onError, onSent: onSent);
-    final data = await _mediableRoutine();
-    final stringData = jsonEncode(data);
-    final ts = await targets;
-    if (ts == null) return onError?.call();
-
-    List<Future<MessageBatchResponse>> requests = [];
-    List<int> indexArr = [];
-    List<MessageTarget> selfTargets = [];
-    List<MessageTarget> otherTargets = [];
-    for (final (i, t) in ts.indexed) {
-      if (t.success) continue;
-      if (t.userID == g.self.id && t.device != g.self.deviceID) {
-        selfTargets.add(t);
-        indexArr.add(i);
-      } else {
-        otherTargets.add(t);
-        indexArr.add(i);
-      }
-    }
-
-    if (selfTargets.isNotEmpty) {
-      requests.add(MessageRequest(
-              sender: g.self.id,
-              tokens: selfTargets.map((e) => e.token).toList(),
-              header: "",
-              body: "",
-              data: stringData)
-          .process());
-    }
-
-    if (otherTargets.isNotEmpty) {
-      requests.add(MessageRequest(
-              sender: g.self.id,
-              tokens: otherTargets.map((e) => e.token).toList(),
-              header: await makeHeader(),
-              body: await makeBody(),
-              data: stringData)
-          .process());
-    }
-
-    final res = await Future.wait(requests).then((value) => value
-        .map((e) => e.sendResponses)
-        .expand((element) => element)
-        .toList());
-
-    for (final (i, r) in res.indexed) {
-      final fullIx = indexArr[i];
-      ts[fullIx].success = r.success;
-    }
-
-    final fullySent = ts.every((t) => t.success);
-    await merge({
-      "isSent": fullySent.toString(),
-      "targets": youKnowEncode(ts.map((e) => e.toJson()).toList()),
-    });
-
-    onSent?.call();
+      ..["root"] = root) as Chat;
   }
 
   @override
   bool get isRead => _isRead!;
 }
 
-class Payment extends Down4Message with Cash, Locals {
+class Payment extends Down4Message with Cash {
   @override
   Down4ID get paymentID => _paymentID!;
-
-  @override
-  Database get dbb => messagesDB;
 
   Payment({
     required super.senderID,
     required Down4ID paymentID,
-    required List<MessageTarget> targets,
     ComposedID? tempPaymentID,
     int? tempPaymentTS,
-    super.payment,
-  }) : super(paymentID,
+  }) : super(
             paymentID: paymentID,
-            targets: targets,
             tempPaymentID: tempPaymentID,
             tempPaymentTS: tempPaymentTS);
 
@@ -774,80 +578,19 @@ class Payment extends Down4Message with Cash, Locals {
   MessageType get type => MessageType.payment;
 
   @override
-  Future<List<MessageTarget>> get targets async => _targets!;
-
-  @override
-  Future<String> makeBody() async {
-    return "payed you!";
-  }
-
-  @override
-  Future<String> makeHeader() async {
-    return g.self.displayName;
-  }
-
-  @override
-  Future<void> processMessage({
-    void Function()? onError,
-    void Function()? onSent,
-  }) async {
-    final data = await _paymentUploadRoutine();
-    if (data == null) return onError?.call();
-    final String strData = jsonEncode(data);
-
-    final ts = await targets;
-
-    List<Future<MessageBatchResponse>> requests = [];
-    List<int> indexArr = [];
-    List<MessageTarget> selfTargets = [];
-    List<MessageTarget> otherTargets = [];
-    for (final (i, t) in ts.indexed) {
-      if (t.success) continue;
-      if (t.userID == g.self.id && t.device != g.self.deviceID) {
-        selfTargets.add(t);
-        indexArr.add(i);
-      } else {
-        otherTargets.add(t);
-        indexArr.add(i);
-      }
+  Future<String?> uploadRoutine() async {
+    final payment = await global<Down4Payment>(paymentID);
+    if (payment == null) return null;
+    final upload = await payment.temporaryUpload();
+    if (upload == null) return null;
+    if (upload.freshID != null) {
+      final String freshID = upload.freshID!.value;
+      final String freshTS = upload.freshTS!.toString();
+      return "p!${paymentID.value}!$freshID!$freshTS";
+    } else {
+      final String tmpID = payment.tempID!.value;
+      final String tmpTS = payment.tempTS!.toString();
+      return "p!${paymentID.value}!$tmpID!$tmpTS";
     }
-
-    if (selfTargets.isNotEmpty) {
-      requests.add(MessageRequest(
-              sender: g.self.id,
-              tokens: selfTargets.map((e) => e.token).toList(),
-              header: "",
-              body: "",
-              data: strData)
-          .process());
-    }
-
-    if (otherTargets.isNotEmpty) {
-      requests.add(MessageRequest(
-              sender: g.self.id,
-              tokens: otherTargets.map((e) => e.token).toList(),
-              header: await makeHeader(),
-              body: await makeBody(),
-              data: strData)
-          .process());
-    }
-
-    final res = await Future.wait(requests).then((value) => value
-        .map((e) => e.sendResponses)
-        .expand((element) => element)
-        .toList());
-
-    for (final (i, r) in res.indexed) {
-      final fullIx = indexArr[i];
-      ts[fullIx].success = r.success;
-    }
-
-    final fullySent = ts.every((t) => t.success);
-    await merge({
-      "isSent": fullySent.toString(),
-      "targets": youKnowEncode(ts.map((e) => e.toJson()).toList()),
-    });
-
-    onSent?.call();
   }
 }

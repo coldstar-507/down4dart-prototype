@@ -1,5 +1,6 @@
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/data_objects/messages.dart';
+import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 
@@ -25,7 +26,7 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final void Function(Iterable<Chat>) send;
   final void Function() forward;
   final void Function() hyperchat, themes, openPreview;
-  final void Function() group, money, search, delete, snip;
+  final void Function() group, money, search, delete, snip, add;
   const HomePage({
     required this.themes,
     required this.hyperchat,
@@ -39,6 +40,7 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
     required this.send,
     required this.openChat,
     required this.forward,
+    required this.add,
     this.promptMessage,
     Key? key,
   }) : super(key: key);
@@ -60,7 +62,8 @@ class _HomePageState extends State<HomePage>
         Hyper2,
         Money2,
         Boost2,
-        Append2 {
+        Append2,
+        Add2 {
   late String placeHolder = widget.promptMessage ?? ":)";
 
   late ScrollController scroller =
@@ -113,6 +116,7 @@ class _HomePageState extends State<HomePage>
         ConsoleButton(name: "DELETE", onPress: widget.delete),
         ConsoleButton(name: "FORWARD", onPress: widget.forward),
         ConsoleButton(name: "COMPOSE", onPress: () => changeConsole("compose")),
+        addButton,
         appendButton,
       ]);
 
@@ -172,30 +176,51 @@ class _HomePageState extends State<HomePage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
+    final sel = palettes.values.selected().asNodes<ChatN>();
+
+    var chts = <Chat>[];
+
     final fo = g.vm.forwardingObjects;
-    final media = mediaInput ?? cameraInput
-      ?..cache()
-      ..merge();
-    if (media == null && input.value.isEmpty && fo.isEmpty) return;
-    final messages = palettes.values
-        .selected()
-        .asNodes<ChatN>()
-        .asComposedIDs()
-        .map((root) => Chat(Down4ID(),
-            senderID: g.self.id,
-            root: root,
-            nodes: fo.palettes().asComposedIDs().toSet(),
-            messages: fo.chatMsgs().asIDs().toSet(),
-            text: input.value,
-            timestamp: makeTimestamp(),
-            mediaID: media?.id)
-          ..cache()
-          ..merge());
 
-    widget.send(messages);
+    final media = mediaInput ??
+        (cameraInput
+          ?..cache()
+          ..merge()
+          ..writeFromCachedPath());
 
-    g.vm.forwardingObjects.clear();
-    input.clear();
+    final fmsgs = fo.whereType<ChatMessage>().map((cm) => cm.message);
+    if (fmsgs.isNotEmpty) {
+      final fm = sel
+          .map((n) => fmsgs
+              .map((m) => m.forwarded(g.self.id, n.root_)
+                ..cache()
+                ..merge())
+              .toList()
+              .reversed)
+          .expand((e) => e);
+      chts.addAll(fm);
+    }
+
+    final fnds = fo.palettes().asComposedIDs().toSet();
+    if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
+      final messages = sel.map((n) => Chat(ComposedID(),
+          root: n.root_,
+          senderID: g.self.id,
+          nodes: fnds,
+          text: input.value,
+          timestamp: makeTimestamp(),
+          mediaID: media?.id)
+        ..cache()
+        ..merge());
+      chts.addAll(messages);
+    }
+
+    if (chts.isNotEmpty) {
+      g.vm.mode = Modes.def;
+      g.vm.forwardingObjects.clear();
+      widget.send(chts);
+      input.clear();
+    }
   }
 
   @override
@@ -241,10 +266,12 @@ class _HomePageState extends State<HomePage>
     g.vm.mode = Modes.forward;
     widget.forward();
   }
-  
+
   @override
   void boost() {
     print("TODO, IMPLEMENT BOOST FUNC");
   }
 
+  @override
+  void add() => widget.add();
 }

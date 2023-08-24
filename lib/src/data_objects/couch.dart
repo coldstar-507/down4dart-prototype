@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:down4/src/_dart_utils.dart';
+import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '_data_utils.dart';
 import 'medias.dart';
@@ -14,11 +15,12 @@ import '../bsv/wallet.dart';
 
 import 'package:cbl/cbl.dart';
 
+late sql.Database db;
+
 late AsyncDatabase nodesDB,
     tempDB,
     personalDB,
     mediasDB,
-    reactionsDB,
     messagesDB,
     utxosDB,
     paymentsDB,
@@ -30,6 +32,8 @@ Future<List<T>> globall<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   Iterable<ComposedID>? tempIDs,
+  Database? sdb,
+  Map<Down4ID, Locals>? sCache,
 }) async {
   if (ids == null) return [];
   final reqs = await Future.wait(ids.indexed
@@ -46,60 +50,66 @@ Map<Down4ID, Locals> _globalCache = {};
 
 Locals? unCache(Down4ID id) => _globalCache.remove(id);
 
-void gCache(Locals obj, {bool ifAbsent = false}) {
+void cacheObj(Locals obj,
+    {bool ifAbsent = false, Map<Down4ID, Locals>? sCache}) {
+  final c = sCache ?? _globalCache;
   if (ifAbsent) {
-    _globalCache[obj.id] ??= obj;
+    c[obj.id] ??= obj;
   } else {
-    _globalCache[obj.id] = obj;
+    c[obj.id] = obj;
   }
 }
 
 Future<void> loadIndexes() async {
-  final isHiddenNodeIndexConfig = ValueIndexConfiguration(["isHidden"]);
   final nodeTypeIndexConfig = ValueIndexConfiguration(["type"]);
 
   final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
   final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
-  final isVideoMediaIndexConfig = ValueIndexConfiguration(["isVideo"]);
 
-  final isSavedMessageIndexConfig = ValueIndexConfiguration(["isSaved"]);
   final isSnipMessageIndexConfig = ValueIndexConfiguration(["isSnip"]);
   final rootMessageIndexConfig = ValueIndexConfiguration(["root"]);
 
   final paymentTimestampIndexConfig = ValueIndexConfiguration(["ts"]);
 
-  final reactionMessageRefIndexConfig = ValueIndexConfiguration(["messageID"]);
-
-  await nodesDB.createIndex("hiddenIndex", isHiddenNodeIndexConfig);
   await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
 
   await mediasDB.createIndex("lastUseIndex", lastUseMediaIndexConfig);
   await mediasDB.createIndex("isSavedIndex", isSavedMediaIndexConfig);
-  await mediasDB.createIndex("isVideoIndex", isVideoMediaIndexConfig);
 
-  await messagesDB.createIndex("isSavedIndex", isSavedMessageIndexConfig);
   await messagesDB.createIndex("isSnipIndex", isSnipMessageIndexConfig);
   await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
 
   await paymentsDB.createIndex("timestampIndex", paymentTimestampIndexConfig);
-
-  await reactionsDB.createIndex(
-      "messageRefIndex", reactionMessageRefIndexConfig);
 }
 
 Future<T?> fetch<T extends Locals>(
   ComposedID? id, {
   bool doMerge = false,
+  bool doCache = true,
   ComposedID? tempID,
+  Database? sdb,
+  Map<Down4ID, Locals>? sc,
 }) async {
   Future<T?> fetchNode() async {
     if (id == null) return null;
-    final ss = await id.userRef.get();
+    final ss = await id.nodeRef.get();
     if (!ss.exists) return null;
     final jsn = Map<String, String?>.from(ss.value as Map);
-    final node = Down4Node.fromJson(jsn)..cache();
-    if (doMerge) node.merge();
+    final node = Down4Node.fromJson(jsn);
+    if (doCache) node.cache(sc: sc);
+    if (doMerge) node.merge(null, sdb);
     return node as T;
+  }
+
+  Future<T?> fetchMessage() async {
+    if (id == null) return null;
+    final m = await id.messageRef.get();
+    if (!m.exists) return null;
+    final jsn = Map<String, String?>.from(m.value as Map);
+    final msg = Down4Message.fromJson(jsn) as Messages;
+    if (doCache) msg.cache(sc: sc);
+    if (doMerge) msg.merge(null, sdb);
+    return msg as T;
   }
 
   Future<Down4Media?> fetchMedia() async {
@@ -116,10 +126,11 @@ Future<T?> fetch<T extends Locals>(
 
       // will throw if no metadata, so we can use !
       final mediaJson = (await futureMedia).customMetadata!;
-      final media = Down4Media.fromJson(mediaJson)..cache();
+      final media = Down4Media.fromJson(mediaJson);
+      if (doCache) media.cache(sc: sc);
 
       if (doMerge) {
-        media.merge();
+        media.merge(null, sdb);
         if (rawData != null) await media.write(rawData);
       }
       return media;
@@ -128,8 +139,27 @@ Future<T?> fetch<T extends Locals>(
       return null;
     }
   }
-  
+
+  Future<Down4Payment?> fetchPayment() async {
+    if (id == null || tempID == null) return null;
+    final ref = tempID.tempStoreRef;
+    try {
+      final compressed = await ref.getData();
+      if (compressed == null) return null;
+      return Down4Payment.fromCompressed(compressed);
+    } catch (e) {
+      print("error fetching payment: $e");
+      return null;
+    }
+  }
+
   switch (T) {
+    case Messages:
+      return fetchMessage();
+    case Chat:
+      return fetchMessage();
+    case Snip:
+      return fetchMessage();
     case Down4Node:
       return fetchNode();
     case BranchN:
@@ -157,6 +187,7 @@ Future<T?> fetch<T extends Locals>(
     case Down4Image:
       return fetchMedia() as Future<T?>;
     case Down4Payment:
+      return fetchPayment() as Future<T?>;
   }
 
   throw 'Unsupported type for fetching $T';
@@ -164,8 +195,6 @@ Future<T?> fetch<T extends Locals>(
 
 Database gdb<T extends Locals>() {
   switch (T) {
-    case Reaction:
-      return reactionsDB;
     case Down4Node:
       return nodesDB;
     case BranchN:
@@ -192,6 +221,8 @@ Database gdb<T extends Locals>() {
       return mediasDB;
     case Down4Image:
       return mediasDB;
+    case Messages:
+      return messagesDB;
     case Chat:
       return messagesDB;
     case Snip:
@@ -209,19 +240,21 @@ Database gdb<T extends Locals>() {
   throw 'No db exists for type: $T';
 }
 
-Future<T?> local<T extends Locals>(Down4ID id) async {
-  final doc = await gdb<T>().document(id.value);
+Future<T?> local<T extends Locals>(Down4ID id,
+    {bool doCache = false, Map<Down4ID, Locals>? sc, Database? sdb}) async {
+  final db = sdb ?? gdb<T>();
+  final doc = await db.document(id.value);
   if (doc == null) return null;
-  final element = fromJson<T>(doc.toPlainMap().cast());
+  final jsns = Map<String, String?>.from(doc.toPlainMap());
+  final element = fromJson<T>(jsns);
+  if (doCache) element.cache(sc: sc);
   return element;
 }
 
-T? cache<T extends Locals>(Down4ID? id) {
-  final element = id == null ? null : _globalCache[id] as T?;
-  if (element != null) {
-    return element;
-  }
-  return null;
+T? cache<T extends Locals>(Down4ID? id, {Map<Down4ID, Locals>? sc}) {
+  final c = sc ?? _globalCache;
+  final element = id == null ? null : c[id] as T?;
+  return element;
 }
 
 Future<T?> global<T extends Locals>(
@@ -230,28 +263,71 @@ Future<T?> global<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   ComposedID? tempID,
+  Database? sdb,
+  Map<Down4ID, Locals>? sc,
 }) async {
   if (id == null) return null;
-  final cached = cache<T>(id);
+  final cached = cache<T>(id, sc: sc);
   if (cached != null) {
     print("RETRIEVED $T ID: ${id.value} FROM CACHE");
     return cached;
   }
-  final localed = await local<T>(id);
+  final localed = await local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
   if (localed != null) {
     print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
-    return doCache ? _globalCache[id] = localed : localed;
+    if (doCache) localed.cache(sc: sc);
+    return localed;
   }
   if (!doFetch) return null;
-  final fetched =
-      await fetch<T>(id as ComposedID, doMerge: doMergeIfFetch, tempID: tempID);
+  final fetched = await fetch<T>(id as ComposedID,
+      doCache: doCache,
+      doMerge: doMergeIfFetch,
+      tempID: tempID,
+      sc: sc,
+      sdb: sdb);
   if (fetched != null) {
     print("RETRIEVED $T ID: ${id.value} FROM FETCH");
-    return doCache ? _globalCache[id] = fetched : fetched;
+    return fetched;
   }
   return null;
 }
 
+enum GetType { miss, cache, local, fetch }
+
+Future<(T?, GetType)> globalgt<T extends Locals>(
+  Down4ID? id, {
+  bool doCache = true,
+  bool doFetch = false,
+  bool doMergeIfFetch = false,
+  ComposedID? tempID,
+  Database? sdb,
+  Map<Down4ID, Locals>? sc,
+}) async {
+  if (id == null) return (null, GetType.miss);
+  final cached = cache<T>(id, sc: sc);
+  if (cached != null) {
+    print("RETRIEVED $T ID: ${id.value} FROM CACHE");
+    return (cached, GetType.cache);
+  }
+  final localed = await local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
+  if (localed != null) {
+    print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
+    if (doCache) localed.cache(sc: sc);
+    return (localed, GetType.local);
+  }
+  if (!doFetch) return (null, GetType.miss);
+  final fetched = await fetch<T>(id as ComposedID,
+      doCache: doCache,
+      doMerge: doMergeIfFetch,
+      tempID: tempID,
+      sc: sc,
+      sdb: sdb);
+  if (fetched != null) {
+    print("RETRIEVED $T ID: ${id.value} FROM FETCH");
+    return (fetched, GetType.fetch);
+  }
+  return (null, GetType.miss);
+}
 
 T fromJson<T extends Locals>(Map<String, String?> json) {
   switch (T) {
@@ -362,8 +438,11 @@ Future<Set<ComposedID>> allMediaReferences() async {
   final ar = await er.allResults();
   final rs = ar
       .map((e) {
-        final jsn = List.from(jsonDecode(e.string("reactions")!));
-        return jsn.map((e) => Down4Message.fromJson(e) as Reaction);
+        final jsn = List.from(youKnowDecode(e.string("reactions")!));
+        return jsn.map((e) {
+          final jsns = Map<String, String?>.from(e as Map);
+          return Down4Message.fromJson(jsns) as Reaction;
+        });
       })
       .expand((e) => e)
       .map((e) => e.mediaID);
@@ -404,17 +483,6 @@ Future<void> mediaDeletingRoutine() async {
     final media = Down4Media.fromJson(jsn);
     if (!allMediaRefs.contains(media.id)) media.delete();
   }
-}
-
-Future<List<Down4Message>> getBackgroundMessages() async {
-  const raw = "SELECT * FROM _ AS k";
-  final q = await AsyncQuery.fromN1ql(tempDB, raw);
-  final r = await q.execute();
-  final a = await r.allResults();
-  return a.map((e) {
-    final jsn = Map<String, String?>.from(e.toPlainMap()["k"] as Map);
-    return Down4Message.fromJson(jsn);
-  }).toList();
 }
 
 Future<List<ChatN>> loadHome() async {

@@ -713,13 +713,16 @@ mixin Transition2 on Pager2 {
     Iterable<Down4ID> userSel = selection.whereNodeIs<PersonN>().asIDs();
     Iterable<Down4ID> ofGroup = sGroup.map((g) => g.group).expand((e) => e);
     Set<Down4ID> fullSel = userSel.followedBy(ofGroup).toSet();
+    final ogs = originals
+        .where((p) => p.show)
+        .followedBy(originals.where((p) => !p.show));
 
     final sizeAnim_ = oneToZero.animate(curved);
     final fadeAnim_ = oneToZero.animate(fadeAnim);
 
     int nHidden = 0;
     Set<PersonN> trueTargets = {};
-    final animatedPalettes = originals.map((p) {
+    final animatedPalettes = ogs.map((p) {
       final inSel = fullSel.contains(p.id);
       final there = p.node is PersonN && inSel;
       final stayHid = !p.show && !inSel;
@@ -742,6 +745,7 @@ mixin Transition2 on Pager2 {
     if (ogs == null && ogOffset == null) return;
     final (transited, nHidden, tt) = transitionPalettes(ogs!);
     trueTargets = tt;
+    print("there are $nHidden hidden palettes!");
     Future(() {
       final offset = nHidden * Palette.fullHeight;
       transitedPalettes = transited;
@@ -952,7 +956,8 @@ mixin Camera2 on Pager2 {
         shouldBeDownButIsnt: cameraController?.value.isRecordingVideo ?? false,
         onPress: () async {
           final XFile f = await cameraController!.takePicture();
-          tempInput = makeCameraMedia(
+          tempInput = await makeCameraMedia(
+              writeFromCachedPath: false,
               cachedPath: f.path,
               size: cameraController!.value.previewSize!.inverted,
               isReversed: isReversed,
@@ -966,7 +971,8 @@ mixin Camera2 on Pager2 {
         },
         onLongPressUp: () async {
           final XFile f = await cameraController!.stopVideoRecording();
-          tempInput = makeCameraMedia(
+          tempInput = await makeCameraMedia(
+              writeFromCachedPath: false,            
               cachedPath: f.path,
               size: cameraController!.value.previewSize!.inverted,
               isReversed: isReversed,
@@ -1009,7 +1015,8 @@ mixin Camera2 on Pager2 {
             // border: Border.all(
             //     color: g.theme.consoleBorderColor, width: Console.borderWidth),
           ),
-          child: tempInput!.display(size: _squaredCamSize, forceSquare: true));
+          child: tempInput!.display(
+              size: _squaredCamSize, forceSquare: true, autoPlay: true));
     } else if (cameraController != null) {
       return Container(
         clipBehavior: Clip.hardEdge,
@@ -1118,7 +1125,7 @@ mixin Add2 {
 }
 
 mixin Scanner2 on Pager2 {
-  void onScan(Barcode bc, MobileScannerArguments? args);
+  void onScan(BarcodeCapture bc);
   MobileScanner? _scanner;
 
   Widget get scanner => _scanner ??= MobileScanner(
@@ -1716,17 +1723,21 @@ mixin Scanner2 on Pager2 {
 //   Future<void> send({FireMedia? mediaInput});
 // }
 
-Down4Media makeCameraMedia({
+Future<Down4Media> makeCameraMedia({
   required String cachedPath,
   required Size size,
   required bool isReversed,
   required ComposedID owner,
   required bool isSquared,
-}) {
+  required bool writeFromCachedPath,
+}) async {
   final mime = lookupMimeType(cachedPath)!;
+  final isVideo = videoMimes.contains(mime);
   final data = File(cachedPath).readAsBytesSync();
-  return Down4Media.fromLocal(ComposedID(region: owner.region), // hack for init
+  final tinyThumbnail = isVideo ? null : makeTiny(data);
+  return Down4Media.fromLocal2(ComposedID(region: owner.region), // hack for init
       mainCachedPath: cachedPath,
+      writeFromCachedPath: writeFromCachedPath,
       metadata: Down4MediaMetadata(
           ownerID: owner,
           isSquared: isSquared,
@@ -1735,5 +1746,5 @@ Down4Media makeCameraMedia({
           width: size.width,
           height: size.height,
           mime: mime),
-      tinyThumbnail: makeTiny(data));
+      tinyThumbnail: tinyThumbnail);
 }

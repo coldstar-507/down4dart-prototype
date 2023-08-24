@@ -2,6 +2,7 @@ import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:down4/src/render_objects/palette.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../data_objects/_data_utils.dart';
 import '../globals.dart';
 
@@ -131,7 +132,7 @@ class _AndrewState extends State<Andrew> {
       g.vm.forwardingObjects.whereType<Palette>().length;
 
   Widget? get forwardingIndicator {
-    final nForw = nForwardingMessages + nForwardingPalettes; 
+    final nForw = nForwardingMessages + nForwardingPalettes;
     if (nForw == 0 || widget.previewFunction == null) return null;
     return GestureDetector(
         onTap: widget.previewFunction,
@@ -336,8 +337,8 @@ class _AndrewState extends State<Andrew> {
         duration: Console.animationDuration,
         opacity: widget.staticRow == null ? 0 : 1,
         child: widget.staticRow != null
-        ? Console3.staticRow(widget.staticRow!)
-        : SizedBox(width: g.sizes.w),
+            ? Console3.staticRow(widget.staticRow!)
+            : SizedBox(width: g.sizes.w),
       ),
     );
   }
@@ -401,8 +402,12 @@ class _AndrewState extends State<Andrew> {
       ),
       child: WillPopScope(
         onWillPop: () async {
-          widget.backFunction?.call();
-          return false;
+          if (widget.backFunction == null) {
+            SystemNavigator.pop();            
+          } else {
+            widget.backFunction!.call();          
+          }
+          return false;          
         },
         child: Scaffold(
           backgroundColor: Colors.transparent,

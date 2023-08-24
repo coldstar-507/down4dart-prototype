@@ -74,7 +74,11 @@ class ChatMessage extends StatelessWidget
   final List<ChatReplyInfo>? repliesInfo;
   final List<Down4Node>? nodes;
 
-  List<Reaction> get reactions => message.reactions;
+  Map<Down4ID, Reaction> get reactions => message.reactions;
+
+  Radius get borderRadius => const Radius.circular(10);
+
+  Radius get innerRadius => const Radius.circular(8);
 
   final Future<void> Function(Chat message) react;
 
@@ -225,9 +229,9 @@ class ChatMessage extends StatelessWidget
     }
   }
 
-  static double get maxMessageWidth => g.sizes.w * 0.8;
+  static double get maxMessageWidth => g.sizes.w * 0.7;
 
-  static double get textPadding => 10.0;
+  static double get textPadding => 12.0;
 
   static double get maxTextWidth =>
       maxMessageWidth - (2 * textPadding) - lateralBorderWidth;
@@ -360,7 +364,7 @@ class ChatMessage extends StatelessWidget
             Container(
               width: 2,
               decoration: BoxDecoration(
-                borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+                borderRadius: BorderRadius.all(borderRadius),
                 color: g.theme.chatRepilesTextStyle.color,
               ),
             ),
@@ -398,8 +402,8 @@ class ChatMessage extends StatelessWidget
     if (ri == null) return null;
     return Container(
       clipBehavior: Clip.hardEdge,
-      decoration: const BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(4.0))),
+      decoration: BoxDecoration(
+          borderRadius: BorderRadius.vertical(top: innerRadius)),
       child: Column(
         textDirection: TextDirection.ltr,
         children: ri.map((r) => reply(r)).toList(),
@@ -491,10 +495,8 @@ class ChatMessage extends StatelessWidget
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
               borderRadius: BorderRadius.vertical(
-                  top: (!hasMedia && !hasText
-                      ? const Radius.circular(4.0)
-                      : Radius.zero),
-                  bottom: const Radius.circular(4.0))),
+                  top: (!hasMedia && !hasText ? innerRadius : Radius.zero),
+                  bottom: innerRadius)),
           child: Column(
               children: hasPalettes
                   ? nodes!.map((node) => loadedPalette(node)).toList()
@@ -518,10 +520,11 @@ class ChatMessage extends StatelessWidget
               width: mi.precalculatedMediaSize.width,
               decoration: BoxDecoration(
                 color: messageColor,
-                borderRadius: BorderRadius.vertical(
-                    top: const Radius.circular(4),
-                    bottom: Radius.circular(hasText || hasPalettes ? 0 : 4)),
-              ),
+                  borderRadius: BorderRadius.vertical(
+                      top: innerRadius,
+                      bottom: hasText || hasPalettes
+                          ? const Radius.circular(0)
+                          : innerRadius)),
               child: child));
     }
 
@@ -546,10 +549,11 @@ class ChatMessage extends StatelessWidget
                 color: myMessage
                     ? g.theme.myBubblesColor
                     : g.theme.otherBubblesColor,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(hasMedia ? 0 : 4),
-                  bottom: Radius.circular(hasPalettes ? 0 : 4),
-                )),
+              borderRadius: BorderRadius.vertical(
+                top: hasMedia ? const Radius.circular(0) : innerRadius,
+                bottom: hasPalettes ? const Radius.circular(0) : innerRadius,
+              ),
+            ),
             child: bubble));
   }
 
@@ -559,7 +563,7 @@ class ChatMessage extends StatelessWidget
       clipBehavior: Clip.hardEdge,
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(6.0)),
+          borderRadius: BorderRadius.all(borderRadius),
           boxShadow: [
             BoxShadow(
               color: Colors.transparent,
@@ -630,7 +634,7 @@ class ChatMessage extends StatelessWidget
               onTap: () => increment(message, r.id),
               child: Container(
                 decoration:
-                    BoxDecoration(borderRadius: BorderRadius.circular(4)),
+                    BoxDecoration(borderRadius: BorderRadius.all(innerRadius)),
                 clipBehavior: Clip.hardEdge,
                 child: media.display(
                   forceSquare: true,
@@ -691,8 +695,7 @@ class ChatMessage extends StatelessWidget
               Container(
                   constraints: BoxConstraints(maxWidth: messageWidth),
                   decoration: BoxDecoration(
-                      borderRadius:
-                          const BorderRadius.all(Radius.circular(6.0)),
+                      borderRadius: BorderRadius.all(borderRadius),
                       border: Border.all(
                         width: bodyBorderWidth,
                         color: selected
@@ -751,16 +754,15 @@ class ChatMessage extends StatelessWidget
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List<Widget?>.generate(maxReactionForThisMessage,
-                  (index) => reaction(reactions[index]))
+                  (index) => reaction(reactions.values.elementAt(index)))
               .whereType<Widget>()
               .toList(),
         ),
-        // ),
       );
 
   Widget get reactionsColumn {
-    final rs = List<Widget?>.generate(
-            maxReactionForThisMessage, (index) => reaction(reactions[index]))
+    final rs = List<Widget?>.generate(maxReactionForThisMessage,
+            (index) => reaction(reactions.values.elementAt(index)))
         .whereType<Widget>()
         .toList();
 

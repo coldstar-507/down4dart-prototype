@@ -1,5 +1,6 @@
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/data_objects/messages.dart';
+import 'package:down4/src/data_objects/nodes.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
@@ -45,7 +46,6 @@ class _ForwadingPageState extends State<ForwardingPage>
         Sender2,
         Compose2,
         Hyper2 {
-
   Set<Down4Object> get fo => widget.fObjects;
 
   late ScrollController scroller =
@@ -67,7 +67,8 @@ class _ForwadingPageState extends State<ForwardingPage>
     super.dispose();
   }
 
-  Map<Down4ID, Palette> get _forwardState => widget.viewState.pages[0].state.cast();
+  Map<Down4ID, Palette> get _forwardState =>
+      widget.viewState.pages[0].state.cast();
 
   Iterable<Palette> get _fList => _forwardState.values;
 
@@ -117,22 +118,47 @@ class _ForwadingPageState extends State<ForwardingPage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
-    final media = mediaInput ?? cameraInput
-      ?..cache()
-      ..merge();
+    final media = mediaInput ??
+        (cameraInput
+          ?..cache()
+          ..merge()
+          ..writeFromCachedPath());
 
-    if (mediaInput == null && input.value.isEmpty && fo.isEmpty) return;
+    var chts = <Chat>[];
 
-    widget.forward(selection.asComposedIDs().map((root) => Chat(Down4ID(),
-        senderID: g.self.id,
-        root: root,
-        text: input.value,
-        messages: fo.whereType<ChatMessage>().asIDs().toSet(),
-        nodes: fo.whereType<Palette>().asComposedIDs().toSet(),
-        timestamp: makeTimestamp(),
-        mediaID: media?.id)
-      ..cache()
-      ..merge()));
+    final sel = selection.asNodes<ChatN>();
+
+    final fms = fo.whereType<ChatMessage>().map((cm) => cm.message);
+
+    final fm = sel
+        .map((s) => fms
+            .map((m) => m.forwarded(g.self.id, s.root_)
+              ..cache()
+              ..merge())
+            .toList()
+            .reversed)
+        .expand((e) => e);
+
+    chts.addAll(fm);
+
+    final fnds = fo.whereType<Palette>().asComposedIDs().toSet();
+    if (input.value.isNotEmpty || fnds.isNotEmpty || media != null) {
+      final chats = sel.map((n) => Chat(ComposedID(),
+          root: n.root_,
+          senderID: g.self.id,
+          text: input.value,
+          nodes: fo.whereType<Palette>().asComposedIDs().toSet(),
+          timestamp: makeTimestamp(),
+          mediaID: media?.id)
+        ..cache()
+        ..merge());
+      chts.addAll(chats);
+    }
+    if (chts.isNotEmpty) {
+      g.vm.mode = Modes.def;
+      g.vm.forwardingObjects.clear();
+      widget.forward(chts);
+    }
   }
 
   @override

@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';
+import 'dart:ui' as ui;
 
-import 'package:image/image.dart' as IMG;
+import 'package:image/image.dart' as img;
 import 'package:flutter/services.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +47,7 @@ extension MediaDisplay on Down4Media {
     bool autoPlay = false,
   }) {
     if (this is Down4Video) {
+      print("auto play video: $autoPlay");
       return _Down4VideoPlayer(
           key: key,
           videoController: controller,
@@ -434,6 +436,13 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
     }
 
     if (ctrlIsInitialized) ctrl?.addListener(_listenOnEnd);
+    if (widget.autoPlay) {
+      print("auto playing video");
+      await ctrl?.initialize();
+      await ctrl?.setLooping(true);
+      await ctrl?.play();
+    }
+    setState(() {});
   }
 
   @override
@@ -518,9 +527,14 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
   }
 
   Widget thumbnail() {
-    return widget.media.thumbnail(widget.displaySize,
-            forceSquare: widget.forceSquareAnyways) ??
-        const SizedBox.shrink();
+    if (widget.media.thumbnailFile != null) {
+      return SizedBox(
+          height: widget.displaySize.height,
+          width: widget.displaySize.width,
+          child: widget.media.thumbnail(widget.displaySize));
+    } else {
+      return const SizedBox.shrink();
+    }
   }
 
   double get properLogoDimension => widget.displaySize.aspectRatio > 1
@@ -550,7 +564,9 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
   @override
   Widget build(BuildContext context) {
     print("VIDEO IS PLAYING = $isPlaying");
-    if (!ctrlIsInitialized && !loading) {
+    if (!ctrlIsInitialized && widget.autoPlay) {
+      return const SizedBox.shrink();
+    } else if (!ctrlIsInitialized && !loading) {
       return Stack(children: [thumbnail(), playButton()]);
     } else if (!ctrlIsInitialized && loading) {
       return Stack(children: [
@@ -680,7 +696,7 @@ extension ImageOfNodes on PaletteN {
     return null;
   }
 
-  Image defaultNodeImage([Size? s]) {
+  Widget defaultNodeImage([Size? s]) {
     final n = this;
     if (n is PersonN) {
       return Image.asset('assets/images/hashirama.jpg',
@@ -701,7 +717,8 @@ extension ImageOfNodes on PaletteN {
         return g.d3;
       }
     } else if (n is NodeTheme) {
-      return g.lg;
+      final double dim = s?.height ?? Palette.paletteHeight;
+      return down4Logo(dim, g.theme.down4IconForPaletteColor);
     }
     throw 'stop breaking my app';
   }
@@ -895,15 +912,15 @@ Future<Down4Image?> importNodeMedia() async {
 }
 
 Uint8List resizeImage(Uint8List bytes, int width, [int? height]) {
-  IMG.Image? img = IMG.decodeImage(bytes);
-  IMG.Image resized = IMG.copyResize(img!, width: width, height: height);
-  return Uint8List.fromList(IMG.encodePng(resized));
+  img.Image? image = img.decodeImage(bytes);
+  img.Image resized = img.copyResize(image!, width: width, height: height);
+  return Uint8List.fromList(img.encodePng(resized));
 }
 
 String makeTiny(Uint8List bytes) {
-  IMG.Image? img = IMG.decodeImage(bytes);
-  IMG.Image resized = IMG.copyResize(img!, width: 20);
-  final d = Uint8List.fromList(IMG.encodeGif(resized));
+  img.Image? image = img.decodeImage(bytes);
+  img.Image resized = img.copyResize(image!, width: 20);
+  final d = Uint8List.fromList(img.encodeGif(resized));
   return base64Encode(d);
 }
 
@@ -938,11 +955,82 @@ Future<void> importConsoleMedias({
         mime: mime,
         isSquared: false,
         isReversed: false);
-    Down4Media.fromLocal(ComposedID(),
-        metadata: metadata, isSaved: true, lastUse: makeTimestamp())
+    await Down4Media.fromLocal2(ComposedID(),
+        mainCachedPath: r.path!,
+        writeFromCachedPath: true,
+        metadata: metadata,
+        isSaved: true,
+        lastUse: makeTimestamp())
       ..cache()
-      ..merge()
-      ..write(r.bytes!);
+      ..merge();
     reload();
+  }
+}
+
+Future<void> cropAndSaveToSquare(
+    {required File from, required File to, int size = 200}) async {
+  img.Image? ogImage = img.decodeImage(await from.readAsBytes());
+  if (ogImage == null) return;
+  final minSize = math.min(ogImage.height, ogImage.width);
+  final resize = size > minSize ? minSize : size;
+  final im = img.copyResizeCropSquare(ogImage, resize);
+  await to.writeAsBytes(img.encodePng(im));
+}
+
+// Future<ui.Image?> cropBitmapToSquare(Uint8List originalBytes) async {
+//   try {
+//     final ui.Codec codec = await ui.instantiateImageCodec(originalBytes);
+//     final ui.Image image = (await codec.getNextFrame()).image;
+//     final int size = image.width < image.height ? image.width : image.height;
+
+//     final recorder = ui.PictureRecorder();
+//     final canvas = Canvas(recorder);
+//     canvas.drawImageRect(
+//       image,
+//       Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+//       Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
+//       Paint(),
+//     );
+
+//     final picture = recorder.endRecording();
+//     return picture.toImage(size, size);
+//   } catch (e) {
+//     print('Error while cropping bitmap: $e');
+//     return null;
+//   }
+// }
+
+Future<Uint8List?> applyCircularMask(ui.Image image) async {
+  final byteData = await image.toByteData();
+  final bytes = byteData?.buffer.asUint8List();
+
+  try {
+    final int size = image.width;
+
+    final paint = Paint()
+      ..shader = ImageShader(
+        image,
+        TileMode.clamp,
+        TileMode.clamp,
+        Matrix4.identity().storage,
+      );
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawCircle(
+      Offset(size / 2, size / 2),
+      size / 2,
+      paint,
+    );
+
+    final picture = recorder.endRecording();
+    final pictureImage = await picture.toImage(size, size);
+    final ByteData? byteData =
+        await pictureImage.toByteData(format: ui.ImageByteFormat.png);
+
+    return byteData?.buffer.asUint8List();
+  } catch (e) {
+    print('Error while applying circular mask: $e');
+    return null;
   }
 }

@@ -254,8 +254,8 @@ void main() {
 
   // io.File("/home/scott/jeff.txt").writeAsString(pair0_.privKeyHex!);
 
-  // final pkHex = io.File("/home/scott/jeff.txt").readAsStringSync();
-  final pkHex = io.File("C:/Users/coton/Desktop/jeff.txt").readAsStringSync();
+  final pkHex = io.File("/home/scott/.jeff.txt").readAsStringSync();
+  // final pkHex = io.File("C:/Users/coton/Desktop/jeff.txt").readAsStringSync();
 
   var pair0 = Down4Keys.fromPrivateKey(BigInt.parse(pkHex, radix: 16));
   var pair1 = pair0.derive(makeUint32(1))!;

@@ -12,7 +12,6 @@ import '../data_objects/couch.dart';
 
 import '../globals.dart';
 import '../themes.dart';
-import 'nodes.dart';
 
 String XORedStrings(List<String> strings) {
   if (strings.isEmpty) return "";
@@ -63,7 +62,9 @@ class ComposedID extends Down4ID {
 
   Down4ServerShard get server => Down4Server.instance.shards[region]![shard];
 
-  DatabaseReference get userRef => server.realtimeDB.ref('users/$value');
+  DatabaseReference get nodeRef => server.realtimeDB.ref('nodes/$unique/node');
+
+  DatabaseReference get messageRef => server.realtimeDB.ref('messages/$unique');
 
   Reference get tempStoreRef => server.temporaryStore.ref(value);
 
@@ -80,10 +81,6 @@ class ComposedID extends Down4ID {
         region: Region.values.byName(elements[1]),
         shard: int.parse(elements[2]));
   }
-}
-
-extension Down4NodeIterables on Iterable<Down4Node> {
-  Iterable<Down4ID> get mediaIDs => map((e) => e.mediaID).whereType();
 }
 
 extension IterableDown4IDs on Iterable<Down4ID> {
@@ -120,9 +117,10 @@ mixin Jsons {
 }
 
 mixin Locals on Down4Object, Jsons {
+  // String get table;
   Database get dbb;
-
-  void cache({bool ifAbsent = false}) => gCache(this, ifAbsent: ifAbsent);
+  void cache({bool ifAbsent = false, Map<Down4ID, Locals>? sc}) =>
+      cacheObj(this, ifAbsent: ifAbsent, sCache: sc);
 
   Future<void> delete() async {
     print("Deleting $runtimeType from dbb: ${dbb.name}");
@@ -133,13 +131,19 @@ mixin Locals on Down4Object, Jsons {
   @override
   Map<String, String> toJson({bool includeLocal = false});
 
-  Future<void> merge([Map<String, String>? values]) async {
-    print("DBB NAME=${dbb.name}");
+  Future<void> merge([Map<String, String>? values, Database? sdb]) async {
+    final _db = sdb ?? dbb;
+
+    print("DBB NAME=${_db.name}");
     // first, we get the current doc in the db
-    var document = (await dbb.document(id.value))?.toMutable();
-    bool wasLocal = (document != null);
+
+    final r = db.select("SELECT id FROM ${_db.name} WHERE id = '${id.value}'");
+    final bool wasLocal = r.isNotEmpty;
+
+    // var document = (await _db.document(id.value))?.toMutable();
+    // bool wasLocal = (document != null);
     // if it wasn't local, we create it
-    if (!wasLocal) document = MutableDocument.withId(id.value);
+    // if (!wasLocal) document = MutableDocument.withId(id.value);
 
     Map<String, String> toMerge;
     if (!wasLocal) {
@@ -148,14 +152,22 @@ mixin Locals on Down4Object, Jsons {
     } else {
       // we merge given values, or the values from the probably freshly
       // fetched object without the local values to not overwrite them
-      toMerge = values ?? toJson();
+      toMerge = values ?? toJson(includeLocal: false);
     }
 
-    toMerge.forEach((key, value) {
-      document!.setValue(value, key: key);
-    });
+    final String q = """
+      INSERT OF REPLACE INTO ${_db.name}
+      ${toMerge.keys.toString()}
+      VALUES ${toMerge.values.toString()}
+    """;
 
-    await dbb.saveDocument(document);
+    db.execute(q);
+
+    // toMerge.forEach((key, value) {
+    //   document!.setValue(value, key: key);
+    // });
+
+    // await _db.saveDocument(document);
   }
 }
 
@@ -205,9 +217,8 @@ mixin Temps on Locals {
     }
   }
 
-  // that is the culprit right here my niggas
-  Future<void> updateTempReferences(
-      ComposedID newTempID, int newTempTS);
+  // that is the culprit right here my bijs
+  Future<void> updateTempReferences(ComposedID newTempID, int newTempTS);
 }
 
 class FireTheme with Down4Object, Jsons, Locals {
@@ -288,7 +299,7 @@ class ExchangeRate with Down4Object, Jsons, Locals {
   Down4ID get id => Down4ID(unique: "exchangeRate");
 
   ExchangeRate({required this.lastUpdate, required this.rate});
- 
+
   static Future<ExchangeRate> get exchangeRate async {
     final doc = await personalDB.document("exchangeRate");
     if (doc == null) return ExchangeRate(lastUpdate: 0, rate: 0)..merge();

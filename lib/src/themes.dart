@@ -717,10 +717,10 @@ class PinkTheme extends Down4Theme {
   Color get snipRibbon => _palePink.withOpacity(0.7);
 
   @override
-  Color get bottomNavigationBarColor => backGroundColor;
+  Color get bottomNavigationBarColor => Colors.black;
 
   @override
-  Brightness get bottonNavigationIconBrightness => Brightness.dark;
+  Brightness get bottonNavigationIconBrightness => Brightness.light;
 
   @override
   Brightness get topStatusIconBrightness => Brightness.light;

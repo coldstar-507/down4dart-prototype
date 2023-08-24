@@ -54,7 +54,8 @@ class _AddFriendPageState extends State<AddFriendPage>
   Future<List<ButtonsInfo2>> bGen(BranchN b) async {
     return [
       ButtonsInfo2(
-        asset: g.fifty,
+        asset: Icon(Icons.arrow_forward_ios_rounded,
+              color: g.theme.noMessageArrowColor),
         pressFunc: () => widget.openNode(b),
         rightMost: true,
       )
@@ -109,9 +110,9 @@ class _AddFriendPageState extends State<AddFriendPage>
   }
 
   @override
-  void onScan(Barcode bc, MobileScannerArguments? args) async {
-    if (bc.rawValue == null) return;
-    final data = bc.rawValue!.split("%");
+  void onScan(BarcodeCapture bc) async {
+    if (bc.raw == null) return;
+    final data = bc.raw!.split("%");
     if (data.length != 6) return;
     final userID = ComposedID.fromString(data[0]);
     // We try to download the user for a more complete user

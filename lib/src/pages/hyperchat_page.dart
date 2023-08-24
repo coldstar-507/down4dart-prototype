@@ -135,11 +135,17 @@ class _HyperchatPageState extends State<HyperchatPage>
           currentConsolesName: currentConsolesName,
           currentPageIndex: currentPageIndex);
 
+
   @override
   Future<void> send({Down4Media? mediaInput}) async {
-    final media = mediaInput ?? cameraInput;
+    final media = mediaInput ??
+        (cameraInput
+          ?..cache()
+          ..merge()
+          ..writeFromCachedPath());
+    
     final text = input.value;
-    if (text.isEmpty && media == null) return;
+    if (text.isEmpty && media == null && fo.isEmpty) return;
 
     final ids = trueTargets.map((n) => n.id);
     final members = Set<ComposedID>.from(ids)..add(g.self.id);

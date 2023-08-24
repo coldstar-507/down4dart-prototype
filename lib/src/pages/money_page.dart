@@ -523,8 +523,8 @@ class _MoneyPageState extends State<MoneyPage>
   }
 
   @override
-  void onScan(Barcode bc, MobileScannerArguments? args) {
-    final raw = bc.rawValue;
+  void onScan(BarcodeCapture bc) {
+    final raw = bc.raw;
     print("Trying to scan some good stuff right here!");
     if (raw == null) return;
 
