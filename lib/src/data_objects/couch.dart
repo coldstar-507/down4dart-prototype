@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:down4/src/_dart_utils.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
@@ -13,18 +12,16 @@ import '../globals.dart';
 import '../bsv/types.dart';
 import '../bsv/wallet.dart';
 
-import 'package:cbl/cbl.dart';
-
 late sql.Database db;
 
-late AsyncDatabase nodesDB,
-    tempDB,
-    personalDB,
-    mediasDB,
-    messagesDB,
-    utxosDB,
-    paymentsDB,
-    billsDB;
+// late AsyncDatabase nodesDB,
+//     tempDB,
+//     personalDB,
+//     mediasDB,
+//     messagesDB,
+//     utxosDB,
+//     paymentsDB,
+//     billsDB;
 
 Future<List<T>> globall<T extends Locals>(
   Iterable<Down4ID>? ids, {
@@ -32,7 +29,7 @@ Future<List<T>> globall<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   Iterable<ComposedID>? tempIDs,
-  Database? sdb,
+  sql.Database? sdb,
   Map<Down4ID, Locals>? sCache,
 }) async {
   if (ids == null) return [];
@@ -40,9 +37,26 @@ Future<List<T>> globall<T extends Locals>(
       .map((e) => global<T>(e.$2,
           doCache: doCache,
           doFetch: doFetch,
+          sdb: sdb,
           doMergeIfFetch: doMergeIfFetch,
           tempID: tempIDs?.elementAt(e.$1)))
       .toList());
+  return reqs.whereType<T>().toList();
+}
+
+List<T> locall<T extends Locals>(
+  Iterable<Down4ID>? ids, {
+  bool doCache = true,
+  bool doFetch = false,
+  bool doMergeIfFetch = false,
+  Iterable<ComposedID>? tempIDs,
+  sql.Database? sdb,
+  Map<Down4ID, Locals>? sCache,
+}) {
+  if (ids == null) return [];
+  final reqs = ids.indexed
+      .map((e) => local<T>(e.$2, doCache: doCache, sdb: sdb))
+      .toList();
   return reqs.whereType<T>().toList();
 }
 
@@ -60,34 +74,34 @@ void cacheObj(Locals obj,
   }
 }
 
-Future<void> loadIndexes() async {
-  final nodeTypeIndexConfig = ValueIndexConfiguration(["type"]);
+// Future<void> loadIndexes() async {
+//   final nodeTypeIndexConfig = ValueIndexConfiguration(["type"]);
 
-  final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
-  final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
+//   final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
+//   final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
 
-  final isSnipMessageIndexConfig = ValueIndexConfiguration(["isSnip"]);
-  final rootMessageIndexConfig = ValueIndexConfiguration(["root"]);
+//   final isSnipMessageIndexConfig = ValueIndexConfiguration(["isSnip"]);
+//   final rootMessageIndexConfig = ValueIndexConfiguration(["root"]);
 
-  final paymentTimestampIndexConfig = ValueIndexConfiguration(["ts"]);
+//   final paymentTimestampIndexConfig = ValueIndexConfiguration(["ts"]);
 
-  await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
+//   await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
 
-  await mediasDB.createIndex("lastUseIndex", lastUseMediaIndexConfig);
-  await mediasDB.createIndex("isSavedIndex", isSavedMediaIndexConfig);
+//   await mediasDB.createIndex("lastUseIndex", lastUseMediaIndexConfig);
+//   await mediasDB.createIndex("isSavedIndex", isSavedMediaIndexConfig);
 
-  await messagesDB.createIndex("isSnipIndex", isSnipMessageIndexConfig);
-  await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
+//   await messagesDB.createIndex("isSnipIndex", isSnipMessageIndexConfig);
+//   await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
 
-  await paymentsDB.createIndex("timestampIndex", paymentTimestampIndexConfig);
-}
+//   await paymentsDB.createIndex("timestampIndex", paymentTimestampIndexConfig);
+// }
 
 Future<T?> fetch<T extends Locals>(
   ComposedID? id, {
   bool doMerge = false,
   bool doCache = true,
   ComposedID? tempID,
-  Database? sdb,
+  sql.Database? sdb,
   Map<Down4ID, Locals>? sc,
 }) async {
   Future<T?> fetchNode() async {
@@ -143,10 +157,11 @@ Future<T?> fetch<T extends Locals>(
   Future<Down4Payment?> fetchPayment() async {
     if (id == null || tempID == null) return null;
     final ref = tempID.tempStoreRef;
+    final compressed = await ref.getData();
+    if (compressed == null) return null;
+    return Down4Payment.fromCompressed(compressed);
     try {
-      final compressed = await ref.getData();
-      if (compressed == null) return null;
-      return Down4Payment.fromCompressed(compressed);
+      print("TODO");
     } catch (e) {
       print("error fetching payment: $e");
       return null;
@@ -193,59 +208,66 @@ Future<T?> fetch<T extends Locals>(
   throw 'Unsupported type for fetching $T';
 }
 
-Database gdb<T extends Locals>() {
+String gdb<T extends Locals>() {
   switch (T) {
     case Down4Node:
-      return nodesDB;
+      return "nodes";
     case BranchN:
-      return nodesDB;
+      return "nodes";
     case ChatN:
-      return nodesDB;
+      return "nodes";
     case GroupN:
-      return nodesDB;
+      return "nodes";
     case PersonN:
-      return nodesDB;
+      return "nodes";
     case EditN:
-      return nodesDB;
+      return "nodes";
     case User:
-      return nodesDB;
+      return "nodes";
     case Self:
-      return nodesDB;
+      return "nodes";
     case Group:
-      return nodesDB;
+      return "nodes";
     case Hyperchat:
-      return nodesDB;
+      return "nodes";
     case Down4Media:
-      return mediasDB;
+      return "medias";
     case Down4Video:
-      return mediasDB;
+      return "medias";
     case Down4Image:
-      return mediasDB;
+      return "medias";
     case Messages:
-      return messagesDB;
+      return "messages";
     case Chat:
-      return messagesDB;
+      return "messages";
     case Snip:
-      return messagesDB;
+      return "messages";
     case Down4TXOUT:
-      return utxosDB;
+      return "utxos";
     case Down4Payment:
-      return paymentsDB;
+      return "payments";
     case ExchangeRate:
-      return personalDB;
+      return "personals";
     case Wallet:
-      return personalDB;
+      return "personals";
   }
 
   throw 'No db exists for type: $T';
 }
 
-Future<T?> local<T extends Locals>(Down4ID id,
-    {bool doCache = false, Map<Down4ID, Locals>? sc, Database? sdb}) async {
-  final db = sdb ?? gdb<T>();
-  final doc = await db.document(id.value);
-  if (doc == null) return null;
-  final jsns = Map<String, String?>.from(doc.toPlainMap());
+T? local<T extends Locals>(Down4ID id,
+    {bool doCache = false, Map<Down4ID, Locals>? sc, sql.Database? sdb}) {
+  final cached = cache<T>(id, sc: sc);
+  if (cached != null) return cached;
+  return _local<T>(id, doCache: doCache, sc: sc, sdb: sdb);
+}
+
+T? _local<T extends Locals>(Down4ID id,
+    {bool doCache = false, Map<Down4ID, Locals>? sc, sql.Database? sdb}) {
+  final db_ = sdb ?? db;
+  final r = db_.select("SELECT * FROM ${gdb<T>()} WHERE id = '${id.value}'");
+  if (r.isEmpty) return null;
+  final jsns = Map<String, String?>.from(r.single);
   final element = fromJson<T>(jsns);
   if (doCache) element.cache(sc: sc);
   return element;
@@ -263,7 +285,7 @@ Future<T?> global<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   ComposedID? tempID,
-  Database? sdb,
+  sql.Database? sdb,
   Map<Down4ID, Locals>? sc,
 }) async {
   if (id == null) return null;
@@ -272,7 +294,7 @@ Future<T?> global<T extends Locals>(
     print("RETRIEVED $T ID: ${id.value} FROM CACHE");
     return cached;
   }
-  final localed = await local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
+  final localed = _local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
   if (localed != null) {
     print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
     if (doCache) localed.cache(sc: sc);
@@ -300,7 +322,7 @@ Future<(T?, GetType)> globalgt<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   ComposedID? tempID,
-  Database? sdb,
+  sql.Database? sdb,
   Map<Down4ID, Locals>? sc,
 }) async {
   if (id == null) return (null, GetType.miss);
@@ -309,7 +331,7 @@ Future<(T?, GetType)> globalgt<T extends Locals>(
     print("RETRIEVED $T ID: ${id.value} FROM CACHE");
     return (cached, GetType.cache);
   }
-  final localed = await local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
+  final localed = _local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
   if (localed != null) {
     print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
     if (doCache) localed.cache(sc: sc);
@@ -376,239 +398,227 @@ T fromJson<T extends Locals>(Map<String, String?> json) {
   throw 'Cannot create Down4Object from json for this type: $T';
 }
 
-Future<List<Chat>> unsentMessages() async {
-  final raw = """
-        SELECT * FROM _ AS m
-        WHERE m.isSent = 'false' AND m.type = 'chat'
-          AND m.senderID = '${g.self.id.value}'
+Iterable<Chat> unsentMessages() sync* {
+  final q = """
+        SELECT * FROM messages
+        WHERE isSent = 'false' AND type = 'chat'
+          AND senderID = '${g.self.id.value}'
         """;
-  final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-  final e = await q.execute();
-  final r = await e.allResults();
 
-  return r.map((e) {
-    final jsn = Map<String, String?>.from(e.toPlainMap()["m"] as Map);
-    return Down4Message.fromJson(jsn) as Chat;
-  }).toList();
+  final r = db.select(q);
+
+  for (final row in r) {
+    final jsn = Map<String, String?>.from(row);
+    yield Down4Message.fromJson(jsn) as Chat;
+  }
 }
 
-Future<List<PersonN>> searchLocalsByUnique(Iterable<String> uniques) async {
-  final raw = """
-    SELECT * FROM _ as n
-    WHERE n.unique IN ${uniques.map((e) => "'$e'").toString()} 
-    """;
+Iterable<PersonN> searchLocalsByUnique(Iterable<String> uniques) sync* {
+  final sbuf = StringBuffer("SELECT * FROM nodes WHERE unik IN (");
+  sbuf.writeAll(uniques.map((_) => "?"), ",");
+  sbuf.write(")");
 
-  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
-  final e = await q.execute();
-  final r = await e.allResults();
-
-  return r.map((e) {
-    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
-    return fromJson<PersonN>(jsn);
-  }).toList();
+  final r = db.select(sbuf.toString(), uniques.toList());
+  for (final row in r) {
+    final jsns = Map<String, String?>.from(row);
+    yield Down4Node.fromJson(jsns) as PersonN;
+  }
 }
 
 Future<Set<ComposedID>> allGroupIDs() async {
-  const rawq = """
-    SELECT group FROM _ 
-    WHERE nodes.type in ('hyperchat', 'group')
+  const q = """
+    SELECT group FROM nodes 
+    WHERE type in ('hyperchat', 'group')
     """;
-  final q = await AsyncQuery.fromN1ql(nodesDB, rawq);
-  final e = await q.execute();
-  final r = await e.allResults();
+
+  final r = db.select(q);
   return r.fold<Set<ComposedID>>(Set<ComposedID>.identity(), (value, element) {
-    final sGroup = element.toPlainMap()["group"] as String;
+    final sGroup = element["group"] as String;
     value.addAll(sGroup.split(" ").map((e) => ComposedID.fromString(e)!));
     return value;
   });
 }
 
 Future<Set<ComposedID>> allMediaReferences() async {
-  const nq = "SELECT mediaID FROM _";
-  final q1 = await AsyncQuery.fromN1ql(messagesDB, nq);
-  final q2 = await AsyncQuery.fromN1ql(nodesDB, nq);
-  final e1 = await q1.execute();
-  final e2 = await q2.execute();
-  final a1 = await e1.allResults();
-  final a2 = await e2.allResults();
+  const nq = "SELECT mediaID FROM nodes";
+  const mq = "SELECT mediaID FROM messages";
 
-  const rq = "SELECT reactions FROM _";
-  final qr = await AsyncQuery.fromN1ql(messagesDB, rq);
-  final er = await qr.execute();
-  final ar = await er.allResults();
-  final rs = ar
+  final rn = db.select(nq);
+  final rm = db.select(mq);
+
+  const rq = "SELECT reactions FROM messages";
+  final rr = db.select(rq);
+  final rs = rr
       .map((e) {
-        final jsn = List.from(youKnowDecode(e.string("reactions")!));
+        final jsn = List.from(youKnowDecode(e["reactions"]));
         return jsn.map((e) {
-          final jsns = Map<String, String?>.from(e as Map);
+          final jsns = Map<String, String?>.from(e);
           return Down4Message.fromJson(jsns) as Reaction;
         });
       })
       .expand((e) => e)
       .map((e) => e.mediaID);
 
-  return a1
-      .followedBy(a2)
-      .map((a) => ComposedID.fromString(a.string("mediaID")))
+  return rn
+      .followedBy(rm)
+      .map((a) => ComposedID.fromString(a["mediaID"]))
       .whereType<ComposedID>()
       .followedBy(rs)
       .toSet();
 }
 
+// TODO: could be optimized
 Future<void> messagesDeletingRoutine() async {
   final fourDaysAgo = DateTime.now().subtract(const Duration(days: 4));
-  final raw = """
-    SELECT * FROM _ AS m
-    WHERE TONUMBER(m.timestamp) < ${fourDaysAgo.millisecondsSinceEpoch}
-      AND m.isSaved = 'false'
-      AND m.root != '${g.self.id.value}'
+
+  final alternate = """
+    DELETE FROM messages
+    WHERE CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
+      AND isSaved = 'false'
+      AND root != '${g.self.id.value}'
     """;
-  final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-  final e = await q.execute();
-  await for (final m in e.asStream()) {
-    final jsn = Map<String, String?>.from(m.toPlainMap()["m"] as Map);
-    final msg = Down4Message.fromJson(jsn) as Locals;
-    msg.delete();
-  }
+
+  db.execute(alternate);
 }
 
 // This should be called after messages and palettes routine
+// TODO: this should be optmized aswell
+// could be a single sql query
 Future<void> mediaDeletingRoutine() async {
-  const raw = "SELECT * FROM _ AS m WHERE isSaved = 'false'";
   final allMediaRefs = await allMediaReferences();
-  final q = await AsyncQuery.fromN1ql(mediasDB, raw);
-  final e = await q.execute();
-  await for (final r in e.asStream()) {
-    final jsn = Map<String, String?>.from(r.toPlainMap()["m"] as Map);
-    final media = Down4Media.fromJson(jsn);
-    if (!allMediaRefs.contains(media.id)) media.delete();
+  final alternate = """
+    DELETE FROM medias
+    WHERE isSaved = 'false'
+      AND id NOT IN ${allMediaRefs.map((id) => id.value)}
+  """;
+
+  db.execute(alternate);
+}
+
+Iterable<ChatN> loadHome() sync* {
+  const q = """
+    SELECT * FROM nodes
+    WHERE type in ('hyperchat', 'group', 'user')
+    """;
+  final r = db.select(q);
+  for (final row in r) {
+    final jsns = Map<String, String?>.from(row);
+    yield fromJson<ChatN>(jsns)..cache();
   }
 }
 
-Future<List<ChatN>> loadHome() async {
-  const raw = """
-    SELECT * FROM _ AS n
-    WHERE n.type in ('hyperchat', 'group', 'user')
+Iterable<ConnectN> loadConnectionNodes() sync* {
+  const q = """
+    SELECT * FROM nodes
+    WHERE isConnected = 'true'
     """;
 
-  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
-  final r = await q.execute();
-  final a = await r.allResults();
-  return a.map((e) {
-    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
-    print("Loading home node id =${jsn['id']}");
-    return fromJson<ChatN>(jsn)..cache();
-  }).toList();
+  final r = db.select(q);
+  for (final row in r) {
+    final jsns = Map<String, String?>.from(row);
+    yield Down4Node.fromJson(jsns) as ConnectN;
+  }
 }
 
-Future<List<ConnectN>> loadConnectionNodes() async {
-  const raw = """
-    SELECT * FROM _ as n
-    WHERE n.isConnected = 'true'
+Iterable<Down4Node> loadAllNodes() sync* {
+  const q = "SELECT * FROM nodes";
+  final r = db.select(q);
+
+  for (final row in r) {
+    final jsns = Map<String, String?>.from(row);
+    yield Down4Node.fromJson(jsns);
+  }
+}
+
+Iterable<Down4ID> savedMediaIDs(MediaType t) sync* {
+  final q = """
+    SELECT id FROM medias
+    WHERE mime IN ${mimeMap[t]!.sqlFmt} AND isSaved = 'true'
+    ORDER BY lastUse DESC
     """;
 
-  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
-  final r = await q.execute();
-  return Future.wait((await r.allResults()).map((e) async {
-    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
-    print("Loading home node id = '${jsn['id']}'");
-    return fromJson<ConnectN>(jsn)..cache();
-  }).toList());
-}
-
-Future<List<Down4Node>> loadAllNodes() async {
-  const raw = "SELECT * FROM _ as n";
-  final q = await AsyncQuery.fromN1ql(nodesDB, raw);
-  final r = await q.execute();
-  return Future.wait((await r.allResults()).map((e) async {
-    final jsn = Map<String, String?>.from(e.toPlainMap()["n"] as Map);
-    print("Loading home node id = '${jsn['id']}'");
-    return fromJson<Down4Node>(jsn)..cache();
-  }).toList());
-}
-
-Future<AsyncListenStream<QueryChange<ResultSet>>> savedMediaIDs(
-  MediaType t,
-) async {
-  final raw = """
-        SELECT META().id FROM _
-        WHERE mime IN ${mimeMap[t]!.sqlFmt} AND isSaved = 'true'
-        ORDER BY lastUse DESC
-        """;
-
-  print("savedMediaIDs raw q = $raw");
-  final query = await AsyncQuery.fromN1ql(mediasDB, raw);
-  return query.changes();
+  final rows = db.select(q);
+  for (final row in rows) {
+    yield Down4ID.fromString(row['id'])!;
+  }
 }
 
 extension WalletManager on Wallet {
-  Stream<Down4Payment> get payments async* {
-    const raw = "SELECT * FROM _ AS p ORDER BY p.ts DESC";
-    final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
-    final r = await q.execute();
-    await for (final p in r.asStream()) {
-      final jsn = Map<String, String?>.from(p.toPlainMap()["p"] as Map);
-      yield Down4Payment.fromJson(jsn);
+  Iterable<Down4Payment> get payments sync* {
+    const raw = "SELECT * FROM payments ORDER BY ts DESC";
+    final rows = db.select(raw);
+    for (final row in rows) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4Payment.fromJson(jsns);
     }
   }
 
-  Stream<Down4Payment> nPayments({required int limit, int offset = 0}) async* {
+  Iterable<Down4Payment> nPayments({required int limit, int offset = 0}) sync* {
     final raw = """
-        SELECT * FROM _ AS p
-        ORDER BY p.ts DESC
-        OFFSET $offset LIMIT $limit
+        SELECT * FROM payments
+        ORDER BY ts DESC
+        LIMIT $limit OFFSET $offset
         """;
-    final q = await AsyncQuery.fromN1ql(paymentsDB, raw);
-    final r = await q.execute();
-    await for (final p in r.asStream()) {
-      final jsn = Map<String, String?>.from(p.toPlainMap()["p"] as Map);
-      yield Down4Payment.fromJson(jsn);
+
+    final rows = db.select(raw);
+    for (final row in rows) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4Payment.fromJson(jsns);
     }
   }
 
-  Stream<Down4TXOUT> get utxos async* {
-    const raw = "SELECT * FROM _ AS u";
-    final q = await AsyncQuery.fromN1ql(utxosDB, raw);
-    final r = await q.execute();
-    await for (final u in r.asStream()) {
-      final jsn = Map<String, String?>.from(u.toPlainMap()["u"] as Map);
-      yield Down4TXOUT.fromJson(jsn);
+  Iterable<Down4TXOUT> get utxos sync* {
+    const raw = "SELECT * FROM utxos";
+    final rows = db.select(raw);
+    for (final row in rows) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4TXOUT.fromJson(jsns);
     }
   }
 
-  Future<Down4TXOUT?> getUtxo(Down4ID id) async {
-    return local<Down4TXOUT>(id);
+  Down4TXOUT? getUtxo(Down4ID id) {
+    return _local<Down4TXOUT>(id);
   }
 
-  Future<void> removeUtxo(Down4ID id) async {
-    await gdb<Down4TXOUT>().purgeDocumentById(id.value);
+  void removeUtxo(Down4ID id) {
+    final raw = "DELETE FROM utxos WHERE id = '${id.value}';";
+    db.execute(raw);
   }
 
-  Future<Down4Payment?> getPayment(Down4ID id) async {
-    return local<Down4Payment>(id);
+  Down4Payment? getPayment(Down4ID id) {
+    return _local<Down4Payment>(id);
   }
 
-  Future<void> removePayment(Down4ID id) async {
-    await gdb<Down4Payment>().purgeDocumentById(id.value);
+  void removePayment(Down4ID id) {
+    final raw = "DELETE FROM payments WHERE id = '${id.value}';";
+    db.execute(raw);
   }
 
-  Future<void> setPayment(Down4Payment payment) async {
-    await payment.merge();
+  String? setPayment(Down4Payment payment) {
+    return payment.merge();
   }
 
-  Future<void> setUtxo(Down4TXOUT utxo) async {
-    await utxo.merge();
+  String? setUtxo(Down4TXOUT utxo) {
+    return utxo.merge();
   }
 
-  Future<bool> isSpent(Down4ID utxoID) async {
-    return (await dbb.document(id.value))?.string(utxoID.value) == "true";
+  bool isSpent(Down4ID utxoID) {
+    final raw = "SELECT * FROM spents WHERE id = '${utxoID.value}';";
+    return db.select(raw).isNotEmpty;
   }
 
-  Future<void> setSpent(Down4ID id, bool spent) async {
-    await merge({id.value: spent.toString()});
+  void setSpent(Down4ID id) {
+    final raw = "INSERT OR IGNORE INTO spents (id) VALUES ('${id.value}');";
+    db.execute(raw);
   }
 
-  static Future<Wallet?> load() async {
-    return local<Wallet>(Down4ID(unique: "wallet"));
+  // still no use, intended as a possible control mechanism
+  void unSpend(Down4ID id) {
+    final raw = "DELETE FROM spents WHERE id = '${id.value}'";
+    db.execute(raw);
+  }
+
+  static Wallet? load() {
+    return _local<Wallet>(Down4ID(unik: "single"));
   }
 }

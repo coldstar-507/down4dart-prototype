@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:cbl/cbl.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '../_dart_utils.dart';
 import '../data_objects/couch.dart';
@@ -30,9 +30,9 @@ String XORedStrings(List<String> strings) {
 }
 
 class Down4ID {
-  late final String unique;
-  Down4ID({String? unique}) : unique = unique ?? pushKey();
-  String get value => unique;
+  late final String unik;
+  Down4ID({String? unik}) : unik = unik ?? pushKey();
+  String get value => unik;
 
   static Down4ID? fromString(String? s) {
     if (s == null) return null;
@@ -40,7 +40,7 @@ class Down4ID {
     if (splits.length > 1) {
       return ComposedID.fromString(s);
     } else {
-      return Down4ID(unique: s);
+      return Down4ID(unik: s);
     }
   }
 
@@ -54,30 +54,29 @@ class Down4ID {
 class ComposedID extends Down4ID {
   late final Region region;
   late final int shard;
-  ComposedID({String? unique, Region? region, int? shard})
-      : super(unique: unique) {
+  ComposedID({String? unik, Region? region, int? shard}) : super(unik: unik) {
     this.region = region ?? g.self.id.region;
-    this.shard = calculateShard(super.unique);
+    this.shard = calculateShard(super.unik);
   }
 
   Down4ServerShard get server => Down4Server.instance.shards[region]![shard];
 
-  DatabaseReference get nodeRef => server.realtimeDB.ref('nodes/$unique/node');
+  DatabaseReference get nodeRef => server.realtimeDB.ref('nodes/$unik/node');
 
-  DatabaseReference get messageRef => server.realtimeDB.ref('messages/$unique');
+  DatabaseReference get messageRef => server.realtimeDB.ref('messages/$unik');
 
   Reference get tempStoreRef => server.temporaryStore.ref(value);
 
   Reference get staticStoreRef => server.staticStore.ref(value);
 
   @override
-  String get value => "$unique~${region.name}~${shard.toString()}";
+  String get value => "$unik~${region.name}~${shard.toString()}";
 
   static ComposedID? fromString(String? s) {
     if (s == null) return null;
     final elements = s.split("~");
     return ComposedID(
-        unique: elements[0],
+        unik: elements[0],
         region: Region.values.byName(elements[1]),
         shard: int.parse(elements[2]));
   }
@@ -116,58 +115,110 @@ mixin Jsons {
   Map<String, String> toJson();
 }
 
+extension SQLStatements on Map<String, String> {
+  String get sqlUpdateFmtParams {
+    // key1 = 'val1', key2 = 'val2'
+    final buf = StringBuffer();
+    buf.writeAll(entries.map((e) => "${e.key} = ?"), ",");
+    return buf.toString();
+  }
+
+  String get sqlUpdateFmt {
+    // key1 = 'val1', key2 = 'val2'
+    final buf = StringBuffer();
+    buf.writeAll(entries.map((e) => "${e.key} = '${e.value}'"), ",");
+    return buf.toString();
+  }
+
+  String get sqlInsertValues {
+    final buf = StringBuffer("(");
+    buf.writeAll(values.map((e) => "'$e'"), ",");
+    buf.write(")");
+    return buf.toString();
+  }
+
+  String get sqlInsertValuesParams {
+    final buf = StringBuffer("(");
+    buf.writeAll(values.map((_) => "?"), ",");
+    buf.write(")");
+    return buf.toString();
+  }
+
+  String get sqlInsertKeys {
+    final buf = StringBuffer("(");
+    buf.writeAll(keys, ",");
+    buf.write(")");
+    return buf.toString();
+  }
+}
+
 mixin Locals on Down4Object, Jsons {
-  // String get table;
-  Database get dbb;
+  String get table;
+  //Database get dbb;
   void cache({bool ifAbsent = false, Map<Down4ID, Locals>? sc}) =>
       cacheObj(this, ifAbsent: ifAbsent, sCache: sc);
 
   Future<void> delete() async {
-    print("Deleting $runtimeType from dbb: ${dbb.name}");
+    final q = "DELETE FROM $table WHERE id = ?";
+    try {
+      db.execute(q, [id.value]);
+    } catch (e) {
+      print("error deleting $runtimeType ${id.value}: $e");
+    }
     unCache(id);
-    await dbb.purgeDocumentById(id.value);
   }
 
   @override
   Map<String, String> toJson({bool includeLocal = false});
 
-  Future<void> merge([Map<String, String>? values, Database? sdb]) async {
-    final _db = sdb ?? dbb;
+  String? merge([Map<String, String>? values, sql.Database? sdb]) {
+    final db_ = sdb ?? db;
 
-    print("DBB NAME=${_db.name}");
-    // first, we get the current doc in the db
-
-    final r = db.select("SELECT id FROM ${_db.name} WHERE id = '${id.value}'");
+    print("TABLE NAME=$table");
+    final r = db.select("SELECT id FROM $table WHERE id = ?", [id.value]);
     final bool wasLocal = r.isNotEmpty;
 
-    // var document = (await _db.document(id.value))?.toMutable();
-    // bool wasLocal = (document != null);
-    // if it wasn't local, we create it
-    // if (!wasLocal) document = MutableDocument.withId(id.value);
-
     Map<String, String> toMerge;
+    String pre, prt;
     if (!wasLocal) {
       // then we need to merge the whole thing with the parameter values
       toMerge = {...toJson(includeLocal: true), ...?values};
+      pre = """
+      INSERT INTO $table
+      ${toMerge.sqlInsertKeys}
+      VALUES ${toMerge.sqlInsertValuesParams};
+      """;
+
+      // just for print/debugging, will remove
+      prt = """\n
+      INSERT INTO $table
+      ${toMerge.sqlInsertKeys}
+      VALUES ${toMerge.sqlInsertValues};
+      \n
+      """;
     } else {
       // we merge given values, or the values from the probably freshly
       // fetched object without the local values to not overwrite them
       toMerge = values ?? toJson(includeLocal: false);
+      pre = """
+      UPDATE $table
+      SET ${toMerge.sqlUpdateFmtParams}
+      WHERE id = '${id.value}';
+      """;
+
+      // just for print/debugging, will remove
+      prt = """\n
+      UPDATE $table
+      SET ${toMerge.sqlUpdateFmt}
+      WHERE id = '${id.value}';
+      \n
+      """;
     }
 
-    final String q = """
-      INSERT OF REPLACE INTO ${_db.name}
-      ${toMerge.keys.toString()}
-      VALUES ${toMerge.values.toString()}
-    """;
+    print(prt);
 
-    db.execute(q);
-
-    // toMerge.forEach((key, value) {
-    //   document!.setValue(value, key: key);
-    // });
-
-    // await _db.saveDocument(document);
+    db_.execute(pre, toMerge.values.toList());
+    return null;
   }
 }
 
@@ -217,32 +268,35 @@ mixin Temps on Locals {
     }
   }
 
-  // that is the culprit right here my bijs
-  Future<void> updateTempReferences(ComposedID newTempID, int newTempTS);
+  void updateTempReferences(ComposedID newTempID, int newTempTS);
 }
 
-class FireTheme with Down4Object, Jsons, Locals {
+class CurrentTheme with Down4Object, Jsons, Locals {
   String _themeName;
-  FireTheme(String themeName) : _themeName = themeName;
+  CurrentTheme(String themeName) : _themeName = themeName;
 
   String get themeName => _themeName;
 
   @override
-  Down4ID get id => Down4ID(unique: "theme");
+  Down4ID get id => Down4ID(unik: "single");
+
+  // @override
+  // Database get dbb => personalDB;
 
   @override
-  Database get dbb => personalDB;
+  String get table => "personals";
 
-  Future<void> changeTheme(String newThemeName) async {
+  void changeTheme(String newThemeName) {
     if (themesRegistry[newThemeName] == null) return;
     _themeName = newThemeName;
-    await merge();
+    merge();
   }
 
-  static Future<FireTheme> get currentTheme async {
-    final doc = await personalDB.document("theme");
-    if (doc != null) return FireTheme(doc.string("themeName")!);
-    return FireTheme(themesRegistry.keys.first)..merge();
+  static Future<CurrentTheme> get currentTheme async {
+    const q = "SELECT themeName FROM personals WHERE id = 'single'";
+    final r = db.select(q);
+    return CurrentTheme(r.single['themeName'] ?? themesRegistry.keys.first)
+      ..merge();
   }
 
   @override
@@ -288,22 +342,30 @@ final Map<Region, GeoLoc> regionsMap = {
   Region.asia: GeoLoc(1.354700, 103.718600),
 };
 
+// TODO: could keep exchanges rates stats to a point locally
+// to draw a chart
 class ExchangeRate with Down4Object, Jsons, Locals {
   @override
-  Database get dbb => personalDB;
+  String get table => "personals";
+  //Database get dbb => personalDB;
 
   int lastUpdate;
   double rate;
 
   @override
-  Down4ID get id => Down4ID(unique: "exchangeRate");
+  Down4ID get id => Down4ID(unik: "single");
 
   ExchangeRate({required this.lastUpdate, required this.rate});
 
-  static Future<ExchangeRate> get exchangeRate async {
-    final doc = await personalDB.document("exchangeRate");
-    if (doc == null) return ExchangeRate(lastUpdate: 0, rate: 0)..merge();
-    return ExchangeRate.fromJson(Map<String, String?>.from(doc.toPlainMap()));
+  static ExchangeRate get exchangeRate {
+    const q = "SELECT * FROM personals WHERE id = 'single'";
+    final r = db.select(q);
+    if (r.isEmpty) return ExchangeRate(lastUpdate: 0, rate: 0);
+    return ExchangeRate.fromJson(Map<String, String?>.from(r.single));
+
+    // final doc = await personalDB.document("exchangeRate");
+    // if (doc == null) return ExchangeRate(lastUpdate: 0, rate: 0)..merge();
+    // return ExchangeRate.fromJson(Map<String, String?>.from(doc.toPlainMap()));
   }
 
   factory ExchangeRate.fromJson(Map<String, String?> decodedJson) {

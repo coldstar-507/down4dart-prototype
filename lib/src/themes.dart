@@ -38,6 +38,8 @@ class Down4Icon {
 abstract class Down4Theme {
   Icon down4Icon(Color color);
 
+  Color get extensionBackdropColor;
+
   String get name;
   String get font;
 
@@ -60,7 +62,7 @@ abstract class Down4Theme {
   // Color get idColor;
   Color get refreshIndicatorColor;
   Color get cursorColor;
-  Color buttonColor({required bool isActivated, required bool isInverted});
+  Color buttonColor({bool isActivated = true, bool isInverted = false});
   Color get myBubblesColor;
   Color get otherBubblesColor;
   // Color get consoleBorderColor;
@@ -150,6 +152,9 @@ abstract class Down4Theme {
 
 class BlackTheme extends Down4Theme {
   @override
+  Color get extensionBackdropColor => Colors.white10;
+
+  @override
   String get name => "Blackout";
 
   @override
@@ -236,7 +241,7 @@ class BlackTheme extends Down4Theme {
   Color get paletteTextColor => const Color.fromARGB(255, 201, 201, 201);
 
   @override
-  Color buttonColor({required bool isActivated, required bool isInverted}) =>
+  Color buttonColor({bool isActivated = true, bool isInverted = false}) =>
       isInverted
           ? _invertedButtonColor
           : isActivated
@@ -430,6 +435,9 @@ class BlackTheme extends Down4Theme {
 
 class PinkTheme extends Down4Theme {
   @override
+  Color get extensionBackdropColor => inputColor;
+
+  @override
   Icon down4Icon(Color color) => Icon(Down4Icon.down4Inverted, color: color);
 
   @override
@@ -493,7 +501,7 @@ class PinkTheme extends Down4Theme {
   Color get cursorColor => Colors.black;
 
   @override
-  Color buttonColor({required bool isActivated, required bool isInverted}) =>
+  Color buttonColor({bool isActivated = true, bool isInverted = false}) =>
       isInverted
           ? _invertedButtonColor
           : isActivated
@@ -549,13 +557,13 @@ class PinkTheme extends Down4Theme {
 
   @override
   Map<NodesColor, Color> get nodeColors => {
-        NodesColor.root: Color.fromARGB(255, 53, 3, 20),
-        NodesColor.checkpoint: Color.fromARGB(255, 22, 94, 161),
-        NodesColor.event: Color.fromARGB(255, 95, 28, 219),
-        NodesColor.item: Color.fromARGB(255, 187, 108, 34),
-        NodesColor.journal: Color.fromARGB(255, 90, 62, 134),
-        NodesColor.market: Color.fromARGB(255, 34, 134, 64),
-        NodesColor.ticket: Color.fromARGB(255, 233, 220, 30),
+        NodesColor.root: const Color.fromARGB(255, 53, 3, 20),
+        NodesColor.checkpoint: const Color.fromARGB(255, 22, 94, 161),
+        NodesColor.event: const Color.fromARGB(255, 95, 28, 219),
+        NodesColor.item: const Color.fromARGB(255, 187, 108, 34),
+        NodesColor.journal: const Color.fromARGB(255, 90, 62, 134),
+        NodesColor.market: const Color.fromARGB(255, 34, 134, 64),
+        NodesColor.ticket: const Color.fromARGB(255, 233, 220, 30),
         // NodesColor.hyperchat: Color.fromARGB(255, 212, 168, 182),
         NodesColor.hyperchat: paletteTextColor,
         // NodesColor.friend: Color.fromARGB(255, 230, 174, 193),

@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:awesome_notifications_fcm/awesome_notifications_fcm.dart';
-import 'package:cbl_flutter/cbl_flutter.dart';
-import 'package:cbl/cbl.dart';
 
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/data_objects/_data_utils.dart';
@@ -20,215 +19,10 @@ import 'package:flutter/services.dart';
 
 import 'package:camera/camera.dart';
 
-// import 'package:timezone/timezone.dart' as tz;
-// import 'package:push/push.dart';
-// import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
-// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'src/login.dart';
 import 'src/globals.dart';
-
-// final FlutterLocalNotificationsPlugin _mainNotificationPlugin =
-//     FlutterLocalNotificationsPlugin();
-
-// Future<void> _initLocalNotifications(FlutterLocalNotificationsPlugin p) async {
-//   const AndroidInitializationSettings initializationSettingsAndroid =
-//       AndroidInitializationSettings('@mipmap/ic_launcher');
-//   const InitializationSettings initializationSettings =
-//       InitializationSettings(android: initializationSettingsAndroid);
-//   await p.initialize(initializationSettings);
-// }
-
-// @pragma("vm:entry-point")
-// Future<void> showNotification(RemoteMessage rmt,
-//     {FlutterLocalNotificationsPlugin? np}) async {
-
-//   print("getting proper plugin");
-//   FlutterLocalNotificationsPlugin p = np ?? _mainNotificationPlugin;
-//   print("notif plugin is initialized: ${p}");
-
-//   print("init android details");
-//   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-//       'channel_id', 'Channel Name',
-//       channelDescription: 'Channel Description',
-//       priority: Priority.high,
-//       importance: Importance.max);
-
-//   print("init platform details");
-//   const NotificationDetails platformDetails =
-//       NotificationDetails(android: androidDetails);
-
-//   final title = rmt.data!["h"] as String;
-//   final body = rmt.data!["b"] as String;
-
-//   print("title: $title, body: $body");
-
-//   // tz.TZDateTime scheduledDate = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 4 ));
-//   // _flutterLocalNotificationsPlugin.zonedSchedule(-1, title, body, scheduledDate, platformDetails, uiLocalNotificationDateInterpretation: ${6:uiLocalNotificationDateInterpretation});
-
-//   // if (np == null) {
-//     print("showing the notification");
-//     await p.show(-1, title, body, platformDetails); // platformDetails);
-//   // } else {
-//   //   print("scheduled notif for 4 secs");
-//   //   tz.TZDateTime scheduledDate =
-//   //       tz.TZDateTime.now(tz.local).add(const Duration(seconds: 4));
-//   //   p.zonedSchedule(-1, title, body, scheduledDate, platformDetails,
-//   //       uiLocalNotificationDateInterpretation:
-//   //           UILocalNotificationDateInterpretation.absoluteTime);
-//   // }
-
-//   return print("done showing the notification");
-//   // payload:  'notification_payload');
-// }
-
-// // Simulating the scenario where the app receives a message
-// // and triggers a function to display a notification
-// // Future<void> receiveMessageAndDisplayNotification(
-// //     Map<String, dynamic> message) async {
-// //   final notificationTitle = message['title'];
-// //   final notificationBody = message['body'];
-
-// //   await _showNotification(notificationTitle, notificationBody);
-// // }
-
-// ///////////////////////////////////
-
-// // const AndroidNotificationChannel globalChannel = AndroidNotificationChannel(
-// //   'Down4AndroidNotificationChannel',
-// //   'Default Importance Notifications for Down4AndroidNotificationChannel',
-// //   importance: Importance.defaultImportance,
-// // );
-
-// // final FlutterLocalNotificationsPlugin globalPlugin =
-// //     FlutterLocalNotificationsPlugin();
-
-// /////////////////
-
-// Future<void> backgroundMessageHandler(RemoteMessage rmt) async {
-//   print("\n####### BACKGROUND MESSAGE HANDLER #######\n");
-
-//   // since this is running in it's own isolate, we must do similar
-//   // initialization we are doing in main
-//   // try {
-//   // init firebase
-
-//   print("ensuring initialization");
-//   WidgetsFlutterBinding.ensureInitialized();
-//   print("initialization has been ensured!");
-
-//   {
-//     print("### initializing firebase app");
-//     await Firebase.initializeApp();
-//     print("### initialized firebase app");
-//   }
-
-//   final FlutterLocalNotificationsPlugin bgNotificationPlugin =
-//       FlutterLocalNotificationsPlugin();
-
-//   await _initLocalNotifications(bgNotificationPlugin);
-
-//   // _bgNotificationPlugin.show(${1:id}, ${2:title}, ${3:body}, ${4:notificationDetails});
-
-//   // initNotificationPlugin(${1:plugin}, ${2:channel});
-
-//   print("\n\nSHOW THAT FUCKING NOTIFICATION MY NIGGA\n\n");
-//   return showNotification(rmt, np: bgNotificationPlugin);
-
-//   // init notification channels
-//   // print("### making local notif channel");
-//   // const AndroidNotificationChannel localChannel = AndroidNotificationChannel(
-//   //     'Down4AndroidNotificationChannel',
-//   //     'Default Importance Notifications for Down4AndroidNotificationChannel',
-//   //     importance: Importance.defaultImportance);
-
-//   // print("### making local plugin");
-//   // final FlutterLocalNotificationsPlugin localPlugin =
-//   //     FlutterLocalNotificationsPlugin();
-
-//   // print("### init notif plugin");
-//   // await initNotificationPlugin(localPlugin, localChannel);
-
-//   // init the databases // this might break idk
-//   // seems to work just right tbh
-//   // print("### init the dbs");
-
-//   // // await CouchbaseLite.initSecondary(CouchbaseLite.context);
-//   // final dbForNodes = await Database.openAsync("nodes");
-//   // final dbForMedias = await Database.openAsync("medias");
-
-//   // const getSelf = "SELECT id FROM _ WHERE type = 'self'";
-//   // final q = await AsyncQuery.fromN1ql(dbForNodes, getSelf);
-//   // final e = await q.execute();
-//   // final r = await e.allResults();
-//   // if (r.length != 1) throw 'error getting selfID in backgroundMessageHandler';
-//   // print(r.first);
-//   // final selfID = ComposedID.fromString(r.first.string("id"))!;
-
-//   // print("### showing the notification");
-//   // await showMessageNotification(rmt,
-//   //     // chan: localChannel,
-//   //     // plug: localPlugin,
-//   //     selfID: selfID,
-//   //     mediaDB: dbForMedias,
-//   //     nodeDB: dbForNodes);
-//   // } catch (e) {
-//   //   print("\n == ERROR HANDLEING BACKGROUND MESSAGE: $e == \n");
-//   // }
-// }
-
-// // Future<void> myNameIsJeff(Object context, RootIsolateToken rootIsolateToken) async {
-// //   print("\n####### BACKGROUND MESSAGE HANDLER #######\n");
-
-// //   BackgroundIsolateBinaryMessenger.ensureInitialized(rootIsolateToken);
-// //   // since this is running in it's own isolate, we must do similar
-// //   // initialization we are doing in main
-// //   // try {
-// //   // init firebase
-// //   {
-// //     print("### initializing firebase app");
-// //     await Firebase.initializeApp();
-// //     print("### initialized firebase app");
-// //   }
-
-// //   // init notification channels
-// //   print("### making local notif channel");
-// //   const AndroidNotificationChannel localChannel = AndroidNotificationChannel(
-// //       'Down4AndroidNotificationChannel',
-// //       'Default Importance Notifications for Down4AndroidNotificationChannel',
-// //       importance: Importance.defaultImportance);
-
-// //   print("### making local plugin");
-// //   final FlutterLocalNotificationsPlugin localPlugin =
-// //       FlutterLocalNotificationsPlugin();
-
-// //   print("### init notif plugin");
-// //   await initNotificationPlugin(localPlugin, localChannel);
-
-// //   // init the databases // this might break idk
-// //   // seems to work just right tbh
-// //   print("### init the dbs");
-
-// //   await CouchbaseLite.initSecondary(context);
-// //   print("did init lol");
-// //   final dbForNodes = await Database.openAsync("nodes");
-// //   final dbForMedias = await Database.openAsync("medias");
-
-// //   const getSelf = "SELECT id FROM _ AS id WHERE type = 'self'";
-// //   final q = await AsyncQuery.fromN1ql(dbForNodes, getSelf);
-// //   final e = await q.execute();
-// //   final r = await e.allResults();
-// //   if (r.length != 1) throw 'error getting selfID in backgroundMessageHandler';
-// //   final selfID = ComposedID.fromString(r.first.string("id"))!;
-
-// //   print("lol but not funny, it works, selfID: ${selfID.value}");
-// //   // } catch (e) {
-// //   //    print("\n == ERROR HANDLEING BACKGROUND MESSAGE: $e == \n");
-// //   // }
-// // }
 
 // TODO: this is no good actually, can't call g
 Future<void> handleTokenChange(String newToken) async {
@@ -242,12 +36,11 @@ Future<void> handleTokenChange(String newToken) async {
 Future<void> showMessageNotification(
   Map<String, String?> data, {
   ComposedID? selfID,
-  Database? mediaDB,
-  Database? nodeDB,
+  sql.Database? sdb,
+  String? appDir,
   ComposedID? currentRoot,
 }) async {
-  final nodesDatabase = nodeDB ?? nodesDB;
-  final mediasDatabase = mediaDB ?? mediasDB;
+  final db_ = sdb ?? db;
   final self = selfID ?? g.self.id;
 
   final sc = <Down4ID, Locals>{};
@@ -273,44 +66,52 @@ Future<void> showMessageNotification(
 
   print("### getting the sender");
   sender = await global<PersonN>(sdrID,
-      sc: sc, sdb: nodesDatabase, doFetch: true, doMergeIfFetch: true);
+      sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
 
   if (sender != null) {
     print("### getting senderMedia");
     senderImage = await global<Down4Image>(sender.mediaID,
-        sc: sc, sdb: mediasDatabase, doFetch: true, doMergeIfFetch: true);
+        sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
   }
 
   if (rtID != null) {
     final rootNode = await global<ChatN>(rtID,
-        sc: sc, sdb: nodesDatabase, doFetch: true, doMergeIfFetch: true);
+        sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
     if (rootNode is GroupN) {
       group = rootNode;
       print("### getting groupMedia");
       groupImage = await global<Down4Image>(group.mediaID,
-          sc: sc, sdb: mediasDatabase, doFetch: true, doMergeIfFetch: true);
+          sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
     }
   }
 
-  final senderImageProfilePath = await senderImage?.profilePath;
-  final groupImageProfilePath = await groupImage?.profilePath;
+  final senderImageProfilePath = await senderImage?.profilePath(appDir);
+  final groupImageProfilePath = await groupImage?.profilePath(appDir);
 
+  print("PATH FOR IMAGE: ${groupImageProfilePath ?? senderImageProfilePath}");
+
+  print("showing notification!");
   AwesomeNotifications().createNotification(
     content: NotificationContent(
-      id: 1,
+      id: Random().nextInt(200000),
       channelKey: 'def',
+      groupKey: rtID?.value ?? sdrID?.value,
       title: header,
       body: body,
-      largeIcon: groupImageProfilePath ?? senderImageProfilePath,
+      summary: '',
+      roundedLargeIcon: true,
+      largeIcon: "file://$senderImageProfilePath",
+      bigPicture: groupImageProfilePath != null
+          ? "file://$groupImageProfilePath"
+          : null,
       icon: 'resource://drawable/ic_stat_down4_white',
       notificationLayout: group != null
           ? NotificationLayout.MessagingGroup
           : NotificationLayout.Messaging,
     ),
   );
+  print("showed notification!");
 }
-
-late Object cblCtx;
 
 void initSqlite() async {
   print("initing sqlite");
@@ -318,9 +119,9 @@ void initSqlite() async {
   final appdir = await getApplicationDocumentsDirectory();
   final appDirPath = appdir.path;
   final dbPath = "$appDirPath${Platform.pathSeparator}down4.db";
+  db = sql.sqlite3.open(dbPath);
 
-  g.initdb(sql.sqlite3.open(dbPath));
-  g.db.execute("""
+  db.execute("""
     CREATE TABLE IF NOT EXISTS nodes (
       id TEXT NOT NULL PRIMARY KEY,
       type TEXT NOT NULL,
@@ -341,70 +142,170 @@ void initSqlite() async {
       privates TEXT,
       admins TEXT,
       neuter TEXT,
-      group TEXT,
+      members TEXT,
       deviceID TEXT,
       isConnected TEXT,
       activity TEXT
     )
     """);
 
-
-
-  g.db.execute("""
-    INSERT OR REPLACE INTO nodes (id, type, name, connection)
-    VALUES ('jeff_id', 'user', 'jeff', 'trololol')
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT NOT NULL PRIMARY KEY,
+      type TEXT NOT NULL,
+      senderID TEXT NOT NULL,
+      root TEXT,
+      reactions TEXT,
+      isSent TEXT,
+      isRead TEXT,
+      reactionID TEXT,
+      forwardedFromID TEXT,
+      paymentID TEXT,
+      nodes TEXT,
+      replies TEXT,
+      tips TEXT,
+      reactors TEXT,
+      txt TEXT,
+      timestamp TEXT,
+      mediaID TEXT,
+      messageID TEXT,
+      tempMediaID TEXT,
+      tempMediaTS TEXT,
+      tempPaymentID TEXT,
+      tempPaymentTS TEXT
+    )
     """);
 
+  db.execute("""
+    CREATE INDEX IF NOT EXISTS root_index
+      ON messages (root)
+      """);
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS medias (
+      id TEXT NOT NULL PRIMARY KEY,
+      ownerID TEXT NOT NULL,
+      timestamp TEXT NOT NULL,
+      mime TEXT NOT NULL,
+      isReversed TEXT NOT NULL,
+      isSquared TEXT NOT NULL,
+      isEncrypted TEXT NOT NULL,
+      width TEXT NOT NULL,
+      height TEXT NOT NULL,
+      isPaidToView TEXT NOT NULL,
+      isPaidToOwn TEXT NOT NULL,
+      isLocked TEXT NOT NULL,
+      tinyThumbnail TEXT,
+      isSaved TEXT NOT NULL,
+      lastUse TEXT NOT NULL,
+      tempID TEXT,
+      tempTS TEXT,
+      txt TEXT
+    )
+    """);
+
+  db.execute("""
+    CREATE INDEX IF NOT EXISTS is_saved_index
+      ON medias (isSaved, mime)
+      """);
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT NOT NULL PRIMARY KEY,
+      tx TEXT NOT NULL,
+      len TEXT NOT NULL,
+      safe TEXT NOT NULL,
+      ts TEXT NOT NULL,
+      tempTS TEXT,
+      tempID TEXT,
+      txt TEXT
+    )
+    """);
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS utxos (
+      id TEXT NOT NULL PRIMARY KEY,
+      txid TEXT NOT NULL,
+      secret TEXT NOT NULL,
+      outIndex TEXT NOT NULL,
+      sats TEXT NOT NULL,
+      type TEXT NOT NULL,
+      script TEXT NOT NULL,
+      receiver TEXT
+    )
+    """);
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS spents (
+      id TEXT NOT NULL PRIMARY KEY
+    )
+    """);
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS personals (
+      id TEXT NOT NULL PRIMARY KEY,
+      keys TEXT,
+      ix TEXT,
+      themeName TEXT,
+      rate TEXT,
+      lastUpdate TEXT
+    )
+    """);
+
+  try {
+    db.execute("ALTER TABLE personals ADD currentPage TEXT");
+  } catch (_) {}
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS themes (
+    id TEXT NOT NULL PRIMARY KEY,
+    themeName TEXT
+  )
+    """);
+
+  db.execute("""
+    INSERT OR IGNORE INTO personals (id)
+    VALUES ('single')
+    """);
+
+  db.execute("PRAGMA journal_mode=WAL;");
   print("done initing sqlite");
 }
 
 Future<void> fcmHandler(FcmSilentData silentData) async {
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
-  final body = data['b'];
-  final header = data['h'];
 
   final appdir = await getApplicationDocumentsDirectory();
   final appDirPath = appdir.path;
-  final db = sql.sqlite3.open("$appDirPath${Platform.pathSeparator}down4.db");
+  final db_ = sql.sqlite3.open("$appDirPath${Platform.pathSeparator}down4.db");
+  db_.execute("PRAGMA journal_mode=WAL;");
 
-  final r = db.select("SELECT name, type FROM nodes WHERE id = 'jeff_id'");
+  final r = db_.select("SELECT id FROM nodes WHERE type = 'self'");
+  final r2 =
+      db_.select("SELECT currentPage FROM personals WHERE id = 'single'");
 
-  final sql.Row d = r.single;
-  print("jeff name: ${d['name']}, jeff type: ${d['type']}");
+  print("got ${r.length} self");
+  final id = ComposedID.fromString(r.single["id"])!;
+  ComposedID? rtID;
+  final String? currentPage = r2.single["currentPage"];
+  if ((currentPage?.length ?? 0) > 5) {
+    final (e1, e2) = (currentPage?.substring(0, 4), currentPage?.substring(5));
+    if (e1 == "chat") rtID = ComposedID.fromString(e2);
+  }
 
-  AwesomeNotifications().createNotification(
-    content: NotificationContent(
-      id: 1,
-      channelKey: 'def',
-      title: header,
-      body: body,
-      // largeIcon: groupImageProfilePath ?? senderImageProfilePath,
-      icon: 'resource://drawable/ic_stat_down4_white',
-      // notificationLayout: group != null
-      //     ? NotificationLayout.MessagingGroup
-      //     : NotificationLayout.Messaging,
-    ),
-  );
-  
-  // print("Trying to init secondary couchbase bro");
-  // await CouchbaseLite.initSecondary(cblCtx);
-  // print("should have succeeded init the couchbasebro, init dbs now...");
-  // final dbForNodes = await Database.openAsync("nodes");
-  // final dbForMedias = await Database.openAsync("medias");
-  // print("dbs are init, woohoo!");
+  if (currentPage != null) {
+    print("""\n
+      \t APP IS LIVE, WAITING 2 SECONDS TO SHOW NOTIFICATION
+      \t TO AVOID DOUBLE FETCHING OF DATA\n
+      """);
+    await Future.delayed(const Duration(seconds: 2));
+  }
 
-  // const getSelf = "SELECT id FROM _ WHERE type = 'self'";
-  // final q = await AsyncQuery.fromN1ql(dbForNodes, getSelf);
-  // final e = await q.execute();
-  // final r = await e.allResults();
-  // if (r.length != 1) throw 'error getting selfID in backgroundMessageHandler';
-  // final selfID = ComposedID.fromString(r.first.string("id"))!;
-
-  // await showMessageNotification(data,
-  //     selfID: selfID, mediaDB: dbForMedias, nodeDB: dbForNodes);
-
-  // return print("shown notification!");
+  print("should be showing notification");
+  await showMessageNotification(data,
+      selfID: id, sdb: db_, appDir: appDirPath, currentRoot: rtID);
+  print("should have shown notification");
 }
 
 Future<void> main() async {
@@ -415,6 +316,7 @@ Future<void> main() async {
     print("\n\n ** SUCCES INITIALIZING FIREBASE APP ** \n\n");
   } catch (e) {
     print("\n\n xx ERROR INITIALIZING FIREBASE APP xx \n\n");
+    print(e);
   }
   // load application directory folder
   {
@@ -422,20 +324,6 @@ Future<void> main() async {
   }
 
   initSqlite();
-
-  // Initializing couchdb
-  {
-    await CouchbaseLiteFlutter.init();
-    tempDB = await Database.openAsync("temp");
-    nodesDB = await Database.openAsync("nodes");
-    mediasDB = await Database.openAsync("medias");
-    messagesDB = await Database.openAsync("messages");
-    personalDB = await Database.openAsync("personal");
-    paymentsDB = await Database.openAsync("payments");
-    utxosDB = await Database.openAsync("utxos");
-    billsDB = await Database.openAsync("bills");
-    await loadIndexes();
-  }
 
   {
     // inits notifications settings
@@ -457,14 +345,7 @@ Future<void> main() async {
         onFcmTokenHandle: handleTokenChange,
         onFcmSilentDataHandle: fcmHandler,
         debug: true);
-
-    // await _initLocalNotifications(_mainNotificationPlugin);
-    // initNotificationPlugin(globalPlugin, globalChannel);
   }
-
-  // special top-level background message handle for android
-  // Push.instance.onBackgroundMessage.listen(backgroundMessageHandler);
-  // FirebaseMessaging.onBackgroundMessage(backgroundMessageHandler);
 
   // loading some asset in memory, not having those assets in memory cause
   // stutter in transitions for example, loading image from assets is
@@ -496,7 +377,7 @@ Future<void> main() async {
 
   // INIT THE THEME
   {
-    g.loadTheme(await FireTheme.currentTheme);
+    g.loadTheme(await CurrentTheme.currentTheme);
 
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -509,6 +390,6 @@ Future<void> main() async {
     );
   }
 
-  final cred = await FirebaseAuth.instance.signInAnonymously();
-  runApp(MaterialApp(home: Material(child: Down4(user: cred.user))));
+
+  runApp(const MaterialApp(home: Material(child: Down4())));
 }

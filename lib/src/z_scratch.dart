@@ -1,15 +1,9 @@
-Future<void> jefff() async {
-  print("hello, I am Jefff");
-  await Future(() {
-    print("hello, I am jeffffff");
-  });
-}
+import 'dart:convert';
 
-void jeff() {
-  print("hello, I am Jeff");
-}
+const jeff = "jeff";
 
 void main() {
-  jefff();
-  jeff();
+  print(jeff.codeUnits);
+
+  print(utf8.encode(jeff));
 }

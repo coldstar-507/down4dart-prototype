@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/_dart_utils.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+// import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr/qr.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../bsv/types.dart';
 import '../bsv/_bsv_utils.dart';
@@ -33,6 +34,7 @@ class PaymentPage extends StatefulWidget implements Down4PageWidget {
   final void Function() back, ok;
   final Down4Payment payment;
   final List<String> paymentAsList;
+  final List<String> paymentAsListFast;
   final void Function(Down4Payment) sendPayment;
 
   PaymentPage({
@@ -42,6 +44,7 @@ class PaymentPage extends StatefulWidget implements Down4PageWidget {
     required this.sendPayment,
     Key? key,
   })  : paymentAsList = payment.asQrData,
+        paymentAsListFast = payment.asQrData2Fast,
         super(key: key);
 
   @override
@@ -85,7 +88,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
               ]))));
     }
     setState(() {
-      // theConsole = aConsole;
       if (qrs.length > 1) timer = startedTimer;
     });
   }
@@ -100,65 +102,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
 
   double get topPadding => g.sizes.w - qrDimension * 2 * 1 / golden;
 
-  // Console get aConsole => Console(
-  //       // inputs: [input],
-  //       topButtons: [
-  //         qrs.isEmpty
-  //             ? ConsoleButton(name: "Generate QR", onPress: loadQrsAsPaints)
-  //             : ConsoleButton(name: "Ok", onPress: widget.ok),
-  //       ],
-  //       bottomButtons: [
-  //         ConsoleButton(name: "Back", onPress: widget.back),
-  //         ConsoleButton(
-  //             name: "Send",
-  //             onPress: () {
-  //               // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
-  //               final spender = widget.payment.txs.last.txsIn.first.spender;
-  //               if (spender == g.self.id) {
-  //                 widget.sendPayment(widget.payment);
-  //                 // final pr = r.PaymentRequest(
-  //                 //   sender: spender!,
-  //                 //   payment: widget.payment,
-  //                 //   targets: widget.payment.txs.last.txsOut
-  //                 //       .where((txout) => txout.isGets)
-  //                 //       .map((txout) => txout.receiver)
-  //                 //       .whereType<String>()
-  //                 //       .toList(growable: false),
-  //                 // );
-  //                 // widget.paymentRequest(pr);
-  //                 widget.ok();
-  //               }
-  //             })
-  //       ],
-  //       // consoleRow: Console3(
-  //       //   widgets: [
-  //       //     qrs.isEmpty
-  //       //         ? ConsoleButton(name: "GENERATE_QR", onPress: loadQrsAsPaints)
-  //       //         : ConsoleButton(name: "OK", onPress: widget.ok),
-  //       //     ConsoleButton(
-  //       //         name: "SEND",
-  //       //         onPress: () {
-  //       //           // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
-  //       //           final spender = widget.payment.txs.last.txsIn.first.spender;
-  //       //           if (spender == g.self.id) {
-  //       //             widget.sendPayment(widget.payment);
-  //       //             // final pr = r.PaymentRequest(
-  //       //             //   sender: spender!,
-  //       //             //   payment: widget.payment,
-  //       //             //   targets: widget.payment.txs.last.txsOut
-  //       //             //       .where((txout) => txout.isGets)
-  //       //             //       .map((txout) => txout.receiver)
-  //       //             //       .whereType<String>()
-  //       //             //       .toList(growable: false),
-  //       //             // );
-  //       //             // widget.paymentRequest(pr);
-  //       //             widget.ok();
-  //       //           }
-  //       //         })
-  //       //   ],
-  //       // ),
-  //     );
-
   @override
   Console3 get console => Console3(
           rows: [
@@ -171,21 +114,10 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
                 ConsoleButton(
                     name: "SEND",
                     onPress: () {
-                      // final textNode = tec.value.text.isEmpty ? null : tec.value.text;
                       final spender =
                           widget.payment.txs.last.txsIn.first.spender;
                       if (spender == g.self.id) {
                         widget.sendPayment(widget.payment);
-                        // final pr = r.PaymentRequest(
-                        //   sender: spender!,
-                        //   payment: widget.payment,
-                        //   targets: widget.payment.txs.last.txsOut
-                        //       .where((txout) => txout.isGets)
-                        //       .map((txout) => txout.receiver)
-                        //       .whereType<String>()
-                        //       .toList(growable: false),
-                        // );
-                        // widget.paymentRequest(pr);
                         widget.ok();
                       }
                     }),
@@ -202,7 +134,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
       pages: [
         Down4Page(
           title: md5(widget.payment.txs.last.txID.data).toBase58(),
-          // stackWidgets: qrs2.isNotEmpty ? [qrs2[listIndex]] : null,
           stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
           console: console,
         )
@@ -237,7 +168,7 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
   final void Function(Down4Payment) onScan;
   final Future<void> Function() loadMorePayments;
   final void Function() back;
-  final Future<void> Function(Down4Payment) makePayment;
+  final void Function(Down4Payment) makePayment;
 
   const MoneyPage({
     required this.loadMorePayments,
@@ -279,8 +210,8 @@ class _MoneyPageState extends State<MoneyPage>
   int get _tipAmount => (_tipPercentage / 100 * _satsInput).toInt();
   int get _totalAmount => _satsInput + _tipAmount - _discountAmount;
 
-  void balanceRoutine() async {
-    _balance = await g.wallet.balance;
+  void balanceRoutine() {
+    _balance = g.wallet.balance;
     mainInput.ctrl.placeHolder = formattedCash;
     setState(() {});
   }
@@ -347,7 +278,7 @@ class _MoneyPageState extends State<MoneyPage>
     MyTextEditor(
       onInput: onInput,
       config: Input2.multiLine,
-      placeHolder: "(NOTE)",
+      placeHolder: "NOTE",
       centered: true,
       onFocusChange: onFocusChange,
       maxWidth: 0.6,
@@ -357,7 +288,7 @@ class _MoneyPageState extends State<MoneyPage>
     MyTextEditor(
       onInput: onInput,
       config: Input2.numberPad,
-      placeHolder: "%",
+      placeHolder: "DISCOUNT %",
       centered: true,
       onFocusChange: onFocusChange,
       maxWidth: 0.6,
@@ -367,7 +298,7 @@ class _MoneyPageState extends State<MoneyPage>
     MyTextEditor(
       onInput: onInput,
       config: Input2.numberPad,
-      placeHolder: "%",
+      placeHolder: "TIP %",
       centered: true,
       onFocusChange: onFocusChange,
       maxWidth: 0.6,
@@ -523,8 +454,8 @@ class _MoneyPageState extends State<MoneyPage>
   }
 
   @override
-  void onScan(BarcodeCapture bc) {
-    final raw = bc.raw;
+  void onScan(Barcode bc) {
+    final raw = bc.code;
     print("Trying to scan some good stuff right here!");
     if (raw == null) return;
 
@@ -555,11 +486,12 @@ class _MoneyPageState extends State<MoneyPage>
 
       widget.onScan(payment);
 
-      setState(() => scanning = false);
-
       print("RESETTING SCAN");
       scannedData = {};
       scannedDataLength = -1;
+      scanning = false;
+      disposeScanner();
+      setTheState();
     }
   }
 
@@ -578,52 +510,46 @@ class _MoneyPageState extends State<MoneyPage>
               ),
               "confirmImport": ConsoleRow(widgets: [
                 ConsoleButton(
-                    name: "CLOSE",
-                    // icon: closeButtonIcon,
-                    onPress: () => changeConsole("import")),
+                    name: "RETURN", onPress: () => changeConsole("import")),
                 currencyButton,
                 ConsoleButton(name: "IMPORT", onPress: import),
               ], extension: importWidget, widths: null, inputMaxHeight: null),
               "confirmPayment": ConsoleRow(
+                widgets: [
+                  cancelButton,
+                  currencyButton,
+                  confirmPaymentButton,
+                  withNoteButton.withExtra(confirmExtra, [
+                    withDiscountButton,
+                    withTipButton,
+                  ]),
+                ],
+                extension: quantityWidget,
+                widths: null,
+                inputMaxHeight: null,
+              ),
+              "textNote": ConsoleRow(
                   widgets: [
-                    cancelButton,
+                    ConsoleButton(
+                        name: "RETURN",
+                        onPress: () => changeConsole("confirmPayment")),
                     textNoteInput.consoleInput,
-                    currencyButton,
-                    confirmPaymentButton.withExtra(confirmExtra, [
+                    withTipButton.withExtra(withTipExtra, [
                       withDiscountButton,
-                      withTipButton,
-                      // withNoteButton,
-                    ]),
+                    ])
                   ],
                   extension: quantityWidget,
-                  widths: textNoteInput.hasFocus ? [0.2, 0.6, 0.0, 0.2] : null,
-                  inputMaxHeight: textNoteInput.hasFocus
-                      ? textNoteInput.height
-                      : Console.buttonHeight),
-              // "textNote": ConsoleRow(
-              //     widgets: [
-              //       ConsoleButton(
-              //           name: null,
-              //           icon: closeButtonIcon,
-              //           onPress: () => changeConsole("confirmPayment")),
-              //       textNoteInput.consoleInput,
-              //       confirmPaymentButton.withExtra(confirmExtraTextNote, [
-              //         withDiscountButton,
-              //         withTipButton,
-              //       ])
-              //     ],
-              //     extension: null,
-              //     widths: hasFocus ? [.2, .6, .2] : [.25, .5, .25],
-              //     inputMaxHeight:
-              //         textNoteInput.hasFocus ? textNoteInput.height : 0),
+                  widths:
+                      textNoteInput.hasFocus ? [.2, .6, .2] : [.25, .5, .25],
+                  inputMaxHeight:
+                      textNoteInput.hasFocus ? textNoteInput.height : null),
               "tip": ConsoleRow(
                   widgets: [
                     ConsoleButton(
-                        name: "CLOSE",
-                        // icon: closeButtonIcon,
+                        name: "RETURN",
                         onPress: () => changeConsole("confirmPayment")),
                     tipInput.consoleInput,
-                    confirmPaymentButton.withExtra(confirmExtraTip, [
+                    withNoteButton.withExtra(withNoteExtra, [
                       withDiscountButton,
                     ]),
                   ],
@@ -633,11 +559,10 @@ class _MoneyPageState extends State<MoneyPage>
               "discount": ConsoleRow(
                   widgets: [
                     ConsoleButton(
-                        name: "CLOSE",
-                        // icon: closeButtonIcon,
+                        name: "RETURN",
                         onPress: () => changeConsole("confirmPayment")),
                     discountInput.consoleInput,
-                    confirmPaymentButton.withExtra(confirmExtraDiscount, [
+                    withNoteButton.withExtra(withNoteExtra2, [
                       withTipButton,
                     ]),
                   ],
@@ -653,7 +578,9 @@ class _MoneyPageState extends State<MoneyPage>
                     ConsoleButton(name: "ACCOUNT", onPress: () {}),
                   ],
                   extension: null,
-                  widths: [0.25, 0.5, 0.25],
+                  widths: filterInput.hasFocus
+                      ? [0.2, 0.6, 0.2]
+                      : [0.25, 0.5, 0.25],
                   inputMaxHeight: null)
             }
           ],
@@ -680,7 +607,7 @@ class _MoneyPageState extends State<MoneyPage>
       name: "W/DISCOUNT", onPress: () => changeConsole("discount"));
 
   ConsoleButton get withNoteButton =>
-      ConsoleButton(name: "W/NOTE", onPress: () {});
+      ConsoleButton(name: "W/NOTE", onPress: () => changeConsole("textNote"));
 
   ConsoleButton get openImportButton =>
       ConsoleButton(name: "IMPORT", onPress: () => changeConsole("import"));
@@ -726,6 +653,7 @@ class _MoneyPageState extends State<MoneyPage>
   (Column, double?) doublerWidget(List<(String name, String format)> ins) {
     Widget doubler(String name, String format) {
       return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(width: g.sizes.w * 0.05),
           SizedBox(
@@ -748,24 +676,64 @@ class _MoneyPageState extends State<MoneyPage>
     }
 
     final doublers = ins.map((e) => doubler(e.$1, e.$2));
-    double singleRowHeight() {
-      final tp = TextPainter(
-          textDirection: TextDirection.ltr,
-          text: TextSpan(text: "0", style: g.theme.consoleTextStyle))
-        ..layout(maxWidth: g.sizes.w);
-      return tp.height;
-    }
+    final (textWidget, textWidgetHeight) = singler();
 
     return (
       Column(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(height: 1 / 4 * Console.buttonHeight),
-            ...doublers,
-          ]),
-      (singleRowHeight() * ins.length) + (1 / 4 * Console.buttonHeight),
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [...doublers, textWidget],
+      ),
+      (singleRowHeight() * ins.length) +
+          (1 / 4 * Console.buttonHeight) +
+          textWidgetHeight,
     );
+  }
+
+  double singleRowHeight() {
+    final tp = TextPainter(
+        textDirection: TextDirection.ltr,
+        text: TextSpan(text: "0", style: g.theme.consoleTextStyle))
+      ..layout(maxWidth: g.sizes.w);
+    return tp.height;
+  }
+
+  (Widget, double) singler() {
+    if (textNoteInput.value.isEmpty) return (const SizedBox.shrink(), 0);
+    final tp = TextPainter(
+        textDirection: TextDirection.ltr,
+        text: TextSpan(
+            text: textNoteInput.value, style: g.theme.consoleTextStyle))
+      ..layout(maxWidth: g.sizes.w * 0.9);
+
+    final w = Row(
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        SizedBox(width: g.sizes.w * 0.05),
+        SizedBox(
+          width: g.sizes.w * 0.9,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            textDirection: TextDirection.ltr,
+            children: [
+              Text(
+                  "-----------------------------------------------------------------------------------------------------------------------------------------------------------------------",
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                  softWrap: true,
+                  style: g.theme.consoleTextStyle),
+              Text(textNoteInput.value,
+                  maxLines: 20,
+                  softWrap: true,
+                  style: g.theme.consoleTextStyle),
+            ],
+          ),
+        ),
+        SizedBox(width: g.sizes.w * 0.05),
+      ],
+    );
+
+    return (w, tp.height + singleRowHeight());
   }
 
   (Column, double?) get importWidget {
@@ -801,14 +769,15 @@ class _MoneyPageState extends State<MoneyPage>
     widget.onScan(payment);
   }
 
-  void confirmPayment() async {
-    final pay = await g.wallet.payPeople(
+  void confirmPayment() {
+    // TODO: add tips utxos and discount notes
+    final pay = g.wallet.payPeople(
         people: trueTargets.toList(),
         selfID: g.self.id,
-        amount: Sats(_satsInput),
+        amount: Sats(_totalAmount),
         textNote: textNoteInput.value);
     if (pay != null) {
-      await widget.makePayment(pay);
+      widget.makePayment(pay);
       mainInput.clear();
       textNoteInput.clear();
     }
@@ -856,7 +825,7 @@ class _MoneyPageState extends State<MoneyPage>
                   ? [0.2, 0.6, 0.2]
                   : null
               : mainInput.hasFocus
-                  ? [0.14, 0.58, 0.14, 0.14]
+                  ? [0.2, 0.4, 0.2, 0.2]
                   : null,
           inputMaxHeight: null);
 
@@ -874,7 +843,9 @@ class _MoneyPageState extends State<MoneyPage>
             scrollController: scroller0,
             staticList: true,
             title: "Money",
-            list: transitedPalettes ?? widget.initPalettes ??  _users.values.toList(),
+            list: transitedPalettes ??
+                widget.initPalettes ??
+                _users.values.toList(),
             console: console),
         Down4Page(
             onRefresh: widget.loadMorePayments,
@@ -890,9 +861,9 @@ class _MoneyPageState extends State<MoneyPage>
 
   Extra get extraButton => extras[0];
   Extra get confirmExtra => extras[1];
-  Extra get confirmExtraTextNote => extras[2];
-  Extra get confirmExtraTip => extras[3];
-  Extra get confirmExtraDiscount => extras[4];
+  Extra get withNoteExtra => extras[2];
+  Extra get withTipExtra => extras[3];
+  Extra get withNoteExtra2 => extras[4];
 
   @override
   late List<Extra> extras = [

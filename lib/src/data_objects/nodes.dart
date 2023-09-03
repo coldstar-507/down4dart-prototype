@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:down4/src/bsv/_bsv_utils.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/themes.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart' show Color;
-import 'package:cbl/cbl.dart';
 
 import '../_dart_utils.dart';
 import '../bsv/types.dart';
@@ -49,44 +49,6 @@ enum NodesColor {
   unsafeTx,
   self,
 }
-
-// extension Tokens on List<MessageTarget> {
-//   List<String> get tokens => map((mt) => mt.token).toList();
-// }
-
-// class MessageTarget implements Jsons {
-//   final ComposedID userID;
-//   final String device;
-//   final String token;
-//   bool success;
-
-//   String get messageSuccessKey => "${userID.value}~$device~$token";
-
-//   MessageTarget({
-//     required this.userID,
-//     required this.device,
-//     required this.token,
-//     this.success = false,
-//   });
-
-//   @override
-//   Map<String, String> toJson({bool includeLocal = false}) => {
-//         "userID": userID.value,
-//         "device": device,
-//         "token": token,
-//         "success": success.toString(),
-//       };
-
-//   factory MessageTarget.fromJson(Map<String, String?> json) {
-//     return MessageTarget(
-//       userID: ComposedID.fromString(json["userID"])!,
-//       device: json["device"]!,
-//       token: json["token"]!,
-//       success: json["success"] == "true",
-//     );
-//   }
-// }
-
 mixin PaletteN on Down4Object {
   Color get color;
   Nodes get type;
@@ -98,7 +60,7 @@ mixin PaletteN on Down4Object {
 
 abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
   @override
-  Database get dbb => nodesDB;
+  String get table => "nodes";
 
   final Down4ID _id;
   final String? _deviceID, _mainDeviceID;
@@ -111,7 +73,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
   final Down4Keys? _neuter;
   ComposedID? _mediaID;
   bool? _isPrivate;
-  final Set<ComposedID>? _group, _children, _privates, _posts, _admins;
+  final Set<ComposedID>? _members, _children, _privates, _posts, _admins;
   final ComposedID? _ownerID;
   double? _longitude, _latitude;
   Map<ComposedID, String>? _treeHash;
@@ -127,9 +89,10 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
         _blueArrowHash,
         _lastOnline.toString(),
       ].join("~");
+
   String _blueArrowHash;
   int _lastOnline;
-  String get publicHash => md5(publicData.toUtf8()).toBase64();
+  String get publicHash => md5(publicData.codeUnits).toBase64();
 
   Map<String, String>? get _jsonTreeHash =>
       _treeHash?.map((key, value) => MapEntry(key.value, value));
@@ -140,7 +103,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
   }
 
   String get publicData {
-    return id.unique +
+    return id.unik +
         _name +
         (_lastName ?? "") +
         jsonEncode(_messagingTokens ?? {}) +
@@ -151,7 +114,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
         (_children?.join(" ") ?? "") +
         (_posts?.join(" ") ?? "") +
         (_admins?.join(" ") ?? "") +
-        (_group?.join(" ") ?? "");
+        (_members?.join(" ") ?? "");
   }
 
   @override
@@ -166,7 +129,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
       "type": (this is Self && !includeLocal) ? Nodes.user.name : type.name,
       "name": _name,
       "connection": _connection,
-      if (includeLocal) "unique": id.unique,
+      if (includeLocal) "unik": id.unik,
       if (_messagingTokens != null) "messagingTokens": messagingTokens!,
       if (_mainDeviceID != null) "mainDeviceID": _mainDeviceID!,
       if (_treeHash != null) "treeHash": youKnowEncode(_jsonTreeHash!),
@@ -181,7 +144,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
       if (_privates != null) "privates": _privates!.values,
       if (_admins != null) "admins": _admins!.values,
       if (_neuter != null) "neuter": _neuter!.toYouKnow(),
-      if (_group != null) "group": _group!.values,
+      if (_members != null) "members": _members!.values,
       if (includeLocal && _deviceID != null) "deviceID": _deviceID!,
       if (includeLocal && _isConnected != null)
         "isConnected": _isConnected!.toString(),
@@ -208,20 +171,22 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
     double? latitude,
     ComposedID? mediaID,
     ComposedID? ownerID,
+    Map<ComposedID, String>? treeHash,
     Set<ComposedID>? children,
     Set<ComposedID>? privates,
     Set<ComposedID>? posts,
     Set<ComposedID>? admins,
-    Set<ComposedID>? group,
+    Set<ComposedID>? members,
   })  : _id = id,
         _activity = activity,
         _lastOnline = lastOnline ?? 0,
         _name = name,
+        _treeHash = treeHash,
         _isConnected = isConnected,
         _mainDeviceID = mainDeviceID,
         _deviceID = deviceID,
         _lastName = lastName,
-        _blueArrowHash = blueArrowHash ?? id.unique,
+        _blueArrowHash = blueArrowHash ?? id.unik,
         _isPrivate = isPrivate,
         _latitude = latitude,
         _longitude = longitude,
@@ -231,7 +196,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
         _mediaID = mediaID,
         _ownerID = ownerID,
         _privates = privates,
-        _group = group,
+        _members = members,
         _admins = admins,
         _posts = posts,
         _children = children;
@@ -252,6 +217,13 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
       messagingTokens = Map<String, String>.from(youKnowDecode(encTokens));
     }
 
+    final encTreeHash = json["treeHash"];
+    Map<ComposedID, String>? treeHash;
+    if (encTreeHash != null) {
+      final jsnTree = Map<String, String>.from(youKnowDecode(encTreeHash));
+      treeHash = jsnTree.map((k, v) => MapEntry(ComposedID.fromString(k)!, v));
+    }
+
     final id = Down4ID.fromString(json["id"])!;
     final deviceID = json["deviceID"];
     final mainDeviceID = json["mainDeviceID"];
@@ -269,7 +241,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
     final children = json["children"]?.toComposedIDs();
     final privates = json["privates"]?.toComposedIDs();
     final admins = json["admins"]?.toComposedIDs();
-    final group = json["group"]?.toComposedIDs();
+    final members = json["members"]?.toComposedIDs();
     final neuter = json["neuter"] != null
         ? Down4Keys.fromYouKnow(json["neuter"] as String)
         : null;
@@ -290,6 +262,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
             neuter: neuter!,
             description: description,
             longitude: longitude,
+            treeHash: treeHash,
             latitude: latitude);
 
       case Nodes.hyperchat:
@@ -300,7 +273,8 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
             blueArrowHash: blueH,
             firstWord: name,
             secondWord: lastName!,
-            group: group!,
+            members: members!,
+            treeHash: treeHash,
             isConnected: isConnected);
 
       case Nodes.group:
@@ -312,7 +286,8 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
             isConnected: isConnected,
             name: name,
             mediaID: mediaID!,
-            group: group!);
+            treeHash: treeHash,
+            members: members!);
 
       case Nodes.self:
         return Self(id as ComposedID,
@@ -369,9 +344,9 @@ mixin ConnectN on RemoteN, Down4Node {
   ComposedID get id;
 
   bool get isConnected;
-  Future<void> updateConnectionStatus(bool isConnected) async {
+  void updateConnectionStatus(bool isConnected) {
     _isConnected = isConnected;
-    await merge({"isConnected": isConnected.toString()});
+    merge({"isConnected": isConnected.toString()});
   }
 
   Stream<DatabaseEvent> get connection {
@@ -417,22 +392,31 @@ mixin BranchN on ConnectN, Down4Node {
         }
       }
     }
-    await merge({"treeHash": jsonEncode(treeHash = tree)});
+    treeHash = tree;
+    final jsnTree = tree.map((key, value) => MapEntry(key.value, value));
+    merge({"treeHash": youKnowEncode(jsnTree)});
   }
 
   @override
   String get publicHash {
-    if ((treeHash ?? {}).isEmpty) return "";
-    final intHashes = treeHash!.values.map((e) => utf8.encode(e)).toList();
-    final hashLen = intHashes.first.length;
-    final nHash = intHashes.length;
-    List<int> hash = List<int>.generate(hashLen, (index) => 0);
-    for (int l = 0; l < hashLen; l++) {
-      for (int n = 0; n < nHash; n++) {
-        hash[n] = intHashes[n][l] ^ hash[n];
+    if ((treeHash ?? {}).isEmpty) return "empty";
+    final hashes =
+        treeHash!.values.map((e) => List<int>.from(e.codeUnits)).toList();
+
+    final mx = hashes.fold(0, (val, h) => max(val, h.length));
+    for (final hash in hashes) {
+      final dif = mx - hash.length;
+      hash.addAll(List.filled(dif, 0));
+    }
+
+    var hash = hashes.first;
+    for (int i = 1; i < hashes.length; i++) {
+      for (int j = 0; j < mx; j++) {
+        hash[j] = hash[j] ^ hashes[i][j];
       }
     }
-    return utf8.decode(hash);
+    
+    return hash.toBase64();
   }
 }
 
@@ -459,14 +443,12 @@ mixin ChatN on Down4Node, Locals {
 
   @override
   Future<void> delete() async {
-    print("DELETING ChatN, unique: ${id.unique}");
+    print("DELETING ChatN, unik: ${id.unik}");
     // must also delete all related chats
-    final raw = "SELECT * AS m FROM _ WHERE root = '$root_'";
-    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-    final e = await q.execute();
-    final r = await e.allResults();
+    const q = "SELECT * FROM messages WHERE root = ?";
+    final r = db.select(q, [root_]);
     final msgs = r.map((m) {
-      final jsns = Map<String, String?>.from(m.toPlainMap()["m"] as Map);
+      final jsns = Map<String, String?>.from(m);
       return Down4Message.fromJson(jsns) as Messages;
     });
 
@@ -478,7 +460,7 @@ mixin ChatN on Down4Node, Locals {
 
   String root(ComposedID selfID) {
     if (this is GroupN) return id.value;
-    final st = [selfID, id]..sort((a, b) => a.unique.compareTo(b.unique));
+    final st = [selfID, id]..sort((a, b) => a.unik.compareTo(b.unik));
     final cat = st.map((e) => e.value).join("!");
     return cat;
   }
@@ -487,121 +469,102 @@ mixin ChatN on Down4Node, Locals {
 
   Future<List<PersonN>> get messageTargets async {
     if (this is GroupN) {
-      final g = await globall<PersonN>(_group);
+      final g = await globall<PersonN>(_members);
       return g;
+    } else if (g.self == this) {
+      return [g.self];
     } else {
       return [g.self, this as PersonN];
     }
   }
 
-  // // This includes the senders tokens, because we can be multi device
-  // // we might send messages to ourselves
-  // // For CHATS, we remove only remove the token of the sender current device
-  // // this way, all participating devices will receive a message except sender's
-  // // current device
-  // // for CASH, we remove sender's tokens and receivers non-mainDevice tokens
-  // // This is done in the messages sending functions
-  // /// A user can have multiple device, hence multiple tokens
-  // /// This returns all possible device tokens except the token
-  // /// of the device the user is using to send the message
-  // Future<List<MessageTarget>> allTargets() async {
-  //   final nodeRef = this;
-  //   List<MessageTarget> targets = [];
-  //   final people = nodeRef is GroupN
-  //       ? (await globall<PersonN>(nodeRef.group))
-  //       : nodeRef.id == g.self.id
-  //           ? [g.self]
-  //           : [g.self, nodeRef as PersonN];
 
-  //   for (final person in people) {
-  //     for (final token in person.messagingTokens.entries) {
-  //       if (person.id == g.self.id && token.key == g.self.deviceID) continue;
-  //       targets.add(MessageTarget(
-  //         userID: person.id,
-  //         device: token.key,
-  //         token: token.value,
-  //       ));
-  //     }
-  //   }
-
-  //   return targets;
-  // }
-
-  Future<Pair<Iterable<Down4ID>, AsyncListenStream<QueryChange<ResultSet>>>>
-      getTheChat() async {
-    final raw = """
-        SELECT META().id AS id FROM _
+  Iterable<ComposedID> fullChatIDs() sync* {
+    final q = """
+        SELECT id FROM messages
         WHERE root = '$root_' AND type = 'chat'
         ORDER BY id DESC
         """;
-    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-    final r = await q.execute();
-    return Pair(
-      (await r.allResults())
-          .map((e) => Down4ID.fromString(e.toPlainMap()["id"] as String)!),
-      q.changes(),
-    );
-  }
-
-  Future<Iterable<ComposedID>> unreadSnipIDs() async {
-    final raw = """
-        SELECT META().id AS id FROM _
-        WHERE root = '$root_' AND type = 'snip' AND isRead = 'false'
-        ORDER BY id ASC
-        """;
-    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-    final r = await q.execute();
-    return (await r.allResults())
-        .map((e) => ComposedID.fromString(e.toPlainMap()["id"] as String)!);
-  }
-
-  Stream<Snip> loadSnips() async* {
-    final raw = "SELECT * FROM _ AS m WHERE type = 'snip' AND root = '$root_'";
-    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-    final r = await q.execute();
-    await for (final a in r.asStream()) {
-      final json = Map<String, String?>.from(a.toPlainMap()["m"] as Map);
-      yield Down4Message.fromJson(json) as Snip;
+    final r = db.select(q);
+    for (final row in r) {
+      yield ComposedID.fromString(row['id'])!;
     }
   }
 
-  Future<Chat?> lastChatMessage() async {
-    final raw = """
-            SELECT * FROM _ AS m
-            WHERE root = '$root_' AND type = 'chat'
-            ORDER BY META(m).id DESC LIMIT 1
-            """;
-    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-    final r = await q.execute();
-    final a = await r.allResults();
-
-    if (a.isEmpty) return null;
-    final single = a.single.toPlainMap()["m"] as Map;
-    final json = Map<String, String?>.from(single);
-    return Down4Message.fromJson(json) as Chat;
+  Iterable<ComposedID> unreadSnipIDs() sync* {
+    final q = """
+        SELECT id FROM messages
+        WHERE root = '$root_' AND type = 'snip' AND isRead = 'false'
+        ORDER BY id ASC
+        """;
+    final r = db.select(q);
+    for (final row in r) {
+      yield ComposedID.fromString(row['id'])!;
+    }
   }
 
-  Future<bool> lastChatFromOtherIsUnread() async {
-    final raw = """
-            SELECT * FROM _
+  Iterable<Snip> loadSnips() sync* {
+    final q = "SELECT * FROM messages WHERE type = 'snip' AND root = '$root_'";
+    final r = db.select(q);
+    for (final row in r) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4Message.fromJson(jsns) as Snip;
+    }
+  }
+
+  Chat? lastChatMessage() {
+    final q = """
+            SELECT * FROM messages
+            WHERE root = '$root_' AND type = 'chat'
+            ORDER BY id DESC LIMIT 1
+            """;
+
+    final r = db.select(q);
+    if (r.isEmpty) return null;
+    final jsns = Map<String, String?>.from(r.single);
+    return Down4Message.fromJson(jsns) as Chat;
+  }
+
+  bool lastChatFromOtherIsUnread() {
+    final q = """
+            SELECT * FROM messages
             WHERE root = '$root_'
               AND type = 'chat'
               AND isRead = 'false'
               AND senderID != '${g.self.id.value}'
-            ORDER BY META().id DESC LIMIT 1
+            ORDER BY id DESC LIMIT 1
             """;
-    final q = await AsyncQuery.fromN1ql(messagesDB, raw);
-    final r = await q.execute();
-    final a = await r.allResults();
 
-    return a.isNotEmpty;
+    final r = db.select(q);
+    return r.isNotEmpty;
   }
 }
 
 mixin GroupN on ChatN, ChildN {
-  Iterable<ComposedID> get group;
+  Iterable<ComposedID> get members;
   @override
-  String get displayID => group.map((id) => "@${id.unique}").join(" ");
+  String get displayID => members.map((id) => "@${id.unik}").join(" ");
+
+  @override
+  String get publicHash {
+    if (members.isEmpty) return "empty";
+    final uniks = members.map((e) => List<int>.from(e.unik.codeUnits)).toList();
+
+    final maxu = uniks.fold(0, (val, e) => max(val, e.length));
+    for (final u in uniks) {
+      final diff = maxu - u.length;
+      u.addAll(List.filled(diff, 0));
+    }
+
+    final hash = uniks.first;
+    for (int i = 1; i < uniks.length; i++) {
+      for (int j = 0; j < hash.length; j++) {
+        hash[j] = hash[j] ^ uniks[i][j];
+      }
+    }
+
+    return hash.toBase64();
+  }
 }
 
 mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
@@ -620,19 +583,19 @@ mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
 
   Down4Keys get neuter;
 
-  Future<void> updateLastOnline(int? lastOnline) async {
+  void updateLastOnline(int? lastOnline) {
     if (lastOnline == null) return;
     _lastOnline = lastOnline;
-    await merge({"lastOnline": _lastOnline.toString()});
+    merge({"lastOnline": _lastOnline.toString()});
   }
 
-  Future<void> updateMessagingToken(Map<String, String> newToken) async {
+  void updateMessagingToken(Map<String, String> newToken) {
     _messagingTokens = {...?_messagingTokens, ...newToken};
-    await merge({"messagingTokens": jsonEncode(messagingTokens)});
+    merge({"messagingTokens": jsonEncode(messagingTokens)});
   }
 
   @override
-  String get displayID => "@${id.unique}";
+  String get displayID => "@${id.unik}";
 
   @override
   String get displayName =>
@@ -640,32 +603,32 @@ mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
 }
 
 mixin EditN on Down4Node {
-  Future<void> editName(String newName) async {
+  void editName(String newName) {
     _name = newName;
-    await merge({"name": _name});
+    merge({"name": _name});
   }
 
-  Future<void> editLastName(String? newLastName) async {
+  void editLastName(String? newLastName) {
     _lastName = newLastName;
-    await merge({"lastName": _lastName ?? ""});
+    merge({"lastName": _lastName ?? ""});
   }
 
-  Future<void> editImage(Down4Media newImage) async {
+  void editImage(Down4Media newImage) {
     _mediaID = newImage.id;
-    await merge({"mediaID": _mediaID!.value});
+    merge({"mediaID": _mediaID!.value});
   }
 
-  Future<void> editDescription(String newDescription) async {
+  void editDescription(String newDescription) {
     _description = newDescription;
-    await merge({"description": _description!});
+    merge({"description": _description!});
   }
 }
 
 mixin GeoN on Geo, Down4Node {
-  Future<void> updateLocation(double lon, double lat) async {
+  void updateLocation(double lon, double lat) {
     _longitude = lon;
     _latitude = lat;
-    await merge({"longitude": lon.toString(), "latitude": lat.toString()});
+    merge({"longitude": lon.toString(), "latitude": lat.toString()});
   }
 }
 
@@ -687,7 +650,7 @@ mixin RemoteN on Down4Node {
             "error deleting node id=${id.value}, node type=$runtimeType, err=$e");
       }
     } else {
-      throw "node type=$runtimeType, id=${id.unique} isn't remoteMutable";
+      throw "node type=$runtimeType, id=${id.unik} isn't remoteMutable";
     }
   }
 
@@ -697,11 +660,11 @@ mixin RemoteN on Down4Node {
         await id.nodeRef.update(data ?? toJson(includeLocal: false));
         return true;
       } catch (e) {
-        print("error remoteMerge node id=${id.unique}\nerror=$e\n");
+        print("error remoteMerge node id=${id.unik}\nerror=$e\n");
         return false;
       }
     } else {
-      throw "node type=$runtimeType, id=${id.unique} isn't remoteMutable";
+      throw "node type=$runtimeType, id=${id.unik} isn't remoteMutable";
     }
   }
 
@@ -731,6 +694,7 @@ class User extends Down4Node
     required Down4Keys neuter,
     super.latitude,
     super.longitude,
+    super.treeHash,
   }) : super(
             lastOnline: lastOnline,
             isConnected: isConnected,
@@ -742,17 +706,15 @@ class User extends Down4Node
   @override
   Map<String, String> get messagingTokens => _messagingTokens!;
 
-  Future<bool> hasMessages() async {
-    final raw_ = """
-      SELECT META().id FROM _ AS m 
-      WHERE m.root = '$root_'
+  bool hasMessages() {
+    final q = """
+      SELECT id FROM messages 
+      WHERE root = '$root_'
       LIMIT 1
       """;
 
-    final q_ = await AsyncQuery.fromN1ql(messagesDB, raw_);
-    final r_ = await q_.execute();
-    final e_ = await r_.allResults();
-    return e_.isNotEmpty;
+    final r = db.select(q);
+    return r.isNotEmpty;
   }
 
   @override
@@ -856,18 +818,14 @@ class Self extends Down4Node
   @override
   Down4Keys get neuter => _neuter!;
 
-  static Future<Self?> loadSelf() async {
-    const raw = "SELECT * FROM _ AS n WHERE n.type = 'self'";
-
-    final q = await AsyncQuery.fromN1ql(nodesDB, raw);
-    final e = await q.execute();
-    final r = await e.allResults();
+  static Self? loadSelf() {
+    const q = "SELECT * FROM nodes WHERE type = 'self'";
+    final r = db.select(q);
 
     if (r.isEmpty) return null;
-    final full = r.single.toPlainMap();
-    final sMap = Map<String, String?>.from(full["n"] as Map);
+    final sMap = Map<String, String?>.from(r.single);
     final self = fromJson<Self>(sMap)..cache();
-    await global<Down4Media>(self.mediaID);
+    local<Down4Media>(self.mediaID);
     return self;
   }
 
@@ -906,10 +864,11 @@ class Group extends Down4Node
     required ComposedID mediaID,
     required ComposedID ownerID,
     required bool isPrivate,
-    required Set<ComposedID> group,
+    required Set<ComposedID> members,
+    super.treeHash,
   }) : super(
             isConnected: isConnected,
-            group: group,
+            members: members,
             isPrivate: isPrivate,
             mediaID: mediaID,
             ownerID: ownerID);
@@ -917,9 +876,9 @@ class Group extends Down4Node
   @override
   ComposedID get ownerID => _ownerID!;
 
-  Future<void> addMembersRef(Iterable<ComposedID> memberIDs) async {
-    _group!.addAll(memberIDs);
-    await merge({"group": group.values});
+  void addMembersRef(Iterable<ComposedID> memberIDs) {
+    _members!.addAll(memberIDs);
+    merge({"members": members.values});
   }
 
   bool get isPrivate => _isPrivate!;
@@ -931,19 +890,13 @@ class Group extends Down4Node
   String get displayName => _name;
 
   @override
-  Iterable<ComposedID> get group => _group!;
+  Iterable<ComposedID> get members => _members!;
 
   @override
   ComposedID? get mediaID => _mediaID;
 
   @override
   Nodes get type => Nodes.group;
-
-  @override
-  String get publicHash =>
-      // we hash ids to get fixed size
-      XORedStrings(
-          group.map((e) => sha1(e.unique.codeUnits).toUtf16()).toList());
 
   @override
   bool get isConnected => _isConnected!;
@@ -960,11 +913,12 @@ class Hyperchat extends Down4Node
     required ComposedID ownerID,
     required String firstWord,
     required String secondWord,
-    required Set<ComposedID> group,
+    required Set<ComposedID> members,
+    super.treeHash,
   }) : super(
             isConnected: isConnected,
             mediaID: mediaID,
-            group: group,
+            members: members,
             name: firstWord,
             lastName: secondWord,
             ownerID: ownerID);
@@ -979,19 +933,13 @@ class Hyperchat extends Down4Node
   String get displayName => "$_name $_lastName";
 
   @override
-  Iterable<ComposedID> get group => _group!;
+  Iterable<ComposedID> get members => _members!;
 
   @override
   ComposedID? get mediaID => _mediaID;
 
   @override
   Nodes get type => Nodes.hyperchat;
-
-  @override
-  String get publicHash =>
-      // we hash ids to get fixed size
-      XORedStrings(
-          group.map((e) => sha1(e.unique.codeUnits).toUtf16()).toList());
 
   @override
   bool get isConnected => _isConnected!;
@@ -1051,7 +999,7 @@ class NodeTheme with Down4Object implements PaletteN {
   Nodes get type => Nodes.theme;
 
   @override
-  Down4ID get id => Down4ID(unique: theme.name);
+  Down4ID get id => Down4ID(unik: theme.name);
 
   @override
   ComposedID? get mediaID => null;

@@ -8,7 +8,6 @@ import '../render_objects/_render_utils.dart' show Down4PageWidget;
 import '_page_utils.dart';
 
 class SnipViewPage extends StatelessWidget
-    with Pager2
     implements Down4PageWidget {
   @override
   String get id => "snipview";
@@ -63,7 +62,7 @@ class SnipViewPage extends StatelessWidget
     ]);
   }
 
-  @override
+  // @override
   Console3 get console => Console3(
           rows: [
             {
@@ -73,20 +72,20 @@ class SnipViewPage extends StatelessWidget
               ], extension: null, widths: null, inputMaxHeight: null)
             }
           ],
-          currentConsolesName: currentConsolesName,
-          currentPageIndex: currentPageIndex);
+          currentConsolesName: ["base"],
+          currentPageIndex: 0);
 
-  @override
-  void setTheState() {}
+  // @override
+  // void setTheState() {}
 
-  @override
-  set extras(List<Extra> e) {}
+  // @override
+  // set extras(List<Extra> e) {}
 
-  @override
-  final List<Extra> extras = const [];
+  // @override
+  // final List<Extra> extras = const [];
 
-  @override
-  List<String> get currentConsolesName => ["base"];
-  @override
-  set currentConsolesName(List<String> j) {}
+  // @override
+  // List<String> get currentConsolesName => ["base"];
+  // @override
+  // set currentConsolesName(List<String> j) {}
 }

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
-import 'package:down4/main.dart';
 import 'package:down4/src/pages/preview_page.dart';
 import 'package:down4/src/themes.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -56,7 +56,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // the page on top of the stack automatically.
   // To go to a page, we push it *push(page)*
 
-  late Down4PageWidget page = g.initLoadingScreen!;
+  late Down4PageWidget page = const LoadingPage2();
   ViewManager get viewManager => g.vm;
 
   Set<Down4Object> get forwardingObjects => viewManager.forwardingObjects;
@@ -79,11 +79,19 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   void setPage(Down4PageWidget p) {
+    if (page.id != p.id) {
+      const raw = "UPDATE personals SET currentPage = ? WHERE id = 'single'";
+      try {
+        db.execute(raw, [p.id]);
+      } catch (e) {
+        print("\n\tERROR IN SETPAGE: $e\n");
+      }
+    }
     page = p;
     setState(() {});
   }
 
-  void back() async {
+  void back() {
     if (page is HomePage) {
       return print("closing app");
     }
@@ -92,32 +100,38 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final pp0 = pID.first;
     final n = poppedView.node;
     if (pID.length > 1 && pp0 == "chat" && n is ChatN && wasPopped) {
-      poppedView.chat?.second.cancel();
-      await writePalette(n, _chats, bGen, rfHome, home: true);
+      // poppedView.chat?.second.cancel();
+      writePalette(n, _chats, bGen, rfHome, home: true);
     }
     final id = currentView.id.split('-');
     final p0 = id.first;
     switch (p0) {
       case 'home':
+        print("backing to homepage");
         return setPage(homePage());
       case 'chat':
         final node = currentView.node as ChatN;
+        print("backing to chat page");
         return setPage(chatPage(node, isReload: true));
       case 'node':
+        print("backing to node page");
         final node = currentView.node as Down4Node;
         return setPage(nodePage(node));
       case 'money':
+        print("backing to money page");
         return setPage(moneyPage());
       case 'search':
+        print("backing to search page");
         return setPage(searchPage());
       case 'forward':
-        return setPage(await forwardPage());
+        print("backing to forward page");
+        return setPage(forwardPage());
     }
   }
 
   void openPreview() async => setPage(await previewPage(isPush: true));
 
-  final Map<MediaType, StreamSubscription> _mediasListeners = {};
+  // final Map<MediaType, StreamSubscription> _mediasListeners = {};
   StreamSubscription? _forgroundMessageListener, _notificationListener;
 
   final Map<ComposedID, StreamSubscription> _nodeConnections = {};
@@ -126,20 +140,19 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   // ========================= INITIALIZATION ============================ //
 
-  void connectToNotifications() async {
-    
-    // _notificationListener = FirebaseMessaging.onMessage.listen((remoteMsg) {
-    // _notificationListener = Push.instance.onMessage.listen((remoteMsg) {
-    //   print("\n\nRECEIVED A FUCKING MESSAGE BRO\n\n");
+  // void connectToNotifications() async {
+  //   // _notificationListener = FirebaseMessaging.onMessage.listen((remoteMsg) {
+  //   // _notificationListener = Push.instance.onMessage.listen((remoteMsg) {
+  //   //   print("\n\nRECEIVED A FUCKING MESSAGE BRO\n\n");
 
-    //   final ComposedID? currentRoot =
-    //       viewManager.currentView.node?.id as ComposedID?;
+  //   //   final ComposedID? currentRoot =
+  //   //       viewManager.currentView.node?.id as ComposedID?;
 
-    //   print("\n\nshowing notification from connectToNotifications\n\n");
-    //   // showNotification(remoteMsg);
-    //   // showMessageNotification(remoteMsg, currentRoot: currentRoot);
-    // });
-  }
+  //   //   print("\n\nshowing notification from connectToNotifications\n\n");
+  //   //   // showNotification(remoteMsg);
+  //   //   // showMessageNotification(remoteMsg, currentRoot: currentRoot);
+  //   // });
+  // }
 
   void connectToNodes() async {
     for (final n in homeConnection) {
@@ -165,14 +178,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   void rfHome() => setPage(homePage());
 
-  void loadSavedMediasListeners() async {
+  void loadSavedMediasIDs() {
     for (final m in MediaType.values) {
-      final idStream = await savedMediaIDs(m);
-      _mediasListeners[m] = idStream.listen((event) async {
-        final ar = await event.results.allResults();
-        final ids = ar.map((e) => Down4ID.fromString(e.string("id"))!).toList();
-        g.savedMediasIDs[m] = ids;
-      });
+      g.savedMediasIDs[m] = savedMediaIDs(m).toList();
     }
   }
 
@@ -183,19 +191,26 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final homeChats = PageState();
     final homeConns = PageState();
     g.vm.push(ViewState(id: "home", pages: [homeChats, homeConns]));
-    loadSavedMediasListeners();
     localPalettesRoutine(init: true);
+    connectToMessages3();
+    connectToNodes();
+    processChats(unsentMessages());
+    loadSavedMediasIDs();
     clearAppCache();
     g.wallet.walletRoutine();
     g.wallet.printWalletInfo();
-    connectToNotifications();
-    connectToMessages3();
-    processUnsentMessages();
     updateExchangeRate();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      db.execute("UPDATE personals SET currentPage = ?", [page.id]);
+      connectToMessages3();
+    } else {
+      db.execute("UPDATE personals SET currentPage = ?", [null]);
+      _forgroundMessageListener?.cancel();
+    }
     switch (state) {
       case AppLifecycleState.resumed:
         print("app in resumed");
@@ -223,18 +238,19 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     for (final nConn in _nodeConnections.values) {
       nConn.cancel();
     }
-    for (final l in _mediasListeners.values) {
-      l.cancel();
-    }
+    // for (final l in _mediasListeners.values) {
+    //   l.cancel();
+    // }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   Future<void> localPalettesRoutine({bool init = false}) async {
     print("\n===LOCAL PALETTE ROUTINE===\n");
-    final allHomeNodes = (await loadHome()).followedBy([g.self]);
+    final allHomeNodes = loadHome().followedBy([g.self]);
     final Iterable<GroupN> groups = allHomeNodes.whereType<GroupN>();
-    final groupUserIDs = groups.map((e) => e.group).expand((id) => id).toSet();
+    final groupUserIDs =
+        groups.map((e) => e.members).expand((id) => id).toSet();
     final Iterable<User> users = allHomeNodes.whereType<User>();
 
     final homeIDs = allHomeNodes.asIDs().toSet();
@@ -242,37 +258,45 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         allHomeNodes.map((e) => e.mediaID).whereType<ComposedID>();
 
     // caches home node medias from local
-    await globall<Down4Media>(homeNodesMediaIDs);
+    locall<Down4Media>(homeNodesMediaIDs);
 
     List<User> hiddenUsers = [];
     for (final u in users) {
-      if (!u.isConnected && !await u.hasMessages()) hiddenUsers.add(u);
+      if (!u.isConnected && !u.hasMessages()) hiddenUsers.add(u);
     }
 
     final hiddenIDs = hiddenUsers.asIDs().toSet();
 
     // we dump hidden users that are not in groups
     final shouldDump = hiddenIDs.difference(groupUserIDs);
-    print("TO DUMP: ${shouldDump.map((id) => id.unique)}");
-    for (final dump in shouldDump) {
-      gdb<Down4Node>().purgeDocumentById(dump.value);
-      unCache(dump);
-    }
+    final sbuf = StringBuffer("DELETE FROM nodes WHERE id IN (");
+    sbuf.writeAll(shouldDump.map((id) {
+      unCache(id);
+      return "?";
+    }), ",");
+    sbuf.write(")");
+    db.execute(sbuf.toString(), shouldDump.toList());
+
+    print("TO DUMP: ${shouldDump.map((id) => id.unik)}");
+    // for (final dump in shouldDump) {
+    //   db.execute(sbuf..write(")").toString());
+    //   // gdb<Down4Node>().purgeDocumentById(dump.value);
+    //   unCache(dump);
+    // }
 
     for (final n in allHomeNodes) {
-      await writePalette(n, _chats, bGen, rfHome, home: true);
+      writePalette(n, _chats, bGen, rfHome, home: true);
     }
 
     if (init) {
       setPage(homePage());
-      g.initLoadingScreen = null;
     }
 
     // we fetch users in groups that are not in home
     final toFetch = groupUserIDs.difference(homeIDs);
     final fetchedNodes =
         await globall<PersonN>(toFetch, doFetch: true, doMergeIfFetch: true);
-    print("TO FETCH: ${toFetch.map((id) => id.unique)}");
+    print("TO FETCH: ${toFetch.map((id) => id.unik)}");
 
     final nodeMediasToFetch =
         fetchedNodes.map((n) => n.mediaID).whereType<ComposedID>();
@@ -283,12 +307,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         doFetch: true, doMergeIfFetch: true);
 
     for (final n in fetchedNodes) {
-      await writePalette(n, _chats, bGen, rfHome, home: true);
+      writePalette(n, _chats, bGen, rfHome, home: true);
     }
   }
 
-  Future<List<ButtonsInfo2>> bGen(ChatN n) async {
-    final snips = await n.unreadSnipIDs();
+  List<ButtonsInfo2> bGen(ChatN n) {
+    final snips = n.unreadSnipIDs();
     if (snips.isNotEmpty) {
       return [
         ButtonsInfo2(
@@ -300,7 +324,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         )
       ];
     } else {
-      final hasUnread = await n.lastChatFromOtherIsUnread();
+      final hasUnread = n.lastChatFromOtherIsUnread();
       return [
         ButtonsInfo2(
             asset: Icon(Icons.arrow_forward_ios_rounded,
@@ -315,7 +339,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
   }
 
-  Future<List<ButtonsInfo2>> bGen2(Down4Node n) async {
+  List<ButtonsInfo2> bGen2(Down4Node n) {
     return [
       ButtonsInfo2(
           asset: Icon(Icons.arrow_forward_ios_rounded,
@@ -371,8 +395,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           // msg medias references are dynamic and always get updated
           // this is because messages are not kept for ever on server
           if (msg.tempMediaID != null) {
-            await msgMedia?.updateTempReferences(
-                msg.tempMediaID!, msg.tempMediaTS!);
+            msgMedia?.updateTempReferences(msg.tempMediaID!, msg.tempMediaTS!);
           }
 
           // if there are users in the group that aren't in home,
@@ -380,14 +403,22 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           final homeKeys = _chats.keys.toList();
           if (rootgt == GetType.fetch &&
               rootNode is GroupN &&
-              !rootNode.group.every((uid) => homeKeys.contains(uid))) {
+              !rootNode.members.every((uid) => homeKeys.contains(uid))) {
             localPalettesRoutine();
           }
 
-          await msg.merge();
-
           rootNode.updateActivity();
-          await writePalette(rootNode, _chats, bGen, rfHome, home: true);
+          writePalette(rootNode, _chats, bGen, rfHome, home: true);
+
+          if (msg is Chat) {
+            final viewID = "chat-${rootNode.id.value}";
+            final refView = viewManager.views[viewID];
+            refView?.orderedChats = [msg.id, ...refView.orderedChats!];
+            if (page is ChatPage && currentView.id == viewID) {
+              setPage(chatPage(rootNode, isReload: true));
+            }
+          }
+
           if (page is HomePage) setPage(homePage());
           break;
         case 'r': // r!msgID!mediaID!tempMediaID!reactorID!reactionID!tempMediaTS
@@ -429,7 +460,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           final payment = await global<Down4Payment>(paymentID,
               doFetch: true, doMergeIfFetch: true, tempID: tempPaymentID);
           if (payment == null) return print("no payment for download");
-          await g.wallet.parsePayment(g.self.id, payment);
+          g.wallet.parsePayment(g.self.id, payment);
           if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
           break;
       }
@@ -445,7 +476,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // =============================== UTILS ============================== //
 
   void reloadChatWithID(Down4ID chatableNodeID, {Chat? msgRe}) {
-    if (currentView.id == "chat-${chatableNodeID.unique}") {
+    if (currentView.id == "chat-${chatableNodeID.value}") {
       setPage(chatPage(currentView.node as ChatN, msgRe: msgRe));
     }
   }
@@ -464,10 +495,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> unselectHomeSelection({bool updateActivity = true}) async {
+  void unselectHomeSelection({bool updateActivity = true}) {
     for (final p in List.of(chats)) {
       if (p.selected) {
-        await writePalette(p.node as ChatN, _chats, bGen, rfHome,
+        writePalette(p.node as ChatN, _chats, bGen, rfHome,
             sel: false, home: true);
       }
     }
@@ -477,7 +508,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   List<Palette> forwardables(List<Palette> ps) {
     final idsInGroups = ps
         .asNodes<GroupN>()
-        .map((e) => e.group)
+        .map((e) => e.members)
         .expand((element) => element)
         .toSet();
 
@@ -486,10 +517,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final all = forwardables.followedBy(idsInGroups).toSet();
 
     return all.map((id) => _chats[id]).whereType<Palette>().toList();
-  }
-
-  Future<void> processUnsentMessages() async {
-    processChats(await unsentMessages());
   }
 
   // =========================== PAGES FUNCTIONS ======================== //
@@ -501,10 +528,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final rt = await global<ChatN>(rtID);
       if (rt == null) return;
       final targets = await rt.messageTargets;
-      print("sending messages to ${targets.map((t) => t.id.unique)}");
+      print("sending messages to ${targets.map((t) => t.id.unik)}");
       final success = await r.push(await rt.messageTargets, c);
       rt.updateActivity();
-      await writePalette(rt, _chats, bGen, rfHome, home: true);
+      writePalette(rt, _chats, bGen, rfHome, home: true);
       if (success) c.markSent();
       reloadChatWithID(rtID, msgRe: c);
       if (page is HomePage) setPage(homePage());
@@ -535,14 +562,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             mime: mimetype,
             timestamp: timestamp,
             isReversed: isReversed,
-            text: text,
+            txt: text,
             width: size.width,
             height: size.height)))
       ..cache();
 
     for (final sel in chats.selected().asNodes<ChatN>()) {
       final snip = Snip(ComposedID(),
-          root: sel.root_, senderID: g.self.id, text: text, mediaID: media.id);
+          root: sel.root_, senderID: g.self.id, txt: text, mediaID: media.id);
 
       await r.push(await sel.messageTargets, snip);
 
@@ -550,14 +577,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         snip
           ..cache()
           ..merge();
-        // media
-        //   ..cache()
-        //   ..merge()
-        //   ..writeFromCachedPath();
       }
     }
 
-    await unselectHomeSelection();
+    unselectHomeSelection();
     viewManager.popUntilHome();
     setPage(homePage(prompt: "SNIPED"));
   }
@@ -567,18 +590,18 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Down4PageWidget homePage({String? prompt}) {
     return HomePage(
       openPreview: openPreview,
-      forward: () async => setPage(await forwardPage(isPush: true)),
+      forward: () => setPage(forwardPage(isPush: true)),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
-      send: (chats) async {
+      send: (chats) {
         processChats(chats);
-        await unselectHomeSelection(updateActivity: true);
+        unselectHomeSelection(updateActivity: true);
         setPage(homePage());
       },
       add: () async {
         final selectedPals = chats.selected().asNodes<PersonN>();
         for (final n in selectedPals) {
-          if (n is User) await n.updateConnectionStatus(true);
-          await writePalette(n, _chats, bGen2, rfHome, sel: false, home: true);
+          if (n is User) n.updateConnectionStatus(true);
+          writePalette(n, _chats, bGen2, rfHome, sel: false, home: true);
           writePalette(n, _chats, bGen, rfHome, home: true);
           (await global<Down4Image>(n.mediaID))?.downloadAndWriteIfNeeded();
         }
@@ -626,12 +649,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.push(ViewState(id: "preview", pages: [PageState()]));
 
       for (final n in fo().palettes().map((p) => p.node)) {
-        await writePalette(n, s(), null, rf, home: false);
+        writePalette(n, s(), null, rf, home: false);
       }
 
       final fs = fo()
           .chatMsgs()
-          .map((m) => m.message.forwarded(g.self.id, Down4ID().unique));
+          .map((m) => m.message.forwarded(g.self.id, Down4ID().unik));
       for (final m in fs) {
         await writePost(
             msg: m, refreshCallback: rf, state: s(), openNode: null);
@@ -645,12 +668,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     });
   }
 
-  Future<Down4PageWidget> forwardPage({bool isPush = false}) async {
+  Down4PageWidget forwardPage({bool isPush = false}) {
     PageState _fPage() => currentView.currentPage;
     Map<Down4ID, Palette> _fState() => _fPage().state.cast();
     List<Palette> _fs() => _fState().values.toList();
 
-    void rf() async => setPage(await forwardPage());
+    void rf() => setPage(forwardPage());
     List<ButtonsInfo2> fbGen(ChatN c) {
       return [
         ButtonsInfo2(
@@ -665,16 +688,16 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.popUntilHome();
       viewManager.push(ViewState(id: "forward", pages: [PageState()]));
       for (final c in formattedHome.asNodes<ChatN>()) {
-        await writePalette<ChatN>(c, _fState(), fbGen, rf, home: false);
+        writePalette<ChatN>(c, _fState(), fbGen, rf, home: false);
       }
     }
 
     return ForwardingPage(
         openPreview: openPreview,
         hyper: () => setPage(hyperchatPage(_fs(), _fPage().scroll)),
-        forward: (chats) async {
+        forward: (chats) {
           processChats(chats);
-          await unselectHomeSelection(updateActivity: true);
+          unselectHomeSelection(updateActivity: true);
           homeScrollToZero();
           viewManager.popUntilHome();
           setPage(homePage());
@@ -686,6 +709,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   Down4PageWidget paymentPage(Down4Payment payment) {
+    viewManager.push(ViewState(id: "payment", pages: []));
     return PaymentPage(
       ok: () {
         viewManager.popUntilHome();
@@ -697,10 +721,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             .whereType<ComposedID>()
             .toList(growable: false);
 
-        final ppl = await globall<PersonN>(receivers, doFetch: true); //).map(
+        final ppl = await globall<PersonN>(receivers, doFetch: true);
         final payment = Payment(senderID: g.self.id, paymentID: pay.id);
 
-        // TODO this returns success, and should perhaps have something happen
+        // TODO: this returns success, and should perhaps have something happen
         // depening on success or failure
         r.push(ppl, payment);
 
@@ -719,11 +743,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     void refresh() => setPage(themePage());
 
     List<ButtonsInfo2> tGen(NodeTheme t) {
-      void swapTheme() async {
+      void swapTheme() {
         g.myTheme.changeTheme(t.displayName);
         for (final t in paletteThemes().asNodes<NodeTheme>()) {
-          await writePalette<NodeTheme>(t, themes(), tGen, refresh,
-              home: false);
+          writePalette<NodeTheme>(t, themes(), tGen, refresh, home: false);
         }
         SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -785,7 +808,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       currentView.pages[1].state = {
         pay.id: Palette(
             node: p,
-            key: Key(p.id.unique),
+            key: Key(p.id.unik),
             messagePreview: pay.textNote,
             buttonsInfo2: payBGen(pay)),
         ...paymentState(),
@@ -793,17 +816,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       rf();
     }
 
-    void loadSomePayments(int limit, [int ms = 0]) =>
-        Future.delayed(Duration(milliseconds: ms), () async {
-          await writePayments(paymentState(), openPay, limit);
-          rf();
-        });
-
     if (isPush) {
       final ppl = PageState();
       final pay = PageState();
       viewManager.push(ViewState(id: "money", pages: [ppl, pay]));
-      loadSomePayments(5, 633);
+      writePayments(paymentState(), openPay, 10);
     }
 
     if (payUpdate != null) scanOrReceivePayment(payUpdate);
@@ -813,13 +830,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         initPalettes: initPals,
         initScroll: initScroll,
         viewState: currentView,
-        loadMorePayments: () async => loadSomePayments(20),
-        onScan: (payment) async {
-          await g.wallet.parsePayment(g.self.id, payment);
+        loadMorePayments: () async =>
+            writePayments(paymentState(), openPay, 10),
+        onScan: (payment) {
+          g.wallet.parsePayment(g.self.id, payment);
           scanOrReceivePayment(payment);
         },
-        makePayment: (payment) async {
-          await g.wallet.parsePayment(g.self.id, payment);
+        makePayment: (payment) {
+          g.wallet.parsePayment(g.self.id, payment);
           unselectHomeSelection(updateActivity: true);
           viewManager.popUntilHome();
           setPage(paymentPage(payment));
@@ -834,13 +852,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       initialPalettes: initPals,
       initialOffset: initScroll,
       openPreview: openPreview,
-      makeHyperchat: (media, text, group) async {
+      makeHyperchat: (media, text, members) async {
         setPage(loadingPage());
         final prompts = await randomPrompts(10);
         final hc = await r.getHyperchat(prompts);
         if (hc == null) {
           viewManager.popUntilHome();
-          await unselectHomeSelection(updateActivity: false);
+          unselectHomeSelection(updateActivity: false);
           setPage(homePage());
           return;
         }
@@ -860,7 +878,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             firstWord: hc.second.first,
             secondWord: hc.second.second,
             activity: makeTimestamp(),
-            group: group,
+            members: members,
             mediaID: hcMedia.id,
             ownerID: g.self.id);
 
@@ -897,7 +915,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             final chat = Chat(ComposedID(),
                 senderID: g.self.id,
                 root: hyper.root_,
-                text: text,
+                txt: text,
                 mediaID: media?.id,
                 timestamp: makeTimestamp(),
                 nodes: forwardingObjects.palettes().asComposedIDs().toSet())
@@ -945,7 +963,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
           processChats([chat]);
 
-          await unselectHomeSelection();
+          unselectHomeSelection();
           viewManager.popUntilHome();
           setPage(chatPage(group, isPush: true));
         } else {
@@ -970,39 +988,37 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         openPreview: openPreview,
         search: (strIDs) async {
           final ids = strIDs.split(" ").toSet();
-          final locals = await searchLocalsByUnique(ids);
-          final localIDs = locals.map((e) => e.id.unique).toSet();
+          final locals = searchLocalsByUnique(ids);
+          final localIDs = locals.map((e) => e.id.unik).toSet();
           final toFetch = ids.difference(localIDs);
           final futureNodes = r.getUsers(toFetch);
           for (final local in locals) {
-            await writePalette(local, searchs(), bGen2, rf, home: false);
+            writePalette(local, searchs(), bGen2, rf, home: false);
           }
           final fetchedNodes = (await futureNodes) ?? [];
           for (final node in fetchedNodes) {
-            await writePalette(node..cache(), searchs(), bGen2, rf,
-                home: false);
+            writePalette(node..cache(), searchs(), bGen2, rf, home: false);
           }
           rf();
         },
-        onScan: (n) async {
-          await writePalette(n, searchs(), bGen2, rf, home: false);
+        onScan: (n) {
+          writePalette(n, searchs(), bGen2, rf, home: false);
           rf();
         },
         openNode: (node) => setPage(nodePage(node, isPush: true)),
         add: (selectedPals) async {
           for (final n in selectedPals) {
-            if (n is User) await n.updateConnectionStatus(true);
-            await writePalette(n, searchs(), bGen2, rf,
-                sel: false, home: false);
+            if (n is User) n.updateConnectionStatus(true);
+            writePalette(n, searchs(), bGen2, rf, sel: false, home: false);
             writePalette(n, _chats, bGen, rfHome, home: true);
             (await global<Down4Image>(n.mediaID))?.downloadAndWriteIfNeeded();
           }
           rf();
           localPalettesRoutine();
         },
-        forwardNodes: (pals) async {
+        forwardNodes: (pals) {
           forwardingObjects.addAll(pals);
-          setPage(await forwardPage(isPush: true));
+          setPage(forwardPage(isPush: true));
         },
         back: back);
   }
@@ -1024,7 +1040,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   Down4PageWidget nodePage(Down4Node n, {bool isPush = false}) {
-    String pageID() => "node-${n.id.unique}";
+    String pageID() => "node-${n.id.value}";
     if (isPush) {
       final r = List<String>.from(route);
       if (r.contains(pageID())) {
@@ -1035,7 +1051,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       } else {
         // TODO, there will be more possible states for nodePage no doubt
         final ps = PageState();
-        viewManager.push(ViewState(id: "node-${n.id}", pages: [ps], node: n));
+        viewManager.push(ViewState(id: pageID(), pages: [ps], node: n));
       }
     }
 
@@ -1044,7 +1060,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         openChat: (p_) => setPage(chatPage(p_, isPush: true)),
         openNode: (p_) => setPage(nodePage(p_, isPush: true)),
         payNode: (p_) => setPage(moneyPage(single: p_, isPush: true)),
-        forward: () async => setPage(await forwardPage(isPush: true)),
+        forward: () => setPage(forwardPage(isPush: true)),
         back: back);
   }
 
@@ -1056,10 +1072,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     Chat? msgRe,
     Chat? reactingTo,
   }) {
-    String chatID() => "chat-${c.id.unique}";
+    String chatID() => "chat-${c.id.value}";
     ViewState chat() => viewManager.at(chatID());
 
-    List<Down4ID> orderedMsgsIDs() => chat().chat?.first ?? [];
+    List<Down4ID> orderedMsgsIDs() => chat().orderedChats ?? [];
     Map<Down4ID, ChatMessage> messages() => chat().pages[0].state.cast();
     Map<Down4ID, Palette> members() => chat().pages[1].state.cast();
     Set<Down4ID> msgsWithVideos() => chat().refs("messages_with_videos");
@@ -1069,8 +1085,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     void opn(Down4Node n_) => setPage(nodePage(n_, isPush: true));
     void Function(Down4Node)? openNode() => forwarding() ? null : opn;
-    FutureOr<List<ButtonsInfo2>> Function(ChatN)? cbGen =
-        forwarding() ? null : bGen2;
+    List<ButtonsInfo2> Function(ChatN)? cbGen = forwarding() ? null : bGen2;
 
     void refreshChat({bool stopVid = false}) async {
       final pg = page;
@@ -1083,13 +1098,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       setPage(chatPage(c));
     }
 
-    void writeGroupNodesIfGroup() async {
+    void writeGroupNodesIfGroup() {
       final Down4Node ref = c;
       if (ref is GroupN) {
-        final gIDs = ref.group;
+        final gIDs = ref.members;
         final mems = _chats.those(gIDs).noNull().palettes();
         for (final n in mems.asNodes<PersonN>()) {
-          await writePalette(n, members(), cbGen, refreshChat, home: false);
+          writePalette(n, members(), cbGen, refreshChat, home: false);
         }
       }
     }
@@ -1110,8 +1125,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       }
     }
 
-    Future<void> reactToMsg(Chat msg) async =>
-        setPage(chatPage(c, reactingTo: msg));
+    void reactToMsg(Chat msg) => setPage(chatPage(c, reactingTo: msg));
 
     Future<void> loadMore([int i = 20]) async {
       await writeMessages(
@@ -1134,7 +1148,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         final pg = page;
         if (pg is! ChatPage || pg.viewState.node?.id != c.id) return;
         final loaded = messages().keys.toList()
-          ..sort((a, b) => b.unique.compareTo(a.unique));
+          ..sort((a, b) => b.unik.compareTo(a.unik));
 
         List<Down4ID> toLoad = [];
         for (final id in orderedMsgsIDs()) {
@@ -1163,28 +1177,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     void initChat() {
       Future(() async {
-        final theChat = await c.getTheChat();
-        final currentMessages = theChat.first.toList();
-        chat().chat = Pair(
-          theChat.first.toList(),
-          theChat.second.listen((event) async {
-            final r = await event.results.allResults();
-            chat().chat = Pair(
-              r.map((e) => Down4ID.fromString(e.string("id"))!).toList(),
-              chat().chat!.second,
-            );
-            reloadChat();
-          }),
-        );
-
-        print("THE MESSAGES = ${theChat.first}");
-
+        chat().orderedChats = c.fullChatIDs().toList();
         // if is group, write members
         writeGroupNodesIfGroup();
         // write the messages
         await writeMessages(
           limit: 20,
-          ordered: currentMessages,
+          ordered: orderedMsgsIDs(),
           ch: c,
           increment: increment,
           state: messages(),
@@ -1230,7 +1229,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     return ChatPage(
       openPreview: openPreview,
-      forward: () async => setPage(await forwardPage(isPush: true)),
+      viewState: viewManager.at(chatID()),
+      forward: () => setPage(forwardPage(isPush: true)),
       onPageChange: (ix) {
         refreshChat(stopVid: true);
         chat().currentIndex = ix;
@@ -1251,17 +1251,21 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       send: (chats) {
         final wasForwarding = viewManager.mode == Modes.forward;
         processChats(chats);
+        final ref = viewManager.currentView.orderedChats!;
+        final or = chats.map((c) => c.id).followedBy(ref).toList();
+        viewManager.currentView.orderedChats = or;
+
         // poping the forwarding page
         if (wasForwarding) viewManager.popInBetween();
         setPage(
             chatPage(c, isReload: true, rewriteMsgWithNodes: wasForwarding));
       }, // TODO, will need future nodes
       back: back,
-      add: () async {
+      add: () {
         final sel = members().values.selected();
         for (final n in sel.asNodes<PersonN>()) {
-          if (n is User) await n.updateConnectionStatus(true);
-          await writePalette(n, members(), bGen2, rf, sel: false, home: false);
+          if (n is User) n.updateConnectionStatus(true);
+          writePalette(n, members(), bGen2, rf, sel: false, home: false);
           writePalette(n, _chats, bGen, rfHome, home: true);
         }
         rf();
@@ -1289,12 +1293,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.push(ViewState(id: "snipView", pages: []));
     }
 
-    final unreadSnips = l ?? (await node.unreadSnipIDs()).toList();
+    final unreadSnips = l ?? node.unreadSnipIDs().toList();
     VideoPlayerController? vpc;
 
-    void back_() async {
+    void back_() {
       vpc?.dispose();
-      await writePalette(node, _chats, bGen, rfHome, home: true);
+      writePalette(node, _chats, bGen, rfHome, home: true);
       back();
     }
 
@@ -1309,11 +1313,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     print("Unread snips=$unreadSnips");
     if (unreadSnips.isEmpty) {
-      await writePalette(node, _chats, bGen, rfHome, home: true);
+      writePalette(node, _chats, bGen, rfHome, home: true);
       setPage(homePage());
     }
     final s = await global<Snip>(unreadSnips.first, doCache: false);
-    await s!.markRead();
+    s!.markRead();
 
     final m = await global<Down4Media>(s.mediaID,
         doCache: false, doFetch: true, tempID: s.tempMediaID);
@@ -1333,7 +1337,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     return SnipViewPage(
         displayMedia: displayMedia,
-        text: m.metadata.text,
+        text: m.metadata.txt,
         back: back_,
         next: next_);
   }

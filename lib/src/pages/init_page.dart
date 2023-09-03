@@ -54,12 +54,12 @@ class _UserMakerPageState extends State<UserMakerPage>
   String get firstName => firstNameInput.value;
   String get lastName => lastNameInput.value;
   late Region region = widget.closestRegion ?? Region.america;
-  ComposedID get willBeReplacedID => ComposedID(unique: id, region: region);
+  ComposedID get willBeReplacedID => ComposedID(unik: id, region: region);
 
   @override
   void setTheState() => setState(() {});
 
-  List<Future<bool>> _calls = [];
+  final List<Future<bool>> _calls = [];
 
   bool _isValidUsername = false;
 
@@ -139,7 +139,7 @@ class _UserMakerPageState extends State<UserMakerPage>
       isGreyedOut: !isReady,
       name: "PROCEED",
       onPress: () => widget.initUser(
-          id: ComposedID(unique: id, region: region),
+          id: ComposedID(unik: id, region: region),
           deviceID: widget.deviceID,
           name: firstName,
           lastName: lastName,

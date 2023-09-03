@@ -65,8 +65,8 @@ class _GroupPageState extends State<GroupPage>
   List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
-          (m) async {
-            await m.use();
+          (m) {
+            m.use();
             send(mediaInput: m);
           }
         ),
@@ -178,7 +178,7 @@ class _GroupPageState extends State<GroupPage>
         fold: false,
         colorCode: NodesColor.group,
         tec: groupInput,
-        id: Down4ID(unique: "groupMaker"),
+        id: Down4ID(unik: "groupMaker"),
         name: _groupName,
         image: _groupImage,
         type: Nodes.group,
@@ -208,12 +208,12 @@ class _GroupPageState extends State<GroupPage>
         isPrivate: _private,
         name: _groupName,
         mediaID: _groupImage!.id,
-        group: members,
+        members: members,
         ownerID: g.self.id);
 
     final chat = Chat(ComposedID(),
         root: group.root_,
-        text: text,
+        txt: text,
         mediaID: media?.id,
         senderID: g.self.id,
         timestamp: makeTimestamp())

@@ -4,7 +4,7 @@ import 'package:down4/src/data_objects/_data_utils.dart';
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:http/http.dart' as http;
 import '_dart_utils.dart';
-import 'bsv/types.dart' show Down4Payment, Down4TX;
+import 'bsv/types.dart' show Down4TX;
 import 'globals.dart' show g;
 import 'data_objects/medias.dart';
 import 'data_objects/messages.dart';
@@ -307,6 +307,12 @@ Future<bool> push(List<PersonN> targets, Down4Message msg) async {
     }
   } else {
     throw 'invalid message type for push: ${msg.runtimeType}';
+  }
+
+  final noNeedToRequest = !ts.any((t) => t.doPush || t.showNotif);
+  if (noNeedToRequest) {
+    print("No need to request");
+    return true;
   }
 
   final mq = MQ(ts,

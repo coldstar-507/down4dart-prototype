@@ -160,8 +160,8 @@ class _HomePageState extends State<HomePage>
   List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
-          (m) async {
-            await m.use();
+          (m) {
+            m.use();
             send(mediaInput: m);
           }
         ),
@@ -207,7 +207,7 @@ class _HomePageState extends State<HomePage>
           root: n.root_,
           senderID: g.self.id,
           nodes: fnds,
-          text: input.value,
+          txt: input.value,
           timestamp: makeTimestamp(),
           mediaID: media?.id)
         ..cache()

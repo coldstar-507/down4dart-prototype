@@ -1,4 +1,4 @@
-import 'package:cbl/cbl.dart';
+// import 'package:cbl/cbl.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../bsv/types.dart';
@@ -13,7 +13,7 @@ import 'nodes.dart';
 enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
 
 abstract class Down4Message with Jsons {
-  final String? _text;
+  final String? _txt;
   final int? _timestamp;
   final ComposedID? _mediaID, _forwardedFromID;
 
@@ -47,7 +47,7 @@ abstract class Down4Message with Jsons {
     Map<Down4ID, Reaction>? reactions,
     bool? isRead,
     bool? isSent,
-    String? text,
+    String? txt,
     ComposedID? mediaID,
     String? root,
     Down4ID? messageID,
@@ -58,7 +58,7 @@ abstract class Down4Message with Jsons {
     int? tempPaymentTS,
     ComposedID? tempPaymentID,
   })  : _reactionID = reactionID,
-        _text = text,
+        _txt = txt,
         _root = root,
         _isSent = isSent,
         _isRead = isRead,
@@ -102,7 +102,7 @@ abstract class Down4Message with Jsons {
         ComposedID.fromString(decodedJson["forwardedFromID"]);
 
     final timestamp = int.tryParse(decodedJson["timestamp"] ?? "");
-    final text = decodedJson["text"];
+    final txt = decodedJson["txt"];
     final mediaID = ComposedID.fromString(decodedJson["mediaID"]);
     final tempMediaTS = int.tryParse(decodedJson["tempMediaTS"] ?? "");
     final tempMediaID = ComposedID.fromString(decodedJson["tempMediaID"]);
@@ -131,7 +131,7 @@ abstract class Down4Message with Jsons {
             root: root!,
             senderID: senderID,
             timestamp: timestamp!,
-            text: text,
+            txt: txt,
             mediaID: mediaID,
             reactions: reactions,
             tempMediaTS: tempMediaTS,
@@ -149,7 +149,7 @@ abstract class Down4Message with Jsons {
             tempMediaID: tempMediaID,
             tempMediaTS: tempMediaTS,
             isRead: isRead,
-            text: text);
+            txt: txt);
       case MessageType.reaction:
         return Reaction(id,
             senderID: senderID,
@@ -196,7 +196,7 @@ abstract class Down4Message with Jsons {
       if (_replies != null) "replies": _replies!.values,
       if (_tips != null) "tips": _tips!.values,
       if (_reactors != null) "reactors": _reactors!.values,
-      if (_text != null) "text": _text!,
+      if (_txt != null) "txt": _txt!,
       if (_timestamp != null) "timestamp": _timestamp!.toString(),
       if (_mediaID != null) "mediaID": _mediaID!.value,
       if (_messageID != null) "messageID": _messageID!.value,
@@ -212,9 +212,9 @@ abstract class Down4Message with Jsons {
 
 mixin Reads on Down4Message, Locals {
   bool get isRead;
-  Future<void> markRead() async {
+  void markRead() {
     if (isRead) return;
-    await merge({"isRead": (_isRead = true).toString()});
+    merge({"isRead": (_isRead = true).toString()});
   }
 }
 
@@ -245,7 +245,7 @@ mixin Medias on Down4Message {
 }
 
 mixin Texts on Down4Message {
-  String? get text => _text;
+  String? get txt => _txt;
 }
 
 mixin Cash on Down4Message {
@@ -292,36 +292,36 @@ mixin Roots on Down4Message {
 }
 
 mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
-  Future<void> onReceipt(void Function(ChatN rootNode) callback) async {
-    // get the rootNode
-    final rootID = idOfRoot(root: root, selfID: g.self.id);
+  // Future<void> onReceipt(void Function(ChatN rootNode) callback) async {
+  //   // get the rootNode
+  //   final rootID = idOfRoot(root: root, selfID: g.self.id);
 
-    final rootNode =
-        await global<ChatN>(rootID, doFetch: true, doMergeIfFetch: true);
-    if (rootNode == null) return;
+  //   final rootNode =
+  //       await global<ChatN>(rootID, doFetch: true, doMergeIfFetch: true);
+  //   if (rootNode == null) return;
 
-    PersonN? senderNode = await global<User>(senderID);
-    Down4Media? msgMedia;
+  //   PersonN? senderNode = await global<User>(senderID);
+  //   Down4Media? msgMedia;
 
-    if (senderNode != null && senderNode.isConnected) {
-      // we predownload the media, else it's download on open
-      msgMedia = await global<Down4Media>(mediaID,
-          doFetch: true, doMergeIfFetch: true, tempID: tempMediaID);
-    }
+  //   if (senderNode != null && senderNode.isConnected) {
+  //     // we predownload the media, else it's download on open
+  //     msgMedia = await global<Down4Media>(mediaID,
+  //         doFetch: true, doMergeIfFetch: true, tempID: tempMediaID);
+  //   }
 
-    // get the rootNode media
-    await global<Down4Media>(rootNode.mediaID,
-        doFetch: true, doMergeIfFetch: true);
+  //   // get the rootNode media
+  //   await global<Down4Media>(rootNode.mediaID,
+  //       doFetch: true, doMergeIfFetch: true);
 
-    // msg medias references are dynamic and always get updated
-    // this is because messages are not kept for ever on server
-    if (tempMediaID != null) {
-      await msgMedia?.updateTempReferences(tempMediaID!, tempMediaTS!);
-    }
-    await merge();
+  //   // msg medias references are dynamic and always get updated
+  //   // this is because messages are not kept for ever on server
+  //   if (tempMediaID != null) {
+  //     await msgMedia?.updateTempReferences(tempMediaID!, tempMediaTS!);
+  //   }
+  //   merge();
 
-    return callback(rootNode);
-  }
+  //   return callback(rootNode);
+  // }
 
   @override
   Future<String?> uploadRoutine() async {
@@ -342,7 +342,7 @@ mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
   ComposedID get id;
 
   DatabaseReference get ref =>
-      id.server.realtimeDB.ref("messages/${id.unique}");
+      id.server.realtimeDB.ref("messages/${id.unik}");
 
   Future<bool> uploadMessageData(Map<String, String?> data) async {
     try {
@@ -445,7 +445,7 @@ class Snip extends Down4Message
     required super.senderID,
     required String root,
     required ComposedID mediaID,
-    required super.text,
+    required super.txt,
     super.tempMediaID,
     super.tempMediaTS,
     bool isRead = false,
@@ -455,7 +455,8 @@ class Snip extends Down4Message
   MessageType get type => MessageType.snip;
 
   @override
-  Database get dbb => messagesDB;
+  String get table => "messages";
+  // Database get dbb => messagesDB;
 
   // @override
   // Future<String?> uploadRoutine() async {
@@ -482,9 +483,9 @@ class Chat extends Down4Message
 
   ComposedID? get forwardedFromID => _forwardedFromID;
 
-  Future<void> mergeReactions() async {
+  void mergeReactions() {
     final jsonRs = reactions.map((k, e) => MapEntry(k.value, e.toJson()));
-    await merge({"reactions": youKnowEncode(jsonRs)});
+    merge({"reactions": youKnowEncode(jsonRs)});
   }
 
   Chat(
@@ -493,7 +494,7 @@ class Chat extends Down4Message
     required String root,
     required int timestamp,
     Map<Down4ID, Reaction>? reactions,
-    super.text,
+    super.txt,
     super.mediaID,
     super.tempMediaID,
     super.tempMediaTS,
@@ -508,21 +509,21 @@ class Chat extends Down4Message
 
   String get messagePreview => forwardedFromID != null
       ? ">> forwarded message"
-      : (text ?? "").isEmpty
+      : (txt ?? "").isEmpty
           ? "&attachment"
-          : text!;
+          : txt!;
 
   Map<Down4ID, Reaction> get reactions => _reactions!;
 
-  Future<void> addReaction(Reaction r) async {
+  void addReaction(Reaction r) {
     if (reactions[r.id] != null) return;
     reactions[r.id] = r;
-    await mergeReactions();
+    mergeReactions();
   }
 
-  Future<void> markSent() async {
+  void markSent() {
     _isSent = true;
-    await merge({"isSent": _isSent.toString()});
+    merge({"isSent": _isSent.toString()});
   }
 
   // Creates a new instance of a messages that will be uploaded
@@ -533,7 +534,7 @@ class Chat extends Down4Message
         root: root,
         senderID: newSenderID,
         forwardedFromID: forwardedFromID ?? senderID,
-        text: text,
+        txt: txt,
         nodes: nodes,
         mediaID: mediaID,
         tempMediaID: tempMediaID,
@@ -545,7 +546,8 @@ class Chat extends Down4Message
   MessageType get type => MessageType.chat;
 
   @override
-  Database get dbb => messagesDB;
+  String get table => "messages";
+  // Database get dbb => messagesDB;
 
   Chat copiedFor(String root) {
     final map = Map<String, String?>.from(toJson(includeLocal: false));

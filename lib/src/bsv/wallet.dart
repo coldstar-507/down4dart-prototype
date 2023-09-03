@@ -8,32 +8,30 @@ import '../data_objects/nodes.dart';
 import '../web_requests.dart' as r;
 
 import 'package:bs58/bs58.dart';
-import 'package:cbl/cbl.dart';
 
 import '_bsv_utils.dart';
 import 'types.dart';
 
 class Wallet with Down4Object, Jsons, Locals {
   @override
-  Database get dbb => personalDB;
+  String get table => "personals";
 
   @override
-  Down4ID get id => Down4ID(unique: "wallet");
+  Down4ID get id => Down4ID(unik: "single");
 
   final Down4Keys _keys;
   int _ix;
 
   Down4Keys get neuter => _keys.neutered();
 
-  Future<int> get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
+  int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
 
-  Future<Set<Down4TX>> get unsettledTxs => payments
+  Set<Down4TX> get unsettledTxs => payments
       .map((pay) => pay.txs.where((tx) => tx.confirmations == 0))
       .expand((tx) => tx)
       .toSet();
 
-  Future<Set<TXID>> get uTXID async =>
-      (await unsettledTxs).map((unsTx) => unsTx.txID).toSet();
+  Set<TXID> get uTXID => unsettledTxs.map((unsTx) => unsTx.txID).toSet();
 
   Future<void> walletRoutine() async {
     await Future.wait(await _updateAllStatus());
@@ -43,7 +41,7 @@ class Wallet with Down4Object, Jsons, Locals {
 
   Future<List<Future<void>>> _settleUnsettledPayments() async {
     var futures = <Future<void>>[];
-    await for (final payment in payments) {
+    for (final payment in payments) {
       if (payment.lastConfirmations == 0) futures.add(_trySettlement(payment));
     }
     return futures;
@@ -51,14 +49,14 @@ class Wallet with Down4Object, Jsons, Locals {
 
   Future<List<Future<void>>> _updateAllStatus() async {
     var futures = <Future<void>>[];
-    await for (final payment in payments) {
+    for (final payment in payments) {
       if (payment.lastConfirmations < 100) futures.add(_updateStatus(payment));
     }
     return futures;
   }
 
   Future<void> printWalletInfo() async {
-    await for (final p in payments) {
+    for (final p in payments) {
       print("============PAYMENT============");
       print("""
       id           = ${p.id}
@@ -88,12 +86,12 @@ class Wallet with Down4Object, Jsons, Locals {
     }
   }
 
-  Future<Down4Payment?> payPeople({
+  Down4Payment? payPeople({
     required List<PersonN> people,
     required ComposedID selfID,
     required Sats amount,
     String textNote = "",
-  }) async {
+  }) {
     final nPeople = people.length;
     final payPerPerson = Sats((amount.asInt / nPeople).floor());
 
@@ -103,14 +101,14 @@ class Wallet with Down4Object, Jsons, Locals {
     // know size = nOuts(var) + outs(nOuts * 34) + version(4) + nSeq(4)
     var knownTxSize = varOutSize + (nOuts * 34) + 8;
 
-    final inInfos = await _unsignedIns(selfID, amount, knownTxSize);
+    final inInfos = _unsignedIns(selfID, amount, knownTxSize);
     if (inInfos == null) return null;
     List<Down4TXIN> ins = inInfos[0];
     Sats minerFees = inInfos[1];
     Sats down4Fees = inInfos[2];
-    Sats inSats = await ins.fold(Sats(0), (tot, txin) async {
-      final utxo = await getUtxo(txin.utxoID);
-      return await tot + (utxo?.sats ?? Sats(0));
+    Sats inSats = ins.fold(Sats(0), (tot, txin) {
+      final utxo = getUtxo(txin.utxoID);
+      return tot + (utxo?.sats ?? Sats(0));
     });
 
     // at this point, there is no reason for the payment to fail
@@ -120,14 +118,14 @@ class Wallet with Down4Object, Jsons, Locals {
     _ix = _ix + 1;
     merge({"ix": _ix.toString()});
     // the goal here is simply having a unique id everytime
-    final txSecret = makeUint32(_ix) + utf8.encode(selfID.unique);
+    final txSecret = makeUint32(_ix) + utf8.encode(selfID.unik);
     final d4Keys = DOWN4_NEUTER.derive(txSecret);
     // except for here possibly? must be fucking rare tho
     if (d4Keys == null) return null;
     var d4out = Down4TXOUT(
       type: UtxoType.fee,
       sats: down4Fees,
-      scriptPubKey: p2pkh(d4Keys.rawAddress),
+      script: p2pkh(d4Keys.rawAddress),
     );
     outs.add(d4out);
 
@@ -137,7 +135,7 @@ class Wallet with Down4Object, Jsons, Locals {
       var uOut = Down4TXOUT(
         type: UtxoType.gets,
         sats: payPerPerson,
-        scriptPubKey: p2pkh(userKeys.rawAddress),
+        script: p2pkh(userKeys.rawAddress),
         receiver: people[i].id,
       );
       outs.add(uOut);
@@ -151,13 +149,13 @@ class Wallet with Down4Object, Jsons, Locals {
       var changeOut = Down4TXOUT(
           type: UtxoType.change,
           sats: change,
-          scriptPubKey: p2pkh(selfKeys.rawAddress),
+          script: p2pkh(selfKeys.rawAddress),
           receiver: selfID);
       outs.add(changeOut);
     }
 
     for (var i = 0; i < ins.length; i++) {
-      final spentUtxo = await getUtxo(ins[i].utxoID);
+      final spentUtxo = getUtxo(ins[i].utxoID);
       if (spentUtxo == null) return null;
 
       final utxoSecret = spentUtxo.secret;
@@ -173,30 +171,86 @@ class Wallet with Down4Object, Jsons, Locals {
       if (scriptSig == null) return null;
 
       ins[i].script = scriptSig;
-      setSpent(spentUtxo.id, true);
+      setSpent(spentUtxo.id);
     }
 
     final theTx = Down4TX(down4Secret: txSecret, txsIn: ins, txsOut: outs);
 
-    return Down4Payment(await _chainedTxs(theTx),
-        safe: true, textNote: textNote);
+    return Down4Payment(_chainedTxs(theTx), safe: true, textNote: textNote);
   }
 
-  Future<void> parsePayment(Down4ID selfID, Down4Payment pay) async {
+  void parsePayment2(Down4ID selfID, Down4Payment pay) {
+    final sbuf = StringBuffer("BEGIN TRANSACTION;");
+    final List<String> args = [];
+
     print("parsing payment: ${pay.id}");
     for (final tx in pay.txs) {
       tx.writeTxInfosToUTXOs();
     }
     for (final utxo in pay.txs.last.txsOut) {
-      final spent = await isSpent(utxo.id);
+      final spent = isSpent(utxo.id);
       print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
-      if (utxo.receiver == selfID && !spent) await setUtxo(utxo);
+      if (utxo.receiver == selfID && !spent) {
+        final jsn = utxo.toJson(includeLocal: true);
+        final stmt = """
+        INSERT INTO utxos ${jsn.sqlInsertKeys}
+        VALUES ${jsn.sqlInsertValuesParams};
+        """;
+        sbuf.write(stmt);
+        args.addAll(jsn.values);
+      }
     }
     for (final txin in pay.txs.last.txsIn) {
-      if (txin.spender == selfID) await removeUtxo(txin.utxoID);
+      if (txin.spender == selfID) {
+        const stmt = "DELETE FROM utxos WHERE id = ?;";
+        const stmt2 = "INSERT INTO spents (id) VALUES (?);";
+        sbuf.write(stmt);
+        sbuf.write(stmt2);
+        args.add(txin.utxoID.value);
+        args.add(txin.utxoID.value);
+      }
     }
-    await setPayment(pay);
-    await _trySettlement(pay);
+
+    final jsn = pay.toJson(includeLocal: true);
+    final stmt = """
+    INSERT INTO payments ${jsn.sqlInsertKeys}
+    VALUES ${jsn.sqlInsertValuesParams};
+    """;
+    sbuf.write(stmt);
+    args.addAll(jsn.values);
+
+    sbuf.write("COMMIT;");
+
+    try {
+      db.execute(sbuf.toString(), args);
+    } catch (e) {
+      print("error parsing payment: $e");
+      db.execute("ROLLBACK;");
+    }
+
+    _trySettlement(pay);
+    return;
+  }
+
+  void parsePayment(Down4ID selfID, Down4Payment pay) {
+    print("parsing payment: ${pay.id}");
+    for (final tx in pay.txs) {
+      tx.writeTxInfosToUTXOs();
+    }
+    for (final utxo in pay.txs.last.txsOut) {
+      final spent = isSpent(utxo.id);
+      print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
+      if (utxo.receiver == selfID && !spent) setUtxo(utxo);
+    }
+    for (final txin in pay.txs.last.txsIn) {
+      if (txin.spender == selfID) {
+        setSpent(txin.utxoID);
+        removeUtxo(txin.utxoID);
+      }
+    }
+
+    setPayment(pay);
+    _trySettlement(pay);
     return;
   }
 
@@ -222,13 +276,13 @@ class Wallet with Down4Object, Jsons, Locals {
     if (encaissement.asInt <= 0) return null;
 
     _ix = _ix + 1;
-    final txSecret = makeUint32(_ix) + utf8.encode(selfID.unique);
+    final txSecret = makeUint32(_ix) + utf8.encode(selfID.unik);
     final down4Keys = DOWN4_NEUTER.derive(txSecret);
     if (down4Keys == null) return null;
     var down4Out = Down4TXOUT(
       type: UtxoType.fee,
       sats: down4Fees,
-      scriptPubKey: p2pkh(down4Keys.rawAddress),
+      script: p2pkh(down4Keys.rawAddress),
     );
 
     final selfKeys = _keys.derive(txSecret);
@@ -237,7 +291,7 @@ class Wallet with Down4Object, Jsons, Locals {
       type: UtxoType.gets,
       receiver: selfID,
       sats: encaissement,
-      scriptPubKey: p2pkh(selfKeys.rawAddress),
+      script: p2pkh(selfKeys.rawAddress),
     );
 
     final List<Down4TXOUT> outs = [down4Out, selfOut];
@@ -287,13 +341,13 @@ class Wallet with Down4Object, Jsons, Locals {
 
     for (int i = 0; i < confirmations.length; i++) {
       payment.txs[i].confirmations = confirmations[i];
-      await setPayment(payment);
+      setPayment(payment);
     }
   }
 
-  Future<List<Down4TX>> _chainedTxs(Down4TX from) async {
-    final unsettledIDs = await uTXID;
-    final unsettledTransactions = await unsettledTxs;
+  List<Down4TX> _chainedTxs(Down4TX from) {
+    final unsettledIDs = uTXID;
+    final unsettledTransactions = unsettledTxs;
 
     // final unsettledIDs = uTXID;
     Set<Down4TX> deps = {from};
@@ -311,8 +365,7 @@ class Wallet with Down4Object, Jsons, Locals {
     return copy.reversed.toList(growable: false);
   }
 
-  Future<List<dynamic>?> _unsignedIns(
-      Down4ID selfID, Sats pay, int currentTxSize) async {
+  List<dynamic>? _unsignedIns(Down4ID selfID, Sats pay, int currentTxSize) {
     const inSize = 148;
     List<Down4TXIN> ins = [];
     var cumulSize = currentTxSize;
@@ -321,8 +374,8 @@ class Wallet with Down4Object, Jsons, Locals {
     var currentDown4Fees = (currentMinerFees * 1.2) + randSats;
     var accumulatedSats = Sats(0);
     var iUtxo = 0;
-    final unsettledTxIDs = await uTXID;
-    await for (final utxo in utxos) {
+    final unsettledTxIDs = uTXID;
+    for (final utxo in utxos) {
       var txin = Down4TXIN(
         utxoTXID: utxo.txid!,
         utxoIndex: FourByteInt(utxo.outIndex!),

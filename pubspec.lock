@@ -201,62 +201,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.2+1"
-  cbl:
-    dependency: "direct main"
-    description:
-      name: cbl
-      sha256: "8e7d5ef453ba6acfadf4c60139b9e2f55e65ad00c4ea13b60627edb665275a0d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.2"
-  cbl_ffi:
-    dependency: transitive
-    description:
-      name: cbl_ffi
-      sha256: "3a55523c447003cc28a890ec8c97d0d6fb465d7867b8d2f65c4e65d780bcfc27"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.8.2+1"
-  cbl_flutter:
-    dependency: "direct main"
-    description:
-      name: cbl_flutter
-      sha256: "0263362f64ba14e58f5e40e6ce9f2b6b9732de0121f40b8dc1874fcb7038bda2"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.9"
-  cbl_flutter_ce:
-    dependency: "direct main"
-    description:
-      name: cbl_flutter_ce
-      sha256: "14a6035bf95e284f48b1c49c92b4122bb06b74197b82c1eae9014204294a9880"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.2"
-  cbl_flutter_platform_interface:
-    dependency: transitive
-    description:
-      name: cbl_flutter_platform_interface
-      sha256: e883cbfbb7088af31b2333636312aed568afb3a028ce70bfb97863234742d0d5
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.9"
-  cbl_libcblite_api:
-    dependency: transitive
-    description:
-      name: cbl_libcblite_api
-      sha256: "839f16022fca3417acc171b683d8b542344277deab5df497736adb2ed803a60a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.1"
-  cbl_libcblitedart_api:
-    dependency: transitive
-    description:
-      name: cbl_libcblitedart_api
-      sha256: "0259268c0a86cf618cac258251780ae41f9d041f40cdd6a1e0431a0cf4e572a2"
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.0.0"
   characters:
     dependency: transitive
     description:
@@ -377,14 +321,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
-  dartx:
-    dependency: transitive
-    description:
-      name: dartx
-      sha256: "8b25435617027257d43e6508b5fe061012880ddfdaa75a71d607c3de2a13d244"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.2.0"
   device_info_plus:
     dependency: "direct main"
     description:
@@ -728,22 +664,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.4"
-  isar:
-    dependency: transitive
-    description:
-      name: isar
-      sha256: "99165dadb2cf2329d3140198363a7e7bff9bbd441871898a87e26914d25cf1ea"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.0+1"
-  isar_generator:
-    dependency: "direct dev"
-    description:
-      name: isar_generator
-      sha256: "76c121e1295a30423604f2f819bc255bc79f852f3bc8743a24017df6068ad133"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.0+1"
   js:
     dependency: transitive
     description:
@@ -808,14 +728,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.4"
-  mobile_scanner:
-    dependency: "direct main"
-    description:
-      name: mobile_scanner
-      sha256: "2fbc3914fe625e196c64ea8ffc4084cd36781d2be276d4d5923b11af3b5d44ff"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.4.1"
   package_config:
     dependency: transitive
     description:
@@ -952,6 +864,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.1"
+  qr_code_scanner:
+    dependency: "direct main"
+    description:
+      name: qr_code_scanner
+      sha256: f23b68d893505a424f0bd2e324ebea71ed88465d572d26bb8d2e78a4749591fd
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   quiver:
     dependency: transitive
     description:
@@ -981,14 +901,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.99"
-  source_gen:
-    dependency: transitive
-    description:
-      name: source_gen
-      sha256: fc0da689e5302edb6177fdd964efcb7f58912f43c28c2047a808f5bfff643d16
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.4.0"
   source_span:
     dependency: transitive
     description:
@@ -1045,14 +957,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.0"
-  synchronized:
-    dependency: transitive
-    description:
-      name: synchronized
-      sha256: "5fcbd27688af6082f5abd611af56ee575342c30e87541d0245f7ff99faa02c60"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.0"
   term_glyph:
     dependency: transitive
     description:
@@ -1069,14 +973,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.0"
-  time:
-    dependency: transitive
-    description:
-      name: time
-      sha256: "83427e11d9072e038364a5e4da559e85869b227cf699a541be0da74f14140124"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.3"
   timing:
     dependency: transitive
     description:
@@ -1213,14 +1109,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.3.0"
-  xxh3:
-    dependency: transitive
-    description:
-      name: xxh3
-      sha256: a92b30944a9aeb4e3d4f3c3d4ddb3c7816ca73475cd603682c4f8149690f56d7
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.1"
   yaml:
     dependency: transitive
     description:

@@ -3,13 +3,11 @@ import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:convert/convert.dart';
-import 'package:cbl/cbl.dart';
 import 'package:pointycastle/export.dart';
 import 'package:base85/base85.dart';
 
 import '../_dart_utils.dart';
 
-import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
 
 import '_bsv_utils.dart';
@@ -23,9 +21,78 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
 
 enum UtxoType { fee, change, gets, tip, tax }
 
+extension on List<Down4TX> {
+  Uint8List get compressFold {
+    Iterable<int> it = [];
+    int l = 0;
+    for (final tx in this) {
+      final cp = tx.compressed2;
+      l += cp.length;
+      it = it.followedBy(cp);
+    }
+
+    var buf = Uint8List(l);
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+    return buf;
+  }
+}
+
+extension on List<Down4TXOUT> {
+  Uint8List get compressFold {
+    Iterable<int> it = [];
+    int l = 0;
+    for (final txout in this) {
+      final cp = txout.compressed2;
+      l += cp.length;
+      it = it.followedBy(cp);
+    }
+
+    var buf = Uint8List(l);
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+    return buf;
+  }
+}
+
+extension on List<Down4TXIN> {
+  Uint8List get compressFold {
+    Iterable<int> it = [];
+    int l = 0;
+    for (final txin in this) {
+      final cp = txin.compressed2;
+      l += cp.length;
+      it = it.followedBy(cp);
+    }
+
+    var buf = Uint8List(l);
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+    return buf;
+  }
+}
+
 class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
-  Database get dbb => paymentsDB;
+  ComposedID get id {
+    final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
+    return ComposedID(unik: sha1(idFold.toUint8List()).toBase58());
+    // final tsPart = makePrefix(timeStamp);
+    // return "$tsPart-$dataPart";
+  }
+
+  @override
+  String get table => "payments";
+  // Database get dbb => paymentsDB;
 
   final List<Down4TX> txs;
   final bool safe;
@@ -33,16 +100,16 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   final int timestamp;
 
   @override
-  Uint8List? get tempPayload => compressed.toUint8List();
+  Uint8List get tempPayload => compressed.toUint8List();
 
   @override
   Map<String, String>? get tempPayloadMetadata => null;
 
   @override
-  Future<void> updateTempReferences(ComposedID newTempID, int newTempTS) async {
+  void updateTempReferences(ComposedID newTempID, int newTempTS) {
     final currentTS = tempTS ?? 0;
     if (currentTS > newTempTS) return;
-    await merge({
+    merge({
       "tempTS": (_tempTS = newTempTS).toString(),
       "tempID": (_tempID = newTempID).value,
     });
@@ -93,14 +160,6 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     return outSats > 0 ? "+$outSats sat" : "$outSats sat";
   }
 
-  @override
-  ComposedID get id {
-    final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    return ComposedID(unique: sha1(idFold.toUint8List()).toBase58());
-    // final tsPart = makePrefix(timeStamp);
-    // return "$tsPart-$dataPart";
-  }
-
   int get lastConfirmations => txs.last.confirmations;
 
   @override
@@ -109,14 +168,93 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
   operator ==(other) => other is Down4Payment && other.id == id;
 
-  List<int> get compressed => [
-        safe ? 0x01 : 0x00,
-        ...VarInt.fromInt(textNote.length).data,
-        ...utf8.encode(textNote), // this needs to be utf8 obviously
-        ...VarInt.fromInt(txs.length).data,
-        ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
-        ...utf8.encode(timestamp.toRadixString(34)),
-      ];
+  List<int> get compressed {
+    final t1 = makeTimestamp();
+    final tNote = textNote.codeUnits;
+
+    final buf = [
+      safe ? 0x01 : 0x00,
+      ...VarInt.fromInt(tNote.length).data,
+      ...tNote,
+      // ...utf8.encode(textNote),
+      ...VarInt.fromInt(txs.length).data,
+      ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
+      // ...utf8.encode(timestamp.toRadixString(34)),
+      ...timestamp.toRadixString(34).codeUnits,
+    ];
+
+    final t2 = makeTimestamp();
+    print("Down4Payment compressed took: ${t2 - t1} ms");
+    return buf;
+  }
+
+  List<int> get compressed2 {
+    final t1 = makeTimestamp();
+
+    final tl = VarInt.fromInt(textNote.length);
+    final tn = utf8.encode(textNote);
+    final txl = VarInt.fromInt(txs.length);
+    final ctxs = txs.compressFold;
+    final ts = utf8.encode(timestamp.toRadixString(34));
+
+    final len = 1 +
+        tl.data.length +
+        tn.length +
+        txl.data.length +
+        ctxs.length +
+        ts.length;
+
+    var buf = Uint8List(len);
+    final it = [safe ? 0x01 : 0x00].followedBy(tl.data
+        .followedBy(tn.followedBy(txl.data.followedBy(ctxs.followedBy(ts)))));
+
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+
+    final t2 = makeTimestamp();
+    print("Down4Payment compressed took: ${t2 - t1} ms");
+
+    return buf;
+  }
+
+  Uint8List get compressed2Mod4 {
+    final t1 = makeTimestamp();
+
+    final tl = VarInt.fromInt(textNote.length);
+    final tn = utf8.encode(textNote);
+    final txl = VarInt.fromInt(txs.length);
+    final ctxs = txs.compressFold;
+    final ts = utf8.encode(timestamp.toRadixString(34));
+
+    var len = 1 +
+        tl.data.length +
+        tn.length +
+        txl.data.length +
+        ctxs.length +
+        ts.length;
+
+    while ((len % 4) != 0) {
+      len++;
+    }
+
+    var buf = Uint8List(len);
+    final it = [safe ? 0x01 : 0x00].followedBy(tl.data
+        .followedBy(tn.followedBy(txl.data.followedBy(ctxs.followedBy(ts)))));
+
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+
+    final t2 = makeTimestamp();
+    print("Down4Payment compressed took: ${t2 - t1} ms");
+
+    return buf;
+  }
 
   factory Down4Payment.fromCompressed(Uint8List buf) {
     final safe = buf[0] == 0x01;
@@ -129,7 +267,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     String textNote = "";
     if (textNoteLen != 0) {
       textNoteData = buf.sublist(textOffset, textOffset + textNoteLen);
-      textNote = utf8.decode(textNoteData);
+      textNote = String.fromCharCodes(textNoteData);      
+      // textNote = utf8.decode(textNoteData);
     }
 
     final nTxVarInt = VarInt.fromRaw(buf.sublist(textOffsetEnd));
@@ -143,25 +282,28 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     }
 
     final tsBuf = buf.sublist(offset, offset + 7);
-    final tsString = utf8.decode(tsBuf);
+    final tsString = String.fromCharCodes(tsBuf);
+    // utf8.decode(tsBuf);
     final ts = int.parse(tsString, radix: 34);
 
     return Down4Payment(txs, safe: safe, textNote: textNote, timestamp: ts);
   }
 
   List<String> get asQrData {
-    final rawFold = txs.fold<List<int>>(<int>[], (p, v) => p + v.raw);
-    final compressedFold =
-        txs.fold<List<int>>(<int>[], (p, v) => p + v.compressed);
+    final t1 = makeTimestamp();
 
-    print("COMPRESSING QR");
-    print(txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
+    // final rawFold = txs.fold<List<int>>(<int>[], (p, v) => p + v.raw);
+    // final compressedFold =
+    //     txs.fold<List<int>>(<int>[], (p, v) => p + v.compressed);
+
+    // print("COMPRESSING QR");
+    // print(txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
 
     var comp = compressed;
     while (comp.length % 4 != 0) {
       comp.add(0x00);
     }
-    print("COMPRESSED\n${comp.toHex()}");
+    // print("COMPRESSED\n${comp.toHex()}");
 
     const maxSize = 550;
     final codec = Base85Codec(Alphabets.z85);
@@ -183,17 +325,66 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       }
     }
 
-    print("THERE ARE ${txs.length} TXS");
-    print(
-      "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsIn.length)} INPUTS",
-    );
-    print(
-      "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsOut.length)} OUTPUTS",
-    );
-    print("RAW FOLDED LEN = ${rawFold.length}");
-    print("COMPRESSED FOLDED LEN = ${compressedFold.length}");
-    print("QR FOLDED LEN = ${listData.join().length}");
+    final t2 = makeTimestamp();
 
+    // print("THERE ARE ${txs.length} TXS");
+    // print(
+    //   "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsIn.length)} INPUTS",
+    // );
+    // print(
+    //   "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsOut.length)} OUTPUTS",
+    // );
+    // // print("RAW FOLDED LEN = ${rawFold.length}");
+    // print("COMPRESSED FOLDED LEN = ${compressedFold.length}");
+    // print("QR FOLDED LEN = ${listData.join().length}");
+
+    print("\n\tpayment.asQrData took: ${t2 - t1} ms\n");
+    return listData;
+  }
+
+  List<String> get asQrData2Fast {
+    final t1 = makeTimestamp();
+
+    // final compressedFold = txs.compressFold;
+
+    final comp = compressed2Mod4;
+
+    const maxSize = 550;
+    final codec = Base85Codec(Alphabets.z85);
+    final encode = codec.encode(comp);
+    int diviser = 1;
+    while (encode.length / diviser > maxSize) {
+      diviser = diviser + 1;
+    }
+
+    final divided = (encode.length / diviser).floor();
+    List<String> listData = [];
+    for (int i = 0; i < diviser; i++) {
+      var sbuf = StringBuffer(i == 0 ? "_$diviser," : "$i;");
+      // String prefix = ;
+      bool isLast = i == (diviser - 1);
+      if (isLast) {
+        sbuf.write(encode.substring(i * divided));
+      } else {
+        sbuf.write(encode.substring(i * divided, (i + 1) * divided));
+      }
+      listData.add(sbuf.toString());
+    }
+
+    final t2 = makeTimestamp();
+
+    // print("THERE ARE ${txs.length} TXS");
+    // print(
+    //   "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsIn.length)} INPUTS",
+    // );
+    // print(
+    //   "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsOut.length)} OUTPUTS",
+    // );
+    // // print("RAW FOLDED LEN = ${rawFold.length}");
+    // print("COMPRESSED FOLDED LEN = ${compressedFold.length}");
+    // print("QR FOLDED LEN = ${listData.join().length}");
+
+    print("\n\tpayment.asQrData2Fast took: ${t2 - t1} ms\n");
     return listData;
   }
 
@@ -214,6 +405,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
   @override
   Map<String, String> toJson({bool includeLocal = true}) => {
+        "id": id.value,
         "tx": youKnowEncode(txs.map((tx) => tx.toJson()).toList()),
         "len": txs.length.toString(),
         "safe": safe.toString(),
@@ -370,11 +562,30 @@ class Down4TXIN with Jsons {
   List<int>? get scriptSig => _scriptSig;
 
   List<int> get compressed {
-    final encodedSpender = utf8.encode(spender!.value);
+    final encsp = spender == null ? [] : utf8.encode(spender!.value);
     return [
       ...raw,
-      ...spender == null ? [0x00] : [encodedSpender.length, ...encodedSpender],
+      ...spender == null ? [0x00] : [encsp.length, ...encsp],
     ];
+  }
+
+  List<int> get compressed2 {
+    final encsp = spender == null ? <int>[] : utf8.encode(spender!.value);
+    final sl = <int>[encsp.length];
+    final raw2_ = raw2;
+
+    final l = encsp.length + sl.length + raw2_.length;
+    final it = raw2_.followedBy(sl.followedBy(encsp));
+
+    var buf = Uint8List(l);
+    int offset = 0;
+
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+
+    return buf;
   }
 
   static Pair<Down4TXIN, int> fromCompressed(Uint8List d4) {
@@ -439,6 +650,28 @@ class Down4TXIN with Jsons {
         ...sequenceNo.data,
       ];
 
+  List<int> get raw2 {
+    final t1 = makeTimestamp();
+    final len = utxoTXID.data.length +
+        utxoIndex.data.length +
+        _scriptSigLen!.data.length +
+        _scriptSig!.length +
+        sequenceNo.data.length;
+
+    final it = utxoTXID.data.followedBy(utxoIndex.data.followedBy(_scriptSigLen!
+        .data
+        .followedBy(_scriptSig!.followedBy(sequenceNo.data))));
+
+    int offset = 0;
+    var buf = Uint8List(len);
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+
+    return buf;
+  }
+
   List<int> get seqNo => sequenceNo.data;
 
   List<int> get prevOut => [
@@ -454,10 +687,10 @@ class Down4TXIN with Jsons {
 
 class Down4TXOUT with Down4Object, Jsons, Locals {
   @override
-  Database get dbb => utxosDB;
+  String get table => "utxos";
 
-  final List<int> scriptPubKey;
-  final VarInt scriptPubKeyLen;
+  final List<int> script;
+  final VarInt scriptLength;
   final UtxoType type;
   ComposedID? receiver;
   int? outIndex;
@@ -467,35 +700,36 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
 
   Down4TXOUT({
     required this.sats,
-    required this.scriptPubKey,
+    required this.script,
     required this.type,
     this.receiver,
     this.secret,
     this.txid,
     this.outIndex,
-  }) : scriptPubKeyLen = VarInt.fromInt(scriptPubKey.length);
+  }) : scriptLength = VarInt.fromInt(script.length);
 
   factory Down4TXOUT.fromJson(Map<String, String?> decodedJson) => Down4TXOUT(
-        receiver: ComposedID.fromString(decodedJson["rc"]),
-        secret: decodedJson["st"] != null
-            ? List<int>.from(base64Decode(decodedJson["st"]!))
+        receiver: ComposedID.fromString(decodedJson["receiver"]),
+        secret: decodedJson["secret"] != null
+            ? List<int>.from(base64Decode(decodedJson["secret"]!))
             : null,
-        outIndex: int.parse(decodedJson["oi"]!),
-        txid: TXID.fromHex(decodedJson["id"]!),
-        sats: Sats(int.parse(decodedJson["s"]!)),
-        type: UtxoType.values.byName(decodedJson["t"]!),
-        scriptPubKey: base64Decode(decodedJson["sc"]!),
+        outIndex: int.parse(decodedJson["outIndex"]!),
+        txid: TXID.fromHex(decodedJson["txid"]!),
+        sats: Sats(int.parse(decodedJson["sats"]!)),
+        type: UtxoType.values.byName(decodedJson["type"]!),
+        script: base64Decode(decodedJson["script"]!),
       );
 
   @override
   Map<String, String> toJson({bool includeLocal = true}) => {
-        if (receiver != null) "rc": receiver!.value,
-        "st": secret!.toBase64(),
-        "oi": outIndex!.toString(),
-        "id": txid!.asHex,
-        "s": sats.asInt.toString(),
-        "t": type.name,
-        "sc": scriptPubKey.toBase64(),
+        "id": id.value,
+        "txid": txid!.asHex,
+        "secret": secret!.toBase64(),
+        "outIndex": outIndex!.toString(),
+        "sats": sats.asInt.toString(),
+        "type": type.name,
+        "script": script.toBase64(),
+        if (receiver != null) "receiver": receiver!.value,
       };
 
   @override
@@ -515,9 +749,23 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
 
   List<int> get raw => [
         ...sats.data,
-        ...scriptPubKeyLen.data,
-        ...scriptPubKey,
+        ...scriptLength.data,
+        ...script,
       ];
+
+  List<int> get raw2 {
+    final len = sats.data.length + scriptLength.data.length + script.length;
+    var buf = Uint8List(len);
+
+    final it = sats.data.followedBy(scriptLength.data.followedBy(script));
+
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+    return buf;
+  }
 
   List<int> get compressed {
     final List<int>? utf8Receiver =
@@ -527,6 +775,25 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
       ...utf8Receiver == null ? [0x00] : [utf8Receiver.length, ...utf8Receiver],
       type.index,
     ];
+  }
+
+  List<int> get compressed2 {
+    final rc = receiver == null ? <int>[] : utf8.encode(receiver!.value);
+    final rcl = [rc.length];
+    final raw2_ = raw2;
+
+    final l = rc.length + rcl.length + raw2_.length;
+
+    final it = raw2_.followedBy(rcl.followedBy(rc));
+
+    var buf = Uint8List(l);
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+
+    return buf;
   }
 
   static Pair<Down4TXOUT, int> fromCompressed(Uint8List d4) {
@@ -554,10 +821,7 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
     final type = UtxoType.values[flag];
 
     final txout = Down4TXOUT(
-        sats: Sats(satInt),
-        scriptPubKey: script,
-        receiver: receiver,
-        type: type);
+        sats: Sats(satInt), script: script, receiver: receiver, type: type);
 
     return Pair(txout, curOffset + 1 + receiverLen + 1);
   }
@@ -643,17 +907,62 @@ class Down4TX {
     }
   }
 
-  List<int> get compressed => [
-        ...versionNo.data,
-        ...inCounter.data,
-        ...txsIn.fold(<int>[], (buf, txin) => [...buf, ...txin.compressed]),
-        ...outCounter.data,
-        ...txsOut.fold(<int>[], (buf, txout) => [...buf, ...txout.compressed]),
-        ...nLockTime.data,
-        down4Secret.length,
-        ...down4Secret,
-        ...VarInt.fromInt(confirmations).data,
-      ];
+  List<int> get compressed {
+    final t1 = makeTimestamp();
+
+    final buf = [
+      ...versionNo.data,
+      ...inCounter.data,
+      ...txsIn.fold(<int>[], (buf, txin) => [...buf, ...txin.compressed]),
+      ...outCounter.data,
+      ...txsOut.fold(<int>[], (buf, txout) => [...buf, ...txout.compressed]),
+      ...nLockTime.data,
+      down4Secret.length,
+      ...down4Secret,
+      ...VarInt.fromInt(confirmations).data,
+    ];
+
+    final t2 = makeTimestamp();
+    print("Down4TX compressed took: ${t2 - t1} ms");
+
+    return buf;
+  }
+
+  List<int> get compressed2 {
+    final t1 = makeTimestamp();
+    final inFold = txsIn.compressFold;
+    // final inFold = txsIn.fold(<int>[], (buf, txin) => buf + txin.compressed);
+    final outFold = txsOut.compressFold;
+    // final outFold = txsOut.fold(<int>[], (buf, txin) => buf + txin.compressed);
+    final confs = VarInt.fromInt(confirmations);
+
+    final len = versionNo.data.length +
+        inCounter.data.length +
+        inFold.length +
+        outCounter.data.length +
+        outFold.length +
+        nLockTime.data.length +
+        down4Secret.length +
+        down4Secret.length +
+        confs.data.length;
+
+    final it = versionNo.data.followedBy(inCounter.data.followedBy(
+        inFold.followedBy(outCounter.data.followedBy(outFold.followedBy(
+            nLockTime.data.followedBy([down4Secret.length]
+                .followedBy(down4Secret.followedBy(confs.data))))))));
+
+    var buf = Uint8List(len);
+    int offset = 0;
+    for (final b in it) {
+      buf[offset] = b;
+      offset++;
+    }
+
+    final t2 = makeTimestamp();
+    print("Down4TX compressed took: ${t2 - t1} ms");
+
+    return buf;
+  }
 
   static Pair<Down4TX, int> fromCompressed(Uint8List buf) {
     final vNo = FourByteInt.fromRaw(buf.sublist(0, 4));

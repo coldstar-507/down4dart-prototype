@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/nodes.dart';
+import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
 
 import 'package:flutter/gestures.dart';
@@ -8,7 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:mime/mime.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+// import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../_dart_utils.dart';
 
@@ -489,6 +491,8 @@ mixin Pager2 {
   Icon get closeButtonIcon =>
       Icon(Icons.keyboard_arrow_down, color: g.theme.buttonTextColor);
 
+  BuildContext get context;
+
   List<Extra> get extras;
   set extras(List<Extra> e);
 
@@ -500,7 +504,18 @@ mixin Pager2 {
     }
   }
 
-  void changeConsole(String consoleName) {
+  void changeConsole(String consoleName) async {
+    // shit's just slow, need better alternative
+    // if (consoleName == "medias") {
+    //   final mediaIDs = g.savedMediasIDs[MediaType.images]!;
+    //   final l = mediaIDs.length > 40 ? 40 : mediaIDs.length;
+    //   for (int i = 0; i < l; i++) {
+    //     final m = local<Down4Image>(mediaIDs[i]);
+    //     final imProvider = m?.localImage(Size.square(Medias2.mediaCelSize));
+    //     if (imProvider != null) await precacheImage(imProvider, context!);
+    //   }
+    // }
+
     currentConsolesName[currentPageIndex] = consoleName;
     turnOffExtras();
     setTheState();
@@ -711,7 +726,7 @@ mixin Transition2 on Pager2 {
     Iterable<Palette> selection = originals.selected();
     Iterable<GroupN> sGroup = selection.asNodes<GroupN>();
     Iterable<Down4ID> userSel = selection.whereNodeIs<PersonN>().asIDs();
-    Iterable<Down4ID> ofGroup = sGroup.map((g) => g.group).expand((e) => e);
+    Iterable<Down4ID> ofGroup = sGroup.map((g) => g.members).expand((e) => e);
     Set<Down4ID> fullSel = userSel.followedBy(ofGroup).toSet();
     final ogs = originals
         .where((p) => p.show)
@@ -759,10 +774,10 @@ mixin Transition2 on Pager2 {
 }
 
 mixin Medias2 on Pager2 {
-  int get _mediasPerRow => 5;
-  int get _nRows => 3;
-  double get _mediaCelSize => Console.trueWidth / _mediasPerRow;
-  double get mediaExtensionHeight => _mediaCelSize * _nRows;
+  static int get _mediasPerRow => 5;
+  static int get _nRows => 3;
+  static double get mediaCelSize => Console.trueWidth / _mediasPerRow;
+  double get mediaExtensionHeight => mediaCelSize * _nRows;
 
   MediaType t = MediaType.images;
   void nextType({MediaType? specificType}) {
@@ -835,14 +850,15 @@ mixin Medias2 on Pager2 {
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
-          color: g.theme.consoleBorderColor,
-          border: Border.all(
-              color: g.theme.consoleBorderColor, width: Console.borderWidth)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+        // color: Colors.white10, //g.theme.buttonTextColor,
+      ),
+      // border: Border.all(
+      //     color: g.theme.consoleBorderColor, width: Console.borderWidth)),
       child: ConstrainedBox(
           constraints: BoxConstraints(
-              maxHeight: _nRows * _mediaCelSize, maxWidth: Console.trueWidth),
+              maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
           child: ListView.builder(
               itemCount: nRows,
               itemBuilder: ((context, index) {
@@ -854,10 +870,14 @@ mixin Medias2 on Pager2 {
                           onTap: () => forMediaMode != null
                               ? forMediaMode!.$2.call(cachedMedia as Down4Image)
                               : curMode.$2(cachedMedia),
-                          child: cachedMedia.display(
-                              key: Key("console-${cachedMedia.id.value}"),
-                              size: Size.square(_mediaCelSize),
-                              forceSquare: true));
+                          child: cachedMedia is Down4Image
+                              ? cachedMedia.displayImage_(
+                                  key: "console-${cachedMedia.id.value}",
+                                  s: Size.square(mediaCelSize))
+                              : cachedMedia.display(
+                                  key: Key("console-${cachedMedia.id.value}"),
+                                  size: Size.square(mediaCelSize),
+                                  forceSquare: true));
                     }
                     return FutureBuilder(
                       future: global<Down4Media>(ids[i]),
@@ -871,16 +891,16 @@ mixin Medias2 on Pager2 {
                               child: ans.requireData?.display(
                                       key: Key(
                                           "console-${ans.requireData?.id.value}"),
-                                      size: Size.square(_mediaCelSize),
+                                      size: Size.square(mediaCelSize),
                                       forceSquare: true) ??
-                                  SizedBox.square(dimension: _mediaCelSize));
+                                  SizedBox.square(dimension: mediaCelSize));
                         } else {
-                          return SizedBox.square(dimension: _mediaCelSize);
+                          return SizedBox.square(dimension: mediaCelSize);
                         }
                       },
                     );
                   } else {
-                    return SizedBox.square(dimension: _mediaCelSize);
+                    return SizedBox.square(dimension: mediaCelSize);
                   }
                 }
 
@@ -972,7 +992,7 @@ mixin Camera2 on Pager2 {
         onLongPressUp: () async {
           final XFile f = await cameraController!.stopVideoRecording();
           tempInput = await makeCameraMedia(
-              writeFromCachedPath: false,            
+              writeFromCachedPath: false,
               cachedPath: f.path,
               size: cameraController!.value.previewSize!.inverted,
               isReversed: isReversed,
@@ -1125,13 +1145,29 @@ mixin Add2 {
 }
 
 mixin Scanner2 on Pager2 {
-  void onScan(BarcodeCapture bc);
-  MobileScanner? _scanner;
 
-  Widget get scanner => _scanner ??= MobileScanner(
-        onDetect: onScan,
-        controller: MobileScannerController(),
-      );
+  void onScan(Barcode bc);
+  Widget? _scanner;
+
+  QRViewController? _ctrl;
+
+  void loadScanner() {
+    _scanner = null;
+    _scanner = QRView(
+      key: GlobalKey(),
+      onQRViewCreated: (ctrl) {
+        scanning = true;
+        _ctrl = ctrl;
+        ctrl.scannedDataStream.listen(onScan);
+      },
+      overlay: QrScannerOverlayShape(
+          borderWidth: 6,
+          borderColor: g.theme.headerColor,
+          cutOutSize: g.sizes.w * 0.92,
+          overlayColor: Colors.black45),
+    );
+    setTheState();
+  }
 
   bool scanning = false;
 
@@ -1141,14 +1177,21 @@ mixin Scanner2 on Pager2 {
       onPress: () {
         scanning = !scanning;
         if (!scanning) {
-          _scanner?.controller?.dispose();
+          _ctrl?.dispose();
           _scanner = null;
+          // _scanner?.controller?.dispose();
+          // _scanner = null;
+        } else {
+          // Future.delayed(Andrew.pageSwitchAnimationDuration, loadScanner);
+          Future.delayed(const Duration(milliseconds: 300), loadScanner);          
         }
         setTheState();
       });
 
   void disposeScanner() {
-    _scanner?.controller?.dispose();
+    _ctrl?.dispose();
+    _scanner = null;
+    // _scanner?.controller?.dispose();
   }
 
   Widget get scanExtension => Container(
@@ -1163,565 +1206,10 @@ mixin Scanner2 on Pager2 {
               child: SizedBox(
                   height: Console.trueWidth,
                   width: Console.trueWidth,
-                  child: scanner))
+                  child: _scanner))
         ]),
       );
 }
-
-// abstract class BasicRows
-//     with Pager2, Medias2, Sender2, Forward2, Input2, Camera2 {
-//   ({String name, ConsoleRow row}) get basicCameraRow => (
-//         name: "camera",
-//         row: ConsoleRow(
-//             widgets: [
-//               cameraBackButton,
-//               cameraCancelButton,
-//               cameraSwitchButton,
-//               cameraCaptureButton,
-//               cameraAcceptButton,
-//             ],
-//             extension: (
-//               cameraExtension,
-//               g.sizes.w
-//             ),
-//             widths: cameraInput == null
-//                 ? [0.34, 0.0, 0.33, 0.33, 0.0]
-//                 : [0.34, 0.33, 0.0, 0.0, 0.33],
-//             inputMaxHeight: null)
-//       );
-//
-//   ({String name, ConsoleRow row}) get basicMediasRow => (
-//         name: "medias",
-//         row: ConsoleRow(widgets: [
-//           mediasBackButton,
-//           mediasImportButton,
-//           mediasTypeButton,
-//           mediasModeButton,
-//         ], extension: (
-//           mediasExtension,
-//           mediaExtensionHeight
-//         ), widths: null, inputMaxHeight: null)
-//       );
-//
-//   ({String name, ConsoleRow row}) get basicComposingRow => (
-//         name: "compose",
-//         row: ConsoleRow(
-//             inputMaxHeight: inputHeight,
-//             extension: (mediasExtension, 0.0),
-//             widgets: [mediasButton, cameraButton, input, sendButton],
-//             widths: focusNode.hasFocus ? [0.2, 0.0, 0.6, 0.2] : null)
-//       );
-// }
-
-// mixin Transition {
-//   Transition get transition;
-// }
-//
-// mixin Hyper on Transition {
-//   void hyper(Transition t);
-//   final GlobalKey _hyperKey = GlobalKey();
-//   ConsoleButton get hyperButton => ConsoleButton(
-//       key: _hyperKey, name: "HYPER", onPress: () => hyper(transition));
-// }
-//
-// mixin Money on Transition {}
-
-// mixin Chatter on Pager2, Medias2, Camera2 {
-//   void send();
-//   late Console3 newConsole;
-//
-//   void loadConsole({
-//     void Function(FireMedia)? forNode,
-//     bool images = true,
-//   }) {
-//     newConsole = Console3(
-//       consoles: [
-//         {
-//           "base": (
-//             extension: null,
-//             inputMaxHeight: _inputHeight,
-//             widths: _focusNode.hasFocus
-//                 ? [0.20, 0.0, 0.6, 0.2]
-//                 : [0.25, 0.25, 0.25, 0.25],
-//             widgets: [
-//               ConsoleButton(
-//                   name: "MEDIAS",
-//                   onPress: () {
-//                     _currentConsole = "medias";
-//                     setTheState();
-//                   }),
-//               ConsoleButton(
-//                   name: _cameraInput == null ? "CAMERA" : "@CAMERA",
-//                   onPress: () {
-//                     _currentConsole = "camera";
-//                     setTheState();
-//                   }),
-//               ConsoleInput2(_myTextEditor),
-//               ConsoleButton(name: "SEND", onPress: send),
-//             ]
-//           ),
-//           "medias": (
-//             extension: SizedBox.shrink(),
-//             inputMaxHeight: null,
-//             widths: null,
-//             widgets: [
-//               ConsoleButton(
-//                 name: "BACK",
-//                 onPress: () {
-//                   _currentConsole = "base";
-//                   setTheState();
-//                 },
-//               ),
-//               ConsoleButton(
-//                   name: "IMPORT",
-//                   onPress: () async {
-//                     if (forNode != null) {
-//                       final nodeMedia = await importNodeMedia();
-//                       if (nodeMedia != null) {
-//                         forNode.call(nodeMedia);
-//                       }
-//                     } else {
-//                       await importConsoleMedias(
-//                           images: images,
-//                           reload: () {
-//                             setTheState();
-//                           });
-//                     }
-//                   }),
-//               ConsoleButton(
-//                 isMode: true,
-//                 isActivated: forNode == null,
-//                 isGreyedOut: forNode != null,
-//                 name: images ? "IMAGES" : "VIDEOS",
-//                 onPress: () => loadMediasConsole(!images, extra, forNode),
-//               ),
-//               ConsoleButton(
-//                 name: curMode.first,
-//                 isMode: true,
-//                 onPress: () {
-//                   currentMode = (currentMode + 1) % mediasMode.length;
-//                   loadMediasConsole(images, extra, forNode);
-//                 },
-//               ),
-//             ]
-//           )
-//         }
-//       ],
-//       currentConsoleName: _currentConsole,
-//       currentPageIndex: _currentPage,
-//     );
-//   }
-//
-//   void loadConsole() {
-//     console = Console(
-//       bottomButtons: [],
-//       consoleRow: Console3(
-//         widgets: [
-//           ConsoleButton(
-//             name: _cameraInput == null ? "CAMERA" : "@CAMERA",
-//             onPress: () => loadSquaredCameraConsole(0),
-//           ),
-//           ConsoleButton(
-//             name: "MEDIAS",
-//             onPress: () => loadMediasConsole(images),
-//           ),
-//           ConsoleInput2(te),
-//           ConsoleButton(
-//             name: "SEND",
-//             onPress: () {
-//               send();
-//               loadBaseConsole();
-//             },
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-//
-// }
-
-// mixin Camera on Pager {
-//   FireMedia? get cameraInput;
-//   set cameraInput(FireMedia? m);
-//   Size get _squaredCamSize => Size.square(Console.trueWidth);
-//   VideoPlayerController? videoPreview;
-//   CameraController? cameraController;
-//
-//   Future<void> loadSquaredCameraConsole([int cam = 0]) async {
-//     // focusNode?.unfocus();
-//     if (cameraController == null) {
-//       try {
-//         cameraController =
-//             CameraController(g.cameras[cam], ResolutionPreset.high);
-//         await cameraController?.initialize();
-//       } catch (e) {
-//         loadBaseConsole();
-//       }
-//     }
-//
-//     final bool isReversed = cam == 1;
-//     console = Console(
-//       // bottomInputs: [mainInput],
-//       cameraController: cameraController,
-//       topButtons: [],
-//       bottomButtons: [
-//         ConsoleButton(
-//             name: "BACK",
-//             onPress: () {
-//               cameraController?.dispose();
-//               cameraController = null;
-//               loadBaseConsole();
-//             }),
-//         ConsoleButton(
-//             name: cam == 0 ? "REAR" : "FRONT",
-//             onPress: () async {
-//               await cameraController?.dispose();
-//               cameraController = null;
-//               loadSquaredCameraConsole((cam + 1) % 2);
-//             },
-//             isMode: true),
-//         ConsoleButton(
-//           name: "CAPTURE",
-//           isSpecial: true,
-//           shouldBeDownButIsnt: cameraController!.value.isRecordingVideo,
-//           onPress: () async {
-//             final XFile f = await cameraController!.takePicture();
-//             print(
-//                 "CAMERA PREVIEW SIZE = ${cameraController?.value.previewSize}");
-//             final media = makeCameraMedia(
-//                 cachedPath: f.path,
-//                 size: cameraController!.value.previewSize!.inverted,
-//                 isReversed: isReversed,
-//                 owner: selfID,
-//                 isSquared: true);
-//             loadPreviewConsole(media);
-//           },
-//           onLongPress: () async {
-//             await cameraController!.startVideoRecording();
-//             loadSquaredCameraConsole(cam);
-//           },
-//           onLongPressUp: () async {
-//             final XFile f = await cameraController!.stopVideoRecording();
-//             final media = makeCameraMedia(
-//                 cachedPath: f.path,
-//                 size: cameraController!.value.previewSize!.inverted,
-//                 isReversed: isReversed,
-//                 owner: selfID,
-//                 isSquared: true);
-//             loadPreviewConsole(media);
-//           },
-//         ),
-//       ],
-//       // consoleRow: Console3(
-//       //   widgets: [
-//       //     ConsoleButton(
-//       //         name: "BACK",
-//       //         onPress: () {
-//       //           cameraController?.dispose();
-//       //           cameraController = null;
-//       //           loadBaseConsole();
-//       //         }),
-//       //     ConsoleButton(
-//       //         name: cam == 0 ? "REAR" : "FRONT",
-//       //         onPress: () async {
-//       //           await cameraController?.dispose();
-//       //           cameraController = null;
-//       //           loadSquaredCameraConsole((cam + 1) % 2);
-//       //         },
-//       //         isMode: true),
-//       //     ConsoleButton(
-//       //       name: "CAPTURE",
-//       //       isSpecial: true,
-//       //       shouldBeDownButIsnt: cameraController!.value.isRecordingVideo,
-//       //       onPress: () async {
-//       //         final XFile f = await cameraController!.takePicture();
-//       //         print(
-//       //             "CAMERA PREVIEW SIZE = ${cameraController?.value.previewSize}");
-//       //         final media = makeCameraMedia(
-//       //             cachedPath: f.path,
-//       //             size: cameraController!.value.previewSize!.inverted,
-//       //             isReversed: isReversed,
-//       //             owner: selfID,
-//       //             isSquared: true);
-//       //         loadPreviewConsole(media);
-//       //       },
-//       //       onLongPress: () async {
-//       //         await cameraController!.startVideoRecording();
-//       //         loadSquaredCameraConsole(cam);
-//       //       },
-//       //       onLongPressUp: () async {
-//       //         final XFile f = await cameraController!.stopVideoRecording();
-//       //         final media = makeCameraMedia(
-//       //             cachedPath: f.path,
-//       //             size: cameraController!.value.previewSize!.inverted,
-//       //             isReversed: isReversed,
-//       //             owner: selfID,
-//       //             isSquared: true);
-//       //         loadPreviewConsole(media);
-//       //       },
-//       //     ),
-//       //   ],
-//       // ),
-//     );
-//
-//     setTheState();
-//   }
-//
-//   Future<VideoPlayerController?> _loopingController(FireMedia m) async {
-//     if (!m.isVideo) return null;
-//     final vpc = await m.videoController;
-//     await vpc?.initialize();
-//     return vpc
-//       ?..setLooping(true)
-//       ..play();
-//   }
-//
-//   void loadPreviewConsole(FireMedia m) async {
-//     // videoPreview = await _loopingController(m);
-//     if (m.isVideo) {
-//       final file = await m.cachedFile;
-//       videoPreview = VideoPlayerController.file(file!);
-//       await videoPreview?.initialize();
-//       videoPreview?.setLooping(true);
-//       videoPreview?.play();
-//     }
-//
-//     Widget videoPlayer() {
-//       return Down4VideoTransform(
-//           displaySize: _squaredCamSize,
-//           videoAspectRatio: m.aspectRatio,
-//           video: VideoPlayer(videoPreview!),
-//           isReversed: m.isReversed,
-//           isScaled: true);
-//     }
-//
-//     console = Console(
-//       // bottomInputs: [mainInput],
-//       previewMedia: m.isVideo
-//           ? videoPlayer()
-//           : m.displayImage(
-//               size: _squaredCamSize,
-//               forceSquare: true,
-//             ), //, controller: vpc),
-//       topButtons: [],
-//       bottomButtons: [
-//         ConsoleButton(
-//           name: "BACK",
-//           onPress: () {
-//             // vpc?.dispose();
-//             videoPreview?.dispose();
-//             loadSquaredCameraConsole(m.isReversed ? 1 : 0);
-//           },
-//         ),
-//         ConsoleButton(
-//             name: "CANCEL",
-//             onPress: () {
-//               cameraController?.dispose();
-//               cameraController = null;
-//               videoPreview?.dispose();
-//               loadBaseConsole();
-//             }),
-//         ConsoleButton(
-//             name: "ACCEPT",
-//             onPress: () {
-//               // vpc?.dispose();
-//               cameraController?.dispose();
-//               cameraController = null;
-//               videoPreview?.dispose();
-//               cameraInput = m;
-//               loadBaseConsole();
-//             }),
-//       ],
-//       // consoleRow: Console3(
-//       //   widgets: [
-//       //     ConsoleButton(
-//       //       name: "BACK",
-//       //       onPress: () {
-//       //         // vpc?.dispose();
-//       //         videoPreview?.dispose();
-//       //         loadSquaredCameraConsole(m.isReversed ? 1 : 0);
-//       //       },
-//       //     ),
-//       //     ConsoleButton(
-//       //         name: "CANCEL",
-//       //         onPress: () {
-//       //           cameraController?.dispose();
-//       //           cameraController = null;
-//       //           videoPreview?.dispose();
-//       //           loadBaseConsole();
-//       //         }),
-//       //     ConsoleButton(
-//       //         name: "ACCEPT",
-//       //         onPress: () {
-//       //           // vpc?.dispose();
-//       //           cameraController?.dispose();
-//       //           cameraController = null;
-//       //           videoPreview?.dispose();
-//       //           cameraInput = m;
-//       //           loadBaseConsole();
-//       //         }),
-//       //   ],
-//       // ),
-//     );
-//     setTheState();
-//   }
-// }
-
-// mixin Medias on Pager {
-//   List<Pair<String, void Function(FireMedia)>> get mediasMode;
-//
-//   int currentMode = 0;
-//
-//   Pair<String, void Function(FireMedia)> get curMode => mediasMode[currentMode];
-//
-//   void loadMediasConsole([
-//     bool images = true,
-//     bool extra = false,
-//     void Function(FireMedia)? forNode,
-//   ]) {
-//     // focusNode?.unfocus();
-//     console = Console(
-//       // bottomInputs: [mainInput],
-//
-//       // topButtons: [
-//       //   ConsoleButton(
-//       //       name: "Import",
-//       //       onPress: () async {
-//       //         if (forNode != null) {
-//       //           final nodeMedia = await importNodeMedia();
-//       //           if (nodeMedia != null) {
-//       //             forNode.call(nodeMedia);
-//       //           }
-//       //         } else {
-//       //           await importConsoleMedias(
-//       //               images: images,
-//       //               reload: () => loadMediasConsole(images, extra, forNode));
-//       //         }
-//       //       }),
-//       // ],
-//       // bottomButtons: [
-//       //   ConsoleButton(
-//       //     showExtra: extra,
-//       //     isSpecial: forNode == null ? true : false,
-//       //     name: "Back",
-//       //     onPress: () => extra && forNode == null
-//       //         ? loadMediasConsole(images, !extra, forNode)
-//       //         : loadBaseConsole(),
-//       //     onLongPress: () => forNode == null
-//       //         ? loadMediasConsole(images, !extra, forNode)
-//       //         : null,
-//       //     extraButtons: [
-//       //       ConsoleButton(
-//       //         name: curMode.first,
-//       //         onPress: () {
-//       //           currentMode = (currentMode + 1) % mediasMode.length;
-//       //           loadMediasConsole(images, extra, forNode);
-//       //         },
-//       //         isMode: true,
-//       //       ),
-//       //     ],
-//       //   ),
-//       //   ConsoleButton(
-//       //     isMode: true,
-//       //     isActivated: forNode == null,
-//       //     isGreyedOut: forNode != null,
-//       //     name: images ? "Images" : "Videos",
-//       //     onPress: () => loadMediasConsole(!images, extra, forNode),
-//       //   ),
-//       // ],
-//       bottomButtons: [
-//         ConsoleButton(
-//           showExtra: extra,
-//           name: "BACK",
-//           onPress: () {
-//             loadBaseConsole();
-//             focusRoutine();
-//           },
-//         ),
-//         ConsoleButton(
-//             name: "IMPORT",
-//             onPress: () async {
-//               if (forNode != null) {
-//                 final nodeMedia = await importNodeMedia();
-//                 if (nodeMedia != null) {
-//                   forNode.call(nodeMedia);
-//                 }
-//               } else {
-//                 await importConsoleMedias(
-//                     images: images,
-//                     reload: () => loadMediasConsole(images, extra, forNode));
-//               }
-//             }),
-//         ConsoleButton(
-//           isMode: true,
-//           isActivated: forNode == null,
-//           isGreyedOut: forNode != null,
-//           name: images ? "IMAGES" : "VIDEOS",
-//           onPress: () => loadMediasConsole(!images, extra, forNode),
-//         ),
-//         ConsoleButton(
-//           name: curMode.first,
-//           isMode: true,
-//           onPress: () {
-//             currentMode = (currentMode + 1) % mediasMode.length;
-//             loadMediasConsole(images, extra, forNode);
-//           },
-//         ),
-//       ],
-//       medias: ConsoleMedias2(
-//         images: images,
-//         onSelect: forNode ?? curMode.second,
-//       ),
-//       // consoleRow: Console3(
-//       //   widgets: [
-//       //     ConsoleButton(
-//       //       showExtra: extra,
-//       //       name: "BACK",
-//       //       onPress: () {
-//       //         loadBaseConsole();
-//       //         focusRoutine();
-//       //       },
-//       //     ),
-//       //     ConsoleButton(
-//       //         name: "IMPORT",
-//       //         onPress: () async {
-//       //           if (forNode != null) {
-//       //             final nodeMedia = await importNodeMedia();
-//       //             if (nodeMedia != null) {
-//       //               forNode.call(nodeMedia);
-//       //             }
-//       //           } else {
-//       //             await importConsoleMedias(
-//       //                 images: images,
-//       //                 reload: () => loadMediasConsole(images, extra, forNode));
-//       //           }
-//       //         }),
-//       //     ConsoleButton(
-//       //       isMode: true,
-//       //       isActivated: forNode == null,
-//       //       isGreyedOut: forNode != null,
-//       //       name: images ? "IMAGES" : "VIDEOS",
-//       //       onPress: () => loadMediasConsole(!images, extra, forNode),
-//       //     ),
-//       //     ConsoleButton(
-//       //       name: curMode.first,
-//       //       isMode: true,
-//       //       onPress: () {
-//       //         currentMode = (currentMode + 1) % mediasMode.length;
-//       //         loadMediasConsole(images, extra, forNode);
-//       //       },
-//       //     ),
-//       //   ],
-//       // ),
-//     );
-//
-//     setTheState();
-//   }
-// }
-
-// mixin Sender {
-//   Future<void> send({FireMedia? mediaInput});
-// }
 
 Future<Down4Media> makeCameraMedia({
   required String cachedPath,
@@ -1735,7 +1223,8 @@ Future<Down4Media> makeCameraMedia({
   final isVideo = videoMimes.contains(mime);
   final data = File(cachedPath).readAsBytesSync();
   final tinyThumbnail = isVideo ? null : makeTiny(data);
-  return Down4Media.fromLocal2(ComposedID(region: owner.region), // hack for init
+  return Down4Media.fromLocal2(
+      ComposedID(region: owner.region), // hack for init
       mainCachedPath: cachedPath,
       writeFromCachedPath: writeFromCachedPath,
       metadata: Down4MediaMetadata(

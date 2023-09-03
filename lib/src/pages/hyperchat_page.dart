@@ -87,8 +87,8 @@ class _HyperchatPageState extends State<HyperchatPage>
   List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
-          (m) async {
-            await m.use();
+          (m) {
+            m.use();
             send(mediaInput: m);
           }
         ),

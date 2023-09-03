@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
@@ -19,9 +20,7 @@ import '_page_utils.dart';
 
 class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
-  String get id => "chat-${viewState.node!.id}";
-
-  ViewState get viewState => g.vm.currentView;
+  final String id;
 
   final void Function(int) onPageChange;
   final void Function() back, add, money, hyper, openPreview;
@@ -31,10 +30,9 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function() forward;
   final Chat? reactingTo;
   final void Function(ComposedID, Chat) react;
+  final ViewState viewState;
 
-  Set<Down4Object> get fo => g.vm.forwardingObjects;
-
-  const ChatPage({
+  ChatPage({
     required this.add,
     required this.money,
     required this.hyper,
@@ -46,9 +44,11 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
     required this.forward,
     required this.react,
     required this.openPreview,
+    required this.viewState,
     this.reactingTo,
     Key? key,
-  }) : super(key: key);
+  })  : id = viewState.node!.id.value,
+        super(key: key);
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -72,14 +72,15 @@ class _ChatPageState extends State<ChatPage>
         Append2 {
   // TODO: this threw an error once
   ChatN get node => widget.viewState.node as ChatN;
-  List<Down4ID> get orderedChats => widget.viewState.chat?.first ?? [];
+
+  List<Down4ID> get orderedChats => widget.viewState.orderedChats ?? [];
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode => [
         (
           "SEND",
-          (m) async {
-            await m.use();
+          (m) {
+            m.use();
             send(mediaInput: m);
           }
         ),
@@ -167,7 +168,7 @@ class _ChatPageState extends State<ChatPage>
 
     var chts = <Chat>[];
 
-    final fm = widget.fo
+    final fm = g.vm.forwardingObjects
         .whereType<ChatMessage>()
         .map((e) => e.message)
         .map((m) => m.forwarded(g.self.id, node.root_)
@@ -177,11 +178,11 @@ class _ChatPageState extends State<ChatPage>
 
     chts.addAll(fm.reversed);
 
-    final fnds = widget.fo.palettes().asComposedIDs().toSet();
+    final fnds = g.vm.forwardingObjects.palettes().asComposedIDs().toSet();
     if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
       final c = Chat(ComposedID(),
           root: node.root_,
-          text: input.value,
+          txt: input.value,
           mediaID: media?.id,
           nodes: fnds,
           replies: _messages.values.selected().asIDs().toSet(),

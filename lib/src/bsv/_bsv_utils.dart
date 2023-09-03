@@ -61,8 +61,8 @@ List<int>? sigData({
         ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
         ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
         ...txsIn[nIn].prevOut,
-        ...utxo.scriptPubKeyLen.data,
-        ...utxo.scriptPubKey,
+        ...utxo.scriptLength.data,
+        ...utxo.script,
         ...utxo.sats.data,
         ...txsIn[nIn].sequenceNo.data,
         ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
@@ -75,8 +75,8 @@ List<int>? sigData({
         ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
         ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
         ...txsIn[nIn].prevOut,
-        ...utxo.scriptPubKeyLen.data,
-        ...utxo.scriptPubKey,
+        ...utxo.scriptLength.data,
+        ...utxo.script,
         ...utxo.sats.data,
         ...txsIn[nIn].sequenceNo.data,
         ...hash256(txsOut[nIn].raw),
@@ -89,8 +89,8 @@ List<int>? sigData({
         ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.prevOut])),
         ...hash256(txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.seqNo])),
         ...txsIn[nIn].prevOut,
-        ...utxo.scriptPubKeyLen.data,
-        ...utxo.scriptPubKey,
+        ...utxo.scriptLength.data,
+        ...utxo.script,
         ...utxo.sats.data,
         ...txsIn[nIn].sequenceNo.data,
         ...Uint8List(32),
@@ -103,8 +103,8 @@ List<int>? sigData({
         ...Uint8List(32),
         ...Uint8List(32),
         ...txsIn[nIn].prevOut,
-        ...utxo.scriptPubKeyLen.data,
-        ...utxo.scriptPubKey,
+        ...utxo.scriptLength.data,
+        ...utxo.script,
         ...utxo.sats.data,
         ...txsIn[nIn].sequenceNo.data,
         ...hash256(txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw])),
@@ -117,8 +117,8 @@ List<int>? sigData({
         ...Uint8List(32),
         ...Uint8List(32),
         ...txsIn[nIn].prevOut,
-        ...utxo.scriptPubKeyLen.data,
-        ...utxo.scriptPubKey,
+        ...utxo.scriptLength.data,
+        ...utxo.script,
         ...utxo.sats.data,
         ...txsIn[nIn].sequenceNo.data,
         ...hash256(txsOut[nIn].raw),
@@ -131,8 +131,8 @@ List<int>? sigData({
         ...Uint8List(32),
         ...Uint8List(32),
         ...txsIn[nIn].prevOut,
-        ...utxo.scriptPubKeyLen.data,
-        ...utxo.scriptPubKey,
+        ...utxo.scriptLength.data,
+        ...utxo.script,
         ...utxo.sats.data,
         ...txsIn[nIn].sequenceNo.data,
         ...Uint8List(32),
@@ -168,7 +168,7 @@ Future<Map<Down4ID, Down4TXOUT>?> getUtxos(String checkAddress) async {
       txid: TXID.fromHex(utxo["tx_hash"]),
       sats: Sats(utxo["value"]),
       outIndex: utxo["tx_pos"],
-      scriptPubKey: p2pkh(rawAddress),
+      script: p2pkh(rawAddress),
     );
     d4utxos[d4txout.id] = d4txout;
   }
@@ -176,7 +176,7 @@ Future<Map<Down4ID, Down4TXOUT>?> getUtxos(String checkAddress) async {
 }
 
 Down4ID down4UtxoID(TXID txid, FourByteInt ix) {
-  return Down4ID(unique: sha1(txid.data + ix.data).toBase58());
+  return Down4ID(unik: sha1(txid.data + ix.data).toBase58());
 }
 
 Future<Map<Down4ID, Down4TXOUT>?> checkPrivateKey(

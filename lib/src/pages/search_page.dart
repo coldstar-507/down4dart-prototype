@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../_dart_utils.dart';
 import '../bsv/types.dart';
 
-import 'package:mobile_scanner/mobile_scanner.dart';
+// import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
@@ -85,7 +86,7 @@ class _AddFriendPageState extends State<AddFriendPage>
         g.self.id.value,
         g.self.firstName,
         g.self.lastName,
-        g.self.mediaID,
+        g.self.mediaID.value,
         g.self.neuter.toYouKnow(),
         g.self.mainDeviceID,
       ].join("%");
@@ -110,9 +111,9 @@ class _AddFriendPageState extends State<AddFriendPage>
   }
 
   @override
-  void onScan(BarcodeCapture bc) async {
-    if (bc.raw == null) return;
-    final data = bc.raw!.split("%");
+  void onScan(Barcode bc) async {
+    if (bc.code == null) return;
+    final data = bc.code!.split("%");
     if (data.length != 6) return;
     final userID = ComposedID.fromString(data[0]);
     // We try to download the user for a more complete user

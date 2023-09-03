@@ -80,7 +80,7 @@ class ChatMessage extends StatelessWidget
 
   Radius get innerRadius => const Radius.circular(8);
 
-  final Future<void> Function(Chat message) react;
+  final void Function(Chat message) react;
 
   final Future<void> Function(Chat, Down4ID) increment;
 
@@ -242,7 +242,7 @@ class ChatMessage extends StatelessWidget
   Down4TextBubble? get bubble => !hasText
       ? null
       : Down4TextBubble(
-          text: message.text!,
+          text: message.txt!,
           dateText: timeString(message),
           inheritedWidth: hasMedia ? maxTextWidth : null);
 
@@ -264,7 +264,7 @@ class ChatMessage extends StatelessWidget
   double? get bubbleWidth =>
       !hasText ? null : bubble!.calcWidth + (2 * textPadding);
 
-  bool get hasText => (message.text ?? "").isNotEmpty; // textInfo != null;
+  bool get hasText => (message.txt ?? "").isNotEmpty; // textInfo != null;
 
   bool get hasMedia => mediaInfo != null;
 
@@ -304,7 +304,7 @@ class ChatMessage extends StatelessWidget
         doFetch: true, doMergeIfFetch: true, tempID: message.tempMediaID);
     if (media == null) return null;
     if (message.tempMediaID != null) {
-      await media.updateTempReferences(
+      media.updateTempReferences(
           message.tempMediaID!, message.tempMediaTS!);
     }
 
@@ -374,7 +374,7 @@ class ChatMessage extends StatelessWidget
                 // color: PinkTheme.nodeColors[replyData.type],
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  replyData.senderID.unique,
+                  replyData.senderID.unik,
                   style: g.theme.chatRepilesTextStyle,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -417,7 +417,7 @@ class ChatMessage extends StatelessWidget
         height: headerHeight * 0.8,
         child: Row(children: [
           const Spacer(),
-          Text("-${message.senderID.unique}   ",
+          Text("-${message.senderID.unik}   ",
               style: g.theme.messageSenderTextStyle),
         ]));
   }
@@ -428,7 +428,7 @@ class ChatMessage extends StatelessWidget
         height: headerHeight * 0.8,
         child: Row(children: [
           Text(
-            "   >> ${message.forwardedFromID!.unique}",
+            "   >> ${message.forwardedFromID!.unik}",
             style: g.theme.messageForwarderTextStyle,
           ),
         ]));
@@ -449,7 +449,7 @@ class ChatMessage extends StatelessWidget
             Expanded(
                 child: Padding(
                     padding: const EdgeInsets.only(top: 12.0, left: 12.0),
-                    child: Text(id.unique)))
+                    child: Text(id.unik)))
           ],
         ),
       );

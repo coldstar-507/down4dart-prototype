@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
-import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -14,11 +14,12 @@ import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../_dart_utils.dart';
 import '../_dart_utils.dart' as u;
-import 'dart:typed_data' show Uint8List;
-import 'package:cbl/cbl.dart';
 
 import '_data_utils.dart';
-import 'couch.dart';
+
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class Down4MediaMetadata with Jsons {
   final bool isReversed, isSquared;
@@ -26,7 +27,7 @@ class Down4MediaMetadata with Jsons {
   final bool isEncrypted;
   final ComposedID ownerID;
   final double width, height;
-  final String? text;
+  final String? txt;
   final int timestamp;
 
   Size get size => Size(width, height);
@@ -46,7 +47,7 @@ class Down4MediaMetadata with Jsons {
     this.isEncrypted = false,
     this.isReversed = false,
     this.isSquared = false,
-    this.text,
+    this.txt,
   });
 
   Future<Down4MediaMetadata?> userInitRecalculation(
@@ -65,7 +66,7 @@ class Down4MediaMetadata with Jsons {
         isSquared: decodedJson["isSquared"] == "true",
         width: double.parse(decodedJson["width"]!),
         height: double.parse(decodedJson["height"]!),
-        text: decodedJson["text"]);
+        txt: decodedJson["txt"]);
   }
 
   @override
@@ -73,12 +74,12 @@ class Down4MediaMetadata with Jsons {
         "ownerID": ownerID.value,
         "timestamp": timestamp.toString(),
         "mime": mime,
-        if (text != null) "text": text!,
         "isReversed": isReversed.toString(),
         "isSquared": isSquared.toString(),
         "isEncrypted": isEncrypted.toString(),
         "width": width.toString(),
         "height": height.toString(),
+        if (txt != null) "txt": txt!,
       };
 }
 
@@ -90,6 +91,18 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   Down4MediaMetadata metadata;
 
   String? mainCachedPath;
+
+  MediaType get type {
+    final mime = metadata.mime;
+    if (videoMimes.contains(mime)) {
+      return MediaType.videos;
+    } else if (imageMimes.contains(mime)) {
+      return MediaType.images;
+    } else if (animatedImageMimes.contains(mime)) {
+      return MediaType.images;
+    }
+    throw "Invalid media type, mime=$mime";
+  }
 
   set cachedUrl(String? u) => _cachedUrl = u;
 
@@ -105,12 +118,12 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   int? get tempTS => _tempTS;
 
   @override
-  Future<void> updateTempReferences(ComposedID newTempID, int newTempTS) async {
+  void updateTempReferences(ComposedID newTempID, int newTempTS) {
     final currentTS = tempTS ?? 0;
     if (currentTS >= newTempTS) return;
     _tempTS = newTempTS;
     _tempID = newTempID;
-    await merge({
+    merge({
       "tempTS": _tempTS!.toString(),
       "tempID": _tempID!.value,
     });
@@ -287,27 +300,31 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
         cacheHeight: (s.height * golden).toInt());
   }
 
-  String get mainPath => "${g.appDirPath}${Platform.pathSeparator}${id.unique}";
+  String mainPath([String? appDir]) {
+    // print("mainPath, appDir parameter: $appDir");
+    return "${appDir ?? g.appDirPath}${Platform.pathSeparator}${id.unik}";
+  }
 
-  File? get mainFile {
-    if (!File(mainPath).existsSync()) {
-      print("main file == null");
+  File? mainFile([String? appDir]) {
+    if (!File(mainPath(appDir)).existsSync()) {
+      // print("main file == null");
       return null;
     }
-    return File(mainPath);
+    return File(mainPath(appDir));
   }
 
   File? get mainCachedFile {
-    print("main cached path: $mainCachedPath");
+    // print("main cached path: $mainCachedPath");
     File? f;
     if (mainCachedPath == null) return null;
     if (!(f = File(mainCachedPath!)).existsSync()) return null;
     return f;
   }
 
-  Future<void> use() async {
+  void use() {
     _lastUse = u.makeTimestamp();
-    await merge({"lastUse": _lastUse.toString()});
+    merge({"lastUse": _lastUse.toString()});
+    g.savedMediasIDs[type] = savedMediaIDs(type).toList();
   }
 
   Future<void> write(Uint8List mainData);
@@ -317,7 +334,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     if ((f = mainCachedFile) != null) {
       if (metadata.isSquared && !metadata.isVideo) {
         const idealSize = 512;
-        final to = File(mainPath);
+        final to = File(mainPath());
         await cropAndSaveToSquare(from: f!, to: to, size: idealSize);
       } else {
         final Uint8List data = f!.readAsBytesSync();
@@ -327,9 +344,10 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   }
 
   // in medias, to follow json as Map<String,String> merge values are also str
-  Future<void> updateSaveStatus(bool newSaveStatus) async {
+  void updateSaveStatus(bool newSaveStatus) {
     _isSaved = newSaveStatus;
-    await merge({"isSaved": _isSaved.toString()});
+    merge({"isSaved": _isSaved.toString()});
+    g.savedMediasIDs[type] = savedMediaIDs(type).toList();
   }
 
   Future<bool> staticUpload() async {
@@ -338,7 +356,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     final setMetadata = SettableMetadata(customMetadata: jsn);
     try {
       File? f;
-      if ((f = mainCachedFile ?? mainFile) != null) {
+      if ((f = mainCachedFile ?? mainFile()) != null) {
         if (metadata.isEncrypted) {
           final d = f!.readAsBytesSync();
           final dec = Cy4.decrypt(d);
@@ -366,7 +384,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   }
 
   Future<void> downloadAndWriteIfNeeded() async {
-    if (mainFile != null) return;
+    if (mainFile() != null) return;
     final ref = tempID == null ? id.staticStoreRef : id.tempStoreRef;
     final data = await ref.getData();
     if (data != null) await write(data);
@@ -407,11 +425,12 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   @override
   Uint8List? get tempPayload {
-    return mainCachedFile?.readAsBytesSync() ?? mainFile?.readAsBytesSync();
+    return mainCachedFile?.readAsBytesSync() ?? mainFile()?.readAsBytesSync();
   }
 
   @override
-  Database get dbb => mediasDB;
+  String get table => "medias";
+  // Database get dbb => mediasDB;
 
   Future<Down4Media> userInitRecalculation(ComposedID oid) async {
     final metadataJson = metadata.toJson();
@@ -439,9 +458,17 @@ class Down4Image extends Down4Media {
     super.isLocked = false,
   });
 
+  (double? w, double? h) ss(Size ds) {
+    if (metadata.width > metadata.height) {
+      return (ds.width * golden, null);
+    } else {
+      return (null, ds.height * golden);
+    }
+  }
+
   Image? readySnipImage() {
     File? f;
-    if ((f = mainCachedFile ?? mainFile) != null) {
+    if ((f = mainCachedFile ?? mainFile()) != null) {
       return Image(image: FileImage(f!), fit: BoxFit.cover);
     } else if (_cachedUrl != null) {
       return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
@@ -457,16 +484,44 @@ class Down4Image extends Down4Media {
     return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
   }
 
-  String get _profilePath => "${mainPath}_prf";
+  String _profilePath([String? appDir]) => "${mainPath(appDir)}_prf";
 
   // returns or generate pofile image
-  Future<String?> get profilePath async {
-    final File to = File(_profilePath);
-    final File? from = mainFile;
-    if (to.existsSync()) return _profilePath;
+  Future<String?> profilePath([String? appDir]) async {
+    print("the app dir man g: $appDir");
+    final File to = File(_profilePath(appDir));
+    final File? from = mainFile(appDir);
+    if (to.existsSync()) return _profilePath(appDir);
     if (from == null) return null;
     await cropAndSaveToSquare(from: from, to: to);
-    return _profilePath;
+    return _profilePath(appDir);
+  }
+
+  ImageProvider? localImage(Size s, {bool forceSquare = false}) {
+    File? f;
+    int? w, h;
+
+    // we want cached (w or h) to be (golden * longest diplaySize side)
+    if (size.aspectRatio < 1) {
+      w = (s.width * golden).toInt();
+    } else {
+      h = (s.height * golden).toInt();
+    }
+
+    if ((f = mainCachedFile ?? mainFile()) != null) {
+      if (isEncrypted) {
+        final enc = EncryptedFileImage(f!);
+        final res = ResizeImage(enc, width: w, height: h);
+        return res;
+      } else {
+        final res = ResizeImage(FileImage(f!), width: w, height: h);
+        return res;
+      }
+    } else if (_cachedUrl != null) {
+      print("cached url: $_cachedUrl");
+      final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
+    }
+    return null;
   }
 
   Image? readyImage(Size s, {bool forceSquare = false}) {
@@ -480,7 +535,7 @@ class Down4Image extends Down4Media {
       h = (s.height * golden).toInt();
     }
 
-    if ((f = mainCachedFile ?? mainFile) != null) {
+    if ((f = mainCachedFile ?? mainFile()) != null) {
       if (isEncrypted) {
         final enc = EncryptedFileImage(f!);
         final res = ResizeImage(enc, width: w, height: h);
@@ -508,17 +563,17 @@ class Down4Image extends Down4Media {
   Future<void> delete() async {
     await super.delete();
     try {
-      await mainFile?.delete();
+      await mainFile()?.delete();
     } catch (_) {}
     try {
-      await File(_profilePath).delete();
+      await File(_profilePath()).delete();
     } catch (_) {}
   }
 
   @override
   Future<void> write(Uint8List mainData) async {
     tinyThumbnail ??= makeTiny(mainData);
-    await File(mainPath).writeAsBytes(mainData);
+    await File(mainPath()).writeAsBytes(mainData);
   }
 }
 
@@ -553,8 +608,8 @@ class Down4Video extends Down4Media {
   }
 
   VideoPlayerController? newReadyController() {
-    if ((mainCachedFile ?? mainFile) != null) {
-      return VideoPlayerController.file((mainCachedFile ?? mainFile)!);
+    if ((mainCachedFile ?? mainFile()) != null) {
+      return VideoPlayerController.file((mainCachedFile ?? mainFile())!);
     }
     if (_cachedUrl != null) {
       final uri = Uri.parse(_cachedUrl!);
@@ -576,7 +631,7 @@ class Down4Video extends Down4Media {
   @override
   Future<void> delete() async {
     await super.delete();
-    await mainFile?.delete();
+    await mainFile()?.delete();
     await thumbnailFile?.delete();
   }
 
@@ -590,10 +645,84 @@ class Down4Video extends Down4Media {
 
   @override
   Future<void> write(Uint8List mainData) async {
-    await File(mainPath).writeAsBytes(mainData);
-    final tn = await VideoThumbnail.thumbnailData(video: mainPath, quality: 75);
+    await File(mainPath()).writeAsBytes(mainData);
+    final tn =
+        await VideoThumbnail.thumbnailData(video: mainPath(), quality: 75);
     if (tn == null) return;
     tinyThumbnail = makeTiny(tn);
     await File(thumbnailPath).writeAsBytes(tn);
+  }
+}
+
+/// console medias cache manager, currently the only use
+/// flutter image seems good enough for the rest
+class ImageCacheManager {
+  static final ImageCacheManager _instance = ImageCacheManager._();
+
+  factory ImageCacheManager() => _instance;
+
+  ImageCacheManager._();
+
+  RawImage? cachedImage(String key) => _imageCache[key];
+
+  final Map<String, RawImage> _imageCache = {};
+
+  Future<RawImage?> loadImageFromFile(Down4Image im,
+      {required Size ds, String? key}) async {
+    print("cached len: ${_imageCache.length}");
+    final f = im.mainCachedFile ?? im.mainFile();
+    if (f == null) return null;
+    final Uint8List imageBytes = await f.readAsBytes();
+    final (ww, hh) = im.ss(ds);
+
+    final codec = await ui.instantiateImageCodec(imageBytes,
+        targetHeight: hh?.toInt(), targetWidth: ww?.toInt());
+    final frame = await codec.getNextFrame();
+    final uiIm = frame.image;
+
+    final k = key ?? im.id.value;
+    return _imageCache[k] = RawImage(
+        image: uiIm, fit: BoxFit.cover, width: ds.width, height: ds.height);
+  }
+
+  // Uint8List _justIt(String path) {
+  //   return File(path).readAsBytesSync();
+  // }
+
+  // Future<ui.Image?> _loadIt(Down4Image im, Size ds, String p) async {
+  //   print("computing this mofo from a fuckin isolate brah");
+  //   print("2");
+  //   final f = im.mainCachedFile ?? im.mainFile(p);
+  //   print("3");
+  //   if (f == null) return null;
+  //   print("4");
+  //   final Uint8List imageBytes = await f.readAsBytes();
+  //   print("5");
+  //   final (ww, hh) = im.ss(ds);
+  //   print("6");
+  //   final ui.Codec codec = await ui.instantiateImageCodec(imageBytes,
+  //       targetHeight: ww?.toInt(), targetWidth: hh?.toInt());
+  //   print("7");
+  //   final frame = await codec.getNextFrame();
+  //   print("done with isolate computation, returning image");
+  //   return frame.image;
+  // }
+
+  // Future<Uint8List?> _loadIt2(Down4Image im, Size ds, String p) async {
+  //   final f = im.mainCachedFile ?? im.mainFile(p);
+  //   if (f == null) return null;
+  //   final Uint8List imageBytes = await f.readAsBytes();
+  //   final (ww, hh) = im.ss(ds);
+  //   print("2");
+  //   final ogImage = img.decodeImage(imageBytes)!;
+  //   print("3");
+  //   final resizedImage =
+  //       img.copyResize(ogImage, width: ww?.toInt(), height: hh?.toInt());
+  //   print("4");
+  //   return resizedImage.getBytes();
+  // }
+
+  void clearCache() {
+    _imageCache.clear();
   }
 }

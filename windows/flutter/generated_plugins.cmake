@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   awesome_notifications
-  cbl_flutter_ce
   firebase_core
   geolocator_windows
   sqlite3_flutter_libs

@@ -10,7 +10,7 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  String get id => "node-${viewState.node!.id}";
+  String get id => "node-${viewState.node!.id.value}";
 
   final void Function(ChatN) openChat;
   final void Function(Down4Node) openNode;

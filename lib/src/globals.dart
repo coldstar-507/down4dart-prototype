@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 import 'package:camera/camera.dart';
-import 'package:cbl/cbl.dart';
+// import 'package:cbl/cbl.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/bsv/wallet.dart';
@@ -34,110 +34,6 @@ import 'themes.dart';
 import 'bsv/types.dart';
 
 final g = Singletons.instance;
-
-// Future<void> showMessageNotification(
-//   RemoteMessage rmt, {
-//   ComposedID? selfID,
-//   Database? mediaDB,
-//   Database? nodeDB,
-//   FlutterLocalNotificationsPlugin? plug,
-//   AndroidNotificationChannel? chan,
-//   ComposedID? currentRoot,
-// }) async {
-//   // final plugin = plug ?? globalPlugin;
-//   // final channel = chan ?? globalChannel;
-//   final nodesDatabase = nodeDB ?? nodesDB;
-//   final mediasDatabase = mediaDB ?? mediasDB;
-//   final self = selfID ?? g.self.id;
-
-//   final sc = <Down4ID, Locals>{};
-
-//   final data = rmt.data ?? {};
-//   if (data.isEmpty) return;
-
-//   final header = data["h"] as String?;
-//   final body = data["b"] as String?;
-//   final root = data["r"] as String?;
-//   final rtID =
-//       root == null || root.isEmpty ? null : idOfRoot(root: root, selfID: self);
-//   final sdrID = ComposedID.fromString(data["s"] as String?);
-
-//   print("rtID: ${rtID?.value}, currentRoot: ${currentRoot?.value}");
-//   if (rtID != null && currentRoot == rtID) {
-//     print("no need to notify");
-//     return;
-//   }
-
-//   AndroidBitmap<String>? senderIcon, groupIcon;
-//   PersonN? sender;
-//   GroupN? group;
-//   Down4Image? senderImage, groupImage;
-
-//   print("### getting the sender");
-//   sender = await global<PersonN>(sdrID,
-//       sc: sc, sdb: nodesDatabase, doFetch: true, doMergeIfFetch: true);
-
-//   if (sender != null) {
-//     print("### getting senderMedia");
-//     senderImage = await global<Down4Image>(sender.mediaID,
-//         sc: sc, sdb: mediasDatabase, doFetch: true, doMergeIfFetch: true);
-//   }
-
-//   if (rtID != null) {
-//     final rootNode = await global<ChatN>(rtID,
-//         sc: sc, sdb: nodesDatabase, doFetch: true, doMergeIfFetch: true);
-//     if (rootNode is GroupN) {
-//       group = rootNode;
-//       print("### getting groupMedia");
-//       groupImage = await global<Down4Image>(group.mediaID,
-//           sc: sc, sdb: mediasDatabase, doFetch: true, doMergeIfFetch: true);
-//     }
-//   }
-
-//   if (senderImage != null) {
-//     print("### getting the sender Icon");
-//     final pf = await senderImage.profilePath;
-//     if (pf != null) {
-//       senderIcon = FilePathAndroidBitmap(pf);
-//     }
-//   }
-
-//   if (groupImage != null) {
-//     print("### getting the group Icon");
-//     final pf = await groupImage.profilePath;
-//     if (pf != null) {
-//       groupIcon = FilePathAndroidBitmap(pf);
-//     }
-//   }
-
-//   globalPlugin.show(
-//       rmt.hashCode,
-//       header,
-//       body,
-//       NotificationDetails(
-//           android: AndroidNotificationDetails(globalChannel.id, globalChannel.name,
-//               channelDescription: globalChannel.description, largeIcon: senderIcon)));
-// }
-
-// Future<void> initNotificationPlugin(
-//   FlutterLocalNotificationsPlugin plugin,
-//   AndroidNotificationChannel channel,
-// ) async {
-//   await plugin
-//       .resolvePlatformSpecificImplementation<
-//           AndroidFlutterLocalNotificationsPlugin>()
-//       ?.createNotificationChannel(channel);
-
-//   const initializationSettingsAndroid = AndroidInitializationSettings(
-//     "@mipmap/ic_down4_inverted_white",
-//   );
-
-//   const initializationSettings = InitializationSettings(
-//     android: initializationSettingsAndroid,
-//   );
-
-//   await plugin.initialize(initializationSettings);
-// }
 
 Future<GeoLoc?> requestGeoloc({required bool askPermission}) async {
   bool serviceEnabled;
@@ -263,7 +159,7 @@ class ViewState {
   // A view can have a single chat
   // A chat is a List<ID> of every messages and a stream subscription that
   // listens to changes
-  Pair<List<Down4ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
+  // Pair<List<Down4ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
   // A view can be from a single node (chatPage, nodePage) both require a node
   final Down4Node? node;
   // Every view has an ID
@@ -290,12 +186,14 @@ class ViewState {
     }
   }
 
+  List<ComposedID>? orderedChats;
+
   ViewState({
     required this.id,
     required this.pages,
     int? ix,
     this.node,
-    this.chat,
+    this.orderedChats,
   })  : currentIndex = ix ?? 0,
         notableReferences = {};
 
@@ -324,18 +222,9 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
-  void initdb(sql.Database db) => _db = db;
-  sql.Database get db => _db;
-  late sql.Database _db;
-
-  // we use the same instance here for when we load login and home
-  // this way there is no wierd glitch be calling LoadingPage2() in both pages
-  // we set this to null after home is loaded
-  Down4PageWidget? initLoadingScreen = const LoadingPage2();
-
   final ViewManager vm = ViewManager();
 
-  late FireTheme myTheme;
+  late CurrentTheme myTheme;
 
   String makeMainMediaPath(String unique) {
     return "${g.appDirPath}${Platform.pathSeparator}$unique";
@@ -352,8 +241,8 @@ class Singletons {
   late Uint8List background;
   late List<CameraDescription> cameras;
 
-  Future<bool> get notYetInitialized async {
-    final self_ = await Self.loadSelf();
+  bool get notYetInitialized {
+    final self_ = Self.loadSelf();
     if (self_ != null) {
       self = self_;
       return false;
@@ -364,12 +253,12 @@ class Singletons {
 
   DatabaseReference get messageQueue {
     return self.id.server.realtimeDB
-        .ref("nodes/${g.self.id.unique}/queues/${g.self.deviceID}");
+        .ref("nodes/${g.self.id.unik}/queues/${g.self.deviceID}");
   }
 
   void loadExchangeRate(ExchangeRate er) => exchangeRate = er;
 
-  void loadTheme(FireTheme theme) => myTheme = theme;
+  void loadTheme(CurrentTheme theme) => myTheme = theme;
 
   void loadSizes(Sizes s) => sizes = s;
 
@@ -377,16 +266,16 @@ class Singletons {
     appDirPath = (await getApplicationDocumentsDirectory()).path;
   }
 
-  Future<void> loadWallet() async {
-    final wallet_ = await WalletManager.load();
+  void loadWallet() {
+    final wallet_ = WalletManager.load();
     if (wallet_ == null) return print("Wallet is null");
     wallet = wallet_;
   }
 
-  Future<void> initWallet(Uint8List s1, Uint8List s2) async {
+  void initWallet(Uint8List s1, Uint8List s2) {
     final keys = Down4Keys.fromRandom(s1, s2);
     wallet = Wallet(keys: keys, ix: null);
-    await wallet.merge();
+    wallet.merge();
   }
 
   void initSelf(Self s) {
@@ -409,14 +298,14 @@ void unselectedSelectedPalettes(Map<Down4ID, Palette> state) {
   }
 }
 
-FutureOr<void> writePalette<T extends PaletteN>(
+void writePalette<T extends PaletteN>(
   T c,
   Map<Down4ID, Down4Widget> s,
-  FutureOr<List<ButtonsInfo2>> Function(T n)? bGen,
+  List<ButtonsInfo2> Function(T n)? bGen,
   void Function()? onSel, {
   required bool home,
   bool? sel,
-}) async {
+}) {
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false
@@ -426,15 +315,15 @@ FutureOr<void> writePalette<T extends PaletteN>(
 
   final node = c;
 
-  final lastChat = node is ChatN ? await node.lastChatMessage() : null;
+  final lastChat = node is ChatN ? node.lastChatMessage() : null;
 
   final hide =
-      home && node is User && !node.isConnected && !await node.hasMessages();
+      home && node is User && !node.isConnected && !node.hasMessages();
 
   void Function()? onSelect = onSel == null || hide
       ? null
-      : () async {
-          await writePalette(c, s, bGen, onSel, sel: !isSelected, home: home);
+      : () {
+          writePalette(c, s, bGen, onSel, sel: !isSelected, home: home);
           onSel.call();
         };
 
@@ -446,7 +335,7 @@ FutureOr<void> writePalette<T extends PaletteN>(
       imPress: onSelect,
       show: !hide,
       bodyPress: onSelect,
-      buttonsInfo2: hide ? [] : await bGen?.call(c) ?? []);
+      buttonsInfo2: hide ? [] : bGen?.call(c) ?? []);
 }
 
 Future<ChatMessage?> getChatMessage({
@@ -458,7 +347,7 @@ Future<ChatMessage?> getChatMessage({
   required bool isFirst,
   required void Function(Down4Node)? openNode,
   required void Function() refreshCallback,
-  required Future<void> Function(Chat message) react,
+  required void Function(Chat message) react,
   required Future<void> Function(Chat, Down4ID) increment,
 }) async {
   final msg = await global<Chat>(msgID);
@@ -571,7 +460,7 @@ Future<void> writeMessages({
   required void Function() refresh,
   required void Function(Down4Node)? openNode,
   int limit = 20,
-  required Future<void> Function(Chat message) react,
+  required void Function(Chat message) react,
   required Future<void> Function(Chat, Down4ID) increment,
 }) async {
   final orderedSet = ordered.toSet();
@@ -606,15 +495,15 @@ Future<void> writeMessages({
   }
 }
 
-Future<void> writePayments(
+void writePayments(
   Map<Down4ID, Down4Widget> state,
   void Function(Down4Payment) openPayment, [
   int limit = 5,
-]) async {
+]) {
   final offset = state.length;
-  await for (final pay in g.wallet.nPayments(limit: limit, offset: offset)) {
+  for (final pay in g.wallet.nPayments(limit: limit, offset: offset)) {
     state[pay.id] = Palette(
-      key: Key(pay.id.unique),
+      key: Key(pay.id.unik),
       node: PaymentNode(payment: pay, selfID: g.self.id),
       messagePreview: pay.textNote,
       buttonsInfo2: pay.isSpentBy(id: g.self.id)

@@ -12,7 +12,7 @@ import 'package:video_player/video_player.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mime/mime.dart';
 
-import '../data_objects/couch.dart' show cache;
+import '../data_objects/couch.dart' show cache, savedMediaIDs;
 import '../data_objects/_data_utils.dart';
 import '../data_objects/medias.dart';
 import '../data_objects/nodes.dart';
@@ -38,7 +38,71 @@ extension InvertedSize on Size {
   Size get inverted => Size(height, width);
 }
 
+class ImageRendererWidget extends SingleChildRenderObjectWidget {
+  final ui.Image image;
+  final Size s;
+
+  const ImageRendererWidget({
+    required this.image,
+    required this.s,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return ImageRendererObject(image, s.width, s.height);
+  }
+}
+
+class ImageRendererObject extends RenderBox {
+  final ui.Image _image;
+  final double _width;
+  final double _height;
+
+  ImageRendererObject(this._image, this._width, this._height);
+
+  @override
+  void performLayout() {
+    size = Size(_width, _height);
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final canvas = context.canvas;
+    final srcRect =
+        Rect.fromLTWH(0, 0, _image.width.toDouble(), _image.height.toDouble());
+    final destRect = Rect.fromLTWH(offset.dx, offset.dy, _width, _height);
+    canvas.drawImageRect(_image, srcRect, destRect, Paint());
+  }
+}
+
 extension MediaDisplay on Down4Media {
+  Widget displayImage_({
+    required String key,
+    required Size s,
+    bool forceSquare = false,
+  }) {
+    final cachedVal = ImageCacheManager().cachedImage(key);
+    if (cachedVal != null) {
+      print("image is cached bro, ez pz loading");
+      return cachedVal;
+      //return ImageRendererWidget(image: cachedVal, s: s);
+    }
+    print("image is not cached bro, need to load");
+    return FutureBuilder(
+        future: ImageCacheManager()
+            .loadImageFromFile(this as Down4Image, key: key, ds: s),
+        builder: (ctx, snp) {
+          final data = snp.data;
+          final state = snp.connectionState;
+          if (state != ConnectionState.done || data == null) {
+            return SizedBox.fromSize(size: s);
+          } else {
+            return data; //ImageRendererWidget(image: data, s: s);
+          }
+        });
+  }
+
   Widget display({
     required Size size,
     Key? key,
@@ -670,7 +734,7 @@ extension IterablePalette2Extensions on Iterable<Palette> {
     Set<Down4ID> ids = {};
     for (final node in asNodes()) {
       if (node is GroupN) {
-        ids.addAll(node.group);
+        ids.addAll(node.members);
       } else if (node is PersonN) {
         ids.add(node.id);
       }
@@ -955,7 +1019,7 @@ Future<void> importConsoleMedias({
         mime: mime,
         isSquared: false,
         isReversed: false);
-    await Down4Media.fromLocal2(ComposedID(),
+    final m = await Down4Media.fromLocal2(ComposedID(),
         mainCachedPath: r.path!,
         writeFromCachedPath: true,
         metadata: metadata,
@@ -963,6 +1027,7 @@ Future<void> importConsoleMedias({
         lastUse: makeTimestamp())
       ..cache()
       ..merge();
+    g.savedMediasIDs[m.type] = savedMediaIDs(m.type).toList();
     reload();
   }
 }

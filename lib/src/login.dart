@@ -4,7 +4,8 @@ import 'dart:convert';
 import 'package:awesome_notifications_fcm/awesome_notifications_fcm.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/nodes.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:down4/src/pages/loading_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 // import 'package:firebase_messaging/firebase_messaging.dart';
@@ -12,7 +13,6 @@ import 'package:flutter/material.dart';
 
 import 'data_objects/_data_utils.dart';
 import 'data_objects/medias.dart';
-import 'web_requests.dart' as r;
 import 'globals.dart';
 import '_dart_utils.dart' as d4utils;
 import 'home.dart';
@@ -22,15 +22,15 @@ import 'pages/init_page.dart';
 // import 'pages/loading_page.dart';
 
 class Down4 extends StatefulWidget {
-  final auth.User? user;
-  const Down4({required this.user, Key? key}) : super(key: key);
+  const Down4({Key? key}) : super(key: key);
 
   @override
   State<Down4> createState() => _Down4State();
 }
 
 class _Down4State extends State<Down4> {
-  Widget? _view;
+  Widget _view = const LoadingPage2();
+  UserCredential? _cred;
 
   @override
   void initState() {
@@ -38,25 +38,30 @@ class _Down4State extends State<Down4> {
     login();
   }
 
-  void loadTokenChangeListener() {
-    // // FirebaseMessaging.instance.onTokenRefresh.listen((newToken)
-    // Push.instance.onNewToken.listen((newToken)
-    //     async {
-    //   final res = await r.refreshTokenRequest(newToken);
-    //   if (res == 200) g.self.updateMessagingToken({g.self.deviceID: newToken});
-    // });
-  }
+  // void loadTokenChangeListener() {
+  //   // // FirebaseMessaging.instance.onTokenRefresh.listen((newToken)
+  //   // Push.instance.onNewToken.listen((newToken)
+  //   //     async {
+  //   //   final res = await r.refreshTokenRequest(newToken);
+  //   //   if (res == 200) g.self.updateMessagingToken({g.self.deviceID: newToken});
+  //   // });
+  // }
 
+  Future<void> logName([String? name]) async {
+      await _cred?.user?.updateDisplayName(name ?? g.self.id.value);
+  }
+  
   Future<void> login() async {
-    g.loadExchangeRate(await ExchangeRate.exchangeRate);
+    _cred = await FirebaseAuth.instance.signInAnonymously();
+    g.loadExchangeRate(ExchangeRate.exchangeRate);
     // this initialized self it it exists
-    if (await g.notYetInitialized) {
+    if (g.notYetInitialized) {
       createUser();
     } else {
       // final isEnabled = await Push.instance.areNotificationsEnabled();
       // if (!isEnabled) await Push.instance.requestPermission();
-      await g.loadWallet();
-      await widget.user?.updateDisplayName(g.self.id.value);
+      await logName();
+      g.loadWallet();
       home();
     }
   }
@@ -70,11 +75,11 @@ class _Down4State extends State<Down4> {
     required double latitude,
     required Down4Media media,
   }) async {
-    // update login for database rules
-    await widget.user?.updateDisplayName(id.value);
-
-    _view = g.initLoadingScreen!;
-    setState(() {});
+    _view = const LoadingPage2();
+    setState(() {});    
+    
+    // update login for database rules    
+    await logName(id.value);
 
     void onFailure(String msg) => createUser(errorMessage: msg);
 
@@ -97,11 +102,11 @@ class _Down4State extends State<Down4> {
     final seed1 = unsafeSeed(32);
     final seed2 = unsafeSeed(32);
     final secret = hash256(seed1 + seed2);
-    await g.initWallet(seed1, seed2);
+    g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
     final fs = Down4Server.instance.masterFS;
-    final ref = fs.collection("users").doc(id.unique);
+    final ref = fs.collection("users").doc(id.unik);
     final success = await fs.runTransaction<bool>((transaction) async {
       final exists = await transaction.get(ref).then((value) => value.exists);
       if (exists) return false;
@@ -141,20 +146,20 @@ class _Down4State extends State<Down4> {
   }
 
   void home() {
-    loadTokenChangeListener();
+    // loadTokenChangeListener();
     _view = const Home();
     setState(() {});
   }
 
-  void createUser({String? errorMessage}) async {
-    final loc = await requestGeoloc(askPermission: true);
+  Future<void> createUser({String? errorMessage}) async {
+    // final loc = await requestGeoloc(askPermission: true);
     _view = UserMakerPage(
       initUser: initUser,
       errorMessage: errorMessage,
       deviceID: await getDeviceID() ?? Down4ID().value,
-      closestRegion: Geo.closestRegion(loc),
-      longitude: loc?.longitude ?? 0,
-      latitude: loc?.latitude ?? 0,
+      closestRegion: null, //Geo.closestRegion(loc),
+      longitude: 0, //loc?.longitude ?? 0,
+      latitude: 0, //loc?.latitude ?? 0,
     );
     setState(() {});
   }
@@ -183,8 +188,8 @@ class _Down4State extends State<Down4> {
 
     g.loadSizes(sizes);
 
-    ImageCache().maximumSize = 0;
+    // ImageCache().maximumSize = 0;
 
-    return _view ?? g.initLoadingScreen!;
+    return _view;
   }
 }
