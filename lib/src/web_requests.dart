@@ -59,50 +59,117 @@ Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
 }
 
 // TODO Might need adjustment for big batches
-Future<List<Pair<int, String>>> broadcastTxs(List<Down4TX> txs) async {
+Future<void> broadcastTxs(List<Down4TX> txs) async {
   final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
   List<Future<http.Response>> responses = [];
-  for (final tx in txs) {
-    print("Full raw =============\n${tx.fullRawHex}\n==================");
-    responses.add(http.post(url, body: jsonEncode({"txhex": tx.fullRawHex})));
-  }
+  // we can do 3 txs per seconds // let's make it 4
+  const fourSeconds = Duration(seconds: 4);
+  var in4seconds = DateTime.now().add(fourSeconds);
 
-  var failedBroadcast = <Pair<int, String>>[];
   for (int i = 0; i < txs.length; i++) {
-    var res = await responses[i];
-    if (res.statusCode != 200) failedBroadcast.add(Pair(i, res.body));
-  }
-  return failedBroadcast;
-}
-
-Future<List<int>?> confirmations(List<String> txsID) async {
-  List<List<String>> twentyTxsLists =
-      List.generate((txsID.length / 20).ceil(), (index) => <String>[]);
-  for (int i = 0; i < txsID.length; i++) {
-    final curIndex = (i / 20).floor();
-    twentyTxsLists[curIndex].add(txsID[i]);
+    if (i % 3 == 0) {
+      final t = DateTime.now();
+      if (t.isBefore(in4seconds)) {
+        await Future.delayed(in4seconds.difference(t));
+      }
+    }
+    final res = http.post(url, body: jsonEncode({"txhex": txs[i].fullRawHex}));
+    responses.add(res);
   }
 
-  List<List<int>> status = [];
-
-  // single threading it for now
-  for (final txids in twentyTxsLists) {
-    if (txsID.isEmpty) return null;
-    final url =
-        Uri.parse("https://api.whatsonchain.com/v1/bsv/test/txs/status");
-    var res = await http.post(url, body: jsonEncode({"txids": txids}));
-    if (res.statusCode != 200) {
-      print("Error getting status of transactions");
+  for (int i = 0; i < responses.length; i++) {
+    final ri = await responses[i];
+    final code = ri.statusCode;
+    if (code == 200 && txs[i].confirmations == -1) {
+      txs[i].updateConfirmations(0); // accepted is 0, not-broadcasted is -1
+    } else if (ri.body.contains("257: txn-already-known")) {
+      txs[i].updateConfirmations(0);
     } else {
-      var answers = jsonDecode(res.body);
-      final iStatus = List.from(answers)
-          .map((e) => (e["confirmations"] ?? 0) as int)
-          .toList();
-      status.add(iStatus);
+      print(
+        "\n\tERROR BROADCASTING TX ID\n\t${txs[i].txID.asHex}\n\t${ri.body}\n",
+      );
     }
   }
 
-  return status.expand((element) => element).toList(growable: false);
+  // final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
+  // List<Future<http.Response>> responses = [];
+  // for (final tx in txs) {
+  //   print("Full raw =============\n${tx.fullRawHex}\n==================");
+  //   responses.add(http.post(url, body: jsonEncode({"txhex": tx.fullRawHex})));
+  // }
+
+  // var failedBroadcast = <Pair<int, String>>[];
+  // for (int i = 0; i < txs.length; i++) {
+  //   var res = await responses[i];
+  //   if (res.statusCode != 200) failedBroadcast.add(Pair(i, res.body));
+  // }
+  // return failedBroadcast;
+}
+
+Future<List<int?>> confirmations(List<String> txids) async {
+  const url = "https://api.whatsonchain.com/v1/bsv/test/txs/status";
+  final uri = Uri.parse(url);
+  List<List<String>> twenties = [];
+  for (int i = 0; i < txids.length; i++) {
+    if (i % 20 == 0) twenties.add([]);
+    twenties.last.add(txids[i]);
+  }
+
+  // List<List<String>> twentyTxsLists =
+  //     List.generate((txsID.length / 20).ceil(), (index) => <String>[]);
+  // for (int i = 0; i < txsID.length; i++) {
+  //   final curIndex = (i / 20).floor();
+  //   twentyTxsLists[curIndex].add(txsID[i]);
+  // }
+
+  List<int?> status = [];
+  const twoSeconds = Duration(seconds: 4);
+  var inTwoSeconds = DateTime.now().add(twoSeconds);
+  for (int t = 0; t < twenties.length; t++) {
+    final now = DateTime.now();
+    if (t % 3 == 0 && now.isBefore(inTwoSeconds)) {
+      await Future.delayed(inTwoSeconds.difference(now));
+      inTwoSeconds = DateTime.now().add(twoSeconds);
+    }
+
+    final ids = twenties[t];
+    final body = jsonEncode({"txids": ids});
+    final headers = {"Content-Type": "application/json"};
+    print("requesting status for txids: $ids");
+    final res = await http.post(uri, body: body, headers: headers);
+    if (res.statusCode != 200) {
+      print("unsuccessful update status request");
+      // if error, we add nulls, which won't do anything to the #confs
+      status.addAll(List.generate(ids.length, (_) => null));
+    } else {
+      print("successful update status request");
+      prettyPrint(jsonDecode(res.body));
+      final jsnL = List.from(jsonDecode(res.body));
+
+      status.addAll(jsnL.map((e) => e["confirmations"] as int?));
+    }
+  }
+
+  return status;
+
+  // single threading it for now
+  // for (final txids in twentyTxsLists) {
+  //   if (txsID.isEmpty) return null;
+  //   final url =
+  //       Uri.parse(
+  //   var res = await http.post(url, body: jsonEncode({"txids": txids}));
+  //   if (res.statusCode != 200) {
+  //     print("Error getting status of transactions");
+  //   } else {
+  //     var answers = jsonDecode(res.body);
+  //     final iStatus = List.from(answers)
+  //         .map((e) => (e["confirmations"] ?? 0) as int)
+  //         .toList();
+  //     status.add(iStatus);
+  //   }
+  // }
+
+  // return status.expand((element) => element).toList(growable: false);
 }
 
 // Future<Down4Payment?> getPayment(String paymentID) async {

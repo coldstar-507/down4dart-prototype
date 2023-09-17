@@ -3,10 +3,14 @@ import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:convert/convert.dart';
+import 'package:down4/src/bsv/wallet.dart';
+import 'package:down4/src/data_objects/couch.dart';
 import 'package:pointycastle/export.dart';
 import 'package:base85/base85.dart';
 
+import '../globals.dart' show g;
 import '../_dart_utils.dart';
+import '../web_requests.dart' as r;
 
 import '../data_objects/_data_utils.dart';
 
@@ -20,6 +24,20 @@ final DOWN4_NEUTER = Down4Keys.fromJson({
 });
 
 enum UtxoType { fee, change, gets, tip, tax }
+
+enum BR {
+  ok(200),
+  badRequest(400),
+  badUnlockScript(461),
+  invalidInputs(462),
+  malformed(463),
+  feeTooLow(465),
+  txConflict(466),
+  frozenInputs(472);
+
+  final int code;
+  const BR(this.code);
+}
 
 extension on List<Down4TX> {
   Uint8List get compressFold {
@@ -83,21 +101,75 @@ extension on List<Down4TXIN> {
 
 class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
-  ComposedID get id {
-    final idFold = txs.fold<List<int>>([], (prev, tx) => prev + tx.txID.data);
-    return ComposedID(unik: sha1(idFold.toUint8List()).toBase58());
-    // final tsPart = makePrefix(timeStamp);
-    // return "$tsPart-$dataPart";
+  final Down4ID id;
+
+  final ComposedID? spender;
+
+  void fullMerge() {
+    for (final tx in txs) {
+      tx.merge(ifNotPresent: true);
+      for (final txin in tx.txsIn) {
+        txin.merge(ifNotPresent: true);
+      }
+      for (final txout in tx.txsOut) {
+        txout.merge(ifNotPresent: true);
+      }
+    }
+    merge(ifNotPresent: true);
+  }
+
+  Future<void> trySettlement() async {
+    return r.broadcastTxs(txs);
+  }
+
+  final TXID txid;
+
+  int get confirmations {
+    if (txs.isEmpty) {
+      return 100;
+    } else {
+      return txs.last.confirmations;
+    }
+  }
+
+  List<ComposedID> get receivers {
+    final xs = txs;
+    if (xs.isEmpty) return [];
+    List<ComposedID> rcs = [];
+    for (final outs in xs.last.txsOut) {
+      final rc = outs.receiver;
+      if (rc != null) rcs.add(rc);
+    }
+    return rcs;
   }
 
   @override
   String get table => "payments";
-  // Database get dbb => paymentsDB;
 
-  final List<Down4TX> txs;
+  List<Down4TX>? _txs;
   final bool safe;
   final String textNote;
   final int timestamp;
+
+  // this is information we calculate on parsePayment()
+  // that are then displayed in payments...
+  int? plusMinus;
+  double? tipPercentage, discountPercentage;
+
+  void calculatePlusMinus({required ComposedID selfID}) {
+    int pm = 0;
+    for (final txout in txs.last.txsOut) {
+      if (txout.receiver == selfID) {
+        pm += txout.sats.asInt;
+      }
+    }
+    for (final txin in txs.last.txsIn) {
+      if (txin.spender == selfID) {
+        pm -= local<Down4TXOUT>(txin.utxoID)!.sats.asInt;
+      }
+    }
+    plusMinus = pm;
+  }
 
   @override
   Uint8List get tempPayload => compressed.toUint8List();
@@ -108,12 +180,16 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
   void updateTempReferences(ComposedID newTempID, int newTempTS) {
     final currentTS = tempTS ?? 0;
-    if (currentTS > newTempTS) return;
-    merge({
+    if (currentTS >= newTempTS) return;
+    merge(vals: {
       "tempTS": (_tempTS = newTempTS).toString(),
       "tempID": (_tempID = newTempID).value,
     });
   }
+
+  List<Down4TX> get txs => _txs ??= Wallet.loadTXs(chain);
+
+  List<TXID> get chain => [...Wallet.dependances(txid), txid];
 
   ComposedID? _tempID;
   int? _tempTS;
@@ -124,8 +200,16 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
   int? get tempTS => _tempTS;
 
+  double? discount, tip;
+
   Down4Payment(
-    this.txs, {
+    this.id, {
+    required this.txid,
+    required List<Down4TX>? txs,
+    required this.spender,
+    this.plusMinus,
+    this.discount,
+    this.tip,
     required this.safe,
     required this.textNote,
     int? tempTS,
@@ -133,34 +217,19 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     int? timestamp,
   })  : timestamp = timestamp ?? makeTimestamp(),
         _tempTS = tempTS,
-        _tempID = tempID;
+        _tempID = tempID,
+        _txs = txs;
 
-  int get independentGets =>
-      txs.last.txsOut.firstWhere((txOut) => txOut.isGets).sats.asInt;
+  int get independentGets => plusMinus!;
 
-  bool isSpentBy({required Down4ID id}) {
-    return txs.last.txsIn.any((element) => element.spender == id);
-  }
-
-  String formattedName(Down4ID selfID) {
-    bool spentBySelf = isSpentBy(id: selfID);
-    int outSats; // can be positive of negative
-    if (spentBySelf) {
-      // we want to sum sats that isn't change and isn't fee and isn't received by self
-      outSats = txs.last.txsOut
-          .where((out) => out.receiver != selfID && out.isGets)
-          .fold<int>(0, (sum, out) => sum - out.sats.asInt);
+  String get formattedName {
+    final pm = plusMinus ?? 0;
+    if (pm > 0) {
+      return "+$pm";
     } else {
-      // we want to sum sats that are received by self
-      outSats = txs.last.txsOut
-          .where((out) => out.receiver == selfID)
-          .fold<int>(0, (sum, out) => sum + out.sats.asInt);
+      return pm.toString();
     }
-
-    return outSats > 0 ? "+$outSats sat" : "$outSats sat";
   }
-
-  int get lastConfirmations => txs.last.confirmations;
 
   @override
   int get hashCode => sha1(id.value.codeUnits).toUtf16().hashCode;
@@ -177,7 +246,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       ...VarInt.fromInt(tNote.length).data,
       ...tNote,
       // ...utf8.encode(textNote),
-      ...VarInt.fromInt(txs.length).data,
+      ...VarInt.fromInt(txs!.length).data,
       ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
       // ...utf8.encode(timestamp.toRadixString(34)),
       ...timestamp.toRadixString(34).codeUnits,
@@ -193,7 +262,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
     final tl = VarInt.fromInt(textNote.length);
     final tn = utf8.encode(textNote);
-    final txl = VarInt.fromInt(txs.length);
+    final txl = VarInt.fromInt(txs!.length);
     final ctxs = txs.compressFold;
     final ts = utf8.encode(timestamp.toRadixString(34));
 
@@ -225,8 +294,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
     final tl = VarInt.fromInt(textNote.length);
     final tn = utf8.encode(textNote);
-    final txl = VarInt.fromInt(txs.length);
-    final ctxs = txs.compressFold;
+    final txl = VarInt.fromInt(txs!.length);
+    final ctxs = txs!.compressFold;
     final ts = utf8.encode(timestamp.toRadixString(34));
 
     var len = 1 +
@@ -267,7 +336,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     String textNote = "";
     if (textNoteLen != 0) {
       textNoteData = buf.sublist(textOffset, textOffset + textNoteLen);
-      textNote = String.fromCharCodes(textNoteData);      
+      textNote = String.fromCharCodes(textNoteData);
       // textNote = utf8.decode(textNoteData);
     }
 
@@ -286,7 +355,13 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     // utf8.decode(tsBuf);
     final ts = int.parse(tsString, radix: 34);
 
-    return Down4Payment(txs, safe: safe, textNote: textNote, timestamp: ts);
+    return Down4Payment(Down4ID(),
+        spender: g.self.id,
+        txid: txs.last.txID,
+        txs: txs,
+        safe: safe,
+        textNote: textNote,
+        timestamp: ts);
   }
 
   List<String> get asQrData {
@@ -389,13 +464,11 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   }
 
   factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
-    final txsJsn = List.from(youKnowDecode(decodedJson["tx"]!));
-    final txs = txsJsn.map((tx) {
-      final jsn = Map<String, Object?>.from(tx as Map);
-      return Down4TX.fromJson(jsn);
-    }).toList();
-
-    return Down4Payment(txs,
+    return Down4Payment(Down4ID.fromString(decodedJson["id"])!,
+        txs: null,
+        plusMinus: int.tryParse(decodedJson["plusMinus"] ?? ""),
+        spender: ComposedID.fromString(decodedJson["spender"]),
+        txid: TXID.fromBase64(decodedJson["txid"]!),
         safe: decodedJson["safe"] == "true",
         tempTS: int.tryParse(decodedJson["tempTS"] ?? ""),
         tempID: ComposedID.fromString(decodedJson["tempID"]),
@@ -406,10 +479,11 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
   Map<String, String> toJson({bool includeLocal = true}) => {
         "id": id.value,
-        "tx": youKnowEncode(txs.map((tx) => tx.toJson()).toList()),
-        "len": txs.length.toString(),
+        "txid": txid.asBase64,
+        if (spender != null) "spender": spender!.value,
         "safe": safe.toString(),
         "ts": timestamp.toString(),
+        "plusMinus": plusMinus!.toString(),
         if (tempTS != null) "tempTS": tempTS!.toString(),
         if (tempID != null) "tempID": tempID!.value,
         if (textNote.isNotEmpty) "txt": textNote,
@@ -430,6 +504,8 @@ class VarInt {
   final int asInt;
 
   const VarInt._(this.data, this.asInt);
+
+  factory VarInt(int n) => VarInt.fromInt(n);
 
   factory VarInt.fromInt(int n) {
     Uint8List data;
@@ -536,28 +612,32 @@ class Sats {
   bool operator <=(Sats s) => asInt <= s.asInt;
 }
 
-class Down4TXIN with Jsons {
+class Down4TXIN with Down4Object, Jsons, Locals {
+  @override
+  Down4ID get id => Down4ID(unik: md5(scriptSig!).toBase64());
+
+  @override
+  String get table => "txins";
+
   Down4ID? spender;
   VarInt? _scriptSigLen;
   TXID utxoTXID;
   FourByteInt utxoIndex;
   List<int>? _scriptSig;
   // dependance can be logically replaced by multiple order txs in a payment
-  TXID? dependance; // So I will probably remove it
+  // TXID? dependance; // So I will probably remove it
   FourByteInt sequenceNo;
 
   Down4TXIN({
     required this.utxoIndex,
     required this.utxoTXID,
-    int? scriptSigLen,
     List<int>? scriptSig,
     this.spender,
     int? sequenceNo,
-    this.dependance,
   })  : sequenceNo = FourByteInt(sequenceNo ?? 0xFFFFFFFF),
         _scriptSig = scriptSig,
         _scriptSigLen =
-            scriptSigLen != null ? VarInt.fromInt(scriptSigLen) : null;
+            scriptSig == null ? null : VarInt.fromInt(scriptSig!.length);
 
   List<int>? get scriptSig => _scriptSig;
 
@@ -610,7 +690,6 @@ class Down4TXIN with Jsons {
         utxoIndex: utxoIX,
         utxoTXID: utxoID,
         scriptSig: script,
-        scriptSigLen: scriptLen,
         sequenceNo: seqNo.asInt,
         spender: spender);
 
@@ -619,27 +698,24 @@ class Down4TXIN with Jsons {
 
   Down4ID get utxoID => down4UtxoID(utxoTXID, utxoIndex);
 
-  factory Down4TXIN.fromJson(Map<String, String?> decodedJson) => Down4TXIN(
-        utxoTXID: TXID.fromBase64(decodedJson["id"]!),
-        utxoIndex: FourByteInt(int.parse(decodedJson["ix"]!)),
-        spender: Down4ID.fromString(decodedJson["sp"]),
-        sequenceNo: int.parse(decodedJson["sn"]!),
-        scriptSigLen: int.tryParse(decodedJson["sl"] ?? ""),
-        scriptSig: hex.decode(decodedJson["sc"]!),
-        dependance: decodedJson["dp"] != null
-            ? TXID.fromBase64(decodedJson["dp"]!)
-            : null,
-      );
+  factory Down4TXIN.fromJson(Map<String, String?> decodedJson) {
+    return Down4TXIN(
+      utxoTXID: TXID.fromBase64(decodedJson["utxoTXID"]!),
+      utxoIndex: FourByteInt(int.parse(decodedJson["utxoIndex"]!)),
+      spender: Down4ID.fromString(decodedJson["spender"]),
+      sequenceNo: int.parse(decodedJson["sequenceNo"]!),
+      scriptSig: base64Decode(decodedJson["scriptSig"]!),
+    );
+  }
 
   @override
-  Map<String, String> toJson() => {
-        "id": utxoTXID.asBase64,
-        "ix": utxoIndex.asInt.toString(),
-        if (spender != null) "sp": spender!.value,
-        "sn": sequenceNo.asInt.toString(),
-        "sl": _scriptSigLen!.asInt.toString(),
-        "sc": _scriptSig!.toHex(),
-        if (dependance != null) "dp": dependance!.asBase64,
+  Map<String, String> toJson({bool includeLocal = false}) => {
+        "id": id.value,
+        "utxoTXID": utxoTXID.asBase64,
+        "utxoIndex": utxoIndex.asInt.toString(),
+        if (spender != null) "spender": spender!.value,
+        "sequenceNo": sequenceNo.asInt.toString(),
+        "scriptSig": _scriptSig!.toBase64(),
       };
 
   List<int> get raw => [
@@ -651,7 +727,6 @@ class Down4TXIN with Jsons {
       ];
 
   List<int> get raw2 {
-    final t1 = makeTimestamp();
     final len = utxoTXID.data.length +
         utxoIndex.data.length +
         _scriptSigLen!.data.length +
@@ -679,15 +754,15 @@ class Down4TXIN with Jsons {
         ...utxoIndex.data,
       ];
 
-  set script(List<int> script) {
-    _scriptSig = script;
-    _scriptSigLen = VarInt.fromInt(script.length);
+  set scriptSig(List<int>? s) {
+    _scriptSig = s;
+    _scriptSigLen = s == null ? null : VarInt.fromInt(s.length);
   }
 }
 
 class Down4TXOUT with Down4Object, Jsons, Locals {
   @override
-  String get table => "utxos";
+  String get table => "txouts";
 
   final List<int> script;
   final VarInt scriptLength;
@@ -697,28 +772,35 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
   List<int>? secret;
   TXID? txid;
   Sats sats;
+  bool _spent;
+  bool get spent => _spent;
 
   Down4TXOUT({
     required this.sats,
     required this.script,
     required this.type,
-    this.receiver,
     this.secret,
-    this.txid,
     this.outIndex,
-  }) : scriptLength = VarInt.fromInt(script.length);
+    this.receiver,
+    this.txid,
+    bool spent = false,
+  })  : scriptLength = VarInt.fromInt(script.length),
+        _spent = spent;
 
-  factory Down4TXOUT.fromJson(Map<String, String?> decodedJson) => Down4TXOUT(
-        receiver: ComposedID.fromString(decodedJson["receiver"]),
-        secret: decodedJson["secret"] != null
-            ? List<int>.from(base64Decode(decodedJson["secret"]!))
-            : null,
-        outIndex: int.parse(decodedJson["outIndex"]!),
-        txid: TXID.fromHex(decodedJson["txid"]!),
-        sats: Sats(int.parse(decodedJson["sats"]!)),
-        type: UtxoType.values.byName(decodedJson["type"]!),
-        script: base64Decode(decodedJson["script"]!),
-      );
+  factory Down4TXOUT.fromJson(Map<String, String?> decodedJson) {
+    return Down4TXOUT(
+      receiver: ComposedID.fromString(decodedJson["receiver"]),
+      secret: decodedJson["secret"] != null
+          ? List<int>.from(base64Decode(decodedJson["secret"]!))
+          : null,
+      outIndex: int.parse(decodedJson["outIndex"]!),
+      spent: decodedJson["spent"] == "true",
+      txid: TXID.fromHex(decodedJson["txid"]!),
+      sats: Sats(int.parse(decodedJson["sats"]!)),
+      type: UtxoType.values.byName(decodedJson["type"]!),
+      script: base64Decode(decodedJson["script"]!),
+    );
+  }
 
   @override
   Map<String, String> toJson({bool includeLocal = true}) => {
@@ -726,14 +808,20 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
         "txid": txid!.asHex,
         "secret": secret!.toBase64(),
         "outIndex": outIndex!.toString(),
+        "spent": spent.toString(),
         "sats": sats.asInt.toString(),
         "type": type.name,
         "script": script.toBase64(),
         if (receiver != null) "receiver": receiver!.value,
       };
 
+  // every transaction has a unique secret
+  // secret + outIndex is always a unique combination
   @override
   Down4ID get id => down4UtxoID(txid!, FourByteInt(outIndex!));
+
+  // @override
+  // Down4ID get id_ => Down4ID(unik: md5(outIndex!.data + secret!));
 
   bool get isGets => type == UtxoType.gets;
 
@@ -741,6 +829,11 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
   int get hashCode {
     final uniqueData = txid!.data + FourByteInt(outIndex!).data;
     return BigInt.parse(hex.encode(uniqueData), radix: 16).hashCode;
+  }
+
+  String? markSpent({bool stmt = false}) {
+    _spent = true;
+    return merge(vals: {"spent": spent.toString()}, stmt: stmt);
   }
 
   @override
@@ -827,65 +920,120 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
   }
 }
 
-class Down4TX {
+class Down4TX with Down4Object, Jsons, Locals {
+  @override
+  Down4ID get id => Down4ID(unik: txID.asBase64);
+
+  @override
+  String get table => "transactions";
+
   ComposedID? maker;
   final List<int> down4Secret;
   final FourByteInt versionNo, nLockTime;
-  final List<Down4TXIN> txsIn;
-  final List<Down4TXOUT> txsOut;
+  List<Down4TXIN>? _txsIn;
+  List<Down4TXOUT>? _txsOut;
   final VarInt inCounter, outCounter;
   late TXID txID;
   int confirmations;
 
+  Set<Down4ID?> get spenders {
+    return txsIn.map((e) => e.spender).toSet();
+  }
+
+  List<Down4ID> ins, outs;
+
+  List<Down4TXIN> get txsIn {
+    List<Down4TXIN> getEm() {
+      final sbuf = StringBuffer();
+      sbuf.writeAll(ins.map((e) => e.value.sqlReady), ",");
+      // TODO: SAME PROBLEM OF ORDER WITH TRANSACTIONS IN PAYMENTS!!
+      // this doesn't specify the order! order is important dummy!!
+      final q = "SELECT * FROM txins WHERE id IN (${sbuf.toString()})";
+      return db.select(q).map((e) {
+        final jsns = Map<String, String?>.from(e);
+        return Down4TXIN.fromJson(jsns);
+      }).toList();
+    }
+
+    return _txsIn ??= getEm();
+  }
+
+  List<Down4TXOUT> get txsOut {
+    List<Down4TXOUT> getEm() {
+      final sbuf = StringBuffer();
+      sbuf.writeAll(outs.map((e) => e.value.sqlReady), ",");
+      final q = "SELECT * FROM txouts WHERE id IN (${sbuf.toString()})";
+      return db.select(q).map((e) {
+        final jsns = Map<String, String?>.from(e);
+        return Down4TXOUT.fromJson(jsns);
+      }).toList();
+    }
+
+    return _txsOut ??= getEm();
+  }
+
   Down4TX({
     required this.down4Secret,
-    required this.txsIn,
-    required this.txsOut,
+    required this.ins,
+    required this.outs,
+    List<Down4TXIN>? txIns,
+    List<Down4TXOUT>? txOuts,
+    TXID? txid,
     this.maker,
     FourByteInt? vNo,
     FourByteInt? nLock,
     VarInt? inCount,
-    VarInt? outCout,
-    this.confirmations = 0,
+    VarInt? outCount,
+    this.confirmations = -1,
   })  : versionNo = vNo ?? FourByteInt(1),
         nLockTime = nLock ?? FourByteInt(0),
-        inCounter = VarInt.fromInt(txsIn.length),
-        outCounter = VarInt.fromInt(txsOut.length) {
-    txID = TXID(hash256([
-      ...versionNo.data,
-      ...inCounter.data,
-      ...txsIn.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
-      ...outCounter.data,
-      ...txsOut.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
-      ...nLockTime.data,
-    ]));
+        inCounter = inCount ?? VarInt.fromInt(ins.length),
+        outCounter = outCount ?? VarInt.fromInt(outs.length),
+        _txsIn = txIns,
+        _txsOut = txOuts {
+    txID = txid ??
+        calculateTXID(
+            versionNo, inCount!, txIns!, outCount!, txOuts!, nLockTime);
+    // TXID(hash256([
+    //   ...versionNo.data,
+    //   ...inCounter.data,
+    //   ...txsIn!.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
+    //   ...outCounter.data,
+    //   ...txsOut!.fold(<int>[], (buf, tx) => [...buf, ...tx.raw]),
+    //   ...nLockTime.data,
+    // ]));
   }
 
-  factory Down4TX.fromJson(Map<String, Object?> decodedJson) => Down4TX(
-        maker: ComposedID.fromString(decodedJson["mk"] as String?),
-        vNo: FourByteInt(decodedJson["vn"] as int),
-        nLock: FourByteInt(decodedJson["nl"] as int),
-        confirmations: decodedJson["cf"] as int,
-        down4Secret: List<int>.from(decodedJson["sc"] as Iterable? ?? []),
-        txsIn: List.from(decodedJson["ti"] as Iterable).map((jsonIn) {
-          final jsns = Map<String, String?>.from(jsonIn as Map);
-          return Down4TXIN.fromJson(jsns);
-        }).toList(),
-        txsOut: List.from(decodedJson["to"] as Iterable).map((jsonOut) {
-          final jsns = Map<String, String?>.from(jsonOut as Map);
-          return Down4TXOUT.fromJson(jsns);
-        }).toList(),
-      );
+  // this should be used when loading own payments from locals
+  factory Down4TX.fromJson(Map<String, String?> decodedJson) {
+    return Down4TX(
+      txid: TXID.fromBase64(decodedJson["id"]!),
+      down4Secret: base64Decode(decodedJson["secret"]!),
+      maker: ComposedID.fromString(decodedJson["maker"]),
+      ins: decodedJson["ins"]!
+          .split(" ")
+          .map((e) => Down4ID.fromString(e)!)
+          .toList(),
+      outs: decodedJson["outs"]!
+          .split(" ")
+          .map((e) => Down4ID.fromString(e)!)
+          .toList(),
+      vNo: FourByteInt(int.parse(decodedJson["versionNo"]!)),
+      nLock: FourByteInt(int.parse(decodedJson["nLockTime"]!)),
+      confirmations: int.parse(decodedJson["confirmations"]!),
+    );
+  }
 
-  Map<String, Object?> toJson([bool withTxs = true]) => {
-        "sc": down4Secret,
-        if (maker != null) "mk": maker!.value,
-        "vn": versionNo.asInt,
-        "nl": nLockTime.asInt,
-        "id": txID.asHex,
-        "cf": confirmations,
-        if (withTxs) "ti": txsIn.map((txin) => txin.toJson()).toList(),
-        if (withTxs) "to": txsOut.map((txout) => txout.toJson()).toList(),
+  @override
+  Map<String, String> toJson({bool includeLocal = false}) => {
+        "id": id.value,
+        "secret": down4Secret.toBase64(),
+        if (maker != null) "maker": maker!.value,
+        "ins": ins.values,
+        "outs": outs.values,
+        "versionNo": versionNo.asInt.toString(),
+        "nLockTime": nLockTime.asInt.toString(),
+        "confirmations": confirmations.toString(),
       };
 
   List<int> get raw => [
@@ -898,13 +1046,20 @@ class Down4TX {
       ];
 
   // this is necessary in the current system of discarding txs and keeping only
-  // the utxos, we can save much space
+  // the utxos, we can save much space, which is good ofcourse
+  // this requires a full transaction, parsing transactions without
+  // all the utxos will break this function
   void writeTxInfosToUTXOs() {
     for (int i = 0; i < txsOut.length; i++) {
-      txsOut[i].txid = txID;
-      txsOut[i].outIndex = i;
-      txsOut[i].secret = down4Secret;
+      txsOut[i].txid ??= txID;
+      txsOut[i].outIndex ??= i;
+      txsOut[i].secret ??= down4Secret;
     }
+  }
+
+  void updateConfirmations(int confs) {
+    confirmations = confs;
+    merge(vals: {"confirmations": confs.toString()});
   }
 
   List<int> get compressed {
@@ -930,9 +1085,9 @@ class Down4TX {
 
   List<int> get compressed2 {
     final t1 = makeTimestamp();
-    final inFold = txsIn.compressFold;
+    final inFold = txsIn!.compressFold;
     // final inFold = txsIn.fold(<int>[], (buf, txin) => buf + txin.compressed);
-    final outFold = txsOut.compressFold;
+    final outFold = txsOut!.compressFold;
     // final outFold = txsOut.fold(<int>[], (buf, txin) => buf + txin.compressed);
     final confs = VarInt.fromInt(confirmations);
 
@@ -991,12 +1146,24 @@ class Down4TX {
     final conf = VarInt.fromRaw(buf.sublist(offset + 5 + down4SecretLen));
 
     final finalOffset = offset + 5 + down4SecretLen + 1;
+
+    final txid = calculateTXID(
+        vNo, inCountVarInt, txsIn, outCounterVarInt, txsOut, nLockTime);
+
+    for (int i = 0; i < txsOut.length; i++) {
+      txsOut[i].txid = txid;
+      txsOut[i].outIndex = i;
+    }
+
     final down4Tx = Down4TX(
+        txid: txid,
         down4Secret: down4Secret,
         inCount: inCountVarInt,
-        txsIn: txsIn,
-        outCout: outCounterVarInt,
-        txsOut: txsOut,
+        txIns: txsIn,
+        ins: txsIn.map((e) => e.id).toList(),
+        outCount: outCounterVarInt,
+        txOuts: txsOut,
+        outs: txsOut.map((e) => e.id).toList(),
         vNo: vNo,
         nLock: nLockTime,
         confirmations: conf.asInt);
@@ -1004,15 +1171,15 @@ class Down4TX {
     return Pair(down4Tx, finalOffset);
   }
 
-  List<TXID> get txidDeps {
-    return txsIn.fold(<TXID>[], (deps, txin) {
-      if (txin.dependance != null) {
-        return deps..add(txin.dependance!);
-      } else {
-        return deps;
-      }
-    });
-  }
+  // List<TXID> get txidDeps {
+  //   return txsIn!.fold(<TXID>[], (deps, txin) {
+  //     if (txin.dependance != null) {
+  //       return deps..add(txin.dependance!);
+  //     } else {
+  //       return deps;
+  //     }
+  //   });
+  // }
 
   String get fullRawHex => hex.encode(raw);
 

@@ -455,13 +455,15 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           break;
         case 'p': // p!paymentID!tempPaymentID
           print("processing payment");
-          final paymentID = ComposedID.fromString(vals[1])!;
+          final paymentID = Down4ID.fromString(vals[1])!;
           final tempPaymentID = ComposedID.fromString(vals[2])!;
           final payment = await global<Down4Payment>(paymentID,
               doFetch: true, doMergeIfFetch: true, tempID: tempPaymentID);
           if (payment == null) return print("no payment for download");
-          g.wallet.parsePayment(g.self.id, payment);
-          if (page is MoneyPage) setPage(moneyPage(payUpdate: payment));
+          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
+          if (page is MoneyPage && parsedPayment != null) {
+            setPage(moneyPage(payUpdate: parsedPayment));
+          }
           break;
       }
     });
@@ -790,7 +792,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     void rf() => setPage(moneyPage());
     void openPay(Down4Payment payment) => setPage(paymentPage(payment));
     List<ButtonsInfo2> payBGen(Down4Payment p) {
-      if (p.isSpentBy(id: g.self.id)) {
+      if (p.spender == g.self.id) {
         return [
           ButtonsInfo2(
               asset: Icon(Icons.arrow_forward_ios_rounded,
@@ -833,14 +835,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         loadMorePayments: () async =>
             writePayments(paymentState(), openPay, 10),
         onScan: (payment) {
-          g.wallet.parsePayment(g.self.id, payment);
-          scanOrReceivePayment(payment);
+          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
+          if (parsedPayment != null) scanOrReceivePayment(parsedPayment);
         },
         makePayment: (payment) {
-          g.wallet.parsePayment(g.self.id, payment);
+          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
           unselectHomeSelection(updateActivity: true);
           viewManager.popUntilHome();
-          setPage(paymentPage(payment));
+          if (parsedPayment != null) setPage(paymentPage(payment));
         },
         back: back);
   }
@@ -1056,6 +1058,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
 
     return NodePage(
+        viewState: viewManager.at(pageID()),
         openPreview: openPreview,
         openChat: (p_) => setPage(chatPage(p_, isPush: true)),
         openNode: (p_) => setPage(nodePage(p_, isPush: true)),

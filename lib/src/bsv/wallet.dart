@@ -1,18 +1,21 @@
 import 'dart:convert';
 import 'dart:io' as io;
 
+import 'package:down4/src/pages/money_page.dart';
+
 import '../_dart_utils.dart';
 import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
 import '../data_objects/nodes.dart';
 import '../web_requests.dart' as r;
+import '../globals.dart' show g;
 
 import 'package:bs58/bs58.dart';
 
 import '_bsv_utils.dart';
 import 'types.dart';
 
-class Wallet with Down4Object, Jsons, Locals {
+class Wallet with Down4Object, Jsons, Locals, WalletManager {
   @override
   String get table => "personals";
 
@@ -26,15 +29,23 @@ class Wallet with Down4Object, Jsons, Locals {
 
   int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
 
-  Set<Down4TX> get unsettledTxs => payments
-      .map((pay) => pay.txs.where((tx) => tx.confirmations == 0))
-      .expand((tx) => tx)
-      .toSet();
+  Iterable<Down4TX> get unsettledTxs sync* {
+    const q = "SELECT * FROM transactions WHERE confirmations = '-1'";
+    for (final txJsn in db.select(q)) {
+      final jsns = Map<String, String?>.from(txJsn);
+      yield Down4TX.fromJson(jsns);
+    }
+  }
+  //  => payment
+  // .map((pay) => pay.txs.where((tx) => tx.confirmations == 0))
+  // .expand((tx) => tx)
+  // .toSet();
 
   Set<TXID> get uTXID => unsettledTxs.map((unsTx) => unsTx.txID).toSet();
 
   Future<void> walletRoutine() async {
-    await Future.wait(await _updateAllStatus());
+    await _updateAllStatus();
+    await Future.delayed(const Duration(seconds: 1));
     await Future.wait(await _settleUnsettledPayments());
     return print("\$\$\$\$\$\$ TERMINATED WALLET ROUTINE \$\$\$\$\$\$");
   }
@@ -42,47 +53,83 @@ class Wallet with Down4Object, Jsons, Locals {
   Future<List<Future<void>>> _settleUnsettledPayments() async {
     var futures = <Future<void>>[];
     for (final payment in payments) {
-      if (payment.lastConfirmations == 0) futures.add(_trySettlement(payment));
+      if (payment.confirmations == -1) futures.add(payment.trySettlement());
     }
     return futures;
   }
 
-  Future<List<Future<void>>> _updateAllStatus() async {
-    var futures = <Future<void>>[];
-    for (final payment in payments) {
-      if (payment.lastConfirmations < 100) futures.add(_updateStatus(payment));
+  Future<void> _updateAllStatus() async {
+    final txs = sub100confsTxs().toList(growable: false);
+    final ids = txs.map((e) => e.txID.asHex).toList();
+
+    final confirmations = await r.confirmations(ids);
+    for (int i = 0; i < confirmations.length; i++) {
+      final nConf = confirmations[i];
+      txs[i].updateConfirmations(nConf ?? -1);
     }
-    return futures;
   }
+
+  // Future<List<Future<void>>> _updateAllStatus() async {
+  //   var futures = <Future<void>>[];
+  //   for (final payment in payments) {
+  //     if ((payment.lastConfirmations ?? 100) < 100) {
+
+  //       futures.add(_updateStatus(payment));
+  //     }
+  //   }
+  //   return futures;
+  // }
 
   Future<void> printWalletInfo() async {
     for (final p in payments) {
       print("============PAYMENT============");
       print("""
-      id           = ${p.id}
-      lastTxID     = ${p.txs.last.txID.asHex}
-      message      = ${p.textNote}
-      lasTX secret = ${p.txs.last.down4Secret}
+        id        = ${p.id.unik}
+        lastTxID  = ${p.txs.last.txID.asHex}
+        message   = ${p.textNote}
       """);
-      print("============TXIN===========");
-      for (final txin in p.txs.last.txsIn) {
+      print("==============TX==============");
+      if (p.txs.isNotEmpty) {
+        final lastTx = p.txs.last;
         print("""
-        spender = ${txin.spender}
-        outIx   = ${txin.utxoIndex.asInt}
-        outId   = ${txin.utxoTXID.asHex}
+        id        = ${lastTx.id.value}
+        txid hex  = ${lastTx.txID.asHex}
+        nIns      = ${lastTx.inCounter.asInt}
+        nOuts     = ${lastTx.outCounter.asInt}
+        confs     = ${lastTx.confirmations}
+        secret    = ${lastTx.down4Secret}
         """);
-      }
-      print("============UTXO============");
-      for (final utxo in p.txs.last.txsOut) {
-        print("""
-        outIx    = ${utxo.outIndex} 
-        sats     = ${utxo.sats.asInt} ${utxo.sats.data}
-        txid     = ${utxo.txid!.asHex}
-        id       = ${utxo.id}
-        receiver = ${utxo.receiver}
-        secret   = ${utxo.secret}
+        print("==RAW==");
+        printWrapped(lastTx.raw.toHex());
+
+        print("============TXIN===========");
+        for (final txin in lastTx.txsIn) {
+          print("""
+        spender   = ${txin.spender?.unik}
+        outIx     = ${txin.utxoIndex.asInt}
+        outId     = ${txin.utxoTXID.asHex}
         """);
+        }
+        print("============UTXO============");
+        for (final utxo in lastTx.txsOut) {
+          print("""
+        outIx     = ${utxo.outIndex} 
+        sats      = ${utxo.sats.asInt} ${utxo.sats.data}
+        txid      = ${utxo.txid!.asHex}
+        id        = ${utxo.id.unik}
+        receiver  = ${utxo.receiver?.unik}
+        secret    = ${utxo.secret}
+        spent     = ${utxo.spent}
+        """);
+        }
       }
+    }
+    print("===============SPENTS===============");
+    final spts = allSpents().toList();
+    for (int i = 0; i < spts.length; i++) {
+      print("""
+        spents[$i] = ${spts[i]}
+        """);
     }
   }
 
@@ -90,6 +137,8 @@ class Wallet with Down4Object, Jsons, Locals {
     required List<PersonN> people,
     required ComposedID selfID,
     required Sats amount,
+    double? discount,
+    double? tip,
     String textNote = "",
   }) {
     final nPeople = people.length;
@@ -103,10 +152,8 @@ class Wallet with Down4Object, Jsons, Locals {
 
     final inInfos = _unsignedIns(selfID, amount, knownTxSize);
     if (inInfos == null) return null;
-    List<Down4TXIN> ins = inInfos[0];
-    Sats minerFees = inInfos[1];
-    Sats down4Fees = inInfos[2];
-    Sats inSats = ins.fold(Sats(0), (tot, txin) {
+    final (txIns, minerFees, down4Fees) = inInfos;
+    Sats inSats = txIns.fold(Sats(0), (tot, txin) {
       final utxo = getUtxo(txin.utxoID);
       return tot + (utxo?.sats ?? Sats(0));
     });
@@ -114,9 +161,9 @@ class Wallet with Down4Object, Jsons, Locals {
     // at this point, there is no reason for the payment to fail
     // except if a key derivation returns null, and in that case, calling the
     // function again should solve the problem
-    List<Down4TXOUT> outs = [];
+    List<Down4TXOUT> txOuts = [];
     _ix = _ix + 1;
-    merge({"ix": _ix.toString()});
+    merge(vals: {"ix": _ix.toString()});
     // the goal here is simply having a unique id everytime
     final txSecret = makeUint32(_ix) + utf8.encode(selfID.unik);
     final d4Keys = DOWN4_NEUTER.derive(txSecret);
@@ -127,7 +174,7 @@ class Wallet with Down4Object, Jsons, Locals {
       sats: down4Fees,
       script: p2pkh(d4Keys.rawAddress),
     );
-    outs.add(d4out);
+    txOuts.add(d4out);
 
     for (int i = 0; i < people.length; i++) {
       final userKeys = people[i].neuter.derive(txSecret);
@@ -138,7 +185,7 @@ class Wallet with Down4Object, Jsons, Locals {
         script: p2pkh(userKeys.rawAddress),
         receiver: people[i].id,
       );
-      outs.add(uOut);
+      txOuts.add(uOut);
     }
 
     // change
@@ -151,17 +198,18 @@ class Wallet with Down4Object, Jsons, Locals {
           sats: change,
           script: p2pkh(selfKeys.rawAddress),
           receiver: selfID);
-      outs.add(changeOut);
+      txOuts.add(changeOut);
     }
 
-    for (var i = 0; i < ins.length; i++) {
-      final spentUtxo = getUtxo(ins[i].utxoID);
+    for (var i = 0; i < txIns.length; i++) {
+      final spentUtxo = getUtxo(txIns[i].utxoID);
       if (spentUtxo == null) return null;
 
       final utxoSecret = spentUtxo.secret;
       if (utxoSecret == null) return null;
 
-      final sData = sigData(txsIn: ins, txsOut: outs, nIn: i, utxo: spentUtxo);
+      final sData =
+          sigData(txsIn: txIns, txsOut: txOuts, nIn: i, utxo: spentUtxo);
       if (sData == null) return null;
 
       final keysForSig = _keys.derive(utxoSecret);
@@ -170,89 +218,210 @@ class Wallet with Down4Object, Jsons, Locals {
       final scriptSig = p2pkhSig(keys: keysForSig, sigData: sData);
       if (scriptSig == null) return null;
 
-      ins[i].script = scriptSig;
-      setSpent(spentUtxo.id);
+      txIns[i].scriptSig = scriptSig;
     }
 
-    final theTx = Down4TX(down4Secret: txSecret, txsIn: ins, txsOut: outs);
+    final (inCount, outCount) = (VarInt(txIns.length), VarInt(txOuts.length));
+    final (versionNo, nLockTime) = (FourByteInt(1), FourByteInt(0));
+    final txid =
+        calculateTXID(versionNo, inCount, txIns, outCount, txOuts, nLockTime);
 
-    return Down4Payment(_chainedTxs(theTx), safe: true, textNote: textNote);
+    for (int i = 0; i < txOuts.length; i++) {
+      txOuts[i].txid = txid;
+      txOuts[i].outIndex = i;
+    }
+
+    final theTx = Down4TX(
+        down4Secret: txSecret,
+        vNo: versionNo,
+        inCount: inCount,
+        txIns: txIns,
+        outCount: outCount,
+        txOuts: txOuts,
+        ins: txIns.map((e) => e.id).toList(),
+        outs: txOuts.map((e) => e.id).toList(),
+        nLock: nLockTime);
+
+    final chainedTxs = [...loadTXs(dependances(theTx.txID)), theTx];
+
+    return Down4Payment(Down4ID(),
+        txid: theTx.txID,
+        txs: chainedTxs,
+        tip: tip,
+        discount: discount,
+        spender: g.self.id,
+        safe: true,
+        textNote: textNote);
+
+    // final theTx = Down4TX(
+    //     vNo: versionNo,
+    //     txIns: txIns,
+    //     inCount: inCount,
+    //     ins: txIns.map((e) => e.id).toList(),
+    //     outCount: outCount,
+    //     txOuts: txOuts,
+    //     outs: txOuts.map((e) => e.id).toList(),
+    //     nLock: nLockTime,
+    //     down4Secret: txSecret);
+
+    // return Down4Payment(Down4ID(),
+    //     spender: null,
+    //     txid: theTx.txID,
+    //     txs: [theTx],
+    //     safe: false,
+    //     textNote: "Imported");
   }
 
-  void parsePayment2(Down4ID selfID, Down4Payment pay) {
-    final sbuf = StringBuffer("BEGIN TRANSACTION;");
-    final List<String> args = [];
+  // void parsePayment2(Down4ID selfID, Down4Payment pay) {
+  //   final sbuf = StringBuffer("BEGIN TRANSACTION;");
+  //   final List<String> args = [];
 
-    print("parsing payment: ${pay.id}");
+  //   print("parsing payment: ${pay.id}");
+  //   for (final tx in pay.txs) {
+  //     tx.writeTxInfosToUTXOs();
+  //   }
+  //   for (final utxo in pay.txs.last.txsOut) {
+  //     final spent = isSpent(utxo.id);
+  //     print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
+  //     if (utxo.receiver == selfID && !spent) {
+  //       final jsn = utxo.toJson(includeLocal: true);
+  //       final stmt = """
+  //       INSERT INTO txouts ${jsn.sqlInsertKeys}
+  //       VALUES ${jsn.sqlInsertValuesParams};
+  //       """;
+  //       sbuf.write(stmt);
+  //       args.addAll(jsn.values);
+  //     }
+  //   }
+  //   for (final txin in pay.txs.last.txsIn) {
+  //     if (txin.spender == selfID) {
+  //       const stmt = "DELETE FROM txouts WHERE id = ?;";
+  //       const stmt2 = "INSERT INTO spents (id) VALUES (?);";
+  //       sbuf.write(stmt);
+  //       sbuf.write(stmt2);
+  //       args.add(txin.utxoID.value);
+  //       args.add(txin.utxoID.value);
+  //     }
+  //   }
+
+  //   final jsn = pay.toJson(includeLocal: true);
+  //   final stmt = """
+  //   INSERT INTO payments ${jsn.sqlInsertKeys}
+  //   VALUES ${jsn.sqlInsertValuesParams};
+  //   """;
+  //   sbuf.write(stmt);
+  //   args.addAll(jsn.values);
+
+  //   sbuf.write("COMMIT;");
+
+  //   try {
+  //     db.execute(sbuf.toString(), args);
+  //   } catch (e) {
+  //     print("error parsing payment: $e");
+  //     db.execute("ROLLBACK;");
+  //   }
+
+  //   _trySettlement(pay);
+  //   return;
+  // }
+
+  Down4Payment? parsePayment3(ComposedID selfID, Down4Payment pay) {
+    printWrapped(pay.txs.last.raw.toHex());
+
+    print("parsing payment: ${pay.id.value}");
+    if (pay.existsLocally() || !pay.receivers.contains(selfID)) {
+      print("payment was already parsed");
+      return null;
+    }
+    final sbuf = StringBuffer()..writeln("BEGIN TRANSACTION;");
     for (final tx in pay.txs) {
       tx.writeTxInfosToUTXOs();
     }
     for (final utxo in pay.txs.last.txsOut) {
       final spent = isSpent(utxo.id);
-      print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
+      print("utxo receiver: ${utxo.receiver?.unik}, isSpent: $spent");
       if (utxo.receiver == selfID && !spent) {
-        final jsn = utxo.toJson(includeLocal: true);
-        final stmt = """
-        INSERT INTO utxos ${jsn.sqlInsertKeys}
-        VALUES ${jsn.sqlInsertValuesParams};
-        """;
-        sbuf.write(stmt);
-        args.addAll(jsn.values);
+        sbuf.writeln(utxo.merge(stmt: true)!);
       }
     }
     for (final txin in pay.txs.last.txsIn) {
       if (txin.spender == selfID) {
-        const stmt = "DELETE FROM utxos WHERE id = ?;";
-        const stmt2 = "INSERT INTO spents (id) VALUES (?);";
-        sbuf.write(stmt);
-        sbuf.write(stmt2);
-        args.add(txin.utxoID.value);
-        args.add(txin.utxoID.value);
+        final txout = local<Down4TXOUT>(txin.utxoID);
+        if (txout == null) continue;
+        sbuf.writeln(handleUtxo(txout, stmt: true)!);
+        sbuf.writeln(setSpent(txout.id, stmt: true)!);
       }
     }
 
-    final jsn = pay.toJson(includeLocal: true);
-    final stmt = """
-    INSERT INTO payments ${jsn.sqlInsertKeys}
-    VALUES ${jsn.sqlInsertValuesParams};
-    """;
-    sbuf.write(stmt);
-    args.addAll(jsn.values);
-
-    sbuf.write("COMMIT;");
+    sbuf.writeln("COMMIT;");
 
     try {
-      db.execute(sbuf.toString(), args);
+      final txstr = sbuf.toString();
+      print("============ EXECUTING TRANSACTION ============\n\n$txstr\n");
+      db.execute(txstr);
+      print("\n============ VALIDATED TRANSACTION ============\n");
+      return pay
+        ..trySettlement()
+        ..calculatePlusMinus(selfID: selfID)
+        ..fullMerge();
     } catch (e) {
       print("error parsing payment: $e");
       db.execute("ROLLBACK;");
     }
 
-    _trySettlement(pay);
-    return;
+    return null;
   }
 
-  void parsePayment(Down4ID selfID, Down4Payment pay) {
-    print("parsing payment: ${pay.id}");
-    for (final tx in pay.txs) {
-      tx.writeTxInfosToUTXOs();
-    }
-    for (final utxo in pay.txs.last.txsOut) {
-      final spent = isSpent(utxo.id);
-      print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
-      if (utxo.receiver == selfID && !spent) setUtxo(utxo);
-    }
-    for (final txin in pay.txs.last.txsIn) {
-      if (txin.spender == selfID) {
-        setSpent(txin.utxoID);
-        removeUtxo(txin.utxoID);
+  void walletTrimRoutine() {
+    const q = """
+      SELECT * FROM transactions
+      WHERE CAST(confirmations AS INTEGER) > 80
+    """;
+    final xs = db.select(q).map((e) {
+      final jsns = Map<String, String?>.from(e);
+      return Down4TX.fromJson(jsns);
+    });
+
+    for (final x in xs) {
+      if (x.spenders.contains(g.self.id)) continue;
+      for (final txin in x.txsIn) {
+        txin.delete();
       }
+      for (final txout in x.txsOut) {
+        if (txout.spent) txout.delete();
+      }
+      x.delete();
     }
-
-    setPayment(pay);
-    _trySettlement(pay);
-    return;
   }
+
+  // void parsePayment(ComposedID selfID, Down4Payment pay) {
+  //   print("parsing payment: ${pay.id}");
+  //   for (final tx in pay.txs) {
+  //     if (tx.txsOut.length != tx.outCounter.asInt) {
+  //       return print("cannot parse payment, we don't have all the TXOUTS");
+  //     }
+  //     tx.writeTxInfosToUTXOs();
+  //   }
+  //   for (final utxo in pay.txs.last.txsOut) {
+  //     final spent = isSpent(utxo.id);
+  //     print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
+  //     if (utxo.receiver == selfID && !spent) setUtxo(utxo);
+  //   }
+  //   for (final txin in pay.txs.last.txsIn) {
+  //     if (txin.spender == selfID) {
+  //       final utxo = local<Down4TXOUT>(txin.utxoID)!..markSpent();
+  //       setSpent(utxo.id);
+  //       removeUtxoIfSettled(utxo);
+  //     }
+  //   }
+
+  //   pay
+  //     ..calculatePlusMinus(selfID: selfID)
+  //     ..fullMerge();
+
+  //   _trySettlement(pay);
+  //   return;
+  // }
 
   Future<Down4Payment?> importMoney(String pkBase68, ComposedID selfID) async {
     final rawKey = BigInt.parse(base58.decode(pkBase68).toHex(), radix: 16);
@@ -294,78 +463,133 @@ class Wallet with Down4Object, Jsons, Locals {
       script: p2pkh(selfKeys.rawAddress),
     );
 
-    final List<Down4TXOUT> outs = [down4Out, selfOut];
+    final List<Down4TXOUT> txOuts = [down4Out, selfOut];
 
-    List<Down4TXIN> ins = [];
+    List<Down4TXIN> txIns = [];
     for (var utxo in fetchedUtxos.values) {
       var txin = Down4TXIN(
         utxoIndex: FourByteInt(utxo.outIndex!),
         utxoTXID: utxo.txid!,
         spender: utxo.receiver,
       );
-      ins.add(txin);
+      txIns.add(txin);
     }
 
-    for (var i = 0; i < ins.length; i++) {
-      final theUtxo = fetchedUtxos[ins[i].utxoID]!;
-      final sData = sigData(txsIn: ins, txsOut: outs, nIn: i, utxo: theUtxo);
+    for (var i = 0; i < txIns.length; i++) {
+      final theUtxo = fetchedUtxos[txIns[i].utxoID]!;
+      final sData =
+          sigData(txsIn: txIns, txsOut: txOuts, nIn: i, utxo: theUtxo);
       if (sData == null) return null;
       final scriptSig = p2pkhSig(keys: importedKeys, sigData: sData);
       if (scriptSig == null) return null;
-      ins[i].script = scriptSig;
+      txIns[i].scriptSig = scriptSig;
     }
 
-    final theTx = Down4TX(txsIn: ins, txsOut: outs, down4Secret: txSecret);
+    final (inCount, outCount) = (VarInt(txIns.length), VarInt(txOuts.length));
+    final (versionNo, nLockTime) = (FourByteInt(1), FourByteInt(0));
+    final txid =
+        calculateTXID(versionNo, inCount, txIns, outCount, txOuts, nLockTime);
 
-    return Down4Payment([theTx], safe: false, textNote: "Imported");
-  }
-
-  Future<void> _trySettlement(Down4Payment payment) async {
-    final txsToSettle = payment.txs
-        .where((tx) => tx.confirmations == 0)
-        .toList(growable: false);
-
-    final failures = await r.broadcastTxs(txsToSettle);
-    for (final f in failures) {
-      print(
-        "ERROR Broadcasting tx ID: ${payment.txs[f.first].txID.asHex}, ${f.second}",
-      );
+    for (int i = 0; i < txOuts.length; i++) {
+      txOuts[i].txid = txid;
+      txOuts[i].outIndex = i;
     }
+
+    final theTx = Down4TX(
+        vNo: versionNo,
+        txIns: txIns,
+        inCount: inCount,
+        ins: txIns.map((e) => e.id).toList(),
+        outCount: outCount,
+        txOuts: txOuts,
+        outs: txOuts.map((e) => e.id).toList(),
+        nLock: nLockTime,
+        down4Secret: txSecret);
+
+    return Down4Payment(Down4ID(),
+        spender: null,
+        txid: theTx.txID,
+        txs: [theTx],
+        safe: false,
+        textNote: "Imported");
   }
 
-  Future<void> _updateStatus(Down4Payment payment) async {
-    final ids = payment.txs.map((e) => e.txID.asHex).toList();
-
-    final confirmations = await r.confirmations(ids);
-    if (confirmations == null || confirmations.length != ids.length) return;
-
-    for (int i = 0; i < confirmations.length; i++) {
-      payment.txs[i].confirmations = confirmations[i];
-      setPayment(payment);
-    }
-  }
-
-  List<Down4TX> _chainedTxs(Down4TX from) {
-    final unsettledIDs = uTXID;
-    final unsettledTransactions = unsettledTxs;
-
-    // final unsettledIDs = uTXID;
-    Set<Down4TX> deps = {from};
-    List<Down4TX> copy;
+  static List<TXID> dependances(TXID head) {
+    List<List<TXID>> ch = [
+      [head]
+    ];
     do {
-      copy = List<Down4TX>.from(deps);
-      var depIDs = copy.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
-      for (final depID in depIDs) {
-        if (unsettledIDs.contains(depID)) {
-          deps.add(unsettledTransactions.singleWhere((tx) => tx.txID == depID));
-        }
-      }
-    } while (deps.length != copy.length);
+      final txs = loadTXs(ch.last);
+      final Set<TXID> refs = txs
+          .map((tx) => tx.txsIn.map((txin) => txin.utxoTXID))
+          .expand((txid) => txid)
+          .toSet();
+      final refstr = refs.map((txid) => txid.asBase64.sqlReady).join(",");
+      final q = """
+        SELECT id FROM transactions
+        WHERE confirmations = '-1' AND id IN ($refstr)
+        """;
+      final r = db.select(q).map((e) => TXID.fromBase64(e["id"]));
+      ch.add(r.toList());
+    } while (ch.last.isNotEmpty);
 
-    return copy.reversed.toList(growable: false);
+    Set<TXID> sortedChain = {};
+    for (final ids in ch.sublist(1).reversed) {
+      for (final id in ids) {
+        sortedChain.add(id);
+      }
+    }
+
+    return sortedChain.toList();
   }
 
-  List<dynamic>? _unsignedIns(Down4ID selfID, Sats pay, int currentTxSize) {
+  static List<Down4TX> loadTXs(Iterable<TXID> txids) {
+    final refstr = txids.map((txid) => txid.asBase64.sqlReady).join(",");
+    final q = """
+        SELECT * FROM transactions
+        WHERE id IN ($refstr)
+        """;
+    return db.select(q).map((e) {
+      final jsns = Map<String, String?>.from(e);
+      return Down4TX.fromJson(jsns);
+    }).toList();
+  }
+
+  // Future<void> _updateStatus(Down4Payment payment) async {
+  //   // final ids = payment.txs.map((e) => e.txID.asHex).toList();
+
+  //   final confirmations = await r.confirmations(ids);
+  //   if (confirmations == null || confirmations.length != ids.length) return;
+
+  //   for (int i = 0; i < confirmations.length; i++) {
+  //     payment.txs[i].confirmations = confirmations[i];
+  //     setPayment(payment);
+  //   }
+  // }
+
+  // List<Down4TX> _chainedTxs(Down4TX from) {
+
+  // final unsettledIDs = uTXID;
+  // final unsettledTransactions = unsettledTxs;
+
+  // // final unsettledIDs = uTXID;
+  // Set<Down4TX> deps = {from};
+  // List<Down4TX> copy;
+  // do {
+  //   copy = List<Down4TX>.from(deps);
+  //   var depIDs = copy.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
+  //   for (final depID in depIDs) {
+  //     if (unsettledIDs.contains(depID)) {
+  //       deps.add(unsettledTransactions.singleWhere((tx) => tx.txID == depID));
+  //     }
+  //   }
+  // } while (deps.length != copy.length);
+
+  // return copy.reversed.toList(growable: false);
+  // }
+
+  (List<Down4TXIN>, Sats, Sats)? _unsignedIns(
+      Down4ID selfID, Sats pay, int currentTxSize) {
     const inSize = 148;
     List<Down4TXIN> ins = [];
     var cumulSize = currentTxSize;
@@ -374,15 +598,12 @@ class Wallet with Down4Object, Jsons, Locals {
     var currentDown4Fees = (currentMinerFees * 1.2) + randSats;
     var accumulatedSats = Sats(0);
     var iUtxo = 0;
-    final unsettledTxIDs = uTXID;
     for (final utxo in utxos) {
       var txin = Down4TXIN(
-        utxoTXID: utxo.txid!,
-        utxoIndex: FourByteInt(utxo.outIndex!),
-        spender: selfID,
-        sequenceNo: 0,
-        dependance: unsettledTxIDs.contains(utxo.txid) ? utxo.txid : null,
-      );
+          utxoTXID: utxo.txid!,
+          utxoIndex: FourByteInt(utxo.outIndex!),
+          spender: selfID,
+          sequenceNo: 0);
       ins.add(txin);
       cumulSize += inSize;
       iUtxo = iUtxo + 1;
@@ -396,7 +617,7 @@ class Wallet with Down4Object, Jsons, Locals {
       var down4Fees = Sats(currentDown4Fees.ceil());
 
       if (accumulatedSats > minerFees + pay + down4Fees) {
-        return [ins, minerFees, down4Fees];
+        return (ins, minerFees, down4Fees);
       }
     }
     return null;
@@ -420,6 +641,150 @@ class Wallet with Down4Object, Jsons, Locals {
         "keys": _keys.toYouKnow(),
         "ix": _ix.toString(),
       };
+
+  /////////////////////////////////////////////////////////////////////
+  //// static utility functions ///////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////
+  static Iterable<Down4Payment> get payments sync* {
+    const raw = "SELECT * FROM payments ORDER BY ts DESC";
+    final rows = db.select(raw);
+    for (final row in rows) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4Payment.fromJson(jsns);
+    }
+  }
+
+  static Iterable<Down4Payment> nPayments(
+      {required int limit, int offset = 0}) sync* {
+    final raw = """
+        SELECT * FROM payments
+        ORDER BY ts DESC
+        LIMIT $limit OFFSET $offset
+        """;
+
+    final rows = db.select(raw);
+    for (final row in rows) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4Payment.fromJson(jsns);
+    }
+  }
+
+  static Iterable<Down4TXOUT> get utxos sync* {
+    final raw = """
+    SELECT * FROM txouts
+    WHERE spent = 'false' AND receiver = ${g.self.id.sqlReady}
+    """;
+    final rows = db.select(raw);
+    for (final row in rows) {
+      final jsns = Map<String, String?>.from(row);
+      yield Down4TXOUT.fromJson(jsns);
+    }
+  }
+
+  static Down4TXOUT? getUtxo(Down4ID id) {
+    return local<Down4TXOUT>(id);
+  }
+
+  static String? removeUtxo(Down4ID id, {bool stmt = false}) {
+    final raw = "DELETE FROM txouts WHERE id = ${id.sqlReady};";
+    if (stmt) return raw;
+    db.execute(raw);
+    return null;
+  }
+
+  static Iterable<Down4TX> sub100confsTxs() sync* {
+    const raw = """
+      SELECT * FROM transactions
+      WHERE CAST(confirmations AS INTEGER) < 100
+    """;
+    final jsnL = db.select(raw);
+    print("there are ${jsnL.length} sub 100 confs txs!");
+    for (final jsn in jsnL) {
+      final jsns = Map<String, String?>.from(jsn);
+      yield Down4TX.fromJson(jsns);
+    }
+  }
+
+  static Iterable<Down4TX> allTxs() sync* {
+    const raw = "SELECT * FROM transactions";
+    final jsnL = db.select(raw);
+    for (final jsn in jsnL) {
+      final jsns = Map<String, String?>.from(jsn);
+      yield Down4TX.fromJson(jsns);
+    }
+  }
+
+  static Down4TX? loadTX(String id) {
+    const raw = "SELECT * FROM transactions WHERE id = ?";
+    final r = db.select(raw, [id]);
+    if (r.isEmpty) return null;
+    final jsns = Map<String, String?>.from(r.single);
+    return Down4TX.fromJson(jsns);
+  }
+
+  static String? handleUtxo(Down4TXOUT utxo, {bool stmt = false}) {
+    final localTx = loadTX(utxo.txid!.asBase64);
+    if (localTx == null) return removeUtxo(utxo.id, stmt: stmt);
+    final (spenders, confs) = (localTx.spenders, localTx.confirmations);
+    // if spender contains self, means we initiated the tx,
+    // and we want to keep those for a while
+    // TODO: decide when to archive our own transactions
+    if (!spenders.contains(g.self.id) && confs > 30) {
+      return removeUtxo(utxo.id, stmt: stmt);
+    } else {
+      return utxo.markSpent(stmt: stmt);
+    }
+  }
+
+  static Down4Payment? getPayment(Down4ID id) {
+    return local<Down4Payment>(id);
+  }
+
+  static String? removePayment(Down4ID id, {bool stmt = false}) {
+    final raw = "DELETE FROM payments WHERE id = ${id.value.sqlReady};";
+    if (stmt) return raw;
+    db.execute(raw);
+    return null;
+  }
+
+  static String? setPayment(Down4Payment payment, {bool stmt = false}) {
+    return payment.merge(stmt: stmt);
+  }
+
+  static String? setUtxo(Down4TXOUT utxo, {bool stmt = false}) {
+    return utxo.merge(stmt: stmt);
+  }
+
+  static bool isSpent(Down4ID utxoID) {
+    final raw = "SELECT * FROM spents WHERE id = ${utxoID.value.sqlReady};";
+    return db.select(raw).isNotEmpty;
+  }
+
+  static Iterable<String> allSpents() sync* {
+    const raw = "SELECT * FROM spents";
+    for (final r in db.select(raw)) {
+      yield r["id"] as String;
+    }
+  }
+
+  static String? setSpent(Down4ID id, {bool stmt = false}) {
+    final raw = """
+    INSERT INTO spents (id) VALUES (${id.value.sqlReady});
+    """;
+    if (stmt) return raw;
+    db.execute(raw);
+    return null;
+  }
+
+  // still no use, intended as a possible control mechanism
+  static void unSpend(Down4ID id) {
+    final raw = "DELETE FROM spents WHERE id = ${id.value.sqlReady}";
+    db.execute(raw);
+  }
+
+  static Wallet? load() {
+    return local<Wallet>(Down4ID(unik: "single"));
+  }
 }
 
 void main() {

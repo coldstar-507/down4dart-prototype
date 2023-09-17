@@ -1,9 +1,20 @@
-import 'dart:convert';
+void main() async {
+  print("jeff");
+  await Future.delayed(const Duration(seconds: 1));
+  print("andrew after 1 second");
 
-const jeff = "jeff";
+  final sbuf = StringBuffer("""
+    BEGIN TRANSACTION;
 
-void main() {
-  print(jeff.codeUnits);
+""");
 
-  print(utf8.encode(jeff));
+  sbuf.write("""
+    SELECT * FROM caca;
+""");
+
+  sbuf.write("""
+    DELETE FROM niggas WHERE age > '10';
+""");
+
+  print(sbuf.toString());
 }

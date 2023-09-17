@@ -15,6 +15,69 @@ import 'data_objects/nodes.dart';
 
 const golden = 1.618;
 
+void printWrapped(String text) {
+  final pattern = RegExp('.{1,800}'); // 800 is the size of each chunk
+  pattern.allMatches(text).forEach((match) => print(match.group(0)));
+}
+
+// extension QuoteQuote on String {
+//   String get sqlReady {
+//     final sbuf = StringBuffer("'");
+//     sbuf.write(replaceAll("'", "''"));
+//     sbuf.write("'");
+//     return sbuf.toString();
+//   }
+// }
+
+// extension SQLiteExtensions on Iterable<String> {
+//   String get valuesInParenthesis {
+//     final sbuf = StringBuffer("(");
+//     sbuf.writeAll(map((e) => e.sqlReady), ",");
+//     sbuf.write(")");
+//     return sbuf.toString();
+//   }
+
+//   String get keysInParenthesis {
+//     final sbuf = StringBuffer("(");
+//     sbuf.writeAll(this, ",");
+//     sbuf.write(")");
+//     return sbuf.toString();
+//   }
+
+//   String get keysNoParenthesis {
+//     final sbuf = StringBuffer();
+//     sbuf.writeAll(this, ",");
+//     return sbuf.toString();
+//   }
+// }
+
+// mixin Sql on Map<String, String>, Down4Object, Locals {
+//   String get sqlInsertStr {
+//     return """
+//     INSERT INTO $table
+//     ${keys.keysInParenthesis}
+//     VALUES ${values.valuesInParenthesis}
+//     """;
+//   }
+
+//   String get updateKeyValueStr {
+//     // key1 = 'val1', key2 = 'val2'
+//     final buf = StringBuffer();
+//     buf.writeAll(entries.map((e) => "${e.key} = ${e.value.sqlReady}"), ",");
+//     return buf.toString();
+//   }
+
+//   String get sqlUpdateStr {
+//     return """
+//     UPDATE $table
+//     SET $updateKeyValueStr
+//     WHERE id = '$id';
+//     """;
+//   }
+// }
+
+
+
 const videoExtensions = ["mp4", "3gp", "webm", "mkv", "m4a", "mov"];
 const videoMimes = [
   "video/mp4",

@@ -115,10 +115,10 @@ abstract class Down4Theme {
   });
 
   TextStyle consoleButtonTextStyle({
-    required bool isMode,
-    required bool isSpecial,
-    required bool isInverted,
-    required bool isActivated,
+    bool isMode = false,
+    bool isSpecial = false,
+    bool isInverted = false,
+    bool isActivated = true,
   });
 
   TextStyle get inputTextStyle;
@@ -301,7 +301,7 @@ class BlackTheme extends Down4Theme {
   Color get snipArrowColor => const Color.fromARGB(115, 143, 0, 9);
 
   @override
-  Color get messageSelectionBorderColor => Colors.white;
+  Color get messageSelectionBorderColor => Colors.grey;
 
   @override
   Color get messageSelectionOverlayColor => Colors.black38;
@@ -351,10 +351,10 @@ class BlackTheme extends Down4Theme {
 
   @override
   TextStyle consoleButtonTextStyle({
-    required bool isMode,
-    required bool isSpecial,
-    required bool isInverted,
-    required bool isActivated,
+    bool isMode = false,
+    bool isSpecial = false,
+    bool isInverted = false,
+    bool isActivated = true,
   }) =>
       TextStyle(
           fontSize: 12,
@@ -626,10 +626,10 @@ class PinkTheme extends Down4Theme {
 
   @override
   TextStyle consoleButtonTextStyle({
-    required bool isMode,
-    required bool isSpecial,
-    required bool isActivated,
-    required bool isInverted,
+    bool isMode = false,
+    bool isSpecial = false,
+    bool isActivated = true,
+    bool isInverted = false,
   }) =>
       TextStyle(
           fontFamily: font,

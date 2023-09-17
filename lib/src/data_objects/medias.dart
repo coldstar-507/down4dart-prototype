@@ -123,7 +123,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     if (currentTS >= newTempTS) return;
     _tempTS = newTempTS;
     _tempID = newTempID;
-    merge({
+    merge(vals: {
       "tempTS": _tempTS!.toString(),
       "tempID": _tempID!.value,
     });
@@ -163,6 +163,9 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     bool isPaidToOwn = false,
     bool isLocked = false,
   }) async {
+    if (writeFromCachedPath && mainCachedPath == null) {
+      throw ("error: Can't writeFromCache AND have mainCachedPath == null");
+    }
     Down4Media media;
     if (metadata.isVideo) {
       media = Down4Video(id,
@@ -317,27 +320,28 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     // print("main cached path: $mainCachedPath");
     File? f;
     if (mainCachedPath == null) return null;
-    if (!(f = File(mainCachedPath!)).existsSync()) return null;
+    f = File(mainCachedPath!);
+    if (!f.existsSync()) return null;
     return f;
   }
 
   void use() {
     _lastUse = u.makeTimestamp();
-    merge({"lastUse": _lastUse.toString()});
+    merge(vals: {"lastUse": _lastUse.toString()});
     g.savedMediasIDs[type] = savedMediaIDs(type).toList();
   }
 
   Future<void> write(Uint8List mainData);
 
   Future<void> writeFromCachedPath() async {
-    File? f;
-    if ((f = mainCachedFile) != null) {
+    final File? f = mainCachedFile;
+    if (f != null) {
       if (metadata.isSquared && !metadata.isVideo) {
         const idealSize = 512;
         final to = File(mainPath());
-        await cropAndSaveToSquare(from: f!, to: to, size: idealSize);
+        await cropAndSaveToSquare(from: f, to: to, size: idealSize);
       } else {
-        final Uint8List data = f!.readAsBytesSync();
+        final Uint8List data = f.readAsBytesSync();
         await write(data);
       }
     }
@@ -346,7 +350,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   // in medias, to follow json as Map<String,String> merge values are also str
   void updateSaveStatus(bool newSaveStatus) {
     _isSaved = newSaveStatus;
-    merge({"isSaved": _isSaved.toString()});
+    merge(vals: {"isSaved": _isSaved.toString()});
     g.savedMediasIDs[type] = savedMediaIDs(type).toList();
   }
 
@@ -438,7 +442,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     return Down4Media.fromLocal2(id,
         writeFromCachedPath: true,
         mainCachedPath: mainCachedPath,
-        metadata: metadata,
+        metadata: Down4MediaMetadata.fromJson(metadataJson),
         tinyThumbnail: tinyThumbnail);
   }
 }
@@ -508,13 +512,14 @@ class Down4Image extends Down4Media {
       h = (s.height * golden).toInt();
     }
 
-    if ((f = mainCachedFile ?? mainFile()) != null) {
+    f ??= (mainCachedFile ?? mainFile());
+    if (f != null) {
       if (isEncrypted) {
-        final enc = EncryptedFileImage(f!);
+        final enc = EncryptedFileImage(f);
         final res = ResizeImage(enc, width: w, height: h);
         return res;
       } else {
-        final res = ResizeImage(FileImage(f!), width: w, height: h);
+        final res = ResizeImage(FileImage(f), width: w, height: h);
         return res;
       }
     } else if (_cachedUrl != null) {
@@ -560,14 +565,15 @@ class Down4Image extends Down4Media {
   }
 
   @override
-  Future<void> delete() async {
-    await super.delete();
+  String? delete({bool stmt = false}) {
+    super.delete(stmt: stmt);
     try {
-      await mainFile()?.delete();
+      mainFile()?.delete();
     } catch (_) {}
     try {
-      await File(_profilePath()).delete();
+      File(_profilePath()).delete();
     } catch (_) {}
+    return null;
   }
 
   @override
@@ -629,10 +635,11 @@ class Down4Video extends Down4Media {
   }
 
   @override
-  Future<void> delete() async {
-    await super.delete();
-    await mainFile()?.delete();
-    await thumbnailFile?.delete();
+  String? delete({bool stmt = false}) {
+    super.delete(stmt: stmt);
+    mainFile()?.delete();
+    thumbnailFile?.delete();
+    return null;
   }
 
   File? get thumbnailFile {

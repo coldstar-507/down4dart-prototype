@@ -255,7 +255,7 @@ class ChatMessage extends StatelessWidget
     final double mediaHeight = mediaInfo?.precalculatedMediaSize.height ?? 0.0;
     final double palettesHeight = (nodes?.length ?? 0.0) * nodeHeight;
     if (bubbleHeight > 0) {
-      return bubbleHeight + mediaHeight + palettesHeight + textPadding;
+      return bubbleHeight + mediaHeight + palettesHeight + (2 * textPadding);
     } else {
       return mediaHeight + palettesHeight;
     }
@@ -594,7 +594,7 @@ class ChatMessage extends StatelessWidget
   bool get hasMoreHeightForReactions => heightForReaction > widthForReactions;
 
   double get sizeForReactions => max(heightForReaction, widthForReactions);
-
+  
   double get messageWidth =>
       hasMedia ? maxMessageWidth : bubbleWidth ?? maxMessageWidth;
 
@@ -700,18 +700,33 @@ class ChatMessage extends StatelessWidget
                         width: bodyBorderWidth,
                         color: selected
                             ? g.theme.messageSelectionBorderColor
-                            : Colors.transparent,
-                      )),
-                  child: Column(
+                          : Colors.transparent,
+                    )),
+                child: Stack(children: [
+                  Column(
                       textDirection: TextDirection.ltr,
                       mainAxisSize: MainAxisSize.max,
                       children: [
                         media ?? const SizedBox.shrink(),
                         text ?? const SizedBox.shrink(),
                         messagePalettes ?? const SizedBox.shrink()
-                      ])
-                  // )
+                      ]),
+                  IgnorePointer(
+                    child: Container(
+                      alignment: AlignmentDirectional.center,
+                      decoration: BoxDecoration(
+                          color: selected
+                              ? g.theme.messageSelectionBorderColor
+                                  .withOpacity(0.16)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.all(innerRadius)),
+                      width: messageWidth,
+                      height: bodyHeight,
+                    ),
                   ),
+                ]),
+                // )
+              ),
               myMessage
                   ? const SizedBox.shrink()
                   : hasMoreHeightForReactions

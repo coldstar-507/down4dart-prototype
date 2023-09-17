@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:flutter/rendering.dart';
@@ -29,10 +30,29 @@ class ConsoleButton extends StatelessWidget {
   final bool isInverted;
   final BorderRadius? border;
 
-  const ConsoleButton({
-    // this.flex = 1,
-    // this.width,
-    // this.maxWidth,
+  double? _mainButtonTextWidth;
+
+  set mainButtonTextWidth(double mw) => _mainButtonTextWidth = mw;
+
+  // double maxButtonTextWidth() => [this, ...?extraButtons].fold(0.0, (prv, e) {
+  //       final (text, style) = (e.name, g.theme.consoleButtonTextStyle());
+  //       final tspan = TextSpan(text: text, style: style);
+  //       final span = TextPainter(text: tspan, textDirection: TextDirection.ltr);
+  //       return math.max(prv, (span..layout()).width);
+  //     });
+
+  double get buttonTextWidth {
+    double calculateIt() {
+      final style = g.theme.consoleButtonTextStyle();
+      final tspan = TextSpan(text: name , style: style);
+      final span = TextPainter(text: tspan, textDirection: TextDirection.ltr);
+      return (span..layout()).width;
+    }
+
+    return _mainButtonTextWidth ??= calculateIt();
+  }
+
+  ConsoleButton({
     this.extra,
     this.icon,
     this.isInverted = false,
@@ -51,9 +71,6 @@ class ConsoleButton extends StatelessWidget {
   }) : super(key: key);
 
   ConsoleButton invertedColors() => ConsoleButton(
-        // flex: flex,
-        // width: width,
-        // maxWidth: maxWidth,
         name: name,
         onPress: onPress,
         onLongPress: onLongPress,
@@ -61,7 +78,6 @@ class ConsoleButton extends StatelessWidget {
         isInverted: true,
         isGreyedOut: isGreyedOut,
         extraButtons: extraButtons,
-        // showExtra: showExtra,
         shouldBeDownButIsnt: shouldBeDownButIsnt,
         isMode: isMode,
         isSpecial: isSpecial,
@@ -79,7 +95,6 @@ class ConsoleButton extends StatelessWidget {
         isInverted: true,
         isGreyedOut: isGreyedOut,
         extraButtons: extraButtons,
-        // showExtra: showExtra,
         shouldBeDownButIsnt: shouldBeDownButIsnt,
         isMode: isMode,
         isSpecial: isSpecial,
@@ -108,9 +123,6 @@ class ConsoleButton extends StatelessWidget {
 
   ConsoleButton withBorder(BorderRadius border, {required GlobalKey k}) =>
       ConsoleButton(
-        // flex: flex,
-        // maxWidth: maxWidth,
-        // width: width,
         name: name,
         onPress: onPress,
         onLongPress: onLongPress,
@@ -119,7 +131,6 @@ class ConsoleButton extends StatelessWidget {
         border: border,
         isGreyedOut: isGreyedOut,
         extraButtons: extraButtons,
-        // showExtra: showExtra,
         shouldBeDownButIsnt: shouldBeDownButIsnt,
         isMode: isMode,
         isSpecial: isSpecial,
@@ -150,35 +161,54 @@ class ConsoleButton extends StatelessWidget {
     if (icon == null && name == null) {
       throw 'ConsoleButton error: Either icon or name must not be null';
     }
-    return Align(
-      alignment: AlignmentDirectional.bottomCenter,
-      child: TouchableOpacity(
-        shouldBeDownButIsnt: shouldBeDownButIsnt,
-        onPress: pressButton,
-        onLongPress: longPressButton,
-        onLongPressUp: isActivated ? onLongPressUp : () {},
-        child: ColoredBox(
-          color: g.theme
-              .buttonColor(isActivated: isActivated, isInverted: isInverted),
-          child: SizedBox(
-            height: Console.buttonHeight,
-            child: Center(
-              child: icon ??
-                  Text(
-                    name!,
-                    maxLines: 1,
-                    style: g.theme.consoleButtonTextStyle(
-                      isMode: isMode,
-                      isSpecial: isSpecial,
-                      isInverted: isInverted,
-                      isActivated: isActivated,
-                    ),
-                  ),
+
+    return LayoutBuilder(builder: (context, constrains) {
+      final double bwidth = constrains.maxWidth;
+      final double leftPad = (bwidth - buttonTextWidth) / 2.0;
+
+      // print("""
+      //   full    width = ${g.sizes.w}
+      //   b       width = $bwidth
+      //   maxName witdh = $buttonTextWidth
+      //   leftPad width = $leftPad
+      //   """);
+
+      return Align(
+        alignment: AlignmentDirectional.bottomCenter,
+        child: TouchableOpacity(
+          shouldBeDownButIsnt: shouldBeDownButIsnt,
+          onPress: pressButton,
+          onLongPress: longPressButton,
+          onLongPressUp: isActivated ? onLongPressUp : () {},
+          child: ColoredBox(
+            color: g.theme
+                .buttonColor(isActivated: isActivated, isInverted: isInverted),
+            child: SizedBox(
+              height: Console.buttonHeight,
+              child: Center(
+                child: icon ?? Text(
+                            name!,
+                            maxLines: 1,
+                            style: g.theme.consoleButtonTextStyle(
+                              isMode: isMode,
+                              isSpecial: isSpecial,
+                              isInverted: isInverted,
+                              isActivated: isActivated,
+                            ),
+                          ),
+                    // Row(
+                    //     mainAxisAlignment: MainAxisAlignment.start,
+                    //     mainAxisSize: MainAxisSize.max,
+                    //     children: [
+                    //       SizedBox(width: leftPad),
+                          
+                    //     ]),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -1158,6 +1188,10 @@ class Console3 {
                 topRight: Radius.circular(Console.consoleRad)));
 
         final nButton = b.extraButtons!.length;
+
+        for (final eb in b.extraButtons!) {
+          eb.mainButtonTextWidth = b.buttonTextWidth;
+        }
 
         return Positioned(
           left: position.dx - Console.borderWidth,

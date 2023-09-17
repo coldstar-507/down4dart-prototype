@@ -17,9 +17,10 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   final void Function(PersonN) payNode;
   final void Function() back, openPreview, forward;
 
-  ViewState get viewState => g.vm.currentView;
+  final ViewState viewState;
 
   const NodePage({
+    required this.viewState,
     required this.openPreview,
     required this.payNode,
     required this.openNode,

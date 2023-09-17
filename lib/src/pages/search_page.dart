@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:down4/src/data_objects/medias.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 
@@ -31,7 +32,7 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
   final void Function(Down4Node) onScan;
   final Future<void> Function(String) search;
   final void Function() back, openPreview;
-  
+
   ViewState get viewState => g.vm.currentView;
 
   const AddFriendPage({
@@ -51,12 +52,11 @@ class AddFriendPage extends StatefulWidget implements Down4PageWidget {
 
 class _AddFriendPageState extends State<AddFriendPage>
     with WidgetsBindingObserver, Pager2, Input2, Scanner2 {
-
   Future<List<ButtonsInfo2>> bGen(BranchN b) async {
     return [
       ButtonsInfo2(
         asset: Icon(Icons.arrow_forward_ios_rounded,
-              color: g.theme.noMessageArrowColor),
+            color: g.theme.noMessageArrowColor),
         pressFunc: () => widget.openNode(b),
         rightMost: true,
       )
@@ -116,13 +116,15 @@ class _AddFriendPageState extends State<AddFriendPage>
     final data = bc.code!.split("%");
     if (data.length != 6) return;
     final userID = ComposedID.fromString(data[0]);
+    final userMediaID = ComposedID.fromString(data[3]);
     // We try to download the user for a more complete user
-    final tryGet = await global<User>(userID, doFetch: true);
-    final node = tryGet ??
+    final tryGet = global<User>(userID, doFetch: true);
+    await global<Down4Image>(userMediaID, doFetch: true);
+    final node = await tryGet ??
         User(userID!,
             name: data[1],
             lastName: data[2],
-            mediaID: ComposedID.fromString(data[3]),
+            mediaID: userMediaID,
             neuter: Down4Keys.fromYouKnow(data[4]),
             children: {},
             activity: makeTimestamp(),
@@ -153,7 +155,6 @@ class _AddFriendPageState extends State<AddFriendPage>
       name: "FORWARD",
       onPress: () => widget.forwardNodes(searchs.values.selected().toList()));
 
-
   @override
   Widget build(BuildContext context) {
     print("QR DATA LEN = ${qrData.length}");
@@ -162,11 +163,11 @@ class _AddFriendPageState extends State<AddFriendPage>
       backFunction: widget.back,
       pages: [
         Down4Page(
-            title: "Search",
-            console: console,
-            stackWidgets: [qr],
-            list: searchs.values.toList(),
-          ),
+          title: "Search",
+          console: console,
+          stackWidgets: [qr],
+          list: searchs.values.toList(),
+        ),
       ],
     );
   }

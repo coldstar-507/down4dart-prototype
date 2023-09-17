@@ -267,7 +267,7 @@ class Singletons {
   }
 
   void loadWallet() {
-    final wallet_ = WalletManager.load();
+    final wallet_ = Wallet.load();
     if (wallet_ == null) return print("Wallet is null");
     wallet = wallet_;
   }
@@ -501,12 +501,12 @@ void writePayments(
   int limit = 5,
 ]) {
   final offset = state.length;
-  for (final pay in g.wallet.nPayments(limit: limit, offset: offset)) {
+  for (final pay in Wallet.nPayments(limit: limit, offset: offset)) {
     state[pay.id] = Palette(
       key: Key(pay.id.unik),
       node: PaymentNode(payment: pay, selfID: g.self.id),
       messagePreview: pay.textNote,
-      buttonsInfo2: pay.isSpentBy(id: g.self.id)
+      buttonsInfo2: pay.spender == g.self.id
           ? [
               ButtonsInfo2(
                   asset: Icon(Icons.arrow_forward_ios_rounded,

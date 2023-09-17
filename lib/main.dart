@@ -212,10 +212,11 @@ void initSqlite() async {
   db.execute("""
     CREATE TABLE IF NOT EXISTS payments (
       id TEXT NOT NULL PRIMARY KEY,
-      tx TEXT NOT NULL,
-      len TEXT NOT NULL,
+      txid TEXT NOT NULL,
       safe TEXT NOT NULL,
       ts TEXT NOT NULL,
+      plusMinus TEXT NOT NULL,      
+      spender TEXT,
       tempTS TEXT,
       tempID TEXT,
       txt TEXT
@@ -223,15 +224,42 @@ void initSqlite() async {
     """);
 
   db.execute("""
-    CREATE TABLE IF NOT EXISTS utxos (
+    CREATE TABLE IF NOT EXISTS txouts (
       id TEXT NOT NULL PRIMARY KEY,
       txid TEXT NOT NULL,
       secret TEXT NOT NULL,
       outIndex TEXT NOT NULL,
+      spent TEXT NOT NULL,
       sats TEXT NOT NULL,
       type TEXT NOT NULL,
       script TEXT NOT NULL,
       receiver TEXT
+    )
+    """);
+
+  db.execute("DROP TABLE IF EXISTS utxos");
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS transactions (
+      id TEXT NOT NULL PRIMARY KEY,
+      secret TEXT NOT NULL,
+      ins TEXT NOT NULL,
+      outs TEXT NOT NULL,
+      versionNo TEXT NOT NULL,
+      nLockTime TEXT NOT NULL,
+      confirmations TEXT NOT NULL,
+      maker TEXT
+    )
+    """);
+
+  db.execute("""
+    CREATE TABLE IF NOT EXISTS txins (
+      id TEXT NOT NULL PRIMARY KEY,
+      utxoTXID TEXT NOT NULL,
+      utxoIndex TEXT NOT NULL,
+      sequenceNo TEXT NOT NULL,
+      scriptSig TEXT NOT NULL,
+      spender TEXT
     )
     """);
 
@@ -248,7 +276,8 @@ void initSqlite() async {
       ix TEXT,
       themeName TEXT,
       rate TEXT,
-      lastUpdate TEXT
+      lastUpdate TEXT,
+      currentPage TEXT
     )
     """);
 
@@ -268,7 +297,7 @@ void initSqlite() async {
     VALUES ('single')
     """);
 
-  db.execute("PRAGMA journal_mode=WAL;");
+  db.execute("PRAGMA journal_mode=IMMEDIATE;");
   print("done initing sqlite");
 }
 
@@ -389,7 +418,6 @@ Future<void> main() async {
       ),
     );
   }
-
 
   runApp(const MaterialApp(home: Material(child: Down4())));
 }

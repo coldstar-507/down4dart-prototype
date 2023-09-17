@@ -23,11 +23,6 @@ import '_page_utils.dart';
 
 final base85 = Base85Codec(Alphabets.z85);
 
-void printWrapped(String text) {
-  final pattern = RegExp('.{1,800}'); // 800 is the size of each chunk
-  pattern.allMatches(text).forEach((match) => print(match.group(0)));
-}
-
 class PaymentPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "payment";
@@ -114,9 +109,9 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
                 ConsoleButton(
                     name: "SEND",
                     onPress: () {
-                      final spender =
-                          widget.payment.txs.last.txsIn.first.spender;
-                      if (spender == g.self.id) {
+                      // final spender =
+                      //     widget.payment.txs.last.txsIn.first.spender;
+                      if (widget.payment.spender == g.self.id) {
                         widget.sendPayment(widget.payment);
                         widget.ok();
                       }
@@ -133,7 +128,7 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
       backFunction: widget.back,
       pages: [
         Down4Page(
-          title: md5(widget.payment.txs.last.txID.data).toBase58(),
+          title: md5(widget.payment.id.value.codeUnits).toBase58(),
           stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
           console: console,
         )

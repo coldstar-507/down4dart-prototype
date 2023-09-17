@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:down4/src/_dart_utils.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '_data_utils.dart';
@@ -97,7 +98,7 @@ void cacheObj(Locals obj,
 // }
 
 Future<T?> fetch<T extends Locals>(
-  ComposedID? id, {
+  Down4ID? id, {
   bool doMerge = false,
   bool doCache = true,
   ComposedID? tempID,
@@ -105,33 +106,39 @@ Future<T?> fetch<T extends Locals>(
   Map<Down4ID, Locals>? sc,
 }) async {
   Future<T?> fetchNode() async {
-    if (id == null) return null;
+    if (id is! ComposedID) return null;
     final ss = await id.nodeRef.get();
     if (!ss.exists) return null;
     final jsn = Map<String, String?>.from(ss.value as Map);
     final node = Down4Node.fromJson(jsn);
     if (doCache) node.cache(sc: sc);
-    if (doMerge) node.merge(null, sdb);
+    if (doMerge) node.merge(sdb: sdb);
     return node as T;
   }
 
   Future<T?> fetchMessage() async {
-    if (id == null) return null;
+    if (id is! ComposedID) return null;
     final m = await id.messageRef.get();
     if (!m.exists) return null;
     final jsn = Map<String, String?>.from(m.value as Map);
     final msg = Down4Message.fromJson(jsn) as Messages;
     if (doCache) msg.cache(sc: sc);
-    if (doMerge) msg.merge(null, sdb);
+    if (doMerge) msg.merge(sdb: sdb);
     return msg as T;
   }
 
   Future<Down4Media?> fetchMedia() async {
-    if (id == null && tempID == null) return null;
-    final fromNodes = tempID == null;
+    Reference ref;
+    if (id is ComposedID && tempID == null) {
+      ref = id.staticStoreRef;
+    } else if (tempID != null) {
+      ref = tempID.tempStoreRef;
+    } else {
+      return null;
+    }
+
     final idValue = tempID?.value ?? id?.value;
-    print("FETCHING MEDIA ID = $idValue FROM NODES = $fromNodes");
-    final ref = fromNodes ? id!.staticStoreRef : tempID.tempStoreRef;
+    print("FETCHING MEDIA ID = $idValue FROM NODES = ${tempID == null}");
     try {
       final futureMedia = ref.getMetadata();
       // for now seems, good to only get the data if we local merge
@@ -144,7 +151,7 @@ Future<T?> fetch<T extends Locals>(
       if (doCache) media.cache(sc: sc);
 
       if (doMerge) {
-        media.merge(null, sdb);
+        media.merge(sdb: sdb);
         if (rawData != null) await media.write(rawData);
       }
       return media;
@@ -242,14 +249,18 @@ String gdb<T extends Locals>() {
       return "messages";
     case Snip:
       return "messages";
+    case Down4TXIN:
+      return "txins";
     case Down4TXOUT:
-      return "utxos";
+      return "txouts";
     case Down4Payment:
       return "payments";
     case ExchangeRate:
       return "personals";
     case Wallet:
       return "personals";
+    case Down4TX:
+      return "transactions";
   }
 
   throw 'No db exists for type: $T';
@@ -301,7 +312,7 @@ Future<T?> global<T extends Locals>(
     return localed;
   }
   if (!doFetch) return null;
-  final fetched = await fetch<T>(id as ComposedID,
+  final fetched = await fetch<T>(id,
       doCache: doCache,
       doMerge: doMergeIfFetch,
       tempID: tempID,
@@ -543,82 +554,4 @@ Iterable<Down4ID> savedMediaIDs(MediaType t) sync* {
   }
 }
 
-extension WalletManager on Wallet {
-  Iterable<Down4Payment> get payments sync* {
-    const raw = "SELECT * FROM payments ORDER BY ts DESC";
-    final rows = db.select(raw);
-    for (final row in rows) {
-      final jsns = Map<String, String?>.from(row);
-      yield Down4Payment.fromJson(jsns);
-    }
-  }
-
-  Iterable<Down4Payment> nPayments({required int limit, int offset = 0}) sync* {
-    final raw = """
-        SELECT * FROM payments
-        ORDER BY ts DESC
-        LIMIT $limit OFFSET $offset
-        """;
-
-    final rows = db.select(raw);
-    for (final row in rows) {
-      final jsns = Map<String, String?>.from(row);
-      yield Down4Payment.fromJson(jsns);
-    }
-  }
-
-  Iterable<Down4TXOUT> get utxos sync* {
-    const raw = "SELECT * FROM utxos";
-    final rows = db.select(raw);
-    for (final row in rows) {
-      final jsns = Map<String, String?>.from(row);
-      yield Down4TXOUT.fromJson(jsns);
-    }
-  }
-
-  Down4TXOUT? getUtxo(Down4ID id) {
-    return _local<Down4TXOUT>(id);
-  }
-
-  void removeUtxo(Down4ID id) {
-    final raw = "DELETE FROM utxos WHERE id = '${id.value}';";
-    db.execute(raw);
-  }
-
-  Down4Payment? getPayment(Down4ID id) {
-    return _local<Down4Payment>(id);
-  }
-
-  void removePayment(Down4ID id) {
-    final raw = "DELETE FROM payments WHERE id = '${id.value}';";
-    db.execute(raw);
-  }
-
-  String? setPayment(Down4Payment payment) {
-    return payment.merge();
-  }
-
-  String? setUtxo(Down4TXOUT utxo) {
-    return utxo.merge();
-  }
-
-  bool isSpent(Down4ID utxoID) {
-    final raw = "SELECT * FROM spents WHERE id = '${utxoID.value}';";
-    return db.select(raw).isNotEmpty;
-  }
-
-  void setSpent(Down4ID id) {
-    final raw = "INSERT OR IGNORE INTO spents (id) VALUES ('${id.value}');";
-    db.execute(raw);
-  }
-
-  // still no use, intended as a possible control mechanism
-  void unSpend(Down4ID id) {
-    final raw = "DELETE FROM spents WHERE id = '${id.value}'";
-    db.execute(raw);
-  }
-
-  static Wallet? load() {
-    return _local<Wallet>(Down4ID(unik: "single"));
-  }
-}
+mixin WalletManager {}

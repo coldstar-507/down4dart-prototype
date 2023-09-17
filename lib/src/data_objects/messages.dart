@@ -214,7 +214,7 @@ mixin Reads on Down4Message, Locals {
   bool get isRead;
   void markRead() {
     if (isRead) return;
-    merge({"isRead": (_isRead = true).toString()});
+    merge(vals: {"isRead": (_isRead = true).toString()});
   }
 }
 
@@ -485,7 +485,7 @@ class Chat extends Down4Message
 
   void mergeReactions() {
     final jsonRs = reactions.map((k, e) => MapEntry(k.value, e.toJson()));
-    merge({"reactions": youKnowEncode(jsonRs)});
+    merge(vals: {"reactions": youKnowEncode(jsonRs)});
   }
 
   Chat(
@@ -523,7 +523,7 @@ class Chat extends Down4Message
 
   void markSent() {
     _isSent = true;
-    merge({"isSent": _isSent.toString()});
+    merge(vals: {"isSent": _isSent.toString()});
   }
 
   // Creates a new instance of a messages that will be uploaded

@@ -176,7 +176,25 @@ Future<Map<Down4ID, Down4TXOUT>?> getUtxos(String checkAddress) async {
 }
 
 Down4ID down4UtxoID(TXID txid, FourByteInt ix) {
-  return Down4ID(unik: sha1(txid.data + ix.data).toBase58());
+  return Down4ID(unik: md5(txid.data + ix.data).toBase58());
+}
+
+TXID calculateTXID(
+  FourByteInt versionNo,
+  VarInt inCount,
+  List<Down4TXIN> txIns,
+  VarInt outCount,
+  List<Down4TXOUT> txOuts,
+  FourByteInt nLockTime,
+) {
+  return TXID(hash256([
+    ...versionNo.data,
+    ...inCount.data,
+    ...txIns.fold(<int>[], (buf, txIn) => [...buf, ...txIn.raw]),
+    ...outCount.data,
+    ...txOuts.fold(<int>[], (buf, txOut) => [...buf, ...txOut.raw]),
+    ...nLockTime.data,
+  ]));
 }
 
 Future<Map<Down4ID, Down4TXOUT>?> checkPrivateKey(
@@ -206,6 +224,18 @@ List<int> p2pkh(List<int> rawAddress) => [
       OP.EQUALVERIFY,
       OP.CHECKSIG,
     ];
+
+/// in our case, secret will be the hash of the true secret
+// sha256 is 32 byte so... 1 + 1 + 32 + 1 = 35 bytes output
+List<int> simpleHashPuzzlePub(List<int> secret) => [
+      OP.SHA256,
+      ...OP.PUSHDATA(sha256(secret)),
+      OP.EQUAL,
+    ];
+
+// input is 33 bytes, means full is 33 + 35 = 68 bytes
+List<int> simpleHashPuzzleSig(List<int> secret) => OP.PUSHDATA(secret);
+
 
 List<int> makeDER2(ECSignature sig, int sh) {
   var rString = sig.r.toRadixString(16);

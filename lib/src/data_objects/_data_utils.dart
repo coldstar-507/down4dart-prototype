@@ -13,26 +13,28 @@ import '../data_objects/couch.dart';
 import '../globals.dart';
 import '../themes.dart';
 
-String XORedStrings(List<String> strings) {
-  if (strings.isEmpty) return "";
-  final nStrings = strings.length;
-  final singleLen = strings.first.length;
-  if (!(strings.every((element) => element.length == singleLen))) {
-    throw "XORedStrings: all strings must be of same length";
-  }
-  List<int> hash = List<int>.generate(singleLen, (_) => 0);
-  for (int i = 0; i < singleLen; i++) {
-    for (int j = 0; j < nStrings; j++) {
-      hash[i] = hash[i] ^ strings[j].codeUnitAt(i);
-    }
-  }
-  return String.fromCharCodes(hash);
-}
+// String XORedStrings(List<String> strings) {
+//   if (strings.isEmpty) return "";
+//   final nStrings = strings.length;
+//   final singleLen = strings.first.length;
+//   if (!(strings.every((element) => element.length == singleLen))) {
+//     throw "XORedStrings: all strings must be of same length";
+//   }
+//   List<int> hash = List<int>.generate(singleLen, (_) => 0);
+//   for (int i = 0; i < singleLen; i++) {
+//     for (int j = 0; j < nStrings; j++) {
+//       hash[i] = hash[i] ^ strings[j].codeUnitAt(i);
+//     }
+//   }
+//   return String.fromCharCodes(hash);
+// }
 
 class Down4ID {
   late final String unik;
   Down4ID({String? unik}) : unik = unik ?? pushKey();
   String get value => unik;
+
+  String get sqlReady => value.sqlReady;
 
   static Down4ID? fromString(String? s) {
     if (s == null) return null;
@@ -83,7 +85,7 @@ class ComposedID extends Down4ID {
 }
 
 extension IterableDown4IDs on Iterable<Down4ID> {
-  String get values => map((e) => e.value).toList().join(" ");
+  String get values => map((e) => e.value).join(" ");
 }
 
 extension ToDown4IDs on String? {
@@ -115,6 +117,15 @@ mixin Jsons {
   Map<String, String> toJson();
 }
 
+extension QuoteQuote on String {
+  String get sqlReady {
+    final sbuf = StringBuffer("'");
+    sbuf.write(replaceAll("'", "''"));
+    sbuf.write("'");
+    return sbuf.toString();
+  }
+}
+
 extension SQLStatements on Map<String, String> {
   String get sqlUpdateFmtParams {
     // key1 = 'val1', key2 = 'val2'
@@ -126,13 +137,13 @@ extension SQLStatements on Map<String, String> {
   String get sqlUpdateFmt {
     // key1 = 'val1', key2 = 'val2'
     final buf = StringBuffer();
-    buf.writeAll(entries.map((e) => "${e.key} = '${e.value}'"), ",");
+    buf.writeAll(entries.map((e) => "${e.key} = ${e.value.sqlReady}"), ",");
     return buf.toString();
   }
 
   String get sqlInsertValues {
     final buf = StringBuffer("(");
-    buf.writeAll(values.map((e) => "'$e'"), ",");
+    buf.writeAll(values.map((e) => e.sqlReady), ",");
     buf.write(")");
     return buf.toString();
   }
@@ -150,74 +161,105 @@ extension SQLStatements on Map<String, String> {
     buf.write(")");
     return buf.toString();
   }
+
+  String sqlInsertStr(String table) {
+    return """
+    INSERT INTO $table
+    $sqlInsertKeys
+    VALUES $sqlInsertValues;
+    """;
+  }
+
+  String sqlUpdateStr(String table, String id) {
+    return """
+    UPDATE $table
+    SET $sqlUpdateFmt
+    WHERE id = ${id.sqlReady};
+    """;
+  }
 }
 
 mixin Locals on Down4Object, Jsons {
   String get table;
-  //Database get dbb;
+
   void cache({bool ifAbsent = false, Map<Down4ID, Locals>? sc}) =>
       cacheObj(this, ifAbsent: ifAbsent, sCache: sc);
 
-  Future<void> delete() async {
-    final q = "DELETE FROM $table WHERE id = ?";
+  String? delete({bool stmt = false}) {
+    final q = "DELETE FROM $table WHERE id = ${id.value.sqlReady};";
+    if (stmt) return q;
     try {
       db.execute(q, [id.value]);
     } catch (e) {
       print("error deleting $runtimeType ${id.value}: $e");
     }
     unCache(id);
+    return null;
+  }
+
+  bool existsLocally() {
+    final q = "SELECT id FROM $table WHERE id = ${id.sqlReady}";
+    return db.select(q).isNotEmpty;
   }
 
   @override
   Map<String, String> toJson({bool includeLocal = false});
 
-  String? merge([Map<String, String>? values, sql.Database? sdb]) {
+  String? merge({
+    Map<String, String>? vals,
+    sql.Database? sdb,
+    bool stmt = false,
+    bool ifNotPresent = false,
+  }) {
     final db_ = sdb ?? db;
 
     print("TABLE NAME=$table");
-    final r = db.select("SELECT id FROM $table WHERE id = ?", [id.value]);
-    final bool wasLocal = r.isNotEmpty;
+    final bool isLocal = existsLocally();
+    if (isLocal && ifNotPresent) return null;
 
     Map<String, String> toMerge;
-    String pre, prt;
-    if (!wasLocal) {
+    String pre, prt, qStr;
+    if (!isLocal) {
       // then we need to merge the whole thing with the parameter values
-      toMerge = {...toJson(includeLocal: true), ...?values};
-      pre = """
-      INSERT INTO $table
-      ${toMerge.sqlInsertKeys}
-      VALUES ${toMerge.sqlInsertValuesParams};
-      """;
+      toMerge = {...toJson(includeLocal: true), ...?vals};
+      qStr = toMerge.sqlInsertStr(table);
+      // pre = """
+      // INSERT INTO $table
+      // ${toMerge.sqlInsertKeys}
+      // VALUES ${toMerge.sqlInsertValuesParams};
+      // """;
 
-      // just for print/debugging, will remove
-      prt = """\n
-      INSERT INTO $table
-      ${toMerge.sqlInsertKeys}
-      VALUES ${toMerge.sqlInsertValues};
-      \n
-      """;
+      // // just for print/debugging, will remove
+      // prt = """\n
+      // INSERT INTO $table
+      // ${toMerge.sqlInsertKeys}
+      // VALUES ${toMerge.sqlInsertValues};
+      // \n
+      // """;
     } else {
       // we merge given values, or the values from the probably freshly
       // fetched object without the local values to not overwrite them
-      toMerge = values ?? toJson(includeLocal: false);
-      pre = """
-      UPDATE $table
-      SET ${toMerge.sqlUpdateFmtParams}
-      WHERE id = '${id.value}';
-      """;
+      toMerge = vals ?? toJson(includeLocal: false);
+      qStr = toMerge.sqlUpdateStr(table, id.value);
+      // pre = """
+      // UPDATE $table
+      // SET ${toMerge.sqlUpdateFmtParams}
+      // WHERE id = '${id.value}';
+      // """;
 
-      // just for print/debugging, will remove
-      prt = """\n
-      UPDATE $table
-      SET ${toMerge.sqlUpdateFmt}
-      WHERE id = '${id.value}';
-      \n
-      """;
+      // // just for print/debugging, will remove
+      // prt = """\n
+      // UPDATE $table
+      // SET ${toMerge.sqlUpdateFmt}
+      // WHERE id = '${id.value}';
+      // \n
+      // """;
     }
+    print("merge statement:\n$qStr");
+    if (stmt) return qStr;
 
-    print(prt);
-
-    db_.execute(pre, toMerge.values.toList());
+    db_.execute(qStr);
+    // db_.execute(pre, toMerge.values.toList());
     return null;
   }
 }
@@ -225,8 +267,8 @@ mixin Locals on Down4Object, Jsons {
 enum Region { america, europe, asia }
 
 mixin Temps on Locals {
-  @override
-  ComposedID get id;
+  // @override
+  // ComposedID get id;
 
   ComposedID? get tempID;
   int? get tempTS;

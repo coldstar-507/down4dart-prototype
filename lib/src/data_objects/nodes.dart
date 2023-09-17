@@ -49,6 +49,7 @@ enum NodesColor {
   unsafeTx,
   self,
 }
+
 mixin PaletteN on Down4Object {
   Color get color;
   Nodes get type;
@@ -205,7 +206,7 @@ abstract class Down4Node with Down4Object, Jsons, Locals, PaletteN {
 
   void updateActivity([int? newActivity]) {
     _activity = newActivity ?? makeTimestamp();
-    merge({"activity": _activity.toString()});
+    merge(vals: {"activity": _activity.toString()});
   }
 
   factory Down4Node.fromJson(Map<String, String?> json) {
@@ -346,7 +347,7 @@ mixin ConnectN on RemoteN, Down4Node {
   bool get isConnected;
   void updateConnectionStatus(bool isConnected) {
     _isConnected = isConnected;
-    merge({"isConnected": isConnected.toString()});
+    merge(vals: {"isConnected": isConnected.toString()});
   }
 
   Stream<DatabaseEvent> get connection {
@@ -394,7 +395,7 @@ mixin BranchN on ConnectN, Down4Node {
     }
     treeHash = tree;
     final jsnTree = tree.map((key, value) => MapEntry(key.value, value));
-    merge({"treeHash": youKnowEncode(jsnTree)});
+    merge(vals: {"treeHash": youKnowEncode(jsnTree)});
   }
 
   @override
@@ -415,7 +416,7 @@ mixin BranchN on ConnectN, Down4Node {
         hash[j] = hash[j] ^ hashes[i][j];
       }
     }
-    
+
     return hash.toBase64();
   }
 }
@@ -442,7 +443,7 @@ mixin ChatN on Down4Node, Locals {
   ComposedID get id => _id as ComposedID;
 
   @override
-  Future<void> delete() async {
+  String? delete({bool stmt = false}) {
     print("DELETING ChatN, unik: ${id.unik}");
     // must also delete all related chats
     const q = "SELECT * FROM messages WHERE root = ?";
@@ -453,9 +454,10 @@ mixin ChatN on Down4Node, Locals {
     });
 
     for (final m in msgs) {
-      await m.delete();
+      m.delete();
     }
-    await super.delete();
+    super.delete();
+    return null;
   }
 
   String root(ComposedID selfID) {
@@ -477,7 +479,6 @@ mixin ChatN on Down4Node, Locals {
       return [g.self, this as PersonN];
     }
   }
-
 
   Iterable<ComposedID> fullChatIDs() sync* {
     final q = """
@@ -586,12 +587,12 @@ mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
   void updateLastOnline(int? lastOnline) {
     if (lastOnline == null) return;
     _lastOnline = lastOnline;
-    merge({"lastOnline": _lastOnline.toString()});
+    merge(vals: {"lastOnline": _lastOnline.toString()});
   }
 
   void updateMessagingToken(Map<String, String> newToken) {
     _messagingTokens = {...?_messagingTokens, ...newToken};
-    merge({"messagingTokens": jsonEncode(messagingTokens)});
+    merge(vals: {"messagingTokens": jsonEncode(messagingTokens)});
   }
 
   @override
@@ -605,22 +606,22 @@ mixin PersonN on ConnectN, ChatN, GeoN, BranchN {
 mixin EditN on Down4Node {
   void editName(String newName) {
     _name = newName;
-    merge({"name": _name});
+    merge(vals: {"name": _name});
   }
 
   void editLastName(String? newLastName) {
     _lastName = newLastName;
-    merge({"lastName": _lastName ?? ""});
+    merge(vals: {"lastName": _lastName ?? ""});
   }
 
   void editImage(Down4Media newImage) {
     _mediaID = newImage.id;
-    merge({"mediaID": _mediaID!.value});
+    merge(vals: {"mediaID": _mediaID!.value});
   }
 
   void editDescription(String newDescription) {
     _description = newDescription;
-    merge({"description": _description!});
+    merge(vals: {"description": _description!});
   }
 }
 
@@ -628,7 +629,7 @@ mixin GeoN on Geo, Down4Node {
   void updateLocation(double lon, double lat) {
     _longitude = lon;
     _latitude = lat;
-    merge({"longitude": lon.toString(), "latitude": lat.toString()});
+    merge(vals: {"longitude": lon.toString(), "latitude": lat.toString()});
   }
 }
 
@@ -878,7 +879,7 @@ class Group extends Down4Node
 
   void addMembersRef(Iterable<ComposedID> memberIDs) {
     _members!.addAll(memberIDs);
-    merge({"members": members.values});
+    merge(vals: {"members": members.values});
   }
 
   bool get isPrivate => _isPrivate!;
@@ -954,20 +955,37 @@ class PaymentNode with Down4Object implements PaletteN {
   }) : _payment = payment;
 
   @override
-  String get displayName => payment.formattedName(selfID);
+  String get displayName => payment.formattedName;
 
   Down4Payment get payment => _payment;
 
   @override
-  String get displayID =>
-      "Confirmations: ${_payment.lastConfirmations > 100 ? "100+" : _payment.lastConfirmations}";
+  String get displayID {
+    final buf = StringBuffer("Confirmations: ");
+    final confs = payment.confirmations;
+    if (confs > 100) {
+      buf.write("100+");
+    } else if (confs > 0) {
+      buf.write(confs.toString());      
+    } else if (confs == -1) {
+      buf.write("unsettled");
+    } else if (confs == 0) {
+      buf.write("accepted");
+    }
+    return buf.toString();
+  }
 
   @override
-  Color get color => _payment.lastConfirmations == 0
-      ? g.theme.nodeColors[NodesColor.unsafeTx]!
-      : _payment.lastConfirmations < 6
-          ? g.theme.nodeColors[NodesColor.mediumTx]!
-          : g.theme.nodeColors[NodesColor.safeTx]!;
+  Color get color {
+    final confs = payment.confirmations;
+    if (confs == -1) {
+      return g.theme.nodeColors[NodesColor.unsafeTx]!;
+    } else if (confs < 6) {
+      return g.theme.nodeColors[NodesColor.mediumTx]!;
+    } else {
+      return g.theme.nodeColors[NodesColor.safeTx]!;
+    }
+  }
 
   @override
   Nodes get type => Nodes.payment;
