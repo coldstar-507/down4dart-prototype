@@ -956,7 +956,7 @@ class Down4TX with Down4Object, Jsons, Locals {
             return Down4TXIN.fromJson(jsns);
           })
           .toList()
-          .inThatOrder(ins)
+          .specificOrder(ins)
           .toList();
     }
 
@@ -975,7 +975,7 @@ class Down4TX with Down4Object, Jsons, Locals {
             return Down4TXOUT.fromJson(jsns);
           })
           .toList()
-          .inThatOrder(outs)
+          .specificOrder(outs)
           .toList();
     }
 

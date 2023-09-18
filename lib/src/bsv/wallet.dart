@@ -558,7 +558,7 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
           return Down4TX.fromJson(jsns);
         })
         .toList()
-        .inThatOrder(txids);
+        .specificOrder(txids);
   }
 
   // Future<void> _updateStatus(Down4Payment payment) async {
