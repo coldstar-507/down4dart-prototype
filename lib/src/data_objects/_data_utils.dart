@@ -102,6 +102,15 @@ extension ToDown4IDs on String? {
       .toSet();
 }
 
+extension Down4Objects<T extends Down4Object> on List<T> {
+  Iterable<T> inThatOrder(Iterable<Down4ID> ids) sync* {
+    final m = asMap().map((k, v) => MapEntry(v.id, v));
+    for (final id in ids) {
+      yield m[id] as T;
+    }
+  }
+}
+
 mixin Down4Object {
   Down4ID get id;
 

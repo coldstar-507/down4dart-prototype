@@ -242,7 +242,8 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
         outs: txOuts.map((e) => e.id).toList(),
         nLock: nLockTime);
 
-    final chainedTxs = [...loadTXs(dependances(theTx.txID)), theTx];
+    final deps = dependances(theTx.txID).asDown4IDs();
+    final chainedTxs = [...loadTXs(deps), theTx];
 
     return Down4Payment(Down4ID(),
         txid: theTx.txID,
@@ -519,7 +520,7 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
       [head]
     ];
     do {
-      final txs = loadTXs(ch.last);
+      final txs = loadTXs(ch.last.asDown4IDs());
       final Set<TXID> refs = txs
           .map((tx) => tx.txsIn.map((txin) => txin.utxoTXID))
           .expand((txid) => txid)
@@ -543,16 +544,21 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
     return sortedChain.toList();
   }
 
-  static List<Down4TX> loadTXs(Iterable<TXID> txids) {
-    final refstr = txids.map((txid) => txid.asBase64.sqlReady).join(",");
+  // TODO: that doesn't work, we want a specific order
+  static Iterable<Down4TX> loadTXs(Iterable<Down4ID> txids) {
+    final refstr = txids.map((txid) => txid.sqlReady).join(",");
     final q = """
         SELECT * FROM transactions
         WHERE id IN ($refstr)
         """;
-    return db.select(q).map((e) {
-      final jsns = Map<String, String?>.from(e);
-      return Down4TX.fromJson(jsns);
-    }).toList();
+    return db
+        .select(q)
+        .map((e) {
+          final jsns = Map<String, String?>.from(e);
+          return Down4TX.fromJson(jsns);
+        })
+        .toList()
+        .inThatOrder(txids);
   }
 
   // Future<void> _updateStatus(Down4Payment payment) async {

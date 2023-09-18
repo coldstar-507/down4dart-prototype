@@ -187,9 +187,9 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     });
   }
 
-  List<Down4TX> get txs => _txs ??= Wallet.loadTXs(chain);
+  List<Down4TX> get txs => _txs ??= Wallet.loadTXs(chain.toList()).toList();
 
-  List<TXID> get chain => [...Wallet.dependances(txid), txid];
+  Iterable<Down4ID> get chain => [...Wallet.dependances(txid), txid].asDown4IDs();
 
   ComposedID? _tempID;
   int? _tempTS;
@@ -949,10 +949,15 @@ class Down4TX with Down4Object, Jsons, Locals {
       // TODO: SAME PROBLEM OF ORDER WITH TRANSACTIONS IN PAYMENTS!!
       // this doesn't specify the order! order is important dummy!!
       final q = "SELECT * FROM txins WHERE id IN (${sbuf.toString()})";
-      return db.select(q).map((e) {
-        final jsns = Map<String, String?>.from(e);
-        return Down4TXIN.fromJson(jsns);
-      }).toList();
+      return db
+          .select(q)
+          .map((e) {
+            final jsns = Map<String, String?>.from(e);
+            return Down4TXIN.fromJson(jsns);
+          })
+          .toList()
+          .inThatOrder(ins)
+          .toList();
     }
 
     return _txsIn ??= getEm();
@@ -963,10 +968,15 @@ class Down4TX with Down4Object, Jsons, Locals {
       final sbuf = StringBuffer();
       sbuf.writeAll(outs.map((e) => e.value.sqlReady), ",");
       final q = "SELECT * FROM txouts WHERE id IN (${sbuf.toString()})";
-      return db.select(q).map((e) {
-        final jsns = Map<String, String?>.from(e);
-        return Down4TXOUT.fromJson(jsns);
-      }).toList();
+      return db
+          .select(q)
+          .map((e) {
+            final jsns = Map<String, String?>.from(e);
+            return Down4TXOUT.fromJson(jsns);
+          })
+          .toList()
+          .inThatOrder(outs)
+          .toList();
     }
 
     return _txsOut ??= getEm();

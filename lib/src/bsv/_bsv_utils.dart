@@ -22,6 +22,12 @@ import 'dart:io' as io;
 
 final listEqual_ = const ListEquality().equals;
 
+extension TXIDS on Iterable<TXID> {
+  Iterable<Down4ID> asDown4IDs() => map((e) => Down4ID(unik: e.asBase64));
+}
+
+ 
+
 // extension on List<int> {
 //   Uint8List toUint8List() => Uint8List.fromList(this);
 //   String toBase58() => base58.encode(toUint8List());
@@ -235,7 +241,6 @@ List<int> simpleHashPuzzlePub(List<int> secret) => [
 
 // input is 33 bytes, means full is 33 + 35 = 68 bytes
 List<int> simpleHashPuzzleSig(List<int> secret) => OP.PUSHDATA(secret);
-
 
 List<int> makeDER2(ECSignature sig, int sh) {
   var rString = sig.r.toRadixString(16);
