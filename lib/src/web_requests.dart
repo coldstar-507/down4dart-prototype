@@ -49,8 +49,9 @@ Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
     "https://us-east1-down4-26ee1.cloudfunctions.net/imageGenerationRequest",
   );
   print(pairs);
-  final imageGenRes = await http.post(url,
-      headers: {"Content-Type": "application/json"}, body: jsonEncode(pairs));
+  const headers = {"Content-Type": "application/json"};
+  final body = jsonEncode(pairs);
+  final imageGenRes = await http.post(url, body: body, headers: headers);
   if (imageGenRes.statusCode != 200) return null;
   final json = jsonDecode(imageGenRes.body);
   final image = base64Decode(json["image"]);
@@ -58,7 +59,6 @@ Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
   return Pair(image, Pair(prompt.first, prompt.last));
 }
 
-// TODO Might need adjustment for big batches
 Future<void> broadcastTxs(List<Down4TX> txs) async {
   final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
   List<Future<http.Response>> responses = [];
@@ -90,20 +90,6 @@ Future<void> broadcastTxs(List<Down4TX> txs) async {
       );
     }
   }
-
-  // final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
-  // List<Future<http.Response>> responses = [];
-  // for (final tx in txs) {
-  //   print("Full raw =============\n${tx.fullRawHex}\n==================");
-  //   responses.add(http.post(url, body: jsonEncode({"txhex": tx.fullRawHex})));
-  // }
-
-  // var failedBroadcast = <Pair<int, String>>[];
-  // for (int i = 0; i < txs.length; i++) {
-  //   var res = await responses[i];
-  //   if (res.statusCode != 200) failedBroadcast.add(Pair(i, res.body));
-  // }
-  // return failedBroadcast;
 }
 
 Future<Map<String, int?>> confirmations(List<String> txids) async {
@@ -120,6 +106,7 @@ Future<Map<String, int?>> confirmations(List<String> txids) async {
   var inTwoSeconds = DateTime.now().add(twoSeconds);
   for (int t = 0; t < twenties.length; t++) {
     final now = DateTime.now();
+    // this is to respect the 3 request / second limit given by whatsonchain
     if (t % 3 == 0 && now.isBefore(inTwoSeconds)) {
       await Future.delayed(inTwoSeconds.difference(now));
       inTwoSeconds = DateTime.now().add(twoSeconds);
@@ -138,46 +125,14 @@ Future<Map<String, int?>> confirmations(List<String> txids) async {
       prettyPrint(jsonDecode(res.body));
       final trf = List.from(jsonDecode(res.body)).asMap().map((_, e) {
         final String txid = e["txid"];
-        final int confs = e["confirmations"];
+        final int? confs = e["confirmations"];
         return MapEntry(txid, confs);
       });
       status.addAll(trf);
     }
   }
-
   return status;
-
-  // single threading it for now
-  // for (final txids in twentyTxsLists) {
-  //   if (txsID.isEmpty) return null;
-  //   final url =
-  //       Uri.parse(
-  //   var res = await http.post(url, body: jsonEncode({"txids": txids}));
-  //   if (res.statusCode != 200) {
-  //     print("Error getting status of transactions");
-  //   } else {
-  //     var answers = jsonDecode(res.body);
-  //     final iStatus = List.from(answers)
-  //         .map((e) => (e["confirmations"] ?? 0) as int)
-  //         .toList();
-  //     status.add(iStatus);
-  //   }
-  // }
-
-  // return status.expand((element) => element).toList(growable: false);
 }
-
-// Future<Down4Payment?> getPayment(String paymentID) async {
-//   final url = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/GetPayment",
-//   );
-//   final req = await http.post(url, body: paymentID);
-//   if (req.statusCode != 200) {
-//     print("error getting payment, id: $paymentID\n");
-//     return null;
-//   }
-//   return Down4Payment.fromJson(jsonDecode(req.body));
-// }
 
 Future<double?> getExchangeRate() async {
   final url = Uri.parse(
