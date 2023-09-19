@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:io' as io;
 
-import 'package:down4/src/pages/money_page.dart';
-
 import '../_dart_utils.dart';
 import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
@@ -242,12 +240,9 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
         outs: txOuts.map((e) => e.id).toList(),
         nLock: nLockTime);
 
-    final deps = dependances(theTx.txID).asDown4IDs();
-    final chainedTxs = [...loadTXs(deps), theTx];
-
     return Down4Payment(Down4ID(),
         txid: theTx.txID,
-        txs: chainedTxs,
+        txs: fullChain(theTx),
         tip: tip,
         discount: discount,
         spender: g.self.id,
@@ -515,36 +510,36 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
         textNote: "Imported");
   }
 
-  static List<TXID> dependances(TXID head) {
-    List<List<TXID>> ch = [
+  static List<Down4TX> fullChain(Down4TX head) {
+    List<List<Down4TX>> ch = [
       [head]
     ];
     do {
-      final txs = loadTXs(ch.last.asDown4IDs());
+      final txs = ch.last;
       final Set<TXID> refs = txs
           .map((tx) => tx.txsIn.map((txin) => txin.utxoTXID))
           .expand((txid) => txid)
           .toSet();
       final refstr = refs.map((txid) => txid.asBase64.sqlReady).join(",");
       final q = """
-        SELECT id FROM transactions
+        SELECT * FROM transactions
         WHERE confirmations = '-1' AND id IN ($refstr)
         """;
-      final r = db.select(q).map((e) => TXID.fromBase64(e["id"]));
+      final r = db.select(q).map((e) {
+        final jsns = Map<String, String?>.from(e);
+        return Down4TX.fromJson(jsns);
+      });
       ch.add(r.toList());
     } while (ch.last.isNotEmpty);
 
-    Set<TXID> sortedChain = {};
-    for (final ids in ch.sublist(1).reversed) {
-      for (final id in ids) {
-        sortedChain.add(id);
-      }
+    Set<Down4TX> sortedChain = {};
+    for (final xs in ch.reversed) {
+      sortedChain.addAll(xs);
     }
 
     return sortedChain.toList();
   }
 
-  // TODO: that doesn't work, we want a specific order
   static Iterable<Down4TX> loadTXs(Iterable<Down4ID> txids) {
     final refstr = txids.map((txid) => txid.sqlReady).join(",");
     final q = """

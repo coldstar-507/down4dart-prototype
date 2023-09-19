@@ -26,15 +26,6 @@ extension TXIDS on Iterable<TXID> {
   Iterable<Down4ID> asDown4IDs() => map((e) => Down4ID(unik: e.asBase64));
 }
 
- 
-
-// extension on List<int> {
-//   Uint8List toUint8List() => Uint8List.fromList(this);
-//   String toBase58() => base58.encode(toUint8List());
-//   String toBase64() => base64.encode(this);
-//   String toHex() => hex.encode(this);
-// }
-
 int randomSats() {
   return Random().nextInt(50);
 }

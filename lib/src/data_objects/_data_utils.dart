@@ -107,8 +107,13 @@ extension Down4Objects<T extends Down4Object> on List<T> {
     final m = asMap().map((k, v) => MapEntry(v.id, v));
     for (final id in ids) {
       final e = m[id];
-      if (e is T) yield e;
-      // yield m[id] as T;
+      if (e is T) {
+        yield e;
+      } else {
+        final ids_ = map((e) => e.id.value);
+        throw "${id.value} is not part of the iterable: $ids_";
+      }
+      yield m[id] as T;
     }
   }
 }

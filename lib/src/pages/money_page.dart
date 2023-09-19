@@ -778,42 +778,33 @@ class _MoneyPageState extends State<MoneyPage>
     }
   }
 
-  ConsoleRow get baseRow => trueTargets.isEmpty
-      ? ConsoleRow(
+  ConsoleRow get baseRow {
+    if (trueTargets.isEmpty) {
+      return ConsoleRow(
+        widgets: [
+          scanButton.withExtra(extraButton, [
+            openImportButton,
+            payButton,
+            billButton,
+          ]),
+          mainInput.consoleInput,
+          currencyButton,
+        ],
+        extension: scanning ? (scanExtension, g.sizes.w) : null,
+        widths: mainInput.hasFocus ? [0.2, 0.6, 0.2] : null,
+        inputMaxHeight: null,
+      );
+    } else if (trueTargets.length == 1) {
+      return ConsoleRow(
           widgets: [
-            scanButton.withExtra(extraButton, [
+            payButton.withExtra(extraButton, [
               openImportButton,
-              payButton,
+              scanButton,
               billButton,
             ]),
             mainInput.consoleInput,
             currencyButton,
           ],
-          extension: scanning ? (scanExtension, g.sizes.w) : null,
-          widths: mainInput.hasFocus ? [0.2, 0.6, 0.2] : null,
-          inputMaxHeight: null,
-        )
-      : ConsoleRow(
-          widgets: trueTargets.length == 1
-              ? [
-                  payButton.withExtra(extraButton, [
-                    openImportButton,
-                    scanButton,
-                    billButton,
-                  ]),
-                  mainInput.consoleInput,
-                  currencyButton,
-                ]
-              : [
-                  payButton.withExtra(extraButton, [
-                    openImportButton,
-                    scanButton,
-                    billButton,
-                  ]),
-                  mainInput.consoleInput,
-                  currencyButton,
-                  modeButton,
-                ],
           extension: scanning ? (scanExtension, g.sizes.w) : null,
           widths: people.length == 1
               ? mainInput.hasFocus
@@ -823,6 +814,29 @@ class _MoneyPageState extends State<MoneyPage>
                   ? [0.2, 0.4, 0.2, 0.2]
                   : null,
           inputMaxHeight: null);
+    } else {
+      return ConsoleRow(
+          widgets: [
+            payButton.withExtra(extraButton, [
+              openImportButton,
+              scanButton,
+              billButton,
+            ]),
+            mainInput.consoleInput,
+            currencyButton,
+            modeButton,
+          ],
+          extension: scanning ? (scanExtension, g.sizes.w) : null,
+          widths: people.length == 1
+              ? mainInput.hasFocus
+                  ? [0.2, 0.6, 0.2]
+                  : null
+              : mainInput.hasFocus
+                  ? [0.2, 0.4, 0.2, 0.2]
+                  : null,
+          inputMaxHeight: null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

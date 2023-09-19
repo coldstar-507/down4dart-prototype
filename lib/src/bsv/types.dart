@@ -119,7 +119,14 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   }
 
   Future<void> trySettlement() async {
+    if (validForBroadcast) {
     return r.broadcastTxs(txs);
+    } else {
+      print("""
+        ================== WARNING =====================
+        Payment id: ${id.value} is invalid for broadcast
+        """);
+    }
   }
 
   final TXID txid;
@@ -187,9 +194,17 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     });
   }
 
-  List<Down4TX> get txs => _txs ??= Wallet.loadTXs(chain.toList()).toList();
+  List<Down4TX> get txs {
+    List<Down4TX> loadEm() {
+      final head = Wallet.loadTX(txid.asBase64);
+      if (head == null) return [];
+      return Wallet.fullChain(head);
+    }
 
-  Iterable<Down4ID> get chain => [...Wallet.dependances(txid), txid].asDown4IDs();
+    return _txs ??= loadEm();
+  }
+
+  // Iterable<Down4ID> get chain => [...Wallet.dependances(txid), txid].asDown4IDs();
 
   ComposedID? _tempID;
   int? _tempTS;
@@ -201,6 +216,15 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   int? get tempTS => _tempTS;
 
   double? discount, tip;
+
+  bool get validForBroadcast {
+    for (final tx in txs) {
+      final hasAllTxins = tx.ins.length == tx.txsIn.length;
+      final hasAllTxouts = tx.outs.length == tx.txsOut.length;
+      if (!(hasAllTxins && hasAllTxouts)) return false;
+    }
+    return true;
+  }
 
   Down4Payment(
     this.id, {

@@ -30,9 +30,9 @@ class ConsoleButton extends StatelessWidget {
   final bool isInverted;
   final BorderRadius? border;
 
-  double? _mainButtonTextWidth;
+  // double? _mainButtonTextWidth;
 
-  set mainButtonTextWidth(double mw) => _mainButtonTextWidth = mw;
+  // set mainButtonTextWidth(double mw) => _mainButtonTextWidth = mw;
 
   // double maxButtonTextWidth() => [this, ...?extraButtons].fold(0.0, (prv, e) {
   //       final (text, style) = (e.name, g.theme.consoleButtonTextStyle());
@@ -41,18 +41,18 @@ class ConsoleButton extends StatelessWidget {
   //       return math.max(prv, (span..layout()).width);
   //     });
 
-  double get buttonTextWidth {
-    double calculateIt() {
-      final style = g.theme.consoleButtonTextStyle();
-      final tspan = TextSpan(text: name , style: style);
-      final span = TextPainter(text: tspan, textDirection: TextDirection.ltr);
-      return (span..layout()).width;
-    }
+  // double get buttonTextWidth {
+  //   double calculateIt() {
+  //     final style = g.theme.consoleButtonTextStyle();
+  //     final tspan = TextSpan(text: name , style: style);
+  //     final span = TextPainter(text: tspan, textDirection: TextDirection.ltr);
+  //     return (span..layout()).width;
+  //   }
 
-    return _mainButtonTextWidth ??= calculateIt();
-  }
+  //   return _mainButtonTextWidth ??= calculateIt();
+  // }
 
-  ConsoleButton({
+  const ConsoleButton({
     this.extra,
     this.icon,
     this.isInverted = false,
@@ -162,9 +162,9 @@ class ConsoleButton extends StatelessWidget {
       throw 'ConsoleButton error: Either icon or name must not be null';
     }
 
-    return LayoutBuilder(builder: (context, constrains) {
-      final double bwidth = constrains.maxWidth;
-      final double leftPad = (bwidth - buttonTextWidth) / 2.0;
+    // return LayoutBuilder(builder: (context, constrains) {
+      // final double bwidth = constrains.maxWidth;
+      // final double leftPad = (bwidth - buttonTextWidth) / 2.0;
 
       // print("""
       //   full    width = ${g.sizes.w}
@@ -208,7 +208,7 @@ class ConsoleButton extends StatelessWidget {
           ),
         ),
       );
-    });
+  //});
   }
 }
 
@@ -1189,9 +1189,9 @@ class Console3 {
 
         final nButton = b.extraButtons!.length;
 
-        for (final eb in b.extraButtons!) {
-          eb.mainButtonTextWidth = b.buttonTextWidth;
-        }
+        // for (final eb in b.extraButtons!) {
+        //   eb.mainButtonTextWidth = b.buttonTextWidth;
+        // }
 
         return Positioned(
           left: position.dx - Console.borderWidth,
