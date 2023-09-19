@@ -963,10 +963,16 @@ class PaymentNode with Down4Object implements PaletteN {
   String get displayID {
     final buf = StringBuffer("Confirmations: ");
     final confs = payment.confirmations;
+
+    final txs = payment.txs;
+    if (txs.isNotEmpty && txs.last.id.value != payment.txid.asBase64) {
+      throw "last tx of payment chained tx != it's related tx!";
+    }
+
     if (confs > 100) {
       buf.write("100+");
     } else if (confs > 0) {
-      buf.write(confs.toString());      
+      buf.write(confs.toString());
     } else if (confs == -1) {
       buf.write("unsettled");
     } else if (confs == 0) {

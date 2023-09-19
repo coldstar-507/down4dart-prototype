@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:url_launcher/url_launcher.dart';
 import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/_dart_utils.dart';
@@ -124,12 +125,28 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
 
   @override
   Widget build(BuildContext context) {
+    final tst = g.theme.paletteNameStyle(selected: false);
+    final urltst = tst.copyWith(color: Colors.blue);
     return Andrew(
       backFunction: widget.back,
       pages: [
         Down4Page(
           title: md5(widget.payment.id.value.codeUnits).toBase58(),
           stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
+          list: [
+            Center(
+              child: Column(children: [
+                GestureDetector(
+                  onTap: () => launchUrl(Uri.parse(
+                      "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}")),
+                  child:
+                      Text("TXID: ${widget.payment.txid.asHex}", style: urltst),
+                ),
+                Text("Confirmations: ${widget.payment.confirmations}",
+                    style: tst),
+              ]),
+            ),
+          ],
           console: console,
         )
       ],
@@ -840,7 +857,6 @@ class _MoneyPageState extends State<MoneyPage>
 
   @override
   Widget build(BuildContext context) {
-    print("PALLETSN = ${_payments.length}");
     return Andrew(
       backFunction: widget.back,
       initialPageIndex: widget.viewState.currentIndex,

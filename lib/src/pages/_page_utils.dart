@@ -745,6 +745,7 @@ mixin Transition2 on Pager2 {
       if (there) trueTargets.add(p.node as PersonN);
       if (wasHid) nHidden++;
       return Palette(
+          key: Key(p.node.id.unik),
           node: p.node,
           sizeAnim: there ? null : sizeAnim_,
           fadeAnim: there ? null : fadeAnim_,

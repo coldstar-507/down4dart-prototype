@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:down4/src/pages/preview_page.dart';
 import 'package:down4/src/themes.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
+// import 'package:firebase_auth/firebase_auth.dart' as auth;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -797,7 +797,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           ButtonsInfo2(
               asset: Icon(Icons.arrow_forward_ios_rounded,
                   color: g.theme.noMessageArrowColor),
-              pressFunc: () => openPay(p))
+              pressFunc: () => openPay(p)),
         ];
       } else {
         return [];

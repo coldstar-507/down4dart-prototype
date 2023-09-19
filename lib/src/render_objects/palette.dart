@@ -361,7 +361,7 @@ class Palette extends StatelessWidget
     this.imLongPress,
     this.bodyLongPress,
     this.selected = false,
-    Key? key,
+    required Key? key,
   })  : _image = node.nodeImage(Size.square(fullHeight - (2 * padding))),
         super(key: key);
 
