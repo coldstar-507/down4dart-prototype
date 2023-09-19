@@ -27,19 +27,15 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
 
   int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
 
-  Iterable<Down4TX> get unsettledTxs sync* {
-    const q = "SELECT * FROM transactions WHERE confirmations = '-1'";
-    for (final txJsn in db.select(q)) {
-      final jsns = Map<String, String?>.from(txJsn);
-      yield Down4TX.fromJson(jsns);
-    }
-  }
-  //  => payment
-  // .map((pay) => pay.txs.where((tx) => tx.confirmations == 0))
-  // .expand((tx) => tx)
-  // .toSet();
+  // Iterable<Down4TX> get allUnsettledTxs sync* {
+  //   const q = "SELECT * FROM transactions WHERE confirmations = '-1'";
+  //   for (final txJsn in db.select(q)) {
+  //     final jsns = Map<String, String?>.from(txJsn);
+  //     yield Down4TX.fromJson(jsns);
+  //   }
+  // }
 
-  Set<TXID> get uTXID => unsettledTxs.map((unsTx) => unsTx.txID).toSet();
+  // Set<TXID> get allUnsettledTXID => allUnsettledTxs.map((unsTx) => unsTx.txID).toSet();
 
   Future<void> walletRoutine() async {
     await _updateAllStatus();
@@ -61,9 +57,13 @@ class Wallet with Down4Object, Jsons, Locals, WalletManager {
     final ids = txs.map((e) => e.txID.asHex).toList();
 
     final confirmations = await r.confirmations(ids);
-    for (int i = 0; i < confirmations.length; i++) {
-      final nConf = confirmations[i];
-      txs[i].updateConfirmations(nConf ?? -1);
+    for (final confs in confirmations.entries) {
+      final c = confs.value;
+      if (c != null) {
+        final txid = TXID.fromHex(confs.key);
+        final tx = txs.singleWhere((tx) => tx.txID == txid);
+        tx.updateConfirmations(c);
+      }
     }
   }
 

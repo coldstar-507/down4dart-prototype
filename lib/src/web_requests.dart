@@ -106,7 +106,7 @@ Future<void> broadcastTxs(List<Down4TX> txs) async {
   // return failedBroadcast;
 }
 
-Future<List<int?>> confirmations(List<String> txids) async {
+Future<Map<String, int?>> confirmations(List<String> txids) async {
   const url = "https://api.whatsonchain.com/v1/bsv/test/txs/status";
   final uri = Uri.parse(url);
   List<List<String>> twenties = [];
@@ -115,14 +115,7 @@ Future<List<int?>> confirmations(List<String> txids) async {
     twenties.last.add(txids[i]);
   }
 
-  // List<List<String>> twentyTxsLists =
-  //     List.generate((txsID.length / 20).ceil(), (index) => <String>[]);
-  // for (int i = 0; i < txsID.length; i++) {
-  //   final curIndex = (i / 20).floor();
-  //   twentyTxsLists[curIndex].add(txsID[i]);
-  // }
-
-  List<int?> status = [];
+  Map<String, int?> status = {};
   const twoSeconds = Duration(seconds: 4);
   var inTwoSeconds = DateTime.now().add(twoSeconds);
   for (int t = 0; t < twenties.length; t++) {
@@ -138,15 +131,17 @@ Future<List<int?>> confirmations(List<String> txids) async {
     print("requesting status for txids: $ids");
     final res = await http.post(uri, body: body, headers: headers);
     if (res.statusCode != 200) {
+      status.addAll(ids.asMap().map((k, v) => MapEntry(v, null)));
       print("unsuccessful update status request");
-      // if error, we add nulls, which won't do anything to the #confs
-      status.addAll(List.generate(ids.length, (_) => null));
     } else {
       print("successful update status request");
       prettyPrint(jsonDecode(res.body));
-      final jsnL = List.from(jsonDecode(res.body));
-
-      status.addAll(jsnL.map((e) => e["confirmations"] as int?));
+      final trf = List.from(jsonDecode(res.body)).asMap().map((_, e) {
+        final String txid = e["txid"];
+        final int confs = e["confirmations"];
+        return MapEntry(txid, confs);
+      });
+      status.addAll(trf);
     }
   }
 
