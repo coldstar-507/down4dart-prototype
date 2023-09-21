@@ -222,6 +222,12 @@ class Singletons {
   static final Singletons _instance = Singletons();
   static Singletons get instance => _instance;
 
+  CameraDescription get frontCam =>
+      cameras.where((c) => c.lensDirection == CameraLensDirection.front).first;
+
+  CameraDescription get backCam =>
+      cameras.where((c) => c.lensDirection == CameraLensDirection.back).first;  
+  
   final ViewManager vm = ViewManager();
 
   late CurrentTheme myTheme;

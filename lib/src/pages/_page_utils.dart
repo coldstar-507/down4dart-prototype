@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/nodes.dart';
-import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
 
 import 'package:flutter/gestures.dart';
@@ -951,73 +950,6 @@ mixin Camera2 on Pager2 {
         },
       );
 
-  final _bs = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
-
-  void _imageProcess(CameraImage image) async {
-    final im = _inputImageFromCameraImage(image);
-    if (im == null) return;
-    final codes = await _bs.processImage(im);
-    if (codes.isEmpty) return;
-  }
-
-  final _orientations = {
-    DeviceOrientation.portraitUp: 0,
-    DeviceOrientation.landscapeLeft: 90,
-    DeviceOrientation.portraitDown: 180,
-    DeviceOrientation.landscapeRight: 270,
-  };
-
-  InputImage? _inputImageFromCameraImage(CameraImage image) {
-    // get image rotation
-    // it is used in android to convert the InputImage from Dart to Java
-    // `rotation` is not used in iOS to convert the InputImage from Dart to Obj-C
-    // in both platforms `rotation` and `camera.lensDirection` can be used to compensate `x` and `y` coordinates on a canvas
-    final camera = cam;
-    final sensorOrientation = camera.sensorOrientation;
-    InputImageRotation? rotation;
-    if (Platform.isIOS) {
-      rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
-    } else if (Platform.isAndroid) {
-      var rotationCompensation =
-          _orientations[cameraController!.value.deviceOrientation];
-      if (rotationCompensation == null) return null;
-      if (camera.lensDirection == CameraLensDirection.front) {
-        // front-facing
-        rotationCompensation = (sensorOrientation + rotationCompensation) % 360;
-      } else {
-        // back-facing
-        rotationCompensation =
-            (sensorOrientation - rotationCompensation + 360) % 360;
-      }
-      rotation = InputImageRotationValue.fromRawValue(rotationCompensation);
-    }
-    if (rotation == null) return null;
-
-    // get image format
-    final format = InputImageFormatValue.fromRawValue(image.format.raw);
-    // validate format depending on platform
-    // only supported formats:
-    // * nv21 for Android
-    // * bgra8888 for iOS
-    if (format == null ||
-        (Platform.isAndroid && format != InputImageFormat.nv21) ||
-        (Platform.isIOS && format != InputImageFormat.bgra8888)) return null;
-
-    // since format is constraint to nv21 or bgra8888, both only have one plane
-    if (image.planes.length != 1) return null;
-    final plane = image.planes.first;
-
-    // compose InputImage using bytes
-    return InputImage.fromBytes(
-      bytes: plane.bytes,
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: rotation, // used only in Android
-        format: format, // used only in iOS
-        bytesPerRow: plane.bytesPerRow, // used only in iOS
-      ),
-    );
-  }
 
   String get backFromCameraConsoleName => "base";
   ConsoleButton get cameraCloseButton => ConsoleButton(
@@ -1210,26 +1142,107 @@ mixin Add2 {
 
 mixin Scanner2 on Pager2 {
   void onScan(Barcode bc);
-  Widget? _scanner;
 
-  QRViewController? _ctrl;
+  CameraController? _ctrl;
 
-  void loadScanner() {
-    _scanner = null;
-    _scanner = QRView(
-      key: GlobalKey(),
-      onQRViewCreated: (ctrl) {
-        scanning = true;
-        _ctrl = ctrl;
-        ctrl.scannedDataStream.listen(onScan);
-      },
-      overlay: QrScannerOverlayShape(
-          borderWidth: 6,
-          borderColor: g.theme.headerColor,
-          cutOutSize: g.sizes.w * 0.92,
-          overlayColor: Colors.black45),
-    );
+  
+  void disposeScanner() {
+    _ctrl?.stopImageStream();
+    _ctrl?.dispose();
+    _ctrl = null;
+  }
+
+  Future<void> loadScanner() async {
+    _ctrl = CameraController(g.backCam, ResolutionPreset.low,
+        imageFormatGroup: ImageFormatGroup.nv21);
+    await _ctrl!.initialize();
+    _ctrl!.startImageStream(_imageProcess);
     setTheState();
+  }
+  
+
+  final _bs = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
+
+  void _imageProcess(CameraImage image) async {
+    final im = _inputImageFromCameraImage(image);
+    if (im == null) return;
+    final codes = await _bs.processImage(im);
+    if (codes.isEmpty) return;
+    onScan(codes.first);
+  }
+
+  final _orientations = {
+    DeviceOrientation.portraitUp: 0,
+    DeviceOrientation.landscapeLeft: 90,
+    DeviceOrientation.portraitDown: 180,
+    DeviceOrientation.landscapeRight: 270,
+  };
+
+  InputImage? _inputImageFromCameraImage(CameraImage image) {
+    // get image rotation
+    // it is used in android to convert the InputImage from Dart to Java
+    // `rotation` is not used in iOS to convert the InputImage from Dart to Obj-C
+    // in both platforms `rotation` and `camera.lensDirection` can be used to compensate `x` and `y` coordinates on a canvas
+    final cam = g.backCam;
+    final sensorOrientation = cam.sensorOrientation;
+    InputImageRotation? rotation;
+    if (Platform.isIOS) {
+      rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+    } else if (Platform.isAndroid) {
+      var rotationCompensation = _orientations[_ctrl!.value.deviceOrientation];
+      if (rotationCompensation == null) return null;
+      if (cam.lensDirection == CameraLensDirection.front) {
+        // front-facing
+        rotationCompensation = (sensorOrientation + rotationCompensation) % 360;
+      } else {
+        // back-facing
+        rotationCompensation =
+            (sensorOrientation - rotationCompensation + 360) % 360;
+      }
+      rotation = InputImageRotationValue.fromRawValue(rotationCompensation);
+    }
+    if (rotation == null) return null;
+
+    // get image format
+    final format = InputImageFormatValue.fromRawValue(image.format.raw);
+    // validate format depending on platform
+    // only supported formats:
+    // * nv21 for Android
+    // * bgra8888 for iOS
+    if (format == null ||
+        (Platform.isAndroid && format != InputImageFormat.nv21) ||
+        (Platform.isIOS && format != InputImageFormat.bgra8888)) return null;
+
+    // since format is constraint to nv21 or bgra8888, both only have one plane
+    if (image.planes.length != 1) return null;
+    final plane = image.planes.first;
+
+    // compose InputImage using bytes
+    return InputImage.fromBytes(
+      bytes: plane.bytes,
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: rotation, // used only in Android
+        format: format, // used only in iOS
+        bytesPerRow: plane.bytesPerRow, // used only in iOS
+      ),
+    );
+  }
+
+  Widget get scanExtension {
+    if (scanning) {
+      return Container(
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(
+              borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(Pager2._widgetRadius))),
+          child: SizedBox.square(
+              dimension: Console.trueWidth,
+              child: Transform.scale(
+                  scaleY: _ctrl!.value.aspectRatio, child: CameraPreview(_ctrl!))));
+    } else {
+      return const SizedBox.shrink();
+    }
   }
 
   bool scanning = false;
@@ -1237,41 +1250,16 @@ mixin Scanner2 on Pager2 {
   ConsoleButton get scanButton => ConsoleButton(
       name: "SCAN",
       isMode: scanning,
-      onPress: () {
+      onPress: () async {
         scanning = !scanning;
         if (!scanning) {
-          _ctrl?.dispose();
-          _scanner = null;
-          // _scanner?.controller?.dispose();
-          // _scanner = null;
+          disposeScanner();
         } else {
-          // Future.delayed(Andrew.pageSwitchAnimationDuration, loadScanner);
-          Future.delayed(const Duration(milliseconds: 300), loadScanner);
+          await loadScanner();
         }
         setTheState();
-      });
-
-  void disposeScanner() {
-    _ctrl?.dispose();
-    _scanner = null;
-    // _scanner?.controller?.dispose();
-  }
-
-  Widget get scanExtension => Container(
-        clipBehavior: Clip.hardEdge,
-        decoration: const BoxDecoration(
-            borderRadius: BorderRadius.vertical(
-                top: Radius.circular(Pager2._widgetRadius))),
-        // border: Border.all(
-        //     width: borderWidth, color: g.theme.consoleBorderColor)),
-        child: Stack(children: [
-          Center(
-              child: SizedBox(
-                  height: Console.trueWidth,
-                  width: Console.trueWidth,
-                  child: _scanner))
-        ]),
-      );
+      });      
+  
 }
 
 Future<Down4Media> makeCameraMedia({

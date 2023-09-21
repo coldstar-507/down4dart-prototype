@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:down4/src/data_objects/medias.dart';
 import 'package:flutter/material.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
+// import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../_dart_utils.dart';
 import '../bsv/types.dart';
@@ -112,8 +113,8 @@ class _AddFriendPageState extends State<AddFriendPage>
 
   @override
   void onScan(Barcode bc) async {
-    if (bc.code == null) return;
-    final data = bc.code!.split("%");
+    if (bc.rawValue == null) return;
+    final data = bc.rawValue!.split("%");
     if (data.length != 6) return;
     final userID = ComposedID.fromString(data[0]);
     final userMediaID = ComposedID.fromString(data[3]);

@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:base85/base85.dart';
 import 'package:flutter/material.dart';
 import 'package:down4/src/_dart_utils.dart';
 // import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr/qr.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
+// import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../bsv/types.dart';
 import '../bsv/_bsv_utils.dart';
@@ -467,7 +468,7 @@ class _MoneyPageState extends State<MoneyPage>
 
   @override
   void onScan(Barcode bc) {
-    final raw = bc.code;
+    final raw = bc.rawValue;
     print("Trying to scan some good stuff right here!");
     if (raw == null) return;
 
