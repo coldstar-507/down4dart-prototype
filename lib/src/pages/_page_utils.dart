@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/nodes.dart';
-import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
 
 import 'package:flutter/gestures.dart';
@@ -9,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:mime/mime.dart';
-// import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../_dart_utils.dart';
