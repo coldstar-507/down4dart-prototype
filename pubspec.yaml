@@ -37,10 +37,11 @@ dependencies:
   cupertino_icons: ^1.0.2
 
   # Packages
+  google_mlkit_barcode_scanning: ^0.9.0  
   qr: ^3.0.1
   url_launcher: ^6.1.14  
   video_thumbnail: ^0.5.3
-  qr_code_scanner: ^1.0.1  
+  # qr_code_scanner: ^1.0.1  
   # mobile_scanner: ^3.4.1  
   path_provider: ^2.0.9
   base85: ^1.0.3
