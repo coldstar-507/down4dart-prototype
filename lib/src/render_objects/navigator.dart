@@ -1,3 +1,4 @@
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:down4/src/render_objects/palette.dart';
@@ -84,7 +85,10 @@ class Andrew extends StatefulWidget {
   static Duration get pageSwitchOpacityDuration =>
       const Duration(milliseconds: 160);
 
+  final Console3? console;
+      
   const Andrew({
+    this.console,  
     this.themes,
     this.staticRow,
     this.addFriends,
@@ -249,6 +253,12 @@ class _AndrewState extends State<Andrew> {
   double get lateralHeaderPad => g.sizes.w * 0.02;
   double get mainHeaderIconWidth => g.sizes.headerHeight;
   double get headerHeight => g.sizes.headerHeight;
+
+  bool get showingMedias {
+    // return widget.pages.map((e) => e.console.currentConsolesName);
+    return widget.pages.first.console.currentConsolesName.contains("medias");
+    // return false;
+  }
 
   Widget pageHeader([List<Widget?>? topRightWidgets]) {
     // final lateralPads = g.sizes.w * 0.02;
@@ -420,6 +430,10 @@ class _AndrewState extends State<Andrew> {
           body: SafeArea(
             child: Stack(
               children: [
+                Positioned(
+                    bottom: Console.buttonHeight,
+                    left: 0,
+                    child: Medias2.imagesExtensionForPrecache_),
                 pageBody2,
                 ...curPage.console.extraButtons,
                 staticConsole

@@ -98,9 +98,14 @@ class DynamicList extends StatelessWidget {
                 controller: scrollController,
                 padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
                 reverse: reversed,
-                itemBuilder: (_, i) =>
-                    asMap?[orderedKeys?[i]] ??
-                    (list.length > i ? list[i] : const SizedBox.shrink()),
+                itemBuilder: (_, i) {
+                  final w = asMap?[orderedKeys?[i]] ??
+                      (list.length > i ? list[i] : const SizedBox.shrink());
+                  return Container(
+                      color: g.theme.backGroundColor,
+                      width: g.sizes.w,
+                      child: w);
+                },
                 itemCount: asMap?.length ?? list.length,
               )));
     }
@@ -115,7 +120,11 @@ class DynamicList extends StatelessWidget {
         // ),
         padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
         reverse: reversed,
-        itemBuilder: (_, i) => asMap?[orderedKeys?[i]] ?? list[i],
+        itemBuilder: (_, i) {
+          final w = asMap?[orderedKeys?[i]] ?? list[i];
+          return Container(
+              color: g.theme.backGroundColor, width: g.sizes.w, child: w);
+        },
         itemCount: asMap?.length ?? list.length,
       ),
     );

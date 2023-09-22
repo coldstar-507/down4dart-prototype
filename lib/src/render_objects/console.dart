@@ -1292,13 +1292,13 @@ class Console3 {
         duration: Andrew.pageSwitchOpacityDuration,
         opacity: staticRow ? 0 : 1,
         child: ColoredBox(
-            color: g.theme.buttonColor(),
+            color: Colors.transparent, // g.theme.buttonColor(),
             child: Column(children: [
               AnimatedOpacity(
                 opacity: extension == null ? 0 : 1,
                 duration: Console.animationDuration,
                 child: AnimatedContainer(
-                  color: g.theme.buttonColor(),
+                  // color: g.theme.buttonColor(),
                   duration: Console.animationDuration,
                   height: h ?? 0,
                   child: Stack(
@@ -1307,7 +1307,7 @@ class Console3 {
                           alignment: AlignmentDirectional.center,
                           duration: Console.animationDuration,
                           width: g.sizes.w,
-                          color: g.theme.extensionBackdropColor,
+                          // color: g.theme.extensionBackdropColor,
                           child: ex ?? const SizedBox.shrink()),
                       IgnorePointer(
                         child: Row(

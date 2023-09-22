@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:awesome_notifications_fcm/awesome_notifications_fcm.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/nodes.dart';
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/pages/loading_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,12 @@ class Down4 extends StatefulWidget {
 
 class _Down4State extends State<Down4> {
   Widget _view = const LoadingPage2();
+  
+  // Widget get view => _view ??= Stack(children: [
+  //   Medias2.imagesExtensionForPrecache_,
+  //   const LoadingPage2(),
+  // ]);
+  
   UserCredential? _cred;
 
   @override
@@ -47,7 +54,7 @@ class _Down4State extends State<Down4> {
   //   // });
   // }
 
-  Future<void> logName([String? name]) async {
+  Future<void> loginName([String? name]) async {
       await _cred?.user?.updateDisplayName(name ?? g.self.id.value);
   }
   
@@ -60,8 +67,9 @@ class _Down4State extends State<Down4> {
     } else {
       // final isEnabled = await Push.instance.areNotificationsEnabled();
       // if (!isEnabled) await Push.instance.requestPermission();
-      await logName();
+      await loginName();
       g.loadWallet();
+      
       home();
     }
   }
@@ -79,7 +87,7 @@ class _Down4State extends State<Down4> {
     setState(() {});    
     
     // update login for database rules    
-    await logName(id.value);
+    await loginName(id.value);
 
     void onFailure(String msg) => createUser(errorMessage: msg);
 
@@ -97,6 +105,7 @@ class _Down4State extends State<Down4> {
     // the ID was the proper one
     final goodMedia = await media.userInitRecalculation(id)
       ..cache()
+      ..merge()
       ..staticUpload();
 
     final seed1 = unsafeSeed(32);

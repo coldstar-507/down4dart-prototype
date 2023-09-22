@@ -844,74 +844,110 @@ mixin Medias2 on Pager2 {
       });
 
   Widget get mediasExtension {
+    return Container(
+        width: Console.trueWidth,
+        height: _nRows * mediaCelSize,
+        color: Colors.transparent);
+  }
+
+  Widget get mediasExtension2 {
     final ids = g.savedMediasIDs[t]!;
     final nRows = (ids.length / _mediasPerRow).ceil();
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
-        // color: Colors.white10, //g.theme.buttonTextColor,
-      ),
-      // border: Border.all(
-      //     color: g.theme.consoleBorderColor, width: Console.borderWidth)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(Console.consoleRad))),
       child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
-          child: ListView.builder(
-              itemCount: nRows,
-              itemBuilder: ((context, index) {
-                Widget f(int i) {
-                  if (i < ids.length) {
-                    final cachedMedia = cache<Down4Media>(ids[i]);
-                    if (cachedMedia != null) {
-                      return GestureDetector(
-                          onTap: () => forMediaMode != null
-                              ? forMediaMode!.$2.call(cachedMedia as Down4Image)
-                              : curMode.$2(cachedMedia),
-                          child: cachedMedia is Down4Image
-                              ? cachedMedia.displayImage_(
-                                  key: "console-${cachedMedia.id.value}",
-                                  s: Size.square(mediaCelSize))
-                              : cachedMedia.display(
-                                  key: Key("console-${cachedMedia.id.value}"),
-                                  size: Size.square(mediaCelSize),
-                                  forceSquare: true));
-                    }
-                    return FutureBuilder(
-                      future: global<Down4Media>(ids[i]),
-                      builder: (ctx, ans) {
-                        if (ans.connectionState == ConnectionState.done &&
-                            ans.hasData) {
-                          return GestureDetector(
-                              onTap: () => ans.data != null
-                                  ? curMode.$2(ans.data!)
-                                  : null,
-                              child: ans.requireData?.display(
-                                      key: Key(
-                                          "console-${ans.requireData?.id.value}"),
-                                      size: Size.square(mediaCelSize),
-                                      forceSquare: true) ??
-                                  SizedBox.square(dimension: mediaCelSize));
-                        } else {
-                          return SizedBox.square(dimension: mediaCelSize);
-                        }
-                      },
-                    );
-                  } else {
-                    return SizedBox.square(dimension: mediaCelSize);
-                  }
+        constraints: BoxConstraints(
+            maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
+        child: ListView.builder(
+          itemCount: nRows,
+          itemBuilder: ((context, index) {
+            Widget f(int i) {
+              if (i < ids.length) {
+                final cachedMedia = cache<Down4Media>(ids[i]);
+                if (cachedMedia != null) {
+                  return GestureDetector(
+                      onTap: () => forMediaMode != null
+                          ? forMediaMode!.$2.call(cachedMedia as Down4Image)
+                          : curMode.$2(cachedMedia),
+                      child: cachedMedia is Down4Image
+                          ? cachedMedia.displayImage_(
+                              key: "console-${cachedMedia.id.value}",
+                              s: Size.square(mediaCelSize))
+                          : cachedMedia.display(
+                              key: Key("console-${cachedMedia.id.value}"),
+                              size: Size.square(mediaCelSize),
+                              forceSquare: true));
                 }
-
-                return Row(
-                  key: Key(t.name + index.toString()),
-                  children: List.generate(
-                    _mediasPerRow,
-                    (j) => f((index * _mediasPerRow) + j),
-                  ),
+                return FutureBuilder(
+                  future: global<Down4Media>(ids[i]),
+                  builder: (ctx, ans) {
+                    if (ans.connectionState == ConnectionState.done &&
+                        ans.hasData) {
+                      return GestureDetector(
+                          onTap: () =>
+                              ans.data != null ? curMode.$2(ans.data!) : null,
+                          child: ans.requireData?.display(
+                                  key: Key(
+                                      "console-${ans.requireData?.id.value}"),
+                                  size: Size.square(mediaCelSize),
+                                  forceSquare: true) ??
+                              SizedBox.square(dimension: mediaCelSize));
+                    } else {
+                      return SizedBox.square(dimension: mediaCelSize);
+                    }
+                  },
                 );
-              }))),
+              } else {
+                return SizedBox.square(dimension: mediaCelSize);
+              }
+            }
+
+            return Row(
+              key: Key(t.name + index.toString()),
+              children: List.generate(
+                _mediasPerRow,
+                (j) => f((index * _mediasPerRow) + j),
+              ),
+            );
+          }),
+        ),
+      ),
     );
+  }
+
+  static Widget get imagesExtensionForPrecache_ {
+    final s = Size.square(mediaCelSize);
+    final me = savedMedias(MediaType.images)
+        .map((e) => e.displayImage_(key: "console-${e.id.value}", s: s))
+        .toList();
+    final nme = me.length;
+    final nRows = (me.length / _mediasPerRow).ceil();
+    return Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(Console.consoleRad))),
+        child: ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
+            child: ListView.builder(
+                itemCount: nRows,
+                itemBuilder: (context, index) {
+                  return Row(
+                    key: Key(MediaType.images.name + index.toString()),
+                    children: List.generate(_mediasPerRow, (j) {
+                      final trueIndex = (index * _mediasPerRow) + j;
+                      if (trueIndex < nme) {
+                        return me[trueIndex];
+                      } else {
+                        return const SizedBox.shrink();
+                      }
+                    }),
+                  );
+                })));
   }
 
   String get basicMediaRowName => "medias";
@@ -1144,7 +1180,6 @@ mixin Add2 {
 }
 
 mixin Scanner2 on Pager2 {
-
   void onScan(Barcode bc);
   Widget? _scanner;
 
@@ -1182,7 +1217,7 @@ mixin Scanner2 on Pager2 {
           // _scanner = null;
         } else {
           // Future.delayed(Andrew.pageSwitchAnimationDuration, loadScanner);
-          Future.delayed(const Duration(milliseconds: 300), loadScanner);          
+          Future.delayed(const Duration(milliseconds: 300), loadScanner);
         }
         setTheState();
       });

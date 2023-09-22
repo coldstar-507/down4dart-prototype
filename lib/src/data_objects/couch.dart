@@ -541,6 +541,21 @@ Iterable<Down4Node> loadAllNodes() sync* {
   }
 }
 
+Iterable<Down4Media> savedMedias(MediaType t) sync* {
+  final q = """
+    SELECT * FROM medias
+    WHERE mime IN ${mimeMap[t]!.sqlFmt} AND isSaved = 'true'
+    ORDER BY lastUse DESC
+    """;
+
+  final rows = db.select(q);
+  for (final row in rows) {
+    final jsns = Map<String, String?>.from(row);
+    yield Down4Media.fromJson(jsns);
+  }
+}
+
+
 Iterable<Down4ID> savedMediaIDs(MediaType t) sync* {
   final q = """
     SELECT id FROM medias

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
@@ -673,6 +674,14 @@ class ImageCacheManager {
   RawImage? cachedImage(String key) => _imageCache[key];
 
   final Map<String, RawImage> _imageCache = {};
+
+  Future<void> precacheSavedImages() async {
+    final ds = Size.square(Medias2.mediaCelSize);
+    for (final im in savedMedias(MediaType.images)) {
+      final k = "console-${im.id.value}";
+      await loadImageFromFile(im as Down4Image, ds: ds, key: k);
+    }
+  }
 
   Future<RawImage?> loadImageFromFile(Down4Image im,
       {required Size ds, String? key}) async {
