@@ -445,3 +445,310 @@ class _AndrewState extends State<Andrew> {
     );
   }
 }
+
+class PageAndHeaderWidget extends StatefulWidget {
+  final List<Down4Page> pages;
+  final int initialPageIndex;
+  final void Function()? backFunction, addFriends, themes;
+  final void Function(int)? onPageChange;
+  final Console3 console;
+  final ConsoleRow? staticRow;
+
+  const PageAndHeaderWidget({
+    required this.pages,
+    required this.initialPageIndex,
+    required this.console,
+    this.onPageChange,
+    this.staticRow,
+    this.backFunction,
+    this.addFriends,
+    this.themes,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<PageAndHeaderWidget> createState() => _PageAndHeaderWidgetState();
+}
+
+class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
+    with SingleTickerProviderStateMixin {
+  late int curPos = widget.initialPageIndex;
+
+  double get lateralHeaderPad => g.sizes.w * 0.02;
+  double get mainHeaderIconWidth => g.sizes.headerHeight;
+  double get headerHeight => g.sizes.headerHeight;
+
+  late final AnimationController _controller = AnimationController(
+    duration: Console.animationDuration,
+    vsync: this,
+  );
+
+  Tween<double> forward = Tween(begin: 0.0, end: 1.0);
+  Tween<double> backward = Tween(begin: 1.0, end: 0.0);
+
+  void jeff() {
+    _colorTween.transform(forward.animate(_controller).value);
+  }
+
+
+  final _colorTween = ColorTween(
+      begin: g.theme.headerTextColor,
+      end: g.theme.headerTextColor.withOpacity(0.3));
+
+  ScrollController titleScroller = ScrollController();
+
+  List<String> get titles {
+    return widget.pages.map((page) => page.title).toList(growable: false);
+  }
+
+  late double pageOffset = widget.initialPageIndex.toDouble();
+
+  (Widget, double, double) titleList3(double leftPadding, double rightPadding) {
+    final fullPadding = leftPadding + rightPadding;
+    final full = g.sizes.w;
+    const double gapWidth = 10;
+    final gapSpace = gapWidth * (titles.length - 1);
+    final availableSpace = full - fullPadding;
+    final availableTitleSpace = availableSpace - gapSpace;
+    final spacePerTitle = availableTitleSpace / titles.length;
+
+    final titlesPaints = titles
+        .map((e) => TextPainter(
+            textDirection: TextDirection.ltr,
+            text: TextSpan(
+              text: " $e ",
+              style: g.theme.headerTextStyle2(Colors.white),
+            ))
+          ..layout())
+        .toList();
+
+    List<double> tSpaces = [];
+    for (final t in titlesPaints) {
+      if (t.width > spacePerTitle) {
+        tSpaces.add(spacePerTitle);
+      } else {
+        tSpaces.add(t.width);
+      }
+    }
+
+    final tSpace = tSpaces.fold(0.0, (p, t) => p + t);
+    final fullSpace = gapSpace + tSpace;
+
+    double leftBox, rightBox, centerBox;
+    rightBox = (full / 2) - (fullSpace / 2) - rightPadding;
+    leftBox = (full / 2) - (fullSpace / 2) - leftPadding;
+    centerBox = fullSpace;
+    if (leftBox < 0) {
+      rightBox += leftBox;
+      leftBox = 0;
+    } else if (rightBox < 0) {
+      leftBox += rightBox;
+      rightBox = 0;
+    }
+
+    return (
+      SizedBox(
+        height: g.sizes.headerHeight,
+        width: centerBox - 2,
+        child: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          controller: titleScroller,
+          scrollDirection: Axis.horizontal,
+          shrinkWrap: true,
+          children: titles.indexed.map((e) {
+            final String text = e.$2;
+            final int i = e.$1;
+
+            // final double tWidth = alpha * titlesPaints[i].width;
+            final double gapW = i == titles.length - 1 ? 0.0 : gapWidth;
+
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: tSpaces[i],
+                  height: g.sizes.headerHeight,
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: _colorTween.animate(_controller),
+                      builder: (context, child) {
+                        return Text(
+                          " $text ",
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 24.0,
+                          ),
+                        );
+                      },
+                    ),
+                    //  Text(" $text ",
+                    // maxLines: 1,
+                    // softWrap: false,
+                    // overflow: TextOverflow.ellipsis,
+                    // style: g.theme.headerTextStyle2(g
+                    //     .theme.headerTextColor
+                    //     .withOpacity(pageTweenValue(i)))),
+                  ),
+                ),
+                // so this is the padding after the titles until the top-right icons / right pad
+                SizedBox(width: gapW, height: headerHeight),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+      leftBox + 1,
+      rightBox + 1,
+    );
+  }
+
+  Widget pageHeader([List<Widget?>? topRightWidgets]) {
+    // final lateralPads = g.sizes.w * 0.02;
+    // final leftPad = lateralPads + g.sizes.headerHeight;
+
+    final topRightWgts = topRightWidgets?.whereType<Widget>() ?? [];
+
+    // this is the pad + the backArrow or down4Icon width
+    final leftPad = lateralHeaderPad + mainHeaderIconWidth;
+    final nTopRightIcons = topRightWgts.length;
+    final rightIconsWidth = nTopRightIcons * mainHeaderIconWidth;
+    double rightPad = lateralHeaderPad + rightIconsWidth;
+
+    final (titleWidget, leftBoxWidth, rightBoxWidth) =
+        titleList3(leftPad, rightPad);
+    return Container(
+      height: g.sizes.headerHeight,
+      width: g.sizes.w,
+      color: g.theme.headerColor,
+      child: Row(
+        textDirection: TextDirection.ltr,
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          GestureDetector(
+              onHorizontalDragUpdate: (_) {},
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.backFunction ?? widget.addFriends,
+              onLongPress: widget.themes,
+              child: Row(children: [
+                // left pad
+                SizedBox(width: lateralHeaderPad, height: headerHeight),
+
+                // (main icon / back arrow)
+                SizedBox.square(
+                  dimension: g.sizes.headerHeight,
+                  child: widget.backFunction != null
+                      ? backArrow()
+                      : Center(
+                          child: SizedBox.square(
+                            dimension: g.sizes.headerHeight, // / golden,
+                            child: g.theme.down4Icon(g.theme.backArrowColor),
+                          ),
+                        ),
+                ),
+              ])),
+
+          // padding before reaching first title
+          SizedBox(width: leftBoxWidth),
+          // all the titles
+          titleWidget,
+          // padding until the righ pad
+          SizedBox(width: rightBoxWidth),
+          // top right widgets if there are
+          ...topRightWgts,
+          // the right pad
+          SizedBox(width: lateralHeaderPad, height: headerHeight),
+        ],
+      ),
+    );
+  }
+
+  Tween<double> tweener = Tween(begin: 1.0, end: 0.3);
+  double pageTweenValue(int page) {
+    final distance = (page - pageOffset).abs();
+    return tweener.transform(distance.toDouble());
+  }
+
+  double get pp => pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
+
+  late PageController pageCtrl = PageController(
+    initialPage: widget.initialPageIndex,
+  );// ..addListener(() {
+    //   if (pageCtrl.page != null) {
+    //     pageOffset = pageCtrl.page!;
+    //     final percent =
+    //         pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
+    //     titleScroller.jumpTo(titleScroller.position.maxScrollExtent * percent);
+    //   }
+    //   setState(() {});
+    // });
+
+  Widget get staticConsole {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      child: AnimatedOpacity(
+        duration: Console.animationDuration,
+        opacity: widget.staticRow == null ? 0 : 1,
+        child: widget.staticRow != null
+            ? Console3.staticRow(widget.staticRow!)
+            : SizedBox(width: g.sizes.w),
+      ),
+    );
+  }
+
+  Widget get pageBody2 => PageView(
+        controller: pageCtrl,
+        onPageChanged: (i) => widget.onPageChange?.call(i),
+        children: widget.pages.indexed.map((e) {
+          final page = e.$2;
+          final index = e.$1;
+          return KeepAlivePage(
+            //        child:
+            // Opacity(
+//              opacity: pageTweenValue(index),
+            child: Stack(
+              children: [
+                ...widget.pages[curPos].stackWidgets ?? [],
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: page.staticList
+                          ? StaticList(
+                              trueLen: page.trueLen,
+                              reversed: page.reversedList,
+                              scrollController: page.scrollController,
+                              topPadding: page.isChatPage ? 4 : null,
+                              list: page.list)
+                          : page.stream != null
+                              ? FutureList(stream: page.stream!)
+                              : DynamicList(
+                                  onRefresh: page.onRefresh,
+                                  reversed: page.reversedList,
+                                  asMap: page.asMap,
+                                  orderedKeys: page.orderedKeys,
+                                  scrollController: page.scrollController,
+                                  topPadding: page.isChatPage ? 4 : null,
+                                  iterables: page.iterables,
+                                  iterableLen: page.iterableLen,
+                                  list: page.list),
+                    ),
+                    page.console.rowOfPage(
+                        index: index, staticRow: g.vm.mode == Modes.append),
+                  ],
+                ),
+              ],
+            ),
+            // ),
+          );
+        }).toList(growable: false),
+        // ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.shrink();
+  }
+}
