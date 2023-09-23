@@ -86,9 +86,9 @@ class Andrew extends StatefulWidget {
       const Duration(milliseconds: 160);
 
   final Console3? console;
-      
+
   const Andrew({
-    this.console,  
+    this.console,
     this.themes,
     this.staticRow,
     this.addFriends,
@@ -413,11 +413,11 @@ class _AndrewState extends State<Andrew> {
       child: WillPopScope(
         onWillPop: () async {
           if (widget.backFunction == null) {
-            SystemNavigator.pop();            
+            SystemNavigator.pop();
           } else {
-            widget.backFunction!.call();          
+            widget.backFunction!.call();
           }
-          return false;          
+          return false;
         },
         child: Scaffold(
           backgroundColor: Colors.transparent,
@@ -470,30 +470,39 @@ class PageAndHeaderWidget extends StatefulWidget {
   State<PageAndHeaderWidget> createState() => _PageAndHeaderWidgetState();
 }
 
-class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
-    with SingleTickerProviderStateMixin {
+class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget> {
   late int curPos = widget.initialPageIndex;
 
   double get lateralHeaderPad => g.sizes.w * 0.02;
   double get mainHeaderIconWidth => g.sizes.headerHeight;
   double get headerHeight => g.sizes.headerHeight;
 
-  late final AnimationController _controller = AnimationController(
-    duration: Console.animationDuration,
-    vsync: this,
-  );
-
-  Tween<double> forward = Tween(begin: 0.0, end: 1.0);
-  Tween<double> backward = Tween(begin: 1.0, end: 0.0);
-
-  void jeff() {
-    _colorTween.transform(forward.animate(_controller).value);
+  double normalize(double val, double floor, double ceil) {
+    return (val - floor) / ceil;
   }
 
+  final Tween<double> tweener = Tween(begin: 1.0, end: 0.3);
+  double titleOpacity(int page) {
+    final distance = (page.toDouble() - pp2).abs();
+    return 1 - distance;
+  }
 
-  final _colorTween = ColorTween(
-      begin: g.theme.headerTextColor,
-      end: g.theme.headerTextColor.withOpacity(0.3));
+  // double get pp => pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
+  double get pp2 => pageCtrl.page ?? widget.initialPageIndex.toDouble();
+
+  late PageController pageCtrl = PageController(
+      initialPage: widget.initialPageIndex)
+    ..addListener(() {
+      // pageOffset = pageCtrl.page!;
+      final percent =
+          pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
+      titleScroller.jumpTo(titleScroller.position.maxScrollExtent * percent);
+      setState(() {});
+    });
+
+  late final Tween<double> fullRange = Tween(
+      begin: pageCtrl.position.minScrollExtent,
+      end: pageCtrl.position.minScrollExtent);
 
   ScrollController titleScroller = ScrollController();
 
@@ -569,25 +578,14 @@ class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
                   width: tSpaces[i],
                   height: g.sizes.headerHeight,
                   child: Center(
-                    child: AnimatedBuilder(
-                      animation: _colorTween.animate(_controller),
-                      builder: (context, child) {
-                        return Text(
-                          " $text ",
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 24.0,
-                          ),
-                        );
-                      },
+                    child: Text(
+                      " $text ",
+                      style: TextStyle(
+                        color: g.theme.headerTextColor
+                            .withOpacity(titleOpacity(i)),
+                        fontSize: 24.0,
+                      ),
                     ),
-                    //  Text(" $text ",
-                    // maxLines: 1,
-                    // softWrap: false,
-                    // overflow: TextOverflow.ellipsis,
-                    // style: g.theme.headerTextStyle2(g
-                    //     .theme.headerTextColor
-                    //     .withOpacity(pageTweenValue(i)))),
                   ),
                 ),
                 // so this is the padding after the titles until the top-right icons / right pad
@@ -663,26 +661,6 @@ class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
     );
   }
 
-  Tween<double> tweener = Tween(begin: 1.0, end: 0.3);
-  double pageTweenValue(int page) {
-    final distance = (page - pageOffset).abs();
-    return tweener.transform(distance.toDouble());
-  }
-
-  double get pp => pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
-
-  late PageController pageCtrl = PageController(
-    initialPage: widget.initialPageIndex,
-  );// ..addListener(() {
-    //   if (pageCtrl.page != null) {
-    //     pageOffset = pageCtrl.page!;
-    //     final percent =
-    //         pageCtrl.position.pixels / pageCtrl.position.maxScrollExtent;
-    //     titleScroller.jumpTo(titleScroller.position.maxScrollExtent * percent);
-    //   }
-    //   setState(() {});
-    // });
-
   Widget get staticConsole {
     return Positioned(
       bottom: 0,
@@ -696,7 +674,7 @@ class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
       ),
     );
   }
-
+  
   Widget get pageBody2 => PageView(
         controller: pageCtrl,
         onPageChanged: (i) => widget.onPageChange?.call(i),
@@ -704,44 +682,43 @@ class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
           final page = e.$2;
           final index = e.$1;
           return KeepAlivePage(
-            //        child:
-            // Opacity(
-//              opacity: pageTweenValue(index),
-            child: Stack(
-              children: [
-                ...widget.pages[curPos].stackWidgets ?? [],
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Flexible(
-                      child: page.staticList
-                          ? StaticList(
-                              trueLen: page.trueLen,
-                              reversed: page.reversedList,
-                              scrollController: page.scrollController,
-                              topPadding: page.isChatPage ? 4 : null,
-                              list: page.list)
-                          : page.stream != null
-                              ? FutureList(stream: page.stream!)
-                              : DynamicList(
-                                  onRefresh: page.onRefresh,
-                                  reversed: page.reversedList,
-                                  asMap: page.asMap,
-                                  orderedKeys: page.orderedKeys,
-                                  scrollController: page.scrollController,
-                                  topPadding: page.isChatPage ? 4 : null,
-                                  iterables: page.iterables,
-                                  iterableLen: page.iterableLen,
-                                  list: page.list),
-                    ),
-                    page.console.rowOfPage(
-                        index: index, staticRow: g.vm.mode == Modes.append),
-                  ],
-                ),
-              ],
+            child: Opacity(
+              opacity: titleOpacity(index),
+              child: Stack(
+                children: [
+                  ...widget.pages[curPos].stackWidgets ?? [],
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Flexible(
+                        child: page.staticList
+                            ? StaticList(
+                                trueLen: page.trueLen,
+                                reversed: page.reversedList,
+                                scrollController: page.scrollController,
+                                topPadding: page.isChatPage ? 4 : null,
+                                list: page.list)
+                            : page.stream != null
+                                ? FutureList(stream: page.stream!)
+                                : DynamicList(
+                                    onRefresh: page.onRefresh,
+                                    reversed: page.reversedList,
+                                    asMap: page.asMap,
+                                    orderedKeys: page.orderedKeys,
+                                    scrollController: page.scrollController,
+                                    topPadding: page.isChatPage ? 4 : null,
+                                    iterables: page.iterables,
+                                    iterableLen: page.iterableLen,
+                                    list: page.list),
+                      ),
+                      page.console.rowOfPage(
+                          index: index, staticRow: g.vm.mode == Modes.append),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            // ),
           );
         }).toList(growable: false),
         // ),
@@ -749,6 +726,6 @@ class _PageAndHeaderWidgetState extends State<PageAndHeaderWidget>
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox.shrink();
+    return pageBody2;
   }
 }
