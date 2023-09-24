@@ -661,35 +661,113 @@ class Down4Video extends Down4Media {
   }
 }
 
+// class CustomImage extends StatelessWidget {
+
+//   @override
+//   Widget build(BuildContext ctx) {
+//     final cachedVal = ImageCacheManager().cachedImage(key);
+//     if (cachedVal != null) {
+//       print("image is cached bro, ez pz loading");
+//       return cachedVal;
+//       //return ImageRendererWidget(image: cachedVal, s: s);
+//     }
+//     print("image is not cached bro, need to load");
+//     return FutureBuilder(
+//         future: ImageCacheManager()
+//             .loadImageFromFile(this as Down4Image, key: key, ds: s),
+//         builder: (ctx, snp) {
+//           final data = snp.data;
+//           final state = snp.connectionState;
+//           if (state != ConnectionState.done || data == null) {
+//             return SizedBox.fromSize(size: s);
+//           } else {
+//             return data; //ImageRendererWidget(image: data, s: s);
+//           }
+//         });
+//   }
+// }
+
 /// console medias cache manager, currently the only use
 /// flutter image seems good enough for the rest
+
 class ImageCacheManager {
   static final ImageCacheManager _instance = ImageCacheManager._();
 
   factory ImageCacheManager() => _instance;
 
+  DateTime _lastLoad = DateTime(0);
+  final Duration _loadingGap = const Duration(milliseconds: 40);
+
+  Stream<RawImage> throttledImages(Iterable<(Down4ID, String?)> keys) async* {
+    for (final (id, prefix) in keys) {
+      final key = (prefix ?? "") + id.unik;
+      final rim = readyImage(key);
+      if (rim != null) {
+        yield rim;
+      } else {
+        final fim = await unReadyImage(id, prefix);
+        if (fim != null) {
+          yield fim;
+        } else {
+          continue;
+        }
+      }
+    }
+  }
+
   ImageCacheManager._();
 
-  RawImage? cachedImage(String key) => _imageCache[key];
+  RawImage? readyImage(String key) {
+    final k = _imageCache[key]?.key as GlobalKey?;
+    if (k != null && k.currentState != null) {
+      return _imageCache[key]!;
+    }
+    return null;
+  }
+
+  Future<RawImage?> unReadyImage(Down4ID id, String? prefix) async {
+    final key = (prefix ?? "") + id.unik;
+    final cached = _imageCache[key];
+    if (cached != null) {
+      final now = DateTime.now();
+      final diff = _lastLoad.add(_loadingGap).difference(now);
+      if (!diff.isNegative) {
+        return Future.delayed(diff, () {
+          _lastLoad = DateTime.now();
+          return cached;
+        });
+      }
+    } else {
+      final image = await global<Down4Image>(id);
+      if (image != null) {
+        return loadImageFromFile(image);
+      } else {
+        return null;
+      }
+    }
+  }
 
   final Map<String, RawImage> _imageCache = {};
 
   Future<RawImage?> loadImageFromFile(Down4Image im,
-      {required Size ds, String? key}) async {
+      {Size? ds, String? prefix}) async {
     print("cached len: ${_imageCache.length}");
     final f = im.mainCachedFile ?? im.mainFile();
     if (f == null) return null;
     final Uint8List imageBytes = await f.readAsBytes();
-    final (ww, hh) = im.ss(ds);
+    final s = ds ?? Size(im.metadata.width, im.metadata.height);
+    final (ww, hh) = im.ss(ds ?? s);
 
     final codec = await ui.instantiateImageCodec(imageBytes,
         targetHeight: hh?.toInt(), targetWidth: ww?.toInt());
     final frame = await codec.getNextFrame();
     final uiIm = frame.image;
 
-    final k = key ?? im.id.value;
-    return _imageCache[k] = RawImage(
-        image: uiIm, fit: BoxFit.cover, width: ds.width, height: ds.height);
+    final k = (prefix ?? "") + im.id.unik;
+    _imageCache[k] =
+        RawImage(image: uiIm, fit: BoxFit.cover, width: ww, height: hh);
+
+    return unReadyImage(im.id, prefix);
   }
 
   // Uint8List _justIt(String path) {
