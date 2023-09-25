@@ -690,22 +690,29 @@ class Down4Video extends Down4Media {
 /// console medias cache manager, currently the only use
 /// flutter image seems good enough for the rest
 
+// class CustomImage extends RawImage {
+//   final Down4Image im;
+//   const CustomImage(this.im,
+//       {super.image, super.fit, super.width, super.height, super.key});
+// }
+
 class ImageCacheManager {
   static final ImageCacheManager _instance = ImageCacheManager._();
 
   factory ImageCacheManager() => _instance;
 
-  DateTime _lastLoad = DateTime(0);
-  final Duration _loadingGap = const Duration(milliseconds: 40);
+  int _lastLoad = makeTimestamp();
+  final int _loadingGap = 10;
 
-  Stream<RawImage> throttledImages(Iterable<(Down4ID, String?)> keys) async* {
+  Stream<CustomImage> throttledImages(Iterable<(Down4ID, String?)> keys,
+      {Size? size}) async* {
     for (final (id, prefix) in keys) {
       final key = (prefix ?? "") + id.unik;
       final rim = readyImage(key);
       if (rim != null) {
         yield rim;
       } else {
-        final fim = await unReadyImage(id, prefix);
+        final fim = await unReadyImage(id, prefix: prefix, size: size);
         if (fim != null) {
           yield fim;
         } else {
@@ -717,46 +724,67 @@ class ImageCacheManager {
 
   ImageCacheManager._();
 
-  RawImage? readyImage(String key) {
-    final k = _imageCache[key]?.key as GlobalKey?;
-    if (k != null && k.currentState != null) {
+  CustomImage? readyImage(String key) {
+    print("testing ready image!");
+    final wasBuilt = _imageCache[key]?.wasBuilt;
+    if (wasBuilt ?? false) {
+      print("image is ready, returing it right away!");
       return _imageCache[key]!;
     }
     return null;
   }
 
-  Future<RawImage?> unReadyImage(Down4ID id, String? prefix) async {
+  Future<CustomImage?> unReadyImage(
+    Down4ID id, {
+    Size? size,
+    String? prefix,
+  }) async {
+    print("image is not ready, loading that bad boy out!");
     final key = (prefix ?? "") + id.unik;
-    final cached = _imageCache[key];
-    if (cached != null) {
-      final now = DateTime.now();
-      final diff = _lastLoad.add(_loadingGap).difference(now);
-      if (!diff.isNegative) {
-        return Future.delayed(diff, () {
-          _lastLoad = DateTime.now();
-          return cached;
-        });
-      }
-    } else {
+    CustomImage? fim = _imageCache[key];
+    if (fim == null) {
       final image = await global<Down4Image>(id);
       if (image != null) {
-        return loadImageFromFile(image);
-      } else {
-        return null;
+        fim = await _loadImageFromFile(image, size: size, prefix: prefix);
       }
     }
+
+    if (fim == null) return null;
+    final now = makeTimestamp();
+    final threshold = _lastLoad + _loadingGap;
+    final diff = now - threshold;
+    print("""
+        now=$now
+        threshold=$threshold
+        diff=$diff
+        """);
+    if (!diff.isNegative) {
+      _lastLoad = makeTimestamp();
+      return fim;
+    } else {
+      print("waiting ${-diff} before loading next image!");
+      return Future.delayed(Duration(milliseconds: -diff), () {
+        _lastLoad = makeTimestamp();
+        return fim;
+      });
+    }
+    // -------10----------20--#-----T--30--N---------40---
+    // threshold = # + G
+    // diff = N - T
+    // if diff is positive -> 'past threshold, return right away'
+    // else -> wait (-diff)
   }
 
-  final Map<String, RawImage> _imageCache = {};
+  final Map<String, CustomImage> _imageCache = {};
 
-  Future<RawImage?> loadImageFromFile(Down4Image im,
-      {Size? ds, String? prefix}) async {
+  Future<CustomImage?> _loadImageFromFile(Down4Image im,
+      {Size? size, String? prefix}) async {
     print("cached len: ${_imageCache.length}");
     final f = im.mainCachedFile ?? im.mainFile();
     if (f == null) return null;
     final Uint8List imageBytes = await f.readAsBytes();
-    final s = ds ?? Size(im.metadata.width, im.metadata.height);
-    final (ww, hh) = im.ss(ds ?? s);
+    final s = size ?? Size(im.metadata.width, im.metadata.height);
+    final (ww, hh) = im.ss(size ?? s);
 
     final codec = await ui.instantiateImageCodec(imageBytes,
         targetHeight: hh?.toInt(), targetWidth: ww?.toInt());
@@ -764,50 +792,28 @@ class ImageCacheManager {
     final uiIm = frame.image;
 
     final k = (prefix ?? "") + im.id.unik;
-    _imageCache[k] =
+    final rawImage =
         RawImage(image: uiIm, fit: BoxFit.cover, width: ww, height: hh);
 
-    return unReadyImage(im.id, prefix);
+    _imageCache[k] = CustomImage(rawImage, im);
+    return unReadyImage(im.id, prefix: prefix);
   }
-
-  // Uint8List _justIt(String path) {
-  //   return File(path).readAsBytesSync();
-  // }
-
-  // Future<ui.Image?> _loadIt(Down4Image im, Size ds, String p) async {
-  //   print("computing this mofo from a fuckin isolate brah");
-  //   print("2");
-  //   final f = im.mainCachedFile ?? im.mainFile(p);
-  //   print("3");
-  //   if (f == null) return null;
-  //   print("4");
-  //   final Uint8List imageBytes = await f.readAsBytes();
-  //   print("5");
-  //   final (ww, hh) = im.ss(ds);
-  //   print("6");
-  //   final ui.Codec codec = await ui.instantiateImageCodec(imageBytes,
-  //       targetHeight: ww?.toInt(), targetWidth: hh?.toInt());
-  //   print("7");
-  //   final frame = await codec.getNextFrame();
-  //   print("done with isolate computation, returning image");
-  //   return frame.image;
-  // }
-
-  // Future<Uint8List?> _loadIt2(Down4Image im, Size ds, String p) async {
-  //   final f = im.mainCachedFile ?? im.mainFile(p);
-  //   if (f == null) return null;
-  //   final Uint8List imageBytes = await f.readAsBytes();
-  //   final (ww, hh) = im.ss(ds);
-  //   print("2");
-  //   final ogImage = img.decodeImage(imageBytes)!;
-  //   print("3");
-  //   final resizedImage =
-  //       img.copyResize(ogImage, width: ww?.toInt(), height: hh?.toInt());
-  //   print("4");
-  //   return resizedImage.getBytes();
-  // }
 
   void clearCache() {
     _imageCache.clear();
+  }
+}
+
+class CustomImage extends StatelessWidget {
+  bool wasBuilt = false;
+  final Down4Image im;
+  final RawImage image;
+  CustomImage(this.image, this.im, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    print("drawing image: ${im.id.unik}");
+    wasBuilt = true;
+    return image;
   }
 }

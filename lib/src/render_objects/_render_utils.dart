@@ -78,31 +78,31 @@ class ImageRendererObject extends RenderBox {
 
 
 extension MediaDisplay on Down4Media {
-  Widget displayImage_({
-    required String key,
-    required Size s,
-    bool forceSquare = false,
-  }) {
-    final cachedVal = ImageCacheManager().cachedImage(key);
-    if (cachedVal != null) {
-      print("image is cached bro, ez pz loading");
-      return cachedVal;
-      //return ImageRendererWidget(image: cachedVal, s: s);
-    }
-    print("image is not cached bro, need to load");
-    return FutureBuilder(
-        future: ImageCacheManager()
-            .loadImageFromFile(this as Down4Image, key: key, ds: s),
-        builder: (ctx, snp) {
-          final data = snp.data;
-          final state = snp.connectionState;
-          if (state != ConnectionState.done || data == null) {
-            return SizedBox.fromSize(size: s);
-          } else {
-            return data; //ImageRendererWidget(image: data, s: s);
-          }
-        });
-  }
+  // Widget displayImage_({
+  //   required String key,
+  //   required Size s,
+  //   bool forceSquare = false,
+  // }) {
+  //   final cachedVal = ImageCacheManager().cachedImage(key);
+  //   if (cachedVal != null) {
+  //     print("image is cached bro, ez pz loading");
+  //     return cachedVal;
+  //     //return ImageRendererWidget(image: cachedVal, s: s);
+  //   }
+  //   print("image is not cached bro, need to load");
+  //   return FutureBuilder(
+  //       future: ImageCacheManager()
+  //           .loadImageFromFile(this as Down4Image, key: key, ds: s),
+  //       builder: (ctx, snp) {
+  //         final data = snp.data;
+  //         final state = snp.connectionState;
+  //         if (state != ConnectionState.done || data == null) {
+  //           return SizedBox.fromSize(size: s);
+  //         } else {
+  //           return data; //ImageRendererWidget(image: data, s: s);
+  //         }
+  //       });
+  // }
 
   Widget display({
     required Size size,

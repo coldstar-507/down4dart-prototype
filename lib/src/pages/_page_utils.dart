@@ -872,11 +872,11 @@ mixin Medias2 on Pager2 {
                               ? forMediaMode!.$2.call(cachedMedia as Down4Image)
                               : curMode.$2(cachedMedia),
                           child: cachedMedia is Down4Image
-                              ? cachedMedia.displayImage_(
-                                  key: "console-${cachedMedia.id.value}",
-                                  s: Size.square(mediaCelSize))
+                              ? cachedMedia.display(
+                                  key: Key("console${cachedMedia.id.value}"),
+                                  size: Size.square(mediaCelSize))
                               : cachedMedia.display(
-                                  key: Key("console-${cachedMedia.id.value}"),
+                                  key: Key("console${cachedMedia.id.value}"),
                                   size: Size.square(mediaCelSize),
                                   forceSquare: true));
                     }
@@ -916,6 +916,71 @@ mixin Medias2 on Pager2 {
     );
   }
 
+  Widget get mediasExtension2 {
+    final ids = g.savedMediasIDs[t]!;
+    final idsWithPrefix = ids.map((id) => (id, "console"));
+    final s = Size.square(mediaCelSize);
+    final imStream = ImageCacheManager()
+        .throttledImages(idsWithPrefix, size: s)
+        .asBroadcastStream();
+    final nRows = (ids.length / _mediasPerRow).ceil();
+
+    return Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+        ),
+        child: ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
+            child: ListView.builder(
+                itemCount: nRows,
+                itemBuilder: (ctx, index) {
+                  Widget f(int i) {
+                    if (i < ids.length) {
+                      final id = ids[i];
+                      final readyImage =
+                          ImageCacheManager().readyImage("console${id.unik}");
+                      if (readyImage != null) {
+                        return GestureDetector(
+                            onTap: () => forMediaMode != null
+                                ? forMediaMode!.$2.call(readyImage.im)
+                                : curMode.$2(readyImage.im),
+                            child: SizedBox.square(
+                                dimension: mediaCelSize, child: readyImage));
+                      }
+                      return FutureBuilder(
+                        future: imStream.elementAt(i),
+                        builder: (ctx, ans) {
+                          final isDone =
+                              ans.connectionState == ConnectionState.done;
+                          if (isDone && ans.hasData) {
+                            return GestureDetector(
+                                onTap: () => curMode.$2(ans.data!.im),
+                                child: SizedBox.square(
+                                    dimension: mediaCelSize, child: ans.data!));
+                          } else {
+                            return SizedBox.square(dimension: mediaCelSize);
+                          }
+                        },
+                      );
+                    } else {
+                      return SizedBox.square(dimension: mediaCelSize);
+                    }
+                  }
+
+                  return Row(
+                    key: Key(t.name + index.toString()),
+                    children: List.generate(
+                      _mediasPerRow,
+                      (j) => f((index * _mediasPerRow) + j),
+                    ),
+                  );
+                })));
+  }
+
+
   String get basicMediaRowName => "medias";
 
   ConsoleRow get basicMediasRow => ConsoleRow(widgets: [
@@ -924,7 +989,8 @@ mixin Medias2 on Pager2 {
         mediasTypeButton,
         mediasModeButton,
       ], extension: (
-        mediasExtension,
+        mediasExtension2,
+        // mediasExtension,
         mediaExtensionHeight
       ), widths: null, inputMaxHeight: null);
 }
