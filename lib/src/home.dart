@@ -832,8 +832,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         initPalettes: initPals,
         initScroll: initScroll,
         viewState: currentView,
-        loadMorePayments: () async =>
-            writePayments(paymentState(), openPay, 10),
+        loadMorePayments: () async {
+          writePayments(paymentState(), openPay, 10);
+          setPage(moneyPage());
+        },
         onScan: (payment) {
           final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
           if (parsedPayment != null) scanOrReceivePayment(parsedPayment);

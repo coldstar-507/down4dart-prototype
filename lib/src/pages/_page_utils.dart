@@ -845,6 +845,10 @@ mixin Medias2 on Pager2 {
         setTheState();
       });
 
+  Widget get mediasExtension3 {
+    return CustomList(forMediaMode?.$2 ?? curMode.$2);
+  }
+
   Widget get mediasExtension {
     final ids = g.savedMediasIDs[t]!;
     final nRows = (ids.length / _mediasPerRow).ceil();
@@ -980,7 +984,6 @@ mixin Medias2 on Pager2 {
                 })));
   }
 
-
   String get basicMediaRowName => "medias";
 
   ConsoleRow get basicMediasRow => ConsoleRow(widgets: [
@@ -989,7 +992,8 @@ mixin Medias2 on Pager2 {
         mediasTypeButton,
         mediasModeButton,
       ], extension: (
-        mediasExtension2,
+        mediasExtension3,
+        // mediasExtension2,
         // mediasExtension,
         mediaExtensionHeight
       ), widths: null, inputMaxHeight: null);
@@ -1212,7 +1216,6 @@ mixin Add2 {
 }
 
 mixin Scanner2 on Pager2 {
-
   void onScan(Barcode bc);
   Widget? _scanner;
 
@@ -1250,7 +1253,7 @@ mixin Scanner2 on Pager2 {
           // _scanner = null;
         } else {
           // Future.delayed(Andrew.pageSwitchAnimationDuration, loadScanner);
-          Future.delayed(const Duration(milliseconds: 300), loadScanner);          
+          Future.delayed(const Duration(milliseconds: 300), loadScanner);
         }
         setTheState();
       });

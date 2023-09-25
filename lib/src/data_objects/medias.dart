@@ -4,11 +4,14 @@ import 'dart:io';
 
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
+import 'package:down4/src/render_objects/console.dart';
 import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -815,5 +818,82 @@ class CustomImage extends StatelessWidget {
     print("drawing image: ${im.id.unik}");
     wasBuilt = true;
     return image;
+  }
+}
+
+class CustomList extends StatefulWidget {
+  final void Function(Down4Image) mediaPressFunc;
+  const CustomList(this.mediaPressFunc, {super.key});
+
+  @override
+  State<CustomList> createState() => _CustomListState();
+}
+
+class _CustomListState extends State<CustomList> {
+  final _streamController = StreamController<CustomImage>.broadcast();
+  List<CustomImage> list = [];
+  final _mediasPerRow = 5;
+  final mediaCelSize = Medias2.mediaCelSize;
+  final mc = ImageCacheManager();
+
+  @override
+  void initState() {
+    super.initState();
+    _streamController.stream.listen((p) => setState(() => list.add(p)));
+    load(_streamController);
+  }
+
+  List<Down4ID> mids(MediaType t) => g.savedMediasIDs[t]!;
+
+  void load(StreamController<CustomImage> sc) async {
+    final its = mids(MediaType.images).map((id) => (id, "console"));
+    final celSize = Size.square(Medias2.mediaCelSize);
+    final strm = mc.throttledImages(its, size: celSize);
+    strm.pipe(sc);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _streamController.close();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ids = mids(MediaType.images);
+    final nRows = (ids.length / _mediasPerRow).ceil();
+    return Container(
+        clipBehavior: Clip.hardEdge,
+        decoration: BoxDecoration(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+        ),
+        child: ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: nRows * mediaCelSize, maxWidth: Console.trueWidth),
+            child: ListView.builder(
+                itemCount: nRows,
+                itemBuilder: (ctx, index) {
+                  Widget f(int i) {
+                    if (i < list.length) {
+                      final im = list[i];
+                      return SizedBox.square(
+                          dimension: mediaCelSize,
+                          child: GestureDetector(
+                              onTap: () => widget.mediaPressFunc(im.im),
+                              child: im));
+                    } else {
+                      return SizedBox.square(dimension: mediaCelSize);
+                    }
+                  }
+
+                  return Row(
+                    key: Key(MediaType.images.name + index.toString()),
+                    children: List.generate(
+                      _mediasPerRow,
+                      (j) => f((index * _mediasPerRow) + j),
+                    ),
+                  );
+                })));
   }
 }
