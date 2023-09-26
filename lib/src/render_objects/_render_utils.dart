@@ -4,7 +4,11 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:down4/src/web_requests.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image/image.dart' as img;
+import 'package:exif/exif.dart' as exif;
+
 import 'package:flutter/services.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
@@ -75,7 +79,6 @@ class ImageRendererObject extends RenderBox {
     canvas.drawImageRect(_image, srcRect, destRect, Paint());
   }
 }
-
 
 extension MediaDisplay on Down4Media {
   // Widget displayImage_({
@@ -1037,10 +1040,54 @@ Future<void> cropAndSaveToSquare(
     {required File from, required File to, int size = 200}) async {
   img.Image? ogImage = img.decodeImage(await from.readAsBytes());
   if (ogImage == null) return;
+  // ogImage = img.bakeOrientation(ogImage);
+
+  final xd = await exif.readExifFromFile(from);
+  final int idRot = xd["Image Orientation"]?.tag ?? 1;
+  switch (idRot) {
+    case 1:
+      print("straight");
+      break;
+    case 2:
+      print("straight mirrored");
+      break;
+    case 3:
+      print("flipped");
+      break;
+    case 4:
+      print("flipped mirrored");
+      break;
+    case 5:
+      print("90-CW mirrored");
+      break;
+    case 6:
+      print("90-CW");
+      break;
+    case 7:
+      print("90 mirrored");
+      break;
+    case 8:
+      print("90");
+      break;
+  }
+
+  print("============EXIF PRE RESIZE============");
+  for (final e in xd.entries) {
+    print("${e.key} : ${e.value}");
+  }
+
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
-  final im = img.copyResizeCropSquare(ogImage, resize);
-  await to.writeAsBytes(img.encodePng(im));
+  final copyRz = img.copyResizeCropSquare(ogImage, resize);
+
+  final xd_ = await exif.readExifFromBytes(copyRz.data);
+  print("============EXIF POST RESIZE============");
+  for (final e in xd_.entries) {
+    print("${e.key} : ${e.value}");
+  }
+
+  // final baked = img.bakeOrientation(copyRz);
+  await to.writeAsBytes(img.encodeJpg(copyRz));
 }
 
 // Future<ui.Image?> cropBitmapToSquare(Uint8List originalBytes) async {

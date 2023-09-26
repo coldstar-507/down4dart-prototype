@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.2
 
   # Packages
+  exif: ^3.2.1  
   qr: ^3.0.1
   url_launcher: ^6.1.14  
   video_thumbnail: ^0.5.3

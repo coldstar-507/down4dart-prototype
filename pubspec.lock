@@ -345,6 +345,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
+  exif:
+    dependency: "direct main"
+    description:
+      name: exif
+      sha256: f65714272f9dbe66487a1594f0e82fb07d419fdbaef0f0cc57a457d2781ed1a4
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.1"
   fake_async:
     dependency: transitive
     description:
@@ -909,6 +917,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.0"
+  sprintf:
+    dependency: transitive
+    description:
+      name: sprintf
+      sha256: "1fc9ffe69d4df602376b52949af107d8f5703b77cda567c4d7d86a0693120f23"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.0"
   sqlite3:
     dependency: "direct main"
     description:

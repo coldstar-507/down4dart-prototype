@@ -307,16 +307,13 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   }
 
   String mainPath([String? appDir]) {
-    // print("mainPath, appDir parameter: $appDir");
     return "${appDir ?? g.appDirPath}${Platform.pathSeparator}${id.unik}";
   }
 
   File? mainFile([String? appDir]) {
-    if (!File(mainPath(appDir)).existsSync()) {
-      // print("main file == null");
-      return null;
-    }
-    return File(mainPath(appDir));
+    final f = File(mainPath(appDir));
+    if (!f.existsSync()) return null;
+    return f;
   }
 
   File? get mainCachedFile {
@@ -432,7 +429,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   @override
   Uint8List? get tempPayload {
-    return mainCachedFile?.readAsBytesSync() ?? mainFile()?.readAsBytesSync();
+    return mainFile()?.readAsBytesSync() ?? mainCachedFile?.readAsBytesSync();
   }
 
   @override
@@ -821,8 +818,46 @@ class CustomImage extends StatelessWidget {
   }
 }
 
+class StreamList<T> extends StatefulWidget {
+  final Stream<T> stream;
+  final Widget Function(int, T) makeObject;
+  final Widget Function(int)? placeHolder;
+  final int? maxN;
+  const StreamList(this.stream, this.makeObject,
+      {this.maxN, this.placeHolder, super.key});
+
+  @override
+  State<StreamList> createState() => _StreamListState<T>();
+}
+
+class _StreamListState<T> extends State<StreamList> {
+  final sc = StreamController<T>.broadcast();
+  List<T> list = [];
+
+  @override
+  void initState() {
+    super.initState();
+    sc.stream.listen((e) => setState(() => list.add(e)));
+    widget.stream.pipe(sc);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: widget.maxN ?? list.length,
+      itemBuilder: (ctx, i) {
+        if (i < list.length) {
+          return widget.makeObject(i, list[i]);
+        } else {
+          return widget.placeHolder?.call(i) ?? const SizedBox.shrink();
+        }
+      },
+    );
+  }
+}
+
 class CustomList extends StatefulWidget {
-  final void Function(Down4Image) mediaPressFunc;
+  final void Function(Down4Media) mediaPressFunc;
   const CustomList(this.mediaPressFunc, {super.key});
 
   @override
@@ -854,14 +889,14 @@ class _CustomListState extends State<CustomList> {
 
   @override
   void dispose() {
+    print("XXXX DISPOSING OF CUSTOM LIST XXXX");
     super.dispose();
     _streamController.close();
   }
 
   @override
   Widget build(BuildContext context) {
-    final ids = mids(MediaType.images);
-    final nRows = (ids.length / _mediasPerRow).ceil();
+    final nRows = (mids(MediaType.images).length / _mediasPerRow).ceil();
     return Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(

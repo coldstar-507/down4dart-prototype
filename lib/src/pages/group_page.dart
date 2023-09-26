@@ -168,7 +168,8 @@ class _GroupPageState extends State<GroupPage>
     });
   }
 
-  void forGroupNode(Down4Image m) {
+  void forGroupNode(Down4Media m) {
+    if (m is! Down4Image) throw 'Error: should only allow Down4Image';
     _groupImage = m;
     reloadItems();
   }
@@ -191,11 +192,12 @@ class _GroupPageState extends State<GroupPage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
-    final media = mediaInput ?? (cameraInput
-      ?..cache()
-      ..merge()
-      ..writeFromCachedPath());
-    
+    final media = mediaInput ??
+        (cameraInput
+          ?..cache()
+          ..merge()
+          ..writeFromCachedPath());
+
     final text = input.value;
     if (_groupImage == null || _groupName.isEmpty) return;
     if (text.isEmpty && media == null) return;

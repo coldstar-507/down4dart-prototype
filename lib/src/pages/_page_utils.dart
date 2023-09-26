@@ -778,6 +778,7 @@ mixin Medias2 on Pager2 {
   static int get _mediasPerRow => 5;
   static int get _nRows => 3;
   static double get mediaCelSize => Console.trueWidth / _mediasPerRow;
+  static Size get celSize => Size.square(mediaCelSize);
   double get mediaExtensionHeight => mediaCelSize * _nRows;
 
   MediaType t = MediaType.images;
@@ -792,13 +793,14 @@ mixin Medias2 on Pager2 {
     setTheState();
   }
 
-  (String, void Function(Down4Image))? forMediaMode;
+  (String, void Function(Down4Media))? forMediaMode;
   Chat? reactingTo;
 
   List<(String, void Function(Down4Media))> get mediasMode;
 
   int currentMode = 0;
   (String, void Function(Down4Media)) get curMode => mediasMode[currentMode];
+  void Function(Down4Media) get curFunc => forMediaMode?.$2 ?? curMode.$2;
 
   String get backFromMediasConsoleName => "base";
 
