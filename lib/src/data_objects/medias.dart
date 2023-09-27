@@ -88,7 +88,8 @@ class Down4MediaMetadata with Jsons {
 
 abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   bool _isPaidToView, _isPaidToOwn, _isLocked;
-  String? tinyThumbnail, _cachedUrl;
+  // String? tinyThumbnail,
+  String? _cachedUrl;
   int _lastUse;
   bool _isSaved;
   Down4MediaMetadata metadata;
@@ -137,7 +138,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     ComposedID? tempID,
     int? tempTS,
     required this.metadata,
-    this.tinyThumbnail,
+    // this.tinyThumbnail,
     this.mainCachedPath,
     int lastUse = 0,
     bool isSaved = false,
@@ -158,7 +159,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     required writeFromCachedPath,
     ComposedID? tempID,
     int? tempTS,
-    String? tinyThumbnail,
+    // String? tinyThumbnail,
     String? mainCachedPath,
     int lastUse = 0,
     bool isSaved = false,
@@ -175,7 +176,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           metadata: metadata,
           tempTS: tempTS,
           tempID: tempID,
-          tinyThumbnail: tinyThumbnail,
+          // tinyThumbnail: tinyThumbnail,
           lastUse: lastUse,
           isSaved: isSaved,
           mainCachedPath: mainCachedPath,
@@ -188,7 +189,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           tempTS: tempTS,
           tempID: tempID,
           mainCachedPath: mainCachedPath,
-          tinyThumbnail: tinyThumbnail,
+          // tinyThumbnail: tinyThumbnail,
           lastUse: lastUse,
           isSaved: isSaved,
           isPaidToView: isPaidToView,
@@ -255,7 +256,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
         "isPaidToView": _isPaidToView.toString(),
         "isPaidToOwn": _isPaidToOwn.toString(),
         "isLocked": _isLocked.toString(),
-        if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
+        // if (tinyThumbnail != null) "tinyThumbnail": tinyThumbnail!,
         if (includeLocal) "isSaved": _isSaved.toString(),
         if (includeLocal) "lastUse": _lastUse.toString(),
         if (includeLocal && tempID != null) "tempID": tempID!.value,
@@ -267,7 +268,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     final isPaidToView = decodedJson["isPaidToView"] == "true";
     final isPaidToOwn = decodedJson["isPaidToOwn"] == "true";
     final isLocked = decodedJson["isLocked"] == "true";
-    final tinyThumbnail = decodedJson["tinyThumbnail"];
+    // final tinyThumbnail = decodedJson["tinyThumbnail"];
     final isSaved = decodedJson["isSaved"] == "true";
     final tempID = ComposedID.fromString(decodedJson["tempID"]);
     final tempTS = int.tryParse(decodedJson["tempTS"] ?? "");
@@ -282,7 +283,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           isLocked: isLocked,
           isPaidToOwn: isPaidToOwn,
           isPaidToView: isPaidToView,
-          tinyThumbnail: tinyThumbnail,
+          // tinyThumbnail: tinyThumbnail,
           tempID: tempID,
           tempTS: tempTS);
     } else {
@@ -292,22 +293,30 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           isLocked: isLocked,
           isPaidToOwn: isPaidToOwn,
           isPaidToView: isPaidToView,
-          tinyThumbnail: tinyThumbnail,
+          // tinyThumbnail: tinyThumbnail,
           tempID: tempID,
           tempTS: tempTS);
     }
   }
 
-  Image? tinyImage(Size s, {bool forceSquare = false}) {
-    if (tinyThumbnail == null) return null;
-    return Image.memory(base64Decode(tinyThumbnail!),
-        fit: BoxFit.cover,
-        cacheWidth: (s.width * golden).toInt(),
-        cacheHeight: (s.height * golden).toInt());
-  }
+  // Image? tinyImage(Size s, {bool forceSquare = false}) {
+  //   if (tinyThumbnail == null) return null;
+  //   return Image.memory(base64Decode(tinyThumbnail!),
+  //       fit: BoxFit.cover,
+  //       cacheWidth: (s.width * golden).toInt(),
+  //       cacheHeight: (s.height * golden).toInt());
+  // }
 
   String mainPath([String? appDir]) {
     return "${appDir ?? g.appDirPath}${Platform.pathSeparator}${id.unik}";
+  }
+
+  static String mainPath_(Down4ID id) {
+    return "${g.appDirPath}${Platform.pathSeparator}${id.unik}";
+  }
+
+  static String cachePath_(Down4ID id) {
+    return "${g.cacheDirPath}${Platform.pathSeparator}${id.unik}";
   }
 
   File? mainFile([String? appDir]) {
@@ -442,8 +451,8 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     return Down4Media.fromLocal2(id,
         writeFromCachedPath: true,
         mainCachedPath: mainCachedPath,
-        metadata: Down4MediaMetadata.fromJson(metadataJson),
-        tinyThumbnail: tinyThumbnail);
+        metadata: Down4MediaMetadata.fromJson(metadataJson));
+    // tinyThumbnail: tinyThumbnail);
   }
 }
 
@@ -452,7 +461,7 @@ class Down4Image extends Down4Media {
     super.id, {
     required super.metadata,
     super.mainCachedPath,
-    super.tinyThumbnail,
+    // super.tinyThumbnail,
     super.lastUse,
     super.tempID,
     super.tempTS,
@@ -497,7 +506,7 @@ class Down4Image extends Down4Media {
     final File? from = mainFile(appDir);
     if (to.existsSync()) return _profilePath(appDir);
     if (from == null) return null;
-    await cropAndSaveToSquare(from: from, to: to);
+    await cropAndSaveToSquare(from: from, to: to, size: 200);
     return _profilePath(appDir);
   }
 
@@ -578,7 +587,7 @@ class Down4Image extends Down4Media {
 
   @override
   Future<void> write(Uint8List mainData) async {
-    tinyThumbnail ??= makeTiny(mainData);
+    // tinyThumbnail ??= makeTiny(mainData);
     await File(mainPath()).writeAsBytes(mainData);
   }
 }
@@ -588,7 +597,7 @@ class Down4Video extends Down4Media {
     super.id, {
     required super.metadata,
     super.mainCachedPath,
-    super.tinyThumbnail,
+    // super.tinyThumbnail,
     super.lastUse,
     super.tempID,
     super.tempTS,
@@ -656,8 +665,8 @@ class Down4Video extends Down4Media {
     final tn =
         await VideoThumbnail.thumbnailData(video: mainPath(), quality: 75);
     if (tn == null) return;
-    tinyThumbnail = makeTiny(tn);
-    await File(thumbnailPath).writeAsBytes(tn);
+    // tinyThumbnail = makeTiny(tn);
+    // await File(thumbnailPath).writeAsBytes(tn);
   }
 }
 

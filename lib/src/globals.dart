@@ -231,7 +231,7 @@ class Singletons {
   }
 
   Down4Theme get theme => themesRegistry[myTheme.themeName]!;
-  late String appDirPath;
+  late String appDirPath, cacheDirPath;
   late Self self;
   late Wallet wallet;
   late Sizes sizes;
@@ -262,8 +262,9 @@ class Singletons {
 
   void loadSizes(Sizes s) => sizes = s;
 
-  Future<void> loadAppDirPath() async {
+  Future<void> loadAppDirPaths() async {
     appDirPath = (await getApplicationDocumentsDirectory()).path;
+    cacheDirPath = (await getApplicationCacheDirectory()).path;
   }
 
   void loadWallet() {
@@ -317,8 +318,7 @@ void writePalette<T extends PaletteN>(
 
   final lastChat = node is ChatN ? node.lastChatMessage() : null;
 
-  final hide =
-      home && node is User && !node.isConnected && !node.hasMessages();
+  final hide = home && node is User && !node.isConnected && !node.hasMessages();
 
   void Function()? onSelect = onSel == null || hide
       ? null

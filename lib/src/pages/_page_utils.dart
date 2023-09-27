@@ -4,6 +4,7 @@ import 'package:down4/src/data_objects/nodes.dart';
 import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
 
+import 'package:image/image.dart' as img;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:mime/mime.dart';
 // import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../_dart_utils.dart';
 
@@ -1289,12 +1291,36 @@ Future<Down4Media> makeCameraMedia({
   required bool isReversed,
   required ComposedID owner,
   required bool isSquared,
+  bool temporary = false,
   required bool writeFromCachedPath,
 }) async {
+  final id = ComposedID(region: owner.region);
+  final bool needWrite = !temporary || isSquared;
+  if (needWrite) {
+    final pGen = temporary ? Down4Media.cachePath_ : Down4Media.mainPath_;
+    final p = pGen(id);
+    if (isSquared) {
+      await cropAndSaveToSquare(from: File(cachedPath), to: File(p));
+    } else {
+      await File(cachedPath).copy(p);
+    }
+  }
+
   final mime = lookupMimeType(cachedPath)!;
   final isVideo = videoMimes.contains(mime);
-  final data = File(cachedPath).readAsBytesSync();
-  final tinyThumbnail = isVideo ? null : makeTiny(data);
+  if (!temporary && isVideo) {
+    final p = "${Down4Media.mainPath_(id)}-tn";
+    await VideoThumbnail.thumbnailFile(
+        video: cachedPath, thumbnailPath: p, quality: 80);
+  }
+
+  // final data = File(cachedPath).readAsBytesSync();
+  // final id = ComposedID(region: owner.region);
+  // final toPath = Down4Media.mainPath_(id);
+  // cropAndSaveToSquare(from: File(cachedPath), to: File(toPath));
+  // final im = img.decodeImage(data);
+
+  // final tinyThumbnail = isVideo ? null : makeTiny(data);
   return Down4Media.fromLocal2(
       ComposedID(region: owner.region), // hack for init
       mainCachedPath: cachedPath,
@@ -1306,6 +1332,6 @@ Future<Down4Media> makeCameraMedia({
           timestamp: makeTimestamp(),
           width: size.width,
           height: size.height,
-          mime: mime),
-      tinyThumbnail: tinyThumbnail);
+          mime: mime));
+  // tinyThumbnail: tinyThumbnail);
 }

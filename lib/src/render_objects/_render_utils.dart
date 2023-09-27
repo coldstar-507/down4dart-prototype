@@ -1037,7 +1037,7 @@ Future<void> importConsoleMedias({
 }
 
 Future<void> cropAndSaveToSquare(
-    {required File from, required File to, int size = 200}) async {
+    {required File from, required File to, int size = 512}) async {
   img.Image? ogImage = img.decodeImage(await from.readAsBytes());
   if (ogImage == null) return;
 
@@ -1049,41 +1049,41 @@ Future<void> cropAndSaveToSquare(
   // do the resize of the image
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
-  final copyRz = img.copyResizeCropSquare(ogImage, resize);  
-  final rz = img.copyResize(ogImage);
+  final cropRz = img.copyResizeCropSquare(ogImage, resize);  
+  // final rz = img.copyResize(ogImage);
 
   img.Image res;
   switch (idRot) {
     case 1:
-      res = rz;
+      res = cropRz;
       print("straight");
       break;
     case 2:
-      res = img.flipHorizontal(rz);
+      res = img.flipHorizontal(cropRz);
       print("straight mirrored");
       break;
     case 3:
-      res = img.flipVertical(rz);
+      res = img.flipVertical(cropRz);
       print("flipped");
       break;
     case 4:
-      res = img.flipHorizontal(img.flipVertical(rz));      
+      res = img.flipHorizontal(img.flipVertical(cropRz));      
       print("flipped mirrored");
       break;
     case 5:
-      res = img.flipHorizontal(img.copyRotate(rz, 270));
+      res = img.flipHorizontal(img.copyRotate(cropRz, 270));
       print("90-CW mirrored");
       break;
     case 6:
-      res = img.copyRotate(rz, 270);
+      res = img.copyRotate(cropRz, 270);
       print("90-CW");
       break;
     case 7:
-      res = img.flipHorizontal(img.copyRotate(rz, 90));
+      res = img.flipHorizontal(img.copyRotate(cropRz, 90));
       print("90 mirrored");
       break;
     case 8:
-      res = img.copyRotate(rz, 90);
+      res = img.copyRotate(cropRz, 90);
       print("90");
       break;
     default:
@@ -1095,7 +1095,7 @@ Future<void> cropAndSaveToSquare(
     print("${e.key} : ${e.value}");
   }
 
-  final xd_ = await exif.readExifFromBytes(copyRz.data);
+  final xd_ = await exif.readExifFromBytes(cropRz.data);
   print("============EXIF POST RESIZE============");
   for (final e in xd_.entries) {
     print("${e.key} : ${e.value}");
