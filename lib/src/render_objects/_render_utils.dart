@@ -1040,35 +1040,54 @@ Future<void> cropAndSaveToSquare(
     {required File from, required File to, int size = 200}) async {
   img.Image? ogImage = img.decodeImage(await from.readAsBytes());
   if (ogImage == null) return;
-  // ogImage = img.bakeOrientation(ogImage);
 
+  // get the exif metadata for orientation tag
   final xd = await exif.readExifFromFile(from);
   final int idRot = xd["Image Orientation"]?.tag ?? 1;
+
+
+  // do the resize of the image
+  final minSize = math.min(ogImage.height, ogImage.width);
+  final resize = size > minSize ? minSize : size;
+  final copyRz = img.copyResizeCropSquare(ogImage, resize);  
+  final rz = img.copyResize(ogImage);
+
+  img.Image res;
   switch (idRot) {
     case 1:
+      res = rz;
       print("straight");
       break;
     case 2:
+      res = img.flipHorizontal(rz);
       print("straight mirrored");
       break;
     case 3:
+      res = img.flipVertical(rz);
       print("flipped");
       break;
     case 4:
+      res = img.flipHorizontal(img.flipVertical(rz));      
       print("flipped mirrored");
       break;
     case 5:
+      res = img.flipHorizontal(img.copyRotate(rz, 270));
       print("90-CW mirrored");
       break;
     case 6:
+      res = img.copyRotate(rz, 270);
       print("90-CW");
       break;
     case 7:
+      res = img.flipHorizontal(img.copyRotate(rz, 90));
       print("90 mirrored");
       break;
     case 8:
+      res = img.copyRotate(rz, 90);
       print("90");
       break;
+    default:
+      throw "error: $idRot is not a valid Image Orientation tag";
   }
 
   print("============EXIF PRE RESIZE============");
@@ -1076,18 +1095,13 @@ Future<void> cropAndSaveToSquare(
     print("${e.key} : ${e.value}");
   }
 
-  final minSize = math.min(ogImage.height, ogImage.width);
-  final resize = size > minSize ? minSize : size;
-  final copyRz = img.copyResizeCropSquare(ogImage, resize);
-
   final xd_ = await exif.readExifFromBytes(copyRz.data);
   print("============EXIF POST RESIZE============");
   for (final e in xd_.entries) {
     print("${e.key} : ${e.value}");
   }
 
-  // final baked = img.bakeOrientation(copyRz);
-  await to.writeAsBytes(img.encodeJpg(copyRz));
+  await to.writeAsBytes(img.encodeJpg(res));
 }
 
 // Future<ui.Image?> cropBitmapToSquare(Uint8List originalBytes) async {

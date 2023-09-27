@@ -120,7 +120,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
   Future<void> trySettlement() async {
     if (validForBroadcast) {
-    return r.broadcastTxs(txs);
+      return r.broadcastTxs(txs);
     } else {
       print("""
         ================== WARNING =====================
@@ -885,11 +885,13 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
   }
 
   List<int> get compressed {
-    final List<int>? utf8Receiver =
-        receiver == null ? null : utf8.encode(receiver!.value);
+    final List<int>? rc = receiver?.value.codeUnits;
+    // final List<int>? utf8Receiver =
+    //     receiver == null ? null : utf8.encode(receiver!.value);
     return [
       ...raw,
-      ...utf8Receiver == null ? [0x00] : [utf8Receiver.length, ...utf8Receiver],
+      ...rc == null ? [0x00] : [rc.length, ...rc],
+      // ...utf8Receiver == null ? [0x00] : [utf8Receiver.length, ...utf8Receiver],
       type.index,
     ];
   }
@@ -931,7 +933,9 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
     if ((receiverLen = d4[curOffset]) != 0x00) {
       final receiverData =
           d4.sublist(curOffset + 1, curOffset + 1 + receiverLen);
-      receiver = ComposedID.fromString(utf8.decode(receiverData));
+      final receiverStr = String.fromCharCodes(receiverData);
+      receiver = ComposedID.fromString(receiverStr);
+      // receiver = ComposedID.fromString(utf8.decode(receiverData));
     }
 
     final flag = d4[curOffset + 1 + receiverLen];
