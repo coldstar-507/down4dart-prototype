@@ -553,11 +553,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final timestamp = makeTimestamp();
     setPage(loadingPage());
 
-    final selection = chats.selected().asNodes<ChatN>();
-
-    final media = (await Down4Media.fromLocal2(ComposedID(),
+    final media = Down4Media.fromLocal(ComposedID(),
         mainCachedPath: path,
-        writeFromCachedPath: selection.contains(g.self),
+        // writeFromCachedPath: selection.contains(g.self),
         metadata: Down4MediaMetadata(
             isSquared: false,
             ownerID: g.self.id,
@@ -566,8 +564,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             isReversed: isReversed,
             txt: text,
             width: size.width,
-            height: size.height)))
+            height: size.height))
       ..cache();
+
+    final selection = chats.selected().asNodes<ChatN>();
+    if (selection.contains(g.self)) await media.writeFromCachedPath();
 
     for (final sel in chats.selected().asNodes<ChatN>()) {
       final snip = Snip(ComposedID(),

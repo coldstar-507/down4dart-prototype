@@ -404,6 +404,18 @@ class _Down4MediaViewerState extends State<_Down4MediaViewer> {
   }
 }
 
+class Down4RotatingLogo extends StatelessWidget {
+  final double dimension;
+  const Down4RotatingLogo(this.dimension, {super.key});
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedRotation(
+        turns: 1,
+        duration: const Duration(seconds: 2),
+        child: down4Logo(dimension, g.theme.down4IconForLoadingScreenColor));
+  }
+}
+
 class Down4ImageViewer extends StatefulWidget {
   final Down4Image image;
   final Size displaySize;
@@ -420,8 +432,10 @@ class Down4ImageViewer extends StatefulWidget {
 }
 
 class _Down4ImageViewerState extends State<Down4ImageViewer> {
-  late Image? im = widget.image
-      .readyImage(widget.displaySize, forceSquare: widget.forceSquareAnyways);
+  late Image? im = widget.image.readyImage(
+    widget.displaySize,
+    forceSquare: widget.forceSquareAnyways,
+  );
 
   @override
   void initState() {
@@ -434,34 +448,40 @@ class _Down4ImageViewerState extends State<Down4ImageViewer> {
     return Transform.flip(flipX: widget.image.isReversed, child: im!);
   }
 
-  void loadFutureImage() async {
+  Future<void> loadFutureImage() async {
     im = await widget.image.futureImage(widget.displaySize,
         forceSquare: widget.forceSquareAnyways);
     setState(() {});
   }
 
+  double get w => widget.displaySize.width;
+  double get h => widget.displaySize.height;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: widget.displaySize.width,
-      height: widget.displaySize.height,
-      child: Stack(
-        fit: StackFit.expand,
-        alignment: AlignmentDirectional.center,
-        children: [
-          widget.image.tinyImage(widget.displaySize,
-                  forceSquare: widget.forceSquareAnyways) ??
-              const SizedBox.shrink(),
-          AnimatedOpacity(
-            curve: Curves.easeInExpo,
-            duration: const Duration(milliseconds: 200),
-            opacity: im == null ? 0 : 1,
-            //|| !ImageCache().containsKey(im!.key!) ? 0 : 1,
-            child: tranformed() ?? const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
+        width: w,
+        height: h,
+        child: im ?? Down4RotatingLogo(math.min(w, h) / 2.0));
+
+      // Stack(
+      //   fit: StackFit.expand,
+      //   alignment: AlignmentDirectional.center,
+      //   children: [
+      //     widget.image.tinyImage(widget.displaySize,
+      //             forceSquare: widget.forceSquareAnyways) ??
+      //         const SizedBox.shrink(),
+      //     AnimatedOpacity(
+      //       curve: Curves.easeInExpo,
+      //       duration: const Duration(milliseconds: 200),
+      //       opacity: im == null ? 0 : 1,
+      //       //|| !ImageCache().containsKey(im!.key!) ? 0 : 1,
+      //       child: tranformed() ?? const SizedBox.shrink(),
+      //     ),
+      //   ],
+      // ),
+
+    
   }
 }
 
@@ -975,8 +995,8 @@ Future<Down4Image?> importNodeMedia() async {
           width: size.width,
           height: size.height,
           isSquared: true,
-          mime: mime),
-      tinyThumbnail: makeTiny(bytes));
+          mime: mime));
+      // tinyThumbnail: makeTiny(bytes));
 }
 
 Uint8List resizeImage(Uint8List bytes, int width, [int? height]) {
@@ -1045,11 +1065,10 @@ Future<void> cropAndSaveToSquare(
   final xd = await exif.readExifFromFile(from);
   final int idRot = xd["Image Orientation"]?.tag ?? 1;
 
-
   // do the resize of the image
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
-  final cropRz = img.copyResizeCropSquare(ogImage, resize);  
+  final cropRz = img.copyResizeCropSquare(ogImage, resize);
   // final rz = img.copyResize(ogImage);
 
   img.Image res;
@@ -1067,7 +1086,7 @@ Future<void> cropAndSaveToSquare(
       print("flipped");
       break;
     case 4:
-      res = img.flipHorizontal(img.flipVertical(cropRz));      
+      res = img.flipHorizontal(img.flipVertical(cropRz));
       print("flipped mirrored");
       break;
     case 5:

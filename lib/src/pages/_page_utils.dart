@@ -1285,53 +1285,64 @@ mixin Scanner2 on Pager2 {
       );
 }
 
-Future<Down4Media> makeCameraMedia({
-  required String cachedPath,
-  required Size size,
-  required bool isReversed,
-  required ComposedID owner,
-  required bool isSquared,
-  bool temporary = false,
-  required bool writeFromCachedPath,
-}) async {
-  final id = ComposedID(region: owner.region);
-  final bool needWrite = !temporary || isSquared;
-  if (needWrite) {
-    final pGen = temporary ? Down4Media.cachePath_ : Down4Media.mainPath_;
-    final p = pGen(id);
-    if (isSquared) {
-      await cropAndSaveToSquare(from: File(cachedPath), to: File(p));
-    } else {
-      await File(cachedPath).copy(p);
-    }
-  }
+// Future<Down4Media> makeCameraMedia({
+//   required String cachedPath,
+//   required Size size,
+//   required bool isReversed,
+//   required ComposedID owner,
+//   required bool isSquared,
+//   // bool temporary = false,
+//   required bool writeFromCachedPath,
+// }) async {
+//   final id = ComposedID(region: owner.region);
+//   final bool needWrite = !temporary || isSquared;
+//   if (needWrite) {
+//     final pGen = temporary ? Down4Media.cachePath_ : Down4Media.mainPath_;
+//     final p = pGen(id);
+//     if (isSquared) {
+//       await cropAndSaveToSquare(from: File(cachedPath), to: File(p));
+//     } else {
+//       await File(cachedPath).copy(p);
+//     }
+//   }
 
-  final mime = lookupMimeType(cachedPath)!;
-  final isVideo = videoMimes.contains(mime);
-  if (!temporary && isVideo) {
-    final p = "${Down4Media.mainPath_(id)}-tn";
-    await VideoThumbnail.thumbnailFile(
-        video: cachedPath, thumbnailPath: p, quality: 80);
-  }
+//   // if it's video, we make a thumbnail
+//   final mime = lookupMimeType(cachedPath)!;
+//   final isVideo = videoMimes.contains(mime);
+//   if (!temporary && isVideo) {
+//     final p = "${Down4Media.mainPath_(id)}-tn";
+//     await VideoThumbnail.thumbnailFile(
+//         video: cachedPath, thumbnailPath: p, quality: 80);
+//   }
 
-  // final data = File(cachedPath).readAsBytesSync();
-  // final id = ComposedID(region: owner.region);
-  // final toPath = Down4Media.mainPath_(id);
-  // cropAndSaveToSquare(from: File(cachedPath), to: File(toPath));
-  // final im = img.decodeImage(data);
+//   return Down4Media.fromLocal(id, metadata: Down4MediaMetadata(
+//           ownerID: owner,
+//           isSquared: isSquared,
+//           isReversed: isReversed,
+//           timestamp: makeTimestamp(),
+//           width: size.width,
+//           height: size.height,
+//           mime: mime));
 
-  // final tinyThumbnail = isVideo ? null : makeTiny(data);
-  return Down4Media.fromLocal2(
-      ComposedID(region: owner.region), // hack for init
-      mainCachedPath: cachedPath,
-      writeFromCachedPath: writeFromCachedPath,
-      metadata: Down4MediaMetadata(
-          ownerID: owner,
-          isSquared: isSquared,
-          isReversed: isReversed,
-          timestamp: makeTimestamp(),
-          width: size.width,
-          height: size.height,
-          mime: mime));
-  // tinyThumbnail: tinyThumbnail);
-}
+//   // final data = File(cachedPath).readAsBytesSync();
+//   // final id = ComposedID(region: owner.region);
+//   // final toPath = Down4Media.mainPath_(id);
+//   // cropAndSaveToSquare(from: File(cachedPath), to: File(toPath));
+//   // final im = img.decodeImage(data);
+  
+
+//   // final tinyThumbnail = isVideo ? null : makeTiny(data);
+//   // return Down4Media.fromLocal2(
+//   //     ComposedID(region: owner.region), // hack for init
+//   //     mainCachedPath: cachedPath,
+//   //     writeFromCachedPath: writeFromCachedPath,
+//   //     metadata: Down4MediaMetadata(
+//   //         ownerID: owner,
+//   //         isSquared: isSquared,
+//   //         isReversed: isReversed,
+//   //         timestamp: makeTimestamp(),
+//   //         width: size.width,
+//   //         height: size.height,
+//   //         mime: mime));
+//   // tinyThumbnail: tinyThumbnail);
+// }

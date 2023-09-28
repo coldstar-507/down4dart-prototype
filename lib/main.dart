@@ -349,7 +349,7 @@ Future<void> main() async {
   }
   // load application directory folder
   {
-    await g.loadAppDirPath();
+    await g.loadAppDirPaths();
   }
 
   initSqlite();
