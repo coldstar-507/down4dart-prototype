@@ -131,7 +131,7 @@ abstract class Down4Theme {
 
   Map<NodesColor, Color> get nodeColors;
   Color get messageSelectionBorderColor;
-  Color get messageSelectionOverlayColor;
+  // Color get messageSelectionOverlayColor;
   Color get messageShadowColor;
   Brightness get keyBoardTheme;
 
@@ -301,10 +301,10 @@ class BlackTheme extends Down4Theme {
   Color get snipArrowColor => const Color.fromARGB(115, 143, 0, 9);
 
   @override
-  Color get messageSelectionBorderColor => Colors.grey;
+  Color get messageSelectionBorderColor => Colors.blue;
 
-  @override
-  Color get messageSelectionOverlayColor => Colors.black38;
+  // @override
+  // Color get messageSelectionOverlayColor => Colors.black38;
 
   @override
   Color get messageShadowColor => Colors.transparent;
@@ -582,8 +582,8 @@ class PinkTheme extends Down4Theme {
   @override
   Color get messageSelectionBorderColor => Colors.black;
 
-  @override
-  Color get messageSelectionOverlayColor => Colors.transparent;
+  // @override
+  // Color get messageSelectionOverlayColor => Colors.transparent;
 
   @override
   Color get messageShadowColor => Colors.black38;

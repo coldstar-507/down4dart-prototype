@@ -4,6 +4,8 @@ import 'package:camera/camera.dart';
 import 'package:down4/src/_dart_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_video_info/flutter_video_info.dart';
+import 'package:mime/mime.dart';
 
 import '../data_objects/_data_utils.dart';
 import '../data_objects/firebase.dart';
@@ -100,13 +102,22 @@ class _UserMakerPageState extends State<UserMakerPage>
     if (r?.files.single.path != null && r?.files.single.bytes != null) {
       final String p = r!.files.single.path!;
       final s = await decodeImageSize(r.files.single.bytes!);
-      cameraInput = await makeCameraMedia(
-          writeFromCachedPath: false,
-          cachedPath: p,
-          size: s,
-          isReversed: false,
-          isSquared: true,
-          owner: willBeReplacedID);
+      cameraInput = Down4Media.fromLocal(ComposedID(),
+          metadata: Down4MediaMetadata(
+              ownerID: g.self.id,
+              timestamp: makeTimestamp(),
+              isReversed: isReversed,
+              width: s.width,
+              height: s.height,
+              mime: lookupMimeType(p)!));
+
+      // cameraInput = await makeCameraMedia(
+      //     writeFromCachedPath: false,
+      //     cachedPath: p,
+      //     size: s,
+      //     isReversed: false,
+      //     isSquared: true,
+      //     owner: willBeReplacedID);
       setTheState();
     }
   }
@@ -133,7 +144,7 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   ConsoleButton get recoverButton => ConsoleButton(
       name: "RECOVER", isGreyedOut: true, onPress: () => print("TODO"));
-    
+
   ConsoleButton get proceedButton => ConsoleButton(
       isActivated: isReady,
       isGreyedOut: !isReady,
@@ -269,13 +280,23 @@ class _UserMakerPageState extends State<UserMakerPage>
         shouldBeDownButIsnt: cameraController?.value.isRecordingVideo ?? false,
         onPress: () async {
           final XFile f = await cameraController!.takePicture();
-          tempInput = await makeCameraMedia(
-              writeFromCachedPath: false,
-              cachedPath: f.path,
-              size: cameraController!.value.previewSize!.inverted,
-              isReversed: isReversed,
-              owner: willBeReplacedID,
-              isSquared: true);
+          final s = await decodeImageSize(await f.readAsBytes());
+          tempInput = Down4Media.fromLocal(ComposedID(),
+              metadata: Down4MediaMetadata(
+                  ownerID: g.self.id,
+                  timestamp: makeTimestamp(),
+                  width: s.width,
+                  isReversed: isReversed,
+                  height: s.height,
+                  mime: lookupMimeType(f.path)!));
+
+          // tempInput = await makeCameraMedia(
+          //     writeFromCachedPath: false,
+          //     cachedPath: f.path,
+          //     size: cameraController!.value.previewSize!.inverted,
+          //     isReversed: isReversed,
+          //     owner: willBeReplacedID,
+          //     isSquared: true);
           changeConsole(cameraConfirmationRowName);
         },
         onLongPress: () async {
@@ -284,13 +305,22 @@ class _UserMakerPageState extends State<UserMakerPage>
         },
         onLongPressUp: () async {
           final XFile f = await cameraController!.stopVideoRecording();
-          tempInput = await makeCameraMedia(
-              writeFromCachedPath: false,
-              cachedPath: f.path,
-              size: cameraController!.value.previewSize!.inverted,
-              isReversed: isReversed,
-              owner: willBeReplacedID,
-              isSquared: true);
+          final vinfo = await FlutterVideoInfo().getVideoInfo(f.path);
+          tempInput = Down4Media.fromLocal(ComposedID(),
+              metadata: Down4MediaMetadata(
+                  ownerID: g.self.id,
+                  timestamp: makeTimestamp(),
+                  isReversed: isReversed,
+                  width: vinfo!.width!.toDouble(),
+                  height: vinfo.height!.toDouble(),
+                  mime: lookupMimeType(f.path)!));
+          // tempInput = await makeCameraMedia(
+          //     writeFromCachedPath: false,
+          //     cachedPath: f.path,
+          //     size: cameraController!.value.previewSize!.inverted,
+          //     isReversed: isReversed,
+          //     owner: willBeReplacedID,
+          //     isSquared: true);
           changeConsole(cameraConfirmationRowName);
         },
       );

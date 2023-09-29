@@ -404,17 +404,49 @@ class _Down4MediaViewerState extends State<_Down4MediaViewer> {
   }
 }
 
-class Down4RotatingLogo extends StatelessWidget {
+class Down4RotatingLogo extends StatefulWidget {
   final double dimension;
   const Down4RotatingLogo(this.dimension, {super.key});
+
+  @override
+  State<Down4RotatingLogo> createState() => _Down4RotatingLogoState();
+}
+
+class _Down4RotatingLogoState extends State<Down4RotatingLogo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: (golden * 1000).toInt()),
+  )..repeat();
+
+  final twn = Tween<double>(begin: 0.0, end: 1.0);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedRotation(
-        turns: 1,
-        duration: const Duration(seconds: 2),
-        child: down4Logo(dimension, g.theme.down4IconForLoadingScreenColor));
+    return RotationTransition(
+        turns: twn.animate(_controller),
+        child: down4Logo(
+            widget.dimension, g.theme.down4IconForLoadingScreenColor));
   }
 }
+
+// class Down4RotatingLogo extends StatelessWidget {
+//   final double dimension;
+//   const Down4RotatingLogo(this.dimension, {super.key});
+//   @override
+//   Widget build(BuildContext context) {
+//     return AnimatedRotation(
+//         turns: 0.1,
+//         duration: const Duration(hours: 1),
+//         child: down4Logo(dimension, g.theme.down4IconForLoadingScreenColor));
+//   }
+// }
 
 class Down4ImageViewer extends StatefulWidget {
   final Down4Image image;
@@ -443,7 +475,7 @@ class _Down4ImageViewerState extends State<Down4ImageViewer> {
     if (im == null) loadFutureImage();
   }
 
-  Widget? tranformed() {
+  Widget? transformed() {
     if (im == null) return null;
     return Transform.flip(flipX: widget.image.isReversed, child: im!);
   }
@@ -462,26 +494,24 @@ class _Down4ImageViewerState extends State<Down4ImageViewer> {
     return SizedBox(
         width: w,
         height: h,
-        child: im ?? Down4RotatingLogo(math.min(w, h) / 2.0));
+        child: transformed() ?? Down4RotatingLogo(math.min(w, h) / 2.0));
 
-      // Stack(
-      //   fit: StackFit.expand,
-      //   alignment: AlignmentDirectional.center,
-      //   children: [
-      //     widget.image.tinyImage(widget.displaySize,
-      //             forceSquare: widget.forceSquareAnyways) ??
-      //         const SizedBox.shrink(),
-      //     AnimatedOpacity(
-      //       curve: Curves.easeInExpo,
-      //       duration: const Duration(milliseconds: 200),
-      //       opacity: im == null ? 0 : 1,
-      //       //|| !ImageCache().containsKey(im!.key!) ? 0 : 1,
-      //       child: tranformed() ?? const SizedBox.shrink(),
-      //     ),
-      //   ],
-      // ),
-
-    
+    // Stack(
+    //   fit: StackFit.expand,
+    //   alignment: AlignmentDirectional.center,
+    //   children: [
+    //     widget.image.tinyImage(widget.displaySize,
+    //             forceSquare: widget.forceSquareAnyways) ??
+    //         const SizedBox.shrink(),
+    //     AnimatedOpacity(
+    //       curve: Curves.easeInExpo,
+    //       duration: const Duration(milliseconds: 200),
+    //       opacity: im == null ? 0 : 1,
+    //       //|| !ImageCache().containsKey(im!.key!) ? 0 : 1,
+    //       child: tranformed() ?? const SizedBox.shrink(),
+    //     ),
+    //   ],
+    // ),
   }
 }
 
@@ -996,7 +1026,7 @@ Future<Down4Image?> importNodeMedia() async {
           height: size.height,
           isSquared: true,
           mime: mime));
-      // tinyThumbnail: makeTiny(bytes));
+  // tinyThumbnail: makeTiny(bytes));
 }
 
 Uint8List resizeImage(Uint8List bytes, int width, [int? height]) {
@@ -1043,14 +1073,27 @@ Future<void> importConsoleMedias({
         mime: mime,
         isSquared: false,
         isReversed: false);
-    final m = await Down4Media.fromLocal2(ComposedID(),
+
+    final m = Down4Media.fromLocal(ComposedID(),
         mainCachedPath: r.path!,
-        writeFromCachedPath: true,
-        metadata: metadata,
-        isSaved: true,
-        lastUse: makeTimestamp())
+        metadata: Down4MediaMetadata(
+            ownerID: g.self.id,
+            timestamp: makeTimestamp(),
+            width: size.width,
+            height: size.height,
+            mime: mime))
       ..cache()
-      ..merge();
+      ..merge()
+      ..writeFromCachedPath();
+
+    // final m = await Down4Media.fromLocal2(ComposedID(),
+    //     mainCachedPath: r.path!,
+    //     writeFromCachedPath: true,
+    //     metadata: metadata,
+    //     isSaved: true,
+    //     lastUse: makeTimestamp())
+    //   ..cache()
+    //   ..merge();
     g.savedMediasIDs[m.type] = savedMediaIDs(m.type).toList();
     reload();
   }
@@ -1059,68 +1102,70 @@ Future<void> importConsoleMedias({
 Future<void> cropAndSaveToSquare(
     {required File from, required File to, int size = 512}) async {
   img.Image? ogImage = img.decodeImage(await from.readAsBytes());
+  print(
+      "\n====================\nCROP AND SAVE TO SQUARE\n====================\n");
   if (ogImage == null) return;
 
   // get the exif metadata for orientation tag
   final xd = await exif.readExifFromFile(from);
+  print("============EXIF PRE RESIZE============");
+  for (final e in xd.entries) {
+    print("${e.key} : ${e.value} (tag=${e.value.tag})");
+  }
+
   final int idRot = xd["Image Orientation"]?.tag ?? 1;
 
   // do the resize of the image
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
   final cropRz = img.copyResizeCropSquare(ogImage, resize);
+
   // final rz = img.copyResize(ogImage);
 
-  img.Image res;
-  switch (idRot) {
-    case 1:
-      res = cropRz;
-      print("straight");
-      break;
-    case 2:
-      res = img.flipHorizontal(cropRz);
-      print("straight mirrored");
-      break;
-    case 3:
-      res = img.flipVertical(cropRz);
-      print("flipped");
-      break;
-    case 4:
-      res = img.flipHorizontal(img.flipVertical(cropRz));
-      print("flipped mirrored");
-      break;
-    case 5:
-      res = img.flipHorizontal(img.copyRotate(cropRz, 270));
-      print("90-CW mirrored");
-      break;
-    case 6:
-      res = img.copyRotate(cropRz, 270);
-      print("90-CW");
-      break;
-    case 7:
-      res = img.flipHorizontal(img.copyRotate(cropRz, 90));
-      print("90 mirrored");
-      break;
-    case 8:
-      res = img.copyRotate(cropRz, 90);
-      print("90");
-      break;
-    default:
-      throw "error: $idRot is not a valid Image Orientation tag";
-  }
-
-  print("============EXIF PRE RESIZE============");
-  for (final e in xd.entries) {
-    print("${e.key} : ${e.value}");
-  }
+  // img.Image res;
+  // switch (idRot) {
+  //   case 1:
+  //     res = cropRz;
+  //     print("straight");
+  //     break;
+  //   case 2:
+  //     res = img.flipHorizontal(cropRz);
+  //     print("straight mirrored");
+  //     break;
+  //   case 3:
+  //     res = img.flipVertical(cropRz);
+  //     print("flipped");
+  //     break;
+  //   case 4:
+  //     res = img.flipHorizontal(img.flipVertical(cropRz));
+  //     print("flipped mirrored");
+  //     break;
+  //   case 5:
+  //     res = img.flipHorizontal(img.copyRotate(cropRz, 270));
+  //     print("90-CW mirrored");
+  //     break;
+  //   case 6:
+  //     res = img.copyRotate(cropRz, 270);
+  //     print("90-CW");
+  //     break;
+  //   case 7:
+  //     res = img.flipHorizontal(img.copyRotate(cropRz, 90));
+  //     print("90 mirrored");
+  //     break;
+  //   case 8:
+  //     res = img.copyRotate(cropRz, 90);
+  //     print("90");
+  //     break;
+  //   default:
+  //     throw "error: $idRot is not a valid Image Orientation tag";
+  // }
 
   final xd_ = await exif.readExifFromBytes(cropRz.data);
   print("============EXIF POST RESIZE============");
   for (final e in xd_.entries) {
     print("${e.key} : ${e.value}");
   }
-
-  await to.writeAsBytes(img.encodeJpg(res));
+  await to.writeAsBytes(img.encodeJpg(cropRz));
 }
 
 // Future<ui.Image?> cropBitmapToSquare(Uint8List originalBytes) async {

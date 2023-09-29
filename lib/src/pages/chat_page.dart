@@ -163,8 +163,8 @@ class _ChatPageState extends State<ChatPage>
     final media = mediaInput ??
         (cameraInput
           ?..cache()
-          ..merge()
-          ..writeFromCachedPath());
+          ..merge());
+    final doneWrite = media?.writeFromCachedPath();
 
     var chts = <Chat>[];
 
@@ -197,6 +197,7 @@ class _ChatPageState extends State<ChatPage>
     if (chts.isNotEmpty) {
       g.vm.mode = Modes.def;
       g.vm.forwardingObjects.clear();
+      await doneWrite;
       widget.send(chts);
       unselectSelectedMessage();
       input.clear();

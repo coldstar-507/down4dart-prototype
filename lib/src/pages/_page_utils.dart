@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
+import 'package:flutter_video_info/flutter_video_info.dart';
 
 import 'package:image/image.dart' as img;
 import 'package:flutter/gestures.dart';
@@ -1051,13 +1052,26 @@ mixin Camera2 on Pager2 {
         shouldBeDownButIsnt: cameraController?.value.isRecordingVideo ?? false,
         onPress: () async {
           final XFile f = await cameraController!.takePicture();
-          tempInput = await makeCameraMedia(
-              writeFromCachedPath: false,
-              cachedPath: f.path,
-              size: cameraController!.value.previewSize!.inverted,
-              isReversed: isReversed,
-              owner: g.self.id,
-              isSquared: true);
+          final im = img.decodeImage(await f.readAsBytes());
+          if (im == null) return changeConsole(backFromCameraConsoleName);
+          tempInput = Down4Media.fromLocal(ComposedID(),
+              mainCachedPath: f.path,            
+              metadata: Down4MediaMetadata(
+                  ownerID: g.self.id,
+                  isSquared: true,
+                  isReversed: isReversed,                  
+                  timestamp: makeTimestamp(),
+                  width: im.width.toDouble(),
+                  height: im.height.toDouble(),
+                  mime: lookupMimeType(f.path)!));
+
+          // tempInput = await makeCameraMedia(
+          //     writeFromCachedPath: false,
+          //     cachedPath: f.path,
+          //     size: cameraController!.value.previewSize!.inverted,
+          //     isReversed: isReversed,
+          //     owner: g.self.id,
+          //     isSquared: true);
           changeConsole(cameraConfirmationRowName);
         },
         onLongPress: () async {
@@ -1066,13 +1080,26 @@ mixin Camera2 on Pager2 {
         },
         onLongPressUp: () async {
           final XFile f = await cameraController!.stopVideoRecording();
-          tempInput = await makeCameraMedia(
-              writeFromCachedPath: false,
-              cachedPath: f.path,
-              size: cameraController!.value.previewSize!.inverted,
-              isReversed: isReversed,
-              owner: g.self.id,
-              isSquared: true);
+          final videoInfo = await FlutterVideoInfo().getVideoInfo(f.path);
+          if (videoInfo == null) return changeConsole(backFromCameraConsoleName);
+          tempInput = Down4Media.fromLocal(ComposedID(),
+              mainCachedPath: f.path,
+              metadata: Down4MediaMetadata(
+                  ownerID: g.self.id,
+                  isSquared: true,
+                  isReversed: isReversed,
+                  timestamp: makeTimestamp(),
+                  width: videoInfo.width!.toDouble(),
+                  height: videoInfo.height!.toDouble(),
+                  mime: lookupMimeType(f.path)!));
+
+          // tempInput = await makeCameraMedia(
+          //     writeFromCachedPath: false,
+          //     cachedPath: f.path,
+          //     size: cameraController!.value.previewSize!.inverted,
+          //     isReversed: isReversed,
+          //     owner: g.self.id,
+          //     isSquared: true);
           changeConsole(cameraConfirmationRowName);
         },
       );

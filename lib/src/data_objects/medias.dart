@@ -153,56 +153,6 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
         _isPaidToOwn = isPaidToOwn,
         _isLocked = isLocked;
 
-  // static Future<Down4Media> fromLocal2(
-  //   ComposedID id, {
-  //   required Down4MediaMetadata metadata,
-  //   required writeFromCachedPath,
-  //   ComposedID? tempID,
-  //   int? tempTS,
-  //   // String? tinyThumbnail,
-  //   String? mainCachedPath,
-  //   int lastUse = 0,
-  //   bool isSaved = false,
-  //   bool isPaidToView = false,
-  //   bool isPaidToOwn = false,
-  //   bool isLocked = false,
-  // }) async {
-  //   if (writeFromCachedPath && mainCachedPath == null) {
-  //     throw ("error: Can't writeFromCache AND have mainCachedPath == null");
-  //   }
-  //   Down4Media media;
-  //   if (metadata.isVideo) {
-  //     media = Down4Video(id,
-  //         metadata: metadata,
-  //         tempTS: tempTS,
-  //         tempID: tempID,
-  //         // tinyThumbnail: tinyThumbnail,
-  //         lastUse: lastUse,
-  //         isSaved: isSaved,
-  //         mainCachedPath: mainCachedPath,
-  //         isPaidToView: isPaidToView,
-  //         isPaidToOwn: isPaidToOwn,
-  //         isLocked: isLocked);
-  //   } else {
-  //     media = Down4Image(id,
-  //         metadata: metadata,
-  //         tempTS: tempTS,
-  //         tempID: tempID,
-  //         mainCachedPath: mainCachedPath,
-  //         // tinyThumbnail: tinyThumbnail,
-  //         lastUse: lastUse,
-  //         isSaved: isSaved,
-  //         isPaidToView: isPaidToView,
-  //         isPaidToOwn: isPaidToOwn,
-  //         isLocked: isLocked);
-  //   }
-  //   if (writeFromCachedPath) {
-  //     await media.writeFromCachedPath();
-  //   }
-
-  //   return media;
-  // }
-
   factory Down4Media.fromLocal(
     ComposedID id, {
     required Down4MediaMetadata metadata,
@@ -346,6 +296,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     final File? f = mainCachedFile;
     if (f != null) {
       if (metadata.isSquared && !metadata.isVideo) {
+        print("CROPPING IMAGE BRO");
         const idealSize = 512;
         final to = File(mainPath());
         await cropAndSaveToSquare(from: f, to: to, size: idealSize);
@@ -438,7 +389,15 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   @override
   Uint8List? get tempPayload {
-    return mainFile()?.readAsBytesSync() ?? mainCachedFile?.readAsBytesSync();
+    File? f = mainFile();
+    if (f == null) {
+      print("mainfile is null, checking cached file.");
+    } else {
+      return f.readAsBytesSync();
+    }
+    f = mainCachedFile;
+    if (f == null) print("cached file is null also");
+    return f?.readAsBytesSync();
   }
 
   @override
@@ -446,14 +405,23 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   // Database get dbb => mediasDB;
 
   Future<Down4Media> userInitRecalculation(ComposedID oid) async {
-    return makeCameraMedia(
-        cachedPath: mainCachedPath!,
-        size: Size(metadata.width, metadata.height),
-        isReversed: metadata.isReversed,
-        owner: oid,
-        isSquared: metadata.isSquared,
-        writeFromCachedPath: false);
-    
+    return Down4Media.fromLocal(id,
+        metadata: Down4MediaMetadata(
+            ownerID: oid,
+            timestamp: makeTimestamp(),
+            width: metadata.width,
+            height: metadata.height,
+            isReversed: metadata.isReversed,
+            mime: metadata.mime));
+
+    // return makeCameraMedia(
+    //     cachedPath: mainCachedPath!,
+    //     size: Size(metadata.width, metadata.height),
+    //     isReversed: metadata.isReversed,
+    //     owner: oid,
+    //     isSquared: metadata.isSquared,
+    //     writeFromCachedPath: false);
+
     // final metadataJson = metadata.toJson();
     // metadataJson["ownerID"] = oid.value;
     // return Down4Media.fromLocal2(id,
@@ -547,7 +515,7 @@ class Down4Image extends Down4Media {
   }
 
   Image? readyImage(Size s, {bool forceSquare = false}) {
-    File? f;
+    File? f = mainFile() ?? mainCachedFile;
     int? w, h;
 
     // we want cached (w or h) to be (golden * longest diplaySize side)
@@ -557,13 +525,13 @@ class Down4Image extends Down4Media {
       h = (s.height * golden).toInt();
     }
 
-    if ((f = mainCachedFile ?? mainFile()) != null) {
+    if (f != null) {
       if (isEncrypted) {
-        final enc = EncryptedFileImage(f!);
+        final enc = EncryptedFileImage(f);
         final res = ResizeImage(enc, width: w, height: h);
         return Image(image: res, fit: BoxFit.cover);
       } else {
-        final res = ResizeImage(FileImage(f!), width: w, height: h);
+        final res = ResizeImage(FileImage(f), width: w, height: h);
         return Image(image: res, fit: BoxFit.cover);
       }
     } else if (_cachedUrl != null) {
@@ -851,9 +819,8 @@ class Down4Video extends Down4Media {
   @override
   Future<void> write(Uint8List mainData) async {
     await File(mainPath()).writeAsBytes(mainData);
-    final tn =
-        await VideoThumbnail.thumbnailData(video: mainPath(), quality: 75);
-    if (tn == null) return;
+    await VideoThumbnail.thumbnailFile(
+        video: mainPath(), thumbnailPath: thumbnailPath, quality: 75);
     // tinyThumbnail = makeTiny(tn);
     // await File(thumbnailPath).writeAsBytes(tn);
   }
