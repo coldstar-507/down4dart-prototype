@@ -520,14 +520,15 @@ class _Down4VideoPlayer extends StatefulWidget {
   final Down4Video media;
   final Color backgroundColor;
   final Size displaySize;
-  final bool forceSquareAnyways;
-  final bool autoPlay;
+  final bool forceSquareAnyways, autoPlay;
+  final RawImage? rawThumbnail;
   const _Down4VideoPlayer({
     required this.videoController,
     required this.backgroundColor,
     required this.media,
     required this.autoPlay,
     required this.displaySize,
+    this.rawThumbnail,
     this.forceSquareAnyways = false,
     Key? key,
   }) : super(key: key);
@@ -588,14 +589,14 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
 
   bool loading = false;
 
-  void startTurning() {
-    timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      setState(() {
-        turns += 2 * math.pi / 10;
-        turns = turns % (2 * math.pi);
-      });
-    });
-  }
+  // void startTurning() {
+  //   timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+  //     setState(() {
+  //       turns += 2 * math.pi / 10;
+  //       turns = turns % (2 * math.pi);
+  //     });
+  //   });
+  // }
 
   Future<void> _initController() async {
     setState(() {
@@ -621,7 +622,7 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
 
   Future<void> onTap() async {
     if (!ctrlIsInitialized) {
-      startTurning();
+      // startTurning();
       await _initController();
     }
     await _pauseOrPlay();
@@ -635,17 +636,19 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
     }
   }
 
-  Widget rotatingLogo(double dimension) {
-    return Center(
-        child: AnimatedRotation(
-      duration: const Duration(seconds: 1),
-      turns: turns,
-      child: down4Logo(dimension, g.theme.messageSelectionBorderColor),
-    ));
-  }
+  // Widget rotatingLogo(double dimension) {
+  //   return Center(
+  //       child: AnimatedRotation(
+  //     duration: const Duration(seconds: 1),
+  //     turns: turns,
+  //     child: down4Logo(dimension, g.theme.messageSelectionBorderColor),
+  //   ));
+  // }
 
   Widget thumbnail() {
-    if (widget.media.thumbnailFile != null) {
+    if (widget.rawThumbnail != null) {
+        return Transform.flip(flipX: widget.media.isReversed, child: widget.rawThumbnail!);
+    } else if (widget.media.thumbnailFile != null) {
       return SizedBox(
           height: widget.displaySize.height,
           width: widget.displaySize.width,
@@ -689,7 +692,8 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
     } else if (!ctrlIsInitialized && loading) {
       return Stack(children: [
         thumbnail(),
-        rotatingLogo(properLogoDimension),
+        Down4RotatingLogo(properLogoDimension)
+        // rotatingLogo(properLogoDimension),
       ]);
     } else if (isPlaying) {
       return video();

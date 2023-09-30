@@ -1,7 +1,7 @@
-import 'dart:io';
+// import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/nodes.dart';
-import 'package:down4/src/render_objects/navigator.dart';
+// import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
 
@@ -13,7 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:mime/mime.dart';
 // import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
+// import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../_dart_utils.dart';
 
@@ -950,12 +950,12 @@ mixin Medias2 on Pager2 {
                     if (i < ids.length) {
                       final id = ids[i];
                       final readyImage =
-                          ImageCacheManager().readyImage("console${id.unik}");
+                          ImageCacheManager().readyMedia("console${id.unik}");
                       if (readyImage != null) {
                         return GestureDetector(
                             onTap: () => forMediaMode != null
-                                ? forMediaMode!.$2.call(readyImage.im)
-                                : curMode.$2(readyImage.im),
+                                ? forMediaMode!.$2.call(readyImage.media)
+                                : curMode.$2(readyImage.media),
                             child: SizedBox.square(
                                 dimension: mediaCelSize, child: readyImage));
                       }
@@ -966,7 +966,7 @@ mixin Medias2 on Pager2 {
                               ans.connectionState == ConnectionState.done;
                           if (isDone && ans.hasData) {
                             return GestureDetector(
-                                onTap: () => curMode.$2(ans.data!.im),
+                                onTap: () => curMode.$2(ans.data!.media),
                                 child: SizedBox.square(
                                     dimension: mediaCelSize, child: ans.data!));
                           } else {

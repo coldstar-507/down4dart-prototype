@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:image/image.dart' as img;
+
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/pages/_page_utils.dart';
@@ -779,6 +781,32 @@ class Down4Video extends Down4Media {
         fit: BoxFit.cover, cacheWidth: w, cacheHeight: h);
   }
 
+  Future<RawImage?> rawThumbnail(Size s, {bool forceSquare = false}) async {
+    if (thumbnailFile == null) return null;
+    int? w, h;
+
+    // we want cached (w or h) to be (golden * longest diplaySize side)
+    if (size.aspectRatio < 1) {
+      w = (s.width * golden).toInt();
+    } else {
+      h = (s.height * golden).toInt();
+    }
+
+    final bytes = thumbnailFile!.readAsBytesSync();
+    final codec = await ui.instantiateImageCodec(bytes,
+        targetHeight: h?.toInt(), targetWidth: w?.toInt());
+    final frame = await codec.getNextFrame();
+    final uiIm = frame.image;
+
+    final rawImage = RawImage(
+        image: uiIm,
+        fit: BoxFit.cover,
+        width: w?.toDouble(),
+        height: h?.toDouble());
+
+    return rawImage;
+  }
+
   VideoPlayerController? newReadyController() {
     if ((mainCachedFile ?? mainFile()) != null) {
       return VideoPlayerController.file((mainCachedFile ?? mainFile())!);
@@ -826,41 +854,6 @@ class Down4Video extends Down4Media {
   }
 }
 
-// class CustomImage extends StatelessWidget {
-
-//   @override
-//   Widget build(BuildContext ctx) {
-//     final cachedVal = ImageCacheManager().cachedImage(key);
-//     if (cachedVal != null) {
-//       print("image is cached bro, ez pz loading");
-//       return cachedVal;
-//       //return ImageRendererWidget(image: cachedVal, s: s);
-//     }
-//     print("image is not cached bro, need to load");
-//     return FutureBuilder(
-//         future: ImageCacheManager()
-//             .loadImageFromFile(this as Down4Image, key: key, ds: s),
-//         builder: (ctx, snp) {
-//           final data = snp.data;
-//           final state = snp.connectionState;
-//           if (state != ConnectionState.done || data == null) {
-//             return SizedBox.fromSize(size: s);
-//           } else {
-//             return data; //ImageRendererWidget(image: data, s: s);
-//           }
-//         });
-//   }
-// }
-
-/// console medias cache manager, currently the only use
-/// flutter image seems good enough for the rest
-
-// class CustomImage extends RawImage {
-//   final Down4Image im;
-//   const CustomImage(this.im,
-//       {super.image, super.fit, super.width, super.height, super.key});
-// }
-
 class ImageCacheManager {
   static final ImageCacheManager _instance = ImageCacheManager._();
 
@@ -869,11 +862,11 @@ class ImageCacheManager {
   int _lastLoad = makeTimestamp();
   final int _loadingGap = 10;
 
-  Stream<CustomImage> throttledImages(Iterable<(Down4ID, String?)> keys,
+  Stream<CustomMedia> throttledImages(Iterable<(Down4ID, String?)> keys,
       {Size? size}) async* {
     for (final (id, prefix) in keys) {
       final key = (prefix ?? "") + id.unik;
-      final rim = readyImage(key);
+      final rim = readyMedia(key);
       if (rim != null) {
         yield rim;
       } else {
@@ -889,7 +882,7 @@ class ImageCacheManager {
 
   ImageCacheManager._();
 
-  CustomImage? readyImage(String key) {
+  CustomMedia? readyMedia(String key) {
     print("testing ready image!");
     final wasBuilt = _imageCache[key]?.wasBuilt;
     if (wasBuilt ?? false) {
@@ -899,14 +892,14 @@ class ImageCacheManager {
     return null;
   }
 
-  Future<CustomImage?> unReadyImage(
+  Future<CustomMedia?> unReadyImage(
     Down4ID id, {
     Size? size,
     String? prefix,
   }) async {
     print("image is not ready, loading that bad boy out!");
     final key = (prefix ?? "") + id.unik;
-    CustomImage? fim = _imageCache[key];
+    CustomMedia? fim = _imageCache[key];
     if (fim == null) {
       final image = await global<Down4Image>(id);
       if (image != null) {
@@ -940,9 +933,9 @@ class ImageCacheManager {
     // else -> wait (-diff)
   }
 
-  final Map<String, CustomImage> _imageCache = {};
+  final Map<String, CustomMedia> _imageCache = {};
 
-  Future<CustomImage?> _loadImageFromFile(Down4Image im,
+  Future<CustomMedia?> _loadImageFromFile(Down4Image im,
       {Size? size, String? prefix}) async {
     print("cached len: ${_imageCache.length}");
     final f = im.mainCachedFile ?? im.mainFile();
@@ -960,7 +953,7 @@ class ImageCacheManager {
     final rawImage =
         RawImage(image: uiIm, fit: BoxFit.cover, width: ww, height: hh);
 
-    _imageCache[k] = CustomImage(rawImage, im);
+    _imageCache[k] = CustomMedia(im, rawImage);
     return unReadyImage(im.id, prefix: prefix);
   }
 
@@ -975,49 +968,38 @@ class CustomImage extends StatelessWidget {
   final RawImage image;
   CustomImage(this.image, this.im, {super.key});
 
+  Widget get transformed => Transform.flip(flipX: im.isReversed, child: image);
+
   @override
   Widget build(BuildContext context) {
     print("drawing image: ${im.id.unik}");
     wasBuilt = true;
-    return image;
+    return transformed;
   }
 }
 
-class StreamList<T> extends StatefulWidget {
-  final Stream<T> stream;
-  final Widget Function(int, T) makeObject;
-  final Widget Function(int)? placeHolder;
-  final int? maxN;
-  const StreamList(this.stream, this.makeObject,
-      {this.maxN, this.placeHolder, super.key});
+class CustomMedia extends StatelessWidget {
+  bool wasBuilt = false;
+  final Down4Media media;
+  final Widget renderMedia;
+  CustomMedia(this.media, this.renderMedia, {super.key});
 
-  @override
-  State<StreamList> createState() => _StreamListState<T>();
-}
-
-class _StreamListState<T> extends State<StreamList> {
-  final sc = StreamController<T>.broadcast();
-  List<T> list = [];
-
-  @override
-  void initState() {
-    super.initState();
-    sc.stream.listen((e) => setState(() => list.add(e)));
-    widget.stream.pipe(sc);
+  Widget get renderWidget {
+    if (renderMedia is RawImage && media.isReversed) {
+      return Transform.flip(flipX: true, child: renderMedia);
+    } else {
+      return renderMedia;
+    }
   }
+
+  // Widget get transformed =>
+  //     Transform.flip(flipX: media.isReversed, child: renderMedia);
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: widget.maxN ?? list.length,
-      itemBuilder: (ctx, i) {
-        if (i < list.length) {
-          return widget.makeObject(i, list[i]);
-        } else {
-          return widget.placeHolder?.call(i) ?? const SizedBox.shrink();
-        }
-      },
-    );
+    print("drawing media: ${media.id.unik}");
+    wasBuilt = true;
+    return renderWidget;
   }
 }
 
@@ -1030,8 +1012,8 @@ class CustomList extends StatefulWidget {
 }
 
 class _CustomListState extends State<CustomList> {
-  final _streamController = StreamController<CustomImage>.broadcast();
-  List<CustomImage> list = [];
+  final _streamController = StreamController<CustomMedia>.broadcast();
+  List<CustomMedia> list = [];
   final _mediasPerRow = 5;
   final mediaCelSize = Medias2.mediaCelSize;
   final mc = ImageCacheManager();
@@ -1045,7 +1027,7 @@ class _CustomListState extends State<CustomList> {
 
   List<Down4ID> mids(MediaType t) => g.savedMediasIDs[t]!;
 
-  void load(StreamController<CustomImage> sc) async {
+  void load(StreamController<CustomMedia> sc) async {
     final its = mids(MediaType.images).map((id) => (id, "console"));
     final celSize = Size.square(Medias2.mediaCelSize);
     final strm = mc.throttledImages(its, size: celSize);
@@ -1080,7 +1062,7 @@ class _CustomListState extends State<CustomList> {
                       return SizedBox.square(
                           dimension: mediaCelSize,
                           child: GestureDetector(
-                              onTap: () => widget.mediaPressFunc(im.im),
+                              onTap: () => widget.mediaPressFunc(im.media),
                               child: im));
                     } else {
                       return SizedBox.square(dimension: mediaCelSize);
