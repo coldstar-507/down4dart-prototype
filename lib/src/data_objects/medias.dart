@@ -856,8 +856,12 @@ class Down4Video extends Down4Media {
 
 class ImageCacheManager {
   static final ImageCacheManager _instance = ImageCacheManager._();
+  static MediaType _t = MediaType.images;
 
-  factory ImageCacheManager() => _instance;
+  factory ImageCacheManager(MediaType type) {
+    _t = type;
+    return _instance;
+  }
 
   int _lastLoad = makeTimestamp();
   final int _loadingGap = 10;
@@ -884,10 +888,10 @@ class ImageCacheManager {
 
   CustomMedia? readyMedia(String key) {
     print("testing ready image!");
-    final wasBuilt = _imageCache[key]?.wasBuilt;
+    final wasBuilt = _consoleMediaCache[key]?.wasBuilt;
     if (wasBuilt ?? false) {
       print("image is ready, returing it right away!");
-      return _imageCache[key]!;
+      return _consoleMediaCache[key]!;
     }
     return null;
   }
@@ -899,7 +903,7 @@ class ImageCacheManager {
   }) async {
     print("image is not ready, loading that bad boy out!");
     final key = (prefix ?? "") + id.unik;
-    CustomMedia? fim = _imageCache[key];
+    CustomMedia? fim = _consoleMediaCache[key];
     if (fim == null) {
       final image = await global<Down4Image>(id);
       if (image != null) {
@@ -933,11 +937,42 @@ class ImageCacheManager {
     // else -> wait (-diff)
   }
 
-  final Map<String, CustomMedia> _imageCache = {};
+  final Map<String, CustomMedia> _consoleMediaCache = {};
+
+  Future<CustomMedia?> _loadVideoFromFile(Down4Video vid,
+      {Size? size, String? prefix}) async {
+    final f = vid.mainFile();
+    if (f == null) return null;
+    final s = size ?? vid.size;
+    final thumbnail = await vid.rawThumbnail(s, forceSquare: true);
+
+    final k = (prefix ?? "") + vid.id.unik;
+    return _consoleMediaCache[k] =
+        CustomMedia(vid, vid.display(size: s, rawThumbnail: thumbnail));
+  }
+
+  Future<CustomMedia?> _loadGifFromFile(Down4Image gif,
+      {Size? size, String? prefix}) async {
+    final f = gif.mainFile();
+    if (f == null) return null;
+    final Uint8List bytes = f.readAsBytesSync();
+    final Completer<ui.Image> completer = Completer();
+    ui.decodeImageFromList(bytes, completer.complete);
+    final ui.Image image = await completer.future;
+
+    final s = size ?? Size(gif.metadata.width, gif.metadata.height);
+    final (ww, hh) = gif.ss(size ?? s);
+
+    final k = (prefix ?? "") + gif.id.unik;
+    final rawImage =
+        RawImage(image: image, fit: BoxFit.cover, width: ww, height: hh);
+
+    return _consoleMediaCache[k] = CustomMedia(gif, rawImage);
+  }
 
   Future<CustomMedia?> _loadImageFromFile(Down4Image im,
       {Size? size, String? prefix}) async {
-    print("cached len: ${_imageCache.length}");
+    print("cached len: ${_consoleMediaCache.length}");
     final f = im.mainCachedFile ?? im.mainFile();
     if (f == null) return null;
     final Uint8List imageBytes = await f.readAsBytes();
@@ -953,30 +988,30 @@ class ImageCacheManager {
     final rawImage =
         RawImage(image: uiIm, fit: BoxFit.cover, width: ww, height: hh);
 
-    _imageCache[k] = CustomMedia(im, rawImage);
+    _consoleMediaCache[k] = CustomMedia(im, rawImage);
     return unReadyImage(im.id, prefix: prefix);
   }
 
   void clearCache() {
-    _imageCache.clear();
+    _consoleMediaCache.clear();
   }
 }
 
-class CustomImage extends StatelessWidget {
-  bool wasBuilt = false;
-  final Down4Image im;
-  final RawImage image;
-  CustomImage(this.image, this.im, {super.key});
+// class CustomImage extends StatelessWidget {
+//   bool wasBuilt = false;
+//   final Down4Image im;
+//   final RawImage image;
+//   CustomImage(this.image, this.im, {super.key});
 
-  Widget get transformed => Transform.flip(flipX: im.isReversed, child: image);
+//   Widget get transformed => Transform.flip(flipX: im.isReversed, child: image);
 
-  @override
-  Widget build(BuildContext context) {
-    print("drawing image: ${im.id.unik}");
-    wasBuilt = true;
-    return transformed;
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     print("drawing image: ${im.id.unik}");
+//     wasBuilt = true;
+//     return transformed;
+//   }
+// }
 
 class CustomMedia extends StatelessWidget {
   bool wasBuilt = false;
@@ -1005,7 +1040,8 @@ class CustomMedia extends StatelessWidget {
 
 class CustomList extends StatefulWidget {
   final void Function(Down4Media) mediaPressFunc;
-  const CustomList(this.mediaPressFunc, {super.key});
+  final MediaType t;
+  const CustomList(this.mediaPressFunc, this.t, {super.key});
 
   @override
   State<CustomList> createState() => _CustomListState();
@@ -1016,7 +1052,7 @@ class _CustomListState extends State<CustomList> {
   List<CustomMedia> list = [];
   final _mediasPerRow = 5;
   final mediaCelSize = Medias2.mediaCelSize;
-  final mc = ImageCacheManager();
+  late final mc = ImageCacheManager(widget.t);
 
   @override
   void initState() {

@@ -610,8 +610,8 @@ mixin Input2 on Pager2, WidgetsBindingObserver {
     print("FOCUS CHANGE");
     setTheState();
   }
-
-  BuildContext get context;
+  
+  // BuildContext get context;
 
   Future<bool> keyboardIsHidden() {
     return Future.delayed(const Duration(milliseconds: 200),
@@ -851,7 +851,7 @@ mixin Medias2 on Pager2 {
       });
 
   Widget get mediasExtension3 {
-    return CustomList(forMediaMode?.$2 ?? curMode.$2);
+    return CustomList(forMediaMode?.$2 ?? curMode.$2, t);
   }
 
   Widget get mediasExtension {
@@ -929,7 +929,7 @@ mixin Medias2 on Pager2 {
     final ids = g.savedMediasIDs[t]!;
     final idsWithPrefix = ids.map((id) => (id, "console"));
     final s = Size.square(mediaCelSize);
-    final imStream = ImageCacheManager()
+    final imStream = ImageCacheManager(t)
         .throttledImages(idsWithPrefix, size: s)
         .asBroadcastStream();
     final nRows = (ids.length / _mediasPerRow).ceil();
@@ -950,7 +950,7 @@ mixin Medias2 on Pager2 {
                     if (i < ids.length) {
                       final id = ids[i];
                       final readyImage =
-                          ImageCacheManager().readyMedia("console${id.unik}");
+                          ImageCacheManager(t).readyMedia("console${id.unik}");
                       if (readyImage != null) {
                         return GestureDetector(
                             onTap: () => forMediaMode != null

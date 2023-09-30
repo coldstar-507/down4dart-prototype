@@ -113,6 +113,7 @@ extension MediaDisplay on Down4Media {
     bool forceSquare = false,
     VideoPlayerController? controller,
     bool autoPlay = false,
+    RawImage? rawThumbnail,
   }) {
     if (this is Down4Video) {
       print("auto play video: $autoPlay");
@@ -121,6 +122,7 @@ extension MediaDisplay on Down4Media {
           videoController: controller,
           backgroundColor: Colors.black45,
           media: this as Down4Video,
+          rawThumbnail: rawThumbnail,
           autoPlay: autoPlay,
           displaySize: size);
     } else {
