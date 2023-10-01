@@ -13,7 +13,7 @@ import 'package:bs58/bs58.dart';
 import '_bsv_utils.dart';
 import 'types.dart';
 
-class Wallet with Down4Object, Jsons, Locals, WalletManager {
+class Wallet with Down4Object, Jsons, Locals {
   @override
   String get table => "personals";
 

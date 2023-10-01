@@ -553,5 +553,3 @@ Iterable<Down4ID> savedMediaIDs(MediaType t) sync* {
     yield Down4ID.fromString(row['id'])!;
   }
 }
-
-mixin WalletManager {}

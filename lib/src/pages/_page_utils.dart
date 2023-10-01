@@ -830,7 +830,7 @@ mixin Medias2 on Pager2 {
             forMediaMode!.$2.call(nodeMedia);
           }
         } else {
-          await importConsoleMedias(type: t, reload: setTheState);
+          await importConsoleMedias(reload: setTheState);
         }
       });
 
@@ -851,6 +851,7 @@ mixin Medias2 on Pager2 {
       });
 
   Widget get mediasExtension3 {
+    print("media extension with type: ${t.name}");
     return CustomList(forMediaMode?.$2 ?? curMode.$2, t);
   }
 
@@ -929,7 +930,7 @@ mixin Medias2 on Pager2 {
     final ids = g.savedMediasIDs[t]!;
     final idsWithPrefix = ids.map((id) => (id, "console"));
     final s = Size.square(mediaCelSize);
-    final imStream = ImageCacheManager(t)
+    final imStream = ConsoleMedias()
         .throttledImages(idsWithPrefix, size: s)
         .asBroadcastStream();
     final nRows = (ids.length / _mediasPerRow).ceil();
@@ -949,8 +950,7 @@ mixin Medias2 on Pager2 {
                   Widget f(int i) {
                     if (i < ids.length) {
                       final id = ids[i];
-                      final readyImage =
-                          ImageCacheManager(t).readyMedia("console${id.unik}");
+                      final readyImage = ConsoleMedias().readyMedia("console${id.unik}");
                       if (readyImage != null) {
                         return GestureDetector(
                             onTap: () => forMediaMode != null

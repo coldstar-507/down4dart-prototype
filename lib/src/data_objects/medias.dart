@@ -842,26 +842,32 @@ class Down4Video extends Down4Media {
     return f;
   }
 
-  String get thumbnailPath => "$mainPath-tn";
+  String get thumbnailPath => "${mainPath()}-tn";
 
   @override
   Future<void> write(Uint8List mainData) async {
     await File(mainPath()).writeAsBytes(mainData);
-    await VideoThumbnail.thumbnailFile(
-        video: mainPath(), thumbnailPath: thumbnailPath, quality: 75);
+    final d = await VideoThumbnail.thumbnailData(video: mainPath(), quality: 80);
+    if (d != null) {
+      await File(thumbnailPath).writeAsBytes(d);
+    }
+    // await VideoThumbnail.thumbnailFile(
+    //     video: mainPath(), thumbnailPath: thumbnailPath, quality: 75);
     // tinyThumbnail = makeTiny(tn);
     // await File(thumbnailPath).writeAsBytes(tn);
   }
 }
 
-class ImageCacheManager {
-  static final ImageCacheManager _instance = ImageCacheManager._();
-  static MediaType _t = MediaType.images;
+class ConsoleMedias {
+  static final ConsoleMedias _instance = ConsoleMedias._();
+  // static MediaType _t = MediaType.images;
 
-  factory ImageCacheManager(MediaType type) {
-    _t = type;
-    return _instance;
-  }
+  // static final Map<MediaType, ConsoleMedias> _instances = {};
+
+  // factory ConsoleMedias(MediaType t) => _instances[t] ??= ConsoleMedias._();
+
+  factory ConsoleMedias() => _instance;
+  
 
   int _lastLoad = makeTimestamp();
   final int _loadingGap = 10;
@@ -874,7 +880,7 @@ class ImageCacheManager {
       if (rim != null) {
         yield rim;
       } else {
-        final fim = await unReadyImage(id, prefix: prefix, size: size);
+        final fim = await unReadyMedia(id, prefix: prefix, size: size);
         if (fim != null) {
           yield fim;
         } else {
@@ -884,19 +890,19 @@ class ImageCacheManager {
     }
   }
 
-  ImageCacheManager._();
+  ConsoleMedias._();
 
   CustomMedia? readyMedia(String key) {
     print("testing ready image!");
-    final wasBuilt = _consoleMediaCache[key]?.wasBuilt;
-    if (wasBuilt ?? false) {
+    final wasBuilt = _consoleMediaCache[key]?.wasBuilt ?? false;
+    if (wasBuilt) {
       print("image is ready, returing it right away!");
       return _consoleMediaCache[key]!;
     }
     return null;
   }
 
-  Future<CustomMedia?> unReadyImage(
+  Future<CustomMedia?> unReadyMedia(
     Down4ID id, {
     Size? size,
     String? prefix,
@@ -905,9 +911,22 @@ class ImageCacheManager {
     final key = (prefix ?? "") + id.unik;
     CustomMedia? fim = _consoleMediaCache[key];
     if (fim == null) {
-      final image = await global<Down4Image>(id);
-      if (image != null) {
-        fim = await _loadImageFromFile(image, size: size, prefix: prefix);
+      final media = await global<Down4Media>(id);
+      if (media != null) {
+        switch (media.type) {
+          case MediaType.images:
+            fim = await _loadImageFromFile(media as Down4Image,
+                size: size, prefix: prefix);
+            break;
+          case MediaType.gifs:
+            fim = await _loadGifFromFile(media as Down4Image,
+                size: size, prefix: prefix);
+            break;
+          case MediaType.videos:
+            fim = await _loadVideoFromFile(media as Down4Video,
+                size: size, prefix: prefix);
+            break;
+        }
       }
     }
 
@@ -989,7 +1008,7 @@ class ImageCacheManager {
         RawImage(image: uiIm, fit: BoxFit.cover, width: ww, height: hh);
 
     _consoleMediaCache[k] = CustomMedia(im, rawImage);
-    return unReadyImage(im.id, prefix: prefix);
+    return unReadyMedia(im.id, prefix: prefix);
   }
 
   void clearCache() {
@@ -1048,25 +1067,56 @@ class CustomList extends StatefulWidget {
 }
 
 class _CustomListState extends State<CustomList> {
-  final _streamController = StreamController<CustomMedia>.broadcast();
-  List<CustomMedia> list = [];
+  // final _streamController = StreamController<CustomMedia>.broadcast();
+  Map<MediaType, List<CustomMedia>> _medias = {
+    MediaType.images: [],
+    MediaType.videos: [],
+    MediaType.gifs: [],    
+  };
+
+  MediaType get currentType => widget.t;
+  
   final _mediasPerRow = 5;
   final mediaCelSize = Medias2.mediaCelSize;
-  late final mc = ImageCacheManager(widget.t);
+  final Map<MediaType, StreamController<CustomMedia>> _streams = {};
+
+  List<CustomMedia> get currentMedias  => _medias[currentType]!;
+
+  void loadStream(MediaType t) {
+    if (_streams[t] != null) return;
+    final s = _streams[t] = StreamController.broadcast();
+    s.stream.listen((e) => setState(() => _medias[t]!.add(e)));
+    load(s, t);
+  }
 
   @override
+  void didUpdateWidget(oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.t != widget.t) {
+      print("loading stream for type=${widget.t.name}");
+      loadStream(widget.t);
+    }
+  }
+  
+  @override
   void initState() {
+    print("init that FUCKIGN shit");
     super.initState();
-    _streamController.stream.listen((p) => setState(() => list.add(p)));
-    load(_streamController);
+    loadStream(currentType);
+    // _streams[t] = StreamController<CustomMedia>.broadcast();
+    // strm!.stream.listen((p) => setState(() => medias.add(p)));
+    // load(strm!);
+    // _streamController.stream.listen((p) => setState(() => list.add(p)));
+    // load(_streamController);
   }
 
   List<Down4ID> mids(MediaType t) => g.savedMediasIDs[t]!;
 
-  void load(StreamController<CustomMedia> sc) async {
-    final its = mids(MediaType.images).map((id) => (id, "console"));
+  void load(StreamController<CustomMedia> sc, MediaType t) async {
+    final its = mids(t).map((id) => (id, "console"));
+    print("there are ${its.length} medias to load of type=${t.name}");
     final celSize = Size.square(Medias2.mediaCelSize);
-    final strm = mc.throttledImages(its, size: celSize);
+    final strm = ConsoleMedias().throttledImages(its, size: celSize);
     strm.pipe(sc);
   }
 
@@ -1074,12 +1124,15 @@ class _CustomListState extends State<CustomList> {
   void dispose() {
     print("XXXX DISPOSING OF CUSTOM LIST XXXX");
     super.dispose();
-    _streamController.close();
+    for (final stream in _streams.values) {
+      stream.close();
+    }
+    // _streamController.close();
   }
 
   @override
   Widget build(BuildContext context) {
-    final nRows = (mids(MediaType.images).length / _mediasPerRow).ceil();
+    final nRows = (mids(currentType).length / _mediasPerRow).ceil();
     return Container(
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
@@ -1093,8 +1146,8 @@ class _CustomListState extends State<CustomList> {
                 itemCount: nRows,
                 itemBuilder: (ctx, index) {
                   Widget f(int i) {
-                    if (i < list.length) {
-                      final im = list[i];
+                    if (i < currentMedias.length) {
+                      final im = currentMedias[i];
                       return SizedBox.square(
                           dimension: mediaCelSize,
                           child: GestureDetector(

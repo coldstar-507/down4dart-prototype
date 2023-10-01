@@ -4,8 +4,8 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:down4/src/web_requests.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+// import 'package:down4/src/web_requests.dart';
+// import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image/image.dart' as img;
 import 'package:exif/exif.dart' as exif;
 
@@ -649,7 +649,8 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
 
   Widget thumbnail() {
     if (widget.rawThumbnail != null) {
-        return Transform.flip(flipX: widget.media.isReversed, child: widget.rawThumbnail!);
+      return Transform.flip(
+          flipX: widget.media.isReversed, child: widget.rawThumbnail!);
     } else if (widget.media.thumbnailFile != null) {
       return SizedBox(
           height: widget.displaySize.height,
@@ -1048,40 +1049,36 @@ String makeTiny(Uint8List bytes) {
   return base64Encode(d);
 }
 
-Future<void> importConsoleMedias({
-  required MediaType type,
-  required VoidCallback reload, // will reload console and show the media
-}) async {
+Future<void> importConsoleMedias({required VoidCallback reload}) async {
   final results = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: extMap[type]!,
+      allowedExtensions: extMap.values.expand((l) => l).toList(),
       allowMultiple: true,
       allowCompression: true,
       withData: true);
   for (final r in results?.files ?? <PlatformFile>[]) {
     final mime = lookupMimeType(r.path!)!;
+    final t = mimeMap.keyWhere((v) => v.contains(mime));
+    if (t == null) {
+      throw "ERROR: mime=$mime isn't valid!";
+    } else {
+      print("Found media with type=${t.name}, mime=$mime");
+    }
     Size size;
-    if ([MediaType.images, MediaType.gifs].contains(type)) {
+    if ([MediaType.images, MediaType.gifs].contains(t)) {
       size = await decodeImageSize(r.bytes!);
-    } else if (type == MediaType.videos) {
+    } else if (t == MediaType.videos) {
       final videoInfoGetter = FlutterVideoInfo();
       final videoInfo = await videoInfoGetter.getVideoInfo(r.path!);
       size = Size(videoInfo?.width?.toDouble() ?? 1.0,
           videoInfo?.height?.toDouble() ?? 1.0);
     } else {
-      throw 'unsupported media type=$type';
+      throw 'unsupported media type=$t';
     }
-    final metadata = Down4MediaMetadata(
-        ownerID: g.self.id,
-        timestamp: makeTimestamp(),
-        width: size.width,
-        height: size.height,
-        mime: mime,
-        isSquared: false,
-        isReversed: false);
 
     final m = Down4Media.fromLocal(ComposedID(),
         mainCachedPath: r.path!,
+        isSaved: true,
         metadata: Down4MediaMetadata(
             ownerID: g.self.id,
             timestamp: makeTimestamp(),
@@ -1091,15 +1088,7 @@ Future<void> importConsoleMedias({
       ..cache()
       ..merge()
       ..writeFromCachedPath();
-
-    // final m = await Down4Media.fromLocal2(ComposedID(),
-    //     mainCachedPath: r.path!,
-    //     writeFromCachedPath: true,
-    //     metadata: metadata,
-    //     isSaved: true,
-    //     lastUse: makeTimestamp())
-    //   ..cache()
-    //   ..merge();
+      
     g.savedMediasIDs[m.type] = savedMediaIDs(m.type).toList();
     reload();
   }

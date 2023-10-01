@@ -54,6 +54,15 @@ dynamic youKnowDecode(String yk) {
 
 enum MediaType { images, gifs, videos }
 
+extension MapEXT<T, M> on Map<T, M> {
+  T? keyWhere(bool Function(M v) filter) {
+    for (final e in entries) {
+      if (filter(e.value)) return e.key;
+    }
+    return null;    
+  }
+}
+
 const Map<MediaType, List<String>> extMap = {
   MediaType.videos: videoExtensions,
   MediaType.images: imageExtensions,
@@ -129,7 +138,6 @@ Uint8List randomBytes({int size = 16}) {
 }
 
 String randomMediaID() => randomBytes().toBase58();
-
 
 int makeTimestamp() => DateTime.now().toUtc().millisecondsSinceEpoch;
 
