@@ -847,7 +847,8 @@ class Down4Video extends Down4Media {
   @override
   Future<void> write(Uint8List mainData) async {
     await File(mainPath()).writeAsBytes(mainData);
-    final d = await VideoThumbnail.thumbnailData(video: mainPath(), quality: 80);
+    final d =
+        await VideoThumbnail.thumbnailData(video: mainPath(), quality: 80);
     if (d != null) {
       await File(thumbnailPath).writeAsBytes(d);
     }
@@ -867,7 +868,6 @@ class ConsoleMedias {
   // factory ConsoleMedias(MediaType t) => _instances[t] ??= ConsoleMedias._();
 
   factory ConsoleMedias() => _instance;
-  
 
   int _lastLoad = makeTimestamp();
   final int _loadingGap = 10;
@@ -1032,28 +1032,60 @@ class ConsoleMedias {
 //   }
 // }
 
-class CustomMedia extends StatelessWidget {
+// class CustomMedia extends StatelessWidget {
+//   bool wasBuilt = false;
+//   final Down4Media media;
+//   final Widget renderMedia;
+//   CustomMedia(this.media, this.renderMedia, {super.key});
+
+//   Widget get renderWidget {
+//     if (renderMedia is RawImage && media.isReversed) {
+//       return Transform.flip(flipX: true, child: renderMedia);
+//     } else {
+//       return renderMedia;
+//     }
+//   }
+  
+//   @override
+//   Widget build(BuildContext context) {
+//     wasBuilt = true;
+//     return renderWidget;
+//   }
+// }
+
+class CustomMedia extends StatefulWidget {
   bool wasBuilt = false;
   final Down4Media media;
   final Widget renderMedia;
   CustomMedia(this.media, this.renderMedia, {super.key});
 
+  @override
+  State<CustomMedia> createState() => _CustomMedia2State();
+}
+
+class _CustomMedia2State extends State<CustomMedia> {
   Widget get renderWidget {
-    if (renderMedia is RawImage && media.isReversed) {
-      return Transform.flip(flipX: true, child: renderMedia);
+    if (widget.renderMedia is RawImage && widget.media.isReversed) {
+      return Transform.flip(flipX: true, child: widget.renderMedia);
     } else {
-      return renderMedia;
+      return widget.renderMedia;
     }
   }
 
-  // Widget get transformed =>
-  //     Transform.flip(flipX: media.isReversed, child: renderMedia);
-
   @override
   Widget build(BuildContext context) {
-    print("drawing media: ${media.id.unik}");
-    wasBuilt = true;
-    return renderWidget;
+    if (!widget.wasBuilt) {
+      WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+        widget.wasBuilt = true;
+        setState(() {});
+      });
+    }
+
+    return AnimatedOpacity(
+      opacity: widget.wasBuilt ? 1 : 0,
+      duration: const Duration(milliseconds: 100),
+      child: renderWidget,
+    );
   }
 }
 
@@ -1071,16 +1103,16 @@ class _CustomListState extends State<CustomList> {
   Map<MediaType, List<CustomMedia>> _medias = {
     MediaType.images: [],
     MediaType.videos: [],
-    MediaType.gifs: [],    
+    MediaType.gifs: [],
   };
 
   MediaType get currentType => widget.t;
-  
+
   final _mediasPerRow = 5;
   final mediaCelSize = Medias2.mediaCelSize;
   final Map<MediaType, StreamController<CustomMedia>> _streams = {};
 
-  List<CustomMedia> get currentMedias  => _medias[currentType]!;
+  List<CustomMedia> get currentMedias => _medias[currentType]!;
 
   void loadStream(MediaType t) {
     if (_streams[t] != null) return;
@@ -1097,7 +1129,7 @@ class _CustomListState extends State<CustomList> {
       loadStream(widget.t);
     }
   }
-  
+
   @override
   void initState() {
     print("init that FUCKIGN shit");

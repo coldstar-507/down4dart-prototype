@@ -270,7 +270,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       ...VarInt.fromInt(tNote.length).data,
       ...tNote,
       // ...utf8.encode(textNote),
-      ...VarInt.fromInt(txs!.length).data,
+      ...VarInt.fromInt(txs.length).data,
       ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
       // ...utf8.encode(timestamp.toRadixString(34)),
       ...timestamp.toRadixString(34).codeUnits,
@@ -363,6 +363,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       textNote = String.fromCharCodes(textNoteData);
       // textNote = utf8.decode(textNoteData);
     }
+
+    print("payment textnote: $textNote");
 
     final nTxVarInt = VarInt.fromRaw(buf.sublist(textOffsetEnd));
     final nTxDataLen = nTxVarInt.data.length;

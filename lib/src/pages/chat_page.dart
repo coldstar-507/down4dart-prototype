@@ -334,7 +334,11 @@ class _ChatPageState extends State<ChatPage>
         .map((chat) => chat.mediaInfo!.media);
     for (final media in selectedMedias) {
       media.updateSaveStatus(true);
+      if (!g.savedMediasIDs[media.type]!.contains(media.id)) {
+        g.savedMediasIDs[media.type]!.add(media.id);
+      }
     }
+
     unselectSelectedMessage();
     changeConsole("base");
   }

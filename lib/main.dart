@@ -302,6 +302,7 @@ void initSqlite() async {
 }
 
 Future<void> fcmHandler(FcmSilentData silentData) async {
+  return print("notifs disabled for debugging payments");
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
 
