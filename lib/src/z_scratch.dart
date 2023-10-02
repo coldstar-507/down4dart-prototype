@@ -1,20 +1,18 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 void main() async {
-  print("jeff");
-  await Future.delayed(const Duration(seconds: 1));
-  print("andrew after 1 second");
+  final str = "hope~america~1";
 
-  final sbuf = StringBuffer("""
-    BEGIN TRANSACTION;
+  final a = utf8.encode(str);
+  final b = str.codeUnits;
 
-""");
+  final a_ = Uint8List.fromList(a);
+  final b_ = Uint8List.fromList(b);
 
-  sbuf.write("""
-    SELECT * FROM caca;
-""");
+  print(String.fromCharCodes(a_));
+  print(String.fromCharCodes(b_));
 
-  sbuf.write("""
-    DELETE FROM niggas WHERE age > '10';
-""");
-
-  print(sbuf.toString());
+  print(a_);
+  print(b_);
 }

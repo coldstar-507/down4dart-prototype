@@ -1135,6 +1135,7 @@ class _CustomListState extends State<CustomList> {
     final nRows = (mids(currentType).length / _mediasPerRow).ceil();
     return Container(
         clipBehavior: Clip.hardEdge,
+        alignment: AlignmentDirectional.topCenter,
         decoration: BoxDecoration(
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
@@ -1159,6 +1160,7 @@ class _CustomListState extends State<CustomList> {
                   }
 
                   return Row(
+                    // crossAxisAlignment: CrossAxisAlignment.start,
                     key: Key(MediaType.images.name + index.toString()),
                     children: List.generate(
                       _mediasPerRow,

@@ -688,7 +688,9 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
   @override
   Widget build(BuildContext context) {
     print("VIDEO IS PLAYING = $isPlaying");
-    if (!ctrlIsInitialized && widget.autoPlay) {
+    if (widget.rawThumbnail != null) {
+      return thumbnail();
+    } else if (!ctrlIsInitialized && widget.autoPlay) {
       return const SizedBox.shrink();
     } else if (!ctrlIsInitialized && !loading) {
       return Stack(children: [thumbnail(), playButton()]);
@@ -1088,7 +1090,7 @@ Future<void> importConsoleMedias({required VoidCallback reload}) async {
       ..cache()
       ..merge()
       ..writeFromCachedPath();
-      
+
     g.savedMediasIDs[m.type] = savedMediaIDs(m.type).toList();
     reload();
   }
