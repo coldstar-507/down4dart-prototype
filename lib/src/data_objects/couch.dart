@@ -166,6 +166,7 @@ Future<T?> fetch<T extends Locals>(
     final ref = tempID.tempStoreRef;
     final compressed = await ref.getData();
     if (compressed == null) return null;
+    printWrapped("compressed payment:\n$compressed");
     return Down4Payment.fromCompressed(compressed);
     try {
       print("TODO");

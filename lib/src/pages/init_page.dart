@@ -281,22 +281,15 @@ class _UserMakerPageState extends State<UserMakerPage>
         onPress: () async {
           final XFile f = await cameraController!.takePicture();
           final s = await decodeImageSize(await f.readAsBytes());
-          tempInput = Down4Media.fromLocal(ComposedID(),
+          tempInput = Down4Media.fromLocal(ComposedID(region: region),
+              mainCachedPath: f.path,
               metadata: Down4MediaMetadata(
-                  ownerID: g.self.id,
+                  ownerID: willBeReplacedID,
                   timestamp: makeTimestamp(),
                   width: s.width,
                   isReversed: isReversed,
                   height: s.height,
                   mime: lookupMimeType(f.path)!));
-
-          // tempInput = await makeCameraMedia(
-          //     writeFromCachedPath: false,
-          //     cachedPath: f.path,
-          //     size: cameraController!.value.previewSize!.inverted,
-          //     isReversed: isReversed,
-          //     owner: willBeReplacedID,
-          //     isSquared: true);
           changeConsole(cameraConfirmationRowName);
         },
         onLongPress: () async {

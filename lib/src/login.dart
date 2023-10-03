@@ -97,6 +97,8 @@ class _Down4State extends State<Down4> {
     // the ID was the proper one
     final goodMedia = await media.userInitRecalculation(id)
       ..cache()
+      ..merge()
+      ..writeFromCachedPath()
       ..staticUpload();
 
     final seed1 = unsafeSeed(32);

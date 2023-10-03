@@ -460,6 +460,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           final payment = await global<Down4Payment>(paymentID,
               doFetch: true, doMergeIfFetch: true, tempID: tempPaymentID);
           if (payment == null) return print("no payment for download");
+          print("compressed payment:\n${payment.compressed}");
           final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
           if (page is MoneyPage && parsedPayment != null) {
             setPage(moneyPage(payUpdate: parsedPayment));

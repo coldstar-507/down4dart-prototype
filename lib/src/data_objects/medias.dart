@@ -408,6 +408,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   Future<Down4Media> userInitRecalculation(ComposedID oid) async {
     return Down4Media.fromLocal(id,
+        mainCachedPath: mainCachedPath,
         metadata: Down4MediaMetadata(
             ownerID: oid,
             timestamp: makeTimestamp(),
