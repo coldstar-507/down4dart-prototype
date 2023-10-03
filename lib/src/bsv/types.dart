@@ -265,6 +265,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     final t1 = makeTimestamp();
     final tNote = textNote.codeUnits;
 
+    print("compressing ${txs.length} txs");
     final buf = [
       safe ? 0x01 : 0x00,
       ...VarInt.fromInt(tNote.length).data,
@@ -1114,6 +1115,9 @@ class Down4TX with Down4Object, Jsons, Locals {
   List<int> get compressed {
     final t1 = makeTimestamp();
 
+    print("inCounter=${inCounter.asInt}, nTxins=${txsIn.length}");
+    print("outCounter=${outCounter.asInt}, nTxins=${txsOut.length}");    
+    
     final buf = [
       ...versionNo.data,
       ...inCounter.data,
