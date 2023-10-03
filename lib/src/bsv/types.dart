@@ -119,6 +119,10 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   }
 
   Future<void> trySettlement() async {
+    if (confirmations != -1) {
+      return print("transactions has already been accepted!");
+    }
+    
     if (validForBroadcast) {
       return r.broadcastTxs(txs);
     } else {
@@ -669,10 +673,11 @@ class Down4TXIN with Down4Object, Jsons, Locals {
   List<int>? get scriptSig => _scriptSig;
 
   List<int> get compressed {
-    final encsp = spender == null ? [] : utf8.encode(spender!.value);
+    final List<int>? encsp = spender?.value.codeUnits;
+    // final encsp = spender == null ? [] : utf8.encode(spender!.value);
     return [
       ...raw,
-      ...spender == null ? [0x00] : [encsp.length, ...encsp],
+      ...encsp == null ? [0x00] : [encsp.length, ...encsp],
     ];
   }
 
@@ -710,7 +715,8 @@ class Down4TXIN with Down4Object, Jsons, Locals {
     Down4ID? spender;
     if (d4[d4Offset] != 0x00) {
       final spenderData = d4.sublist(d4Offset + 1, d4Offset + 1 + d4[d4Offset]);
-      spender = Down4ID.fromString(utf8.decode(spenderData));
+      final spenderStr = String.fromCharCodes(spenderData);
+      spender = Down4ID.fromString(spenderStr);
     }
 
     final txin = Down4TXIN(
