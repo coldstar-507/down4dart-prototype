@@ -430,36 +430,47 @@ Set<ComposedID> allGroupIDs() {
 }
 
 Set<ComposedID> allMediaReferences() {
-  const nq = "SELECT mediaID FROM nodes";
-  const mq = "SELECT mediaID FROM messages";
+  final rn = db.select("SELECT mediaID FROM nodes");
+  final rm = db.select("SELECT mediaID FROM messages");
+  final rmn = (rn.followedBy(rm))
+      .map((e) => ComposedID.fromString(e["mediaID"]))
+      .whereType<ComposedID>();
 
-  final rn = db.select(nq);
-  final rm = db.select(mq);
-
-  const rq = "SELECT reactions FROM messages";
-  final rr = db.select(rq);
-  final rs = rr
-      .map((e) {
-        final reacs = e["reactions"];
-        if (reacs == null) return null;
-        final jsn = List.from(youKnowDecode(reacs));
-        return jsn.map((e) {
-          final jsns = Map<String, String?>.from(e);
+  const q = "SELECT reactions FROM messages";
+  final Iterable<ComposedID> rr = db.select(q).map((e) {
+      final reacs = e["reactions"];
+      if (reacs == null) return null;
+      final jsnl = List.from(youKnowDecode(reacs));
+      return jsnl.map((a) {
+          final jsns = Map<String, String?>.from(a);
           return Down4Message.fromJson(jsns) as Reaction;
-        });
-      })
-      .whereType()
-      .expand((e) => e)
-      .whereType<Reaction>()
-      .map((e) => e.mediaID);
+      });
+  }).whereType<List<ComposedID>>().expand((b) => b);
 
-  return rn
-      .followedBy(rm)
-      .map((a) => ComposedID.fromString(a["mediaID"]))
-      .whereType<ComposedID>()
-      .followedBy(rs)
-      .whereType<ComposedID>()
-      .toSet();
+  return (rmn.followedBy(rr)).toSet();
+
+  // final rs = rr
+  //     .map((e) {
+  //       final reacs = e["reactions"];
+  //       if (reacs == null) return null;
+  //       final jsn = List.from(youKnowDecode(reacs));
+  //       return jsn.map((e) {
+  //         final jsns = Map<String, String?>.from(e);
+  //         return Down4Message.fromJson(jsns) as Reaction;
+  //       });
+  //     })
+  //     .whereType()
+  //     .expand((e) => e)
+  //     .whereType<Reaction>()
+  //     .map((e) => e.mediaID);
+
+  // return rn
+  //     .followedBy(rm)
+  //     .map((a) => ComposedID.fromString(a["mediaID"]))
+  //     .whereType<ComposedID>()
+  //     .followedBy(rs)
+  //     .whereType<ComposedID>()
+  //     .toSet();
 }
 
 // TODO: could be optimized // how?
