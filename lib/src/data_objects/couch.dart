@@ -75,28 +75,6 @@ void cacheObj(Locals obj,
   }
 }
 
-// Future<void> loadIndexes() async {
-//   final nodeTypeIndexConfig = ValueIndexConfiguration(["type"]);
-
-//   final lastUseMediaIndexConfig = ValueIndexConfiguration(["lastUse"]);
-//   final isSavedMediaIndexConfig = ValueIndexConfiguration(["isSaved"]);
-
-//   final isSnipMessageIndexConfig = ValueIndexConfiguration(["isSnip"]);
-//   final rootMessageIndexConfig = ValueIndexConfiguration(["root"]);
-
-//   final paymentTimestampIndexConfig = ValueIndexConfiguration(["ts"]);
-
-//   await nodesDB.createIndex("typeIndex", nodeTypeIndexConfig);
-
-//   await mediasDB.createIndex("lastUseIndex", lastUseMediaIndexConfig);
-//   await mediasDB.createIndex("isSavedIndex", isSavedMediaIndexConfig);
-
-//   await messagesDB.createIndex("isSnipIndex", isSnipMessageIndexConfig);
-//   await messagesDB.createIndex("rootIndex", rootMessageIndexConfig);
-
-//   await paymentsDB.createIndex("timestampIndex", paymentTimestampIndexConfig);
-// }
-
 Future<T?> fetch<T extends Locals>(
   Down4ID? id, {
   bool doMerge = false,
@@ -437,7 +415,7 @@ Iterable<PersonN> searchLocalsByUnique(Iterable<String> uniques) sync* {
   }
 }
 
-Future<Set<ComposedID>> allGroupIDs() async {
+Set<ComposedID> allGroupIDs() {
   const q = """
     SELECT group FROM nodes 
     WHERE type in ('hyperchat', 'group')
@@ -451,7 +429,7 @@ Future<Set<ComposedID>> allGroupIDs() async {
   });
 }
 
-Future<Set<ComposedID>> allMediaReferences() async {
+Set<ComposedID> allMediaReferences() {
   const nq = "SELECT mediaID FROM nodes";
   const mq = "SELECT mediaID FROM messages";
 
@@ -462,13 +440,17 @@ Future<Set<ComposedID>> allMediaReferences() async {
   final rr = db.select(rq);
   final rs = rr
       .map((e) {
-        final jsn = List.from(youKnowDecode(e["reactions"]));
+        final reacs = e["reactions"];
+        if (reacs == null) return null;
+        final jsn = List.from(youKnowDecode(reacs));
         return jsn.map((e) {
           final jsns = Map<String, String?>.from(e);
           return Down4Message.fromJson(jsns) as Reaction;
         });
       })
+      .whereType()
       .expand((e) => e)
+      .whereType<Reaction>()
       .map((e) => e.mediaID);
 
   return rn
@@ -476,35 +458,76 @@ Future<Set<ComposedID>> allMediaReferences() async {
       .map((a) => ComposedID.fromString(a["mediaID"]))
       .whereType<ComposedID>()
       .followedBy(rs)
+      .whereType<ComposedID>()
       .toSet();
 }
 
-// TODO: could be optimized
-Future<void> messagesDeletingRoutine() async {
+// TODO: could be optimized // how?
+void messagesDeletingRoutine() {
   final fourDaysAgo = DateTime.now().subtract(const Duration(days: 4));
 
-  final alternate = """
+  final countStmt = """
+  SELECT COUNT(*) AS c FROM messages
+  WHERE CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
+    AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip')
+  """;
+  final count = db.select(countStmt).single["c"] as int;
+  print("""
+    //////////////////////////////
+    // DELETING $count MESSAGES //
+    //////////////////////////////
+    """);
+
+  final msgDeleteStmt = """
     DELETE FROM messages
     WHERE CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
-      AND isSaved = 'false'
-      AND root != '${g.self.id.value}'
+      AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip')
     """;
 
-  db.execute(alternate);
+  db.execute(msgDeleteStmt);
 }
 
 // This should be called after messages and palettes routine
 // TODO: this should be optmized aswell
 // could be a single sql query
-Future<void> mediaDeletingRoutine() async {
-  final allMediaRefs = await allMediaReferences();
-  final alternate = """
-    DELETE FROM medias
-    WHERE isSaved = 'false'
-      AND id NOT IN ${allMediaRefs.map((id) => id.value)}
+void mediasDeletingRoutine() {
+  final allMediaRefs = allMediaReferences();
+  final sbuf = StringBuffer()
+    ..writeAll(allMediaRefs.map((e) => e.sqlReady), ',');
+
+  final mediasToDeleteStmt = """
+  SELECT * FROM medias
+  WHERE isSaved = 'false'
+    AND id NOT in (${sbuf.toString()})
   """;
 
-  db.execute(alternate);
+  final mediasToDelete = db.select(mediasToDeleteStmt).map((e) {
+    final jsns = Map<String, String?>.from(e);
+    return Down4Media.fromJson(jsns);
+  });
+
+  int fileBytesDeleted = 0;
+  int nMediasDeleted = 0;
+  for (final m in mediasToDelete) {
+    fileBytesDeleted += m.sizeInBytes;
+    nMediasDeleted += 1;
+    m.delete();
+  }
+
+  print("""
+    ///////////////////////////////////////////////////////
+    // deleted $nMediasDeleted medias                    //
+    // ${fileBytesDeleted ~/ 1000000} mb of data removed //
+    ///////////////////////////////////////////////////////
+    """);
+
+  // final alternate = """
+  //   DELETE FROM medias
+  //   WHERE isSaved = 'false'
+  //     AND id NOT IN (${sbuf.toString()})
+  // """;
+
+  // db.execute(alternate);
 }
 
 Iterable<ChatN> loadHome() sync* {

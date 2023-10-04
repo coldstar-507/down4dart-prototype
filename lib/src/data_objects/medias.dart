@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
+// import 'dart:convert';
 import 'dart:io';
 
-import 'package:image/image.dart' as img;
+// import 'package:image/image.dart' as img;
 
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
@@ -13,7 +13,7 @@ import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+// import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -97,6 +97,8 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   Down4MediaMetadata metadata;
 
   String? mainCachedPath;
+
+  int get sizeInBytes;
 
   MediaType get type {
     final mime = metadata.mime;
@@ -458,6 +460,19 @@ class Down4Image extends Down4Media {
     }
   }
 
+  @override
+  int get sizeInBytes {
+    final mainBytes = mainCachedFile?.readAsBytesSync();
+    final profBytes = profileFile?.readAsBytesSync();
+    return (mainBytes?.length ?? 0) + (profBytes?.length ?? 0);
+  }
+
+  File? get profileFile {
+    final f = File(_profilePath());
+    if (!f.existsSync()) return null;
+    return f;
+  }
+
   Image? readySnipImage() {
     File? f;
     if ((f = mainCachedFile ?? mainFile()) != null) {
@@ -557,10 +572,14 @@ class Down4Image extends Down4Media {
     super.delete(stmt: stmt);
     try {
       mainFile()?.delete();
-    } catch (_) {}
+    } catch (_) {
+      print("error deleting main file");
+    }
     try {
       File(_profilePath()).delete();
-    } catch (_) {}
+    } catch (_) {
+      print("error deleting profile file");
+    }
     return null;
   }
 
@@ -767,6 +786,13 @@ class Down4Video extends Down4Media {
     super.isLocked = false,
   });
 
+  @override
+  int get sizeInBytes {
+    final mainBytes = mainCachedFile?.readAsBytesSync();
+    final thumBytes = thumbnailFile?.readAsBytesSync();
+    return (mainBytes?.length ?? 0) + (thumBytes?.length ?? 0);
+  }
+
   Image? thumbnail(Size s, {bool forceSquare = false}) {
     if (thumbnailFile == null) return null;
     int? w, h;
@@ -832,8 +858,16 @@ class Down4Video extends Down4Media {
   @override
   String? delete({bool stmt = false}) {
     super.delete(stmt: stmt);
-    mainFile()?.delete();
-    thumbnailFile?.delete();
+    try {
+      mainFile()?.delete();
+    } catch (_) {
+      print("error deleting main file");
+    }
+    try {
+      thumbnailFile?.delete();
+    } catch (_) {
+      print("error deleting thumnail file");
+    }
     return null;
   }
 
@@ -1046,7 +1080,7 @@ class ConsoleMedias {
 //       return renderMedia;
 //     }
 //   }
-  
+
 //   @override
 //   Widget build(BuildContext context) {
 //     wasBuilt = true;

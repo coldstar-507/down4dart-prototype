@@ -195,6 +195,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     connectToMessages3();
     connectToNodes();
     processChats(unsentMessages());
+    messagesDeletingRoutine();
+    mediasDeletingRoutine();
     loadSavedMediasIDs();
     clearAppCache();
     g.wallet.walletRoutine();
