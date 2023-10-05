@@ -211,6 +211,7 @@ class Sizes {
   double w;
   double fullHeight;
   double headerHeight;
+  Offset get middlePoint => Offset(w / 2, h / 2);
   Size get fullSize => Size(w, fullHeight);
   Size get paddedSize => Size(w, h);
   double get viewPaddingHeight => fullHeight - h;

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:down4/src/data_objects/medias.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:mime/mime.dart';
@@ -12,6 +13,60 @@ import '../render_objects/_render_utils.dart'
 import '../render_objects/console.dart';
 import '../pages/_page_utils.dart';
 import '../globals.dart';
+
+class TransformableWidget extends StatefulWidget {
+  Widget child;
+  Offset defaultOffset;
+  void Function(Offset, double rotation, double scale) onPositionChange;
+  TransformableWidget({
+    required this.onPositionChange,
+    required this.defaultOffset,
+    required this.child,
+    super.key,
+  });
+
+  @override
+  State<TransformableWidget> createState() => _TransformableWidgetState();
+}
+
+class _TransformableWidgetState extends State<TransformableWidget> {
+  double _scale = 1.0;
+  double _previousScale = 1.0;
+  double _rotation = 0.0;
+  late Offset _offset = widget.defaultOffset;
+  late Offset _prevOffset = widget.defaultOffset;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onScaleStart: (details) {
+        _previousScale = _scale;
+      },
+      onScaleUpdate: (details) {
+        _scale = _previousScale * details.scale;
+        _offset = _prevOffset + details.focalPoint - details.localFocalPoint;
+        _rotation = details.rotation;
+        widget.onPositionChange(_offset, _rotation, _scale);
+        setState(() {});
+      },
+      onScaleEnd: (details) {
+        _prevOffset = _offset;
+      },
+      child: Center(
+        child: Transform(
+          transform: Matrix4.identity()
+            ..translate(_offset.dx, _offset.dy)
+            ..scale(_scale)
+            ..rotateZ(_rotation),
+          alignment: FractionalOffset.center,
+          child: Center(
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class SnipCamera extends StatefulWidget implements Down4PageWidget {
   @override
@@ -39,12 +94,27 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
 }
 
 class _SnipCameraState extends State<SnipCamera>
-    with WidgetsBindingObserver, Pager2, Input2 {
+    with WidgetsBindingObserver, Pager2, Input2, Medias2 {
   VideoPlayerController? vpc;
   String? filePath;
   String? mimetype;
   String? text;
   bool hasInput = false;
+
+  List<(Down4Media, Offset, double, double)> sticks = [];
+
+  @override
+  List<(String, void Function(Down4Media))> get mediasMode {
+    return [
+      (
+        "PUT",
+        (m) {
+          sticks.insert(0, (m, g.sizes.middlePoint, 0, 0));
+          setState(() {});
+        }
+      )
+    ];
+  }
 
   // Widget? _preview;
   double _scale = 1.0;
@@ -106,8 +176,6 @@ class _SnipCameraState extends State<SnipCamera>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     initCamera();
-    // capturingPage();
-    // widget.ctrl.setFlashMode(FlashMode.off);
   }
 
   void _nextFlashMode() {
@@ -173,20 +241,30 @@ class _SnipCameraState extends State<SnipCamera>
   }
 
   Widget previewsContainer({bool reverse = false, required Widget child}) =>
-      Center(
-        child: Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.rotationY(reverse ? math.pi : 0),
-          child: Transform.scale(
-            scale: scale > 1 ? scale : 1 / scale,
-            child: SizedBox(
-              height: ctrl.value.aspectRatio * g.sizes.w,
-              width: g.sizes.w,
-              child: child,
+      Stack(children: [
+        Center(
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(reverse ? math.pi : 0),
+            child: Transform.scale(
+              scale: scale > 1 ? scale : 1 / scale,
+              child: SizedBox(
+                height: ctrl.value.aspectRatio * g.sizes.w,
+                width: g.sizes.w,
+                child: child,
+              ),
             ),
           ),
         ),
-      );
+        ...sticks.map((s) {
+          final (m, _, _, _) = s;
+          return const SizedBox.shrink();
+          // return TransformableWidget(
+          //     onPositionChange: onPositionChange,
+          //     defaultOffset: g.sizes.middlePoint,
+          //     child: child);
+        })
+      ]);
 
   Widget consoleBody(Widget child) => Positioned(
       bottom: 0,

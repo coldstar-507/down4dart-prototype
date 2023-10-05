@@ -437,40 +437,22 @@ Set<ComposedID> allMediaReferences() {
       .whereType<ComposedID>();
 
   const q = "SELECT reactions FROM messages";
-  final Iterable<ComposedID> rr = db.select(q).map((e) {
-      final reacs = e["reactions"];
-      if (reacs == null) return null;
-      final jsnl = List.from(youKnowDecode(reacs));
-      return jsnl.map((a) {
-          final jsns = Map<String, String?>.from(a);
-          return Down4Message.fromJson(jsns) as Reaction;
-      });
-  }).whereType<List<ComposedID>>().expand((b) => b);
+  final Iterable<ComposedID> rr = db
+      .select(q)
+      .map((e) {
+        final reacs = e["reactions"];
+        if (reacs == null) return null;
+        final jsnl = Map.from(youKnowDecode(reacs));
+        return jsnl.map((k, v) {
+            final mid = ComposedID.fromString(v["mediaID"])!;
+            return MapEntry(k, mid);
+        }).values;
+      })
+      .whereType<Iterable<ComposedID>>()
+      .expand((b) => b);
 
   return (rmn.followedBy(rr)).toSet();
 
-  // final rs = rr
-  //     .map((e) {
-  //       final reacs = e["reactions"];
-  //       if (reacs == null) return null;
-  //       final jsn = List.from(youKnowDecode(reacs));
-  //       return jsn.map((e) {
-  //         final jsns = Map<String, String?>.from(e);
-  //         return Down4Message.fromJson(jsns) as Reaction;
-  //       });
-  //     })
-  //     .whereType()
-  //     .expand((e) => e)
-  //     .whereType<Reaction>()
-  //     .map((e) => e.mediaID);
-
-  // return rn
-  //     .followedBy(rm)
-  //     .map((a) => ComposedID.fromString(a["mediaID"]))
-  //     .whereType<ComposedID>()
-  //     .followedBy(rs)
-  //     .whereType<ComposedID>()
-  //     .toSet();
 }
 
 // TODO: could be optimized // how?
@@ -479,8 +461,10 @@ void messagesDeletingRoutine() {
 
   final countStmt = """
   SELECT COUNT(*) AS c FROM messages
-  WHERE CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
-    AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip')
+  WHERE
+    (CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
+      AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip'))
+    OR (type = 'snip' AND isRead = 'true')
   """;
   final count = db.select(countStmt).single["c"] as int;
   print("""
@@ -490,10 +474,12 @@ void messagesDeletingRoutine() {
     """);
 
   final msgDeleteStmt = """
-    DELETE FROM messages
-    WHERE CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
-      AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip')
-    """;
+  DELETE FROM messages
+  WHERE
+    (CAST(timestamp AS INTEGER) < ${fourDaysAgo.millisecondsSinceEpoch}
+      AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip'))
+    OR (type = 'snip' AND isRead = 'true')
+  """;
 
   db.execute(msgDeleteStmt);
 }
@@ -531,14 +517,6 @@ void mediasDeletingRoutine() {
     // ${fileBytesDeleted ~/ 1000000} mb of data removed //
     ///////////////////////////////////////////////////////
     """);
-
-  // final alternate = """
-  //   DELETE FROM medias
-  //   WHERE isSaved = 'false'
-  //     AND id NOT IN (${sbuf.toString()})
-  // """;
-
-  // db.execute(alternate);
 }
 
 Iterable<ChatN> loadHome() sync* {

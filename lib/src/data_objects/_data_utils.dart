@@ -203,7 +203,7 @@ mixin Locals on Down4Object, Jsons {
     final q = "DELETE FROM $table WHERE id = ${id.value.sqlReady};";
     if (stmt) return q;
     try {
-      db.execute(q, [id.value]);
+      db.execute(q);
     } catch (e) {
       print("error deleting $runtimeType ${id.value}: $e");
     }

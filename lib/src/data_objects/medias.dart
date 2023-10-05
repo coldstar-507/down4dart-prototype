@@ -887,25 +887,16 @@ class Down4Video extends Down4Media {
     if (d != null) {
       await File(thumbnailPath).writeAsBytes(d);
     }
-    // await VideoThumbnail.thumbnailFile(
-    //     video: mainPath(), thumbnailPath: thumbnailPath, quality: 75);
-    // tinyThumbnail = makeTiny(tn);
-    // await File(thumbnailPath).writeAsBytes(tn);
   }
 }
 
 class ConsoleMedias {
   static final ConsoleMedias _instance = ConsoleMedias._();
-  // static MediaType _t = MediaType.images;
-
-  // static final Map<MediaType, ConsoleMedias> _instances = {};
-
-  // factory ConsoleMedias(MediaType t) => _instances[t] ??= ConsoleMedias._();
 
   factory ConsoleMedias() => _instance;
 
   int _lastLoad = makeTimestamp();
-  final int _loadingGap = 10;
+  final int _loadingGap = 2;
 
   Stream<CustomMedia> throttledImages(Iterable<(Down4ID, String?)> keys,
       {Size? size}) async* {
@@ -1051,43 +1042,6 @@ class ConsoleMedias {
   }
 }
 
-// class CustomImage extends StatelessWidget {
-//   bool wasBuilt = false;
-//   final Down4Image im;
-//   final RawImage image;
-//   CustomImage(this.image, this.im, {super.key});
-
-//   Widget get transformed => Transform.flip(flipX: im.isReversed, child: image);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     print("drawing image: ${im.id.unik}");
-//     wasBuilt = true;
-//     return transformed;
-//   }
-// }
-
-// class CustomMedia extends StatelessWidget {
-//   bool wasBuilt = false;
-//   final Down4Media media;
-//   final Widget renderMedia;
-//   CustomMedia(this.media, this.renderMedia, {super.key});
-
-//   Widget get renderWidget {
-//     if (renderMedia is RawImage && media.isReversed) {
-//       return Transform.flip(flipX: true, child: renderMedia);
-//     } else {
-//       return renderMedia;
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     wasBuilt = true;
-//     return renderWidget;
-//   }
-// }
-
 class CustomMedia extends StatefulWidget {
   bool wasBuilt = false;
   final Down4Media media;
@@ -1134,7 +1088,6 @@ class CustomList extends StatefulWidget {
 }
 
 class _CustomListState extends State<CustomList> {
-  // final _streamController = StreamController<CustomMedia>.broadcast();
   Map<MediaType, List<CustomMedia>> _medias = {
     MediaType.images: [],
     MediaType.videos: [],
@@ -1170,11 +1123,6 @@ class _CustomListState extends State<CustomList> {
     print("init that FUCKIGN shit");
     super.initState();
     loadStream(currentType);
-    // _streams[t] = StreamController<CustomMedia>.broadcast();
-    // strm!.stream.listen((p) => setState(() => medias.add(p)));
-    // load(strm!);
-    // _streamController.stream.listen((p) => setState(() => list.add(p)));
-    // load(_streamController);
   }
 
   List<Down4ID> mids(MediaType t) => g.savedMediasIDs[t]!;
@@ -1194,7 +1142,6 @@ class _CustomListState extends State<CustomList> {
     for (final stream in _streams.values) {
       stream.close();
     }
-    // _streamController.close();
   }
 
   @override
