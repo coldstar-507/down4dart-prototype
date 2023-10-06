@@ -51,20 +51,39 @@ class TransformableWidget extends StatelessWidget {
       // onScaleStart: (details) {
       //   _previousScale = _scale;
       // },
-      onPanDown: (_) => onTap(tid),
-      onScaleUpdate: (details) {
-        final newScale = currentScale * details.scale;
-        final newOffset =
-            currentOffset + details.focalPoint - details.localFocalPoint;
-
-        // _scale = _previousScale * details.scale;
-        // _offset = _prevOffset + details.focalPoint - details.localFocalPoint;
-        final newRotation = details.rotation;
-
-        // _rotation = details.rotation;
-        onPositionChange(newOffset, newRotation, newScale, tid);
-        // setState(() {});
+      onTap: () {
+        print("was tapped!");
       },
+      onVerticalDragUpdate: (d) {
+        print("vertical drag!");
+        onPositionChange(
+            currentOffset + d.delta, currentRotation, currentScale, tid);
+      },
+      onHorizontalDragUpdate: (d) {
+        print("horizontal drag!");
+        onPositionChange(
+            currentOffset + d.delta, currentRotation, currentScale, tid);
+      },
+      onPanDown: (_) => onTap(tid),
+      onLongPressMoveUpdate: (details) {
+        print("long press move");        
+        final ofs = details.localOffsetFromOrigin;
+        onPositionChange(ofs, currentRotation, currentScale, tid);
+      },
+      // onScaleUpdate: (details) {
+      //   print("scale update!");
+      //   final newScale = currentScale * details.scale;
+      //   final newOffset =
+      //       currentOffset + details.focalPoint - details.localFocalPoint;
+
+      //   // _scale = _previousScale * details.scale;
+      //   // _offset = _prevOffset + details.focalPoint - details.localFocalPoint;
+      //   final newRotation = details.rotation;
+
+      //   // _rotation = details.rotation;
+      //   onPositionChange(newOffset, newRotation, newScale, tid);
+      //   // setState(() {});
+      // },
       // onScaleEnd: (details) {
       //   _prevOffset = _offset;
       // },
