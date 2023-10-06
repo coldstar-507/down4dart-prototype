@@ -2,71 +2,130 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/data_objects/medias.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
+import 'package:collection/collection.dart' show ListExtensions;
 
-import '../render_objects/_render_utils.dart'
-    show Down4PageWidget, InvertedSize;
+import '../render_objects/_render_utils.dart';
 import '../render_objects/console.dart';
 import '../pages/_page_utils.dart';
 import '../globals.dart';
 
-class TransformableWidget extends StatefulWidget {
-  Widget child;
-  Offset defaultOffset;
-  void Function(Offset, double rotation, double scale) onPositionChange;
+class TransformableWidget extends StatelessWidget {
+  final Widget child;
+  final String tid;
+  final Offset currentOffset;
+  final double currentScale, currentRotation;
+  final void Function(Offset, double rotation, double scale, String tid)
+      onPositionChange;
+  final void Function(String tid) onTap;
   TransformableWidget({
     required this.onPositionChange,
-    required this.defaultOffset,
+    required this.onTap,
+    required this.currentOffset,
+    required this.currentScale,
+    required this.currentRotation,
+    required this.tid,
     required this.child,
-    super.key,
-  });
+  }) : super(key: ValueKey(tid));
 
-  @override
-  State<TransformableWidget> createState() => _TransformableWidgetState();
-}
-
-class _TransformableWidgetState extends State<TransformableWidget> {
-  double _scale = 1.0;
-  double _previousScale = 1.0;
-  double _rotation = 0.0;
-  late Offset _offset = widget.defaultOffset;
-  late Offset _prevOffset = widget.defaultOffset;
+  TransformableWidget withNewPosition(Offset ofs, rot, scl) {
+    return TransformableWidget(
+      onPositionChange: onPositionChange,
+      onTap: onTap,
+      currentOffset: ofs,
+      currentScale: scl,
+      currentRotation: rot,
+      tid: tid,
+      child: child,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onScaleStart: (details) {
-        _previousScale = _scale;
-      },
+      // onScaleStart: (details) {
+      //   _previousScale = _scale;
+      // },
+      onPanDown: (_) => onTap(tid),
       onScaleUpdate: (details) {
-        _scale = _previousScale * details.scale;
-        _offset = _prevOffset + details.focalPoint - details.localFocalPoint;
-        _rotation = details.rotation;
-        widget.onPositionChange(_offset, _rotation, _scale);
-        setState(() {});
+        final newScale = currentScale * details.scale;
+        final newOffset =
+            currentOffset + details.focalPoint - details.localFocalPoint;
+
+        // _scale = _previousScale * details.scale;
+        // _offset = _prevOffset + details.focalPoint - details.localFocalPoint;
+        final newRotation = details.rotation;
+
+        // _rotation = details.rotation;
+        onPositionChange(newOffset, newRotation, newScale, tid);
+        // setState(() {});
       },
-      onScaleEnd: (details) {
-        _prevOffset = _offset;
-      },
+      // onScaleEnd: (details) {
+      //   _prevOffset = _offset;
+      // },
       child: Center(
         child: Transform(
           transform: Matrix4.identity()
-            ..translate(_offset.dx, _offset.dy)
-            ..scale(_scale)
-            ..rotateZ(_rotation),
+            // ..translate(currentOffset.dx, currentOffset.dy)
+            ..scale(currentScale)
+            ..rotateZ(currentRotation),
           alignment: FractionalOffset.center,
           child: Center(
-            child: widget.child,
+            child: child,
           ),
         ),
       ),
     );
   }
+
+  // @override
+  // State<TransformableWidget> createState() => _TransformableWidgetState();
 }
+
+// class _TransformableWidgetState extends State<TransformableWidget> {
+//   double _scale = 1.0;
+//   double _previousScale = 1.0;
+//   double _rotation = 0.0;
+//   late Offset _offset = widget.defaultOffset;
+//   late Offset _prevOffset = widget.defaultOffset;
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return GestureDetector(
+//       onScaleStart: (details) {
+//         _previousScale = _scale;
+//       },
+//       onPanDown: (_) => widget.onTap(widget.tid),
+//       onScaleUpdate: (details) {
+//         _scale = _previousScale * details.scale;
+//         _offset = _prevOffset + details.focalPoint - details.localFocalPoint;
+//         _rotation = details.rotation;
+//         widget.onPositionChange(_offset, _rotation, _scale, widget.tid);
+//         setState(() {});
+//       },
+//       onScaleEnd: (details) {
+//         _prevOffset = _offset;
+//       },
+//       child: Center(
+//         child: Transform(
+//           transform: Matrix4.identity()
+//             ..translate(_offset.dx, _offset.dy)
+//             ..scale(_scale)
+//             ..rotateZ(_rotation),
+//           alignment: FractionalOffset.center,
+//           child: Center(
+//             child: widget.child,
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 class SnipCamera extends StatefulWidget implements Down4PageWidget {
   @override
@@ -101,7 +160,7 @@ class _SnipCameraState extends State<SnipCamera>
   String? text;
   bool hasInput = false;
 
-  List<(Down4Media, Offset, double, double)> sticks = [];
+  List<TransformableWidget> sticks = [];
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode {
@@ -109,7 +168,23 @@ class _SnipCameraState extends State<SnipCamera>
       (
         "PUT",
         (m) {
-          sticks.insert(0, (m, g.sizes.middlePoint, 0, 0));
+          final tw = TransformableWidget(
+              onPositionChange: (ofs, rot, scl, tid) {
+                final ix = sticks.indexWhere((w) => w.tid == tid);
+                sticks[ix] = sticks[ix].withNewPosition(ofs, rot, scl);
+                setState(() {});
+              },
+              onTap: (tid) {
+                final ix = sticks.indexWhere((w) => w.tid == tid);
+                sticks.swap(ix, 0);
+                setState(() {});                
+              },
+              currentOffset: g.sizes.middlePoint,
+              currentRotation: 0,
+              currentScale: 1.0,
+              tid: randomMediaID(),
+              child: m.display(size: m.size));
+          sticks.insert(0, tw);
           setState(() {});
         }
       )
@@ -256,14 +331,8 @@ class _SnipCameraState extends State<SnipCamera>
             ),
           ),
         ),
-        ...sticks.map((s) {
-          final (m, _, _, _) = s;
-          return const SizedBox.shrink();
-          // return TransformableWidget(
-          //     onPositionChange: onPositionChange,
-          //     defaultOffset: g.sizes.middlePoint,
-          //     child: child);
-        })
+        ...sticks.map((e) => Positioned(
+            left: e.currentOffset.dx, top: e.currentOffset.dy, child: e)),
       ]);
 
   Widget consoleBody(Widget child) => Positioned(
@@ -365,6 +434,7 @@ class _SnipCameraState extends State<SnipCamera>
                     changeConsole("base");
                   }),
                 ),
+                mediasButton,
                 ConsoleButton(
                   name: "TEXT",
                   isInverted: true,
@@ -385,12 +455,16 @@ class _SnipCameraState extends State<SnipCamera>
                     );
                   },
                 ),
-              ], extension: null, widths: null, inputMaxHeight: null)
+              ], extension: null, widths: null, inputMaxHeight: null),
+              "medias": basicMediasRow,
             }
           ],
           currentConsolesName: currentConsolesName,
           currentPageIndex: currentPageIndex);
 
+  @override
+  String get backFromMediasConsoleName => "preview";
+        
   @override
   List<String> currentConsolesName = ["base"];
 

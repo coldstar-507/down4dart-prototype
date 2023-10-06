@@ -259,6 +259,7 @@ void initSqlite() async {
       utxoIndex TEXT NOT NULL,
       sequenceNo TEXT NOT NULL,
       scriptSig TEXT NOT NULL,
+      satSpent TEXT NOT NULL,
       spender TEXT
     )
     """);

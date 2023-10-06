@@ -102,9 +102,11 @@ class _UserMakerPageState extends State<UserMakerPage>
     if (r?.files.single.path != null && r?.files.single.bytes != null) {
       final String p = r!.files.single.path!;
       final s = await decodeImageSize(r.files.single.bytes!);
-      cameraInput = Down4Media.fromLocal(ComposedID(),
+      cameraInput = Down4Media.fromLocal(
+          ComposedID(region: willBeReplacedID.region),
+          mainCachedPath: p,
           metadata: Down4MediaMetadata(
-              ownerID: g.self.id,
+              ownerID: willBeReplacedID,
               timestamp: makeTimestamp(),
               isReversed: isReversed,
               width: s.width,

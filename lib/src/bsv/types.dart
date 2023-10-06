@@ -122,7 +122,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     if (confirmations != -1) {
       return print("transactions has already been accepted!");
     }
-    
+
     if (validForBroadcast) {
       return r.broadcastTxs(txs);
     } else {
@@ -176,7 +176,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     }
     for (final txin in txs.last.txsIn) {
       if (txin.spender == selfID) {
-        pm -= local<Down4TXOUT>(txin.utxoID)!.sats.asInt;
+        pm -= txin.satSpent;
       }
     }
     plusMinus = pm;
@@ -323,8 +323,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
     final tl = VarInt.fromInt(textNote.length);
     final tn = utf8.encode(textNote);
-    final txl = VarInt.fromInt(txs!.length);
-    final ctxs = txs!.compressFold;
+    final txl = VarInt.fromInt(txs.length);
+    final ctxs = txs.compressFold;
     final ts = utf8.encode(timestamp.toRadixString(34));
 
     var len = 1 +
@@ -376,9 +376,9 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     List<Down4TX> txs = [];
     int offset = textOffsetEnd + nTxDataLen;
     for (int i = 0; i < nTxVarInt.asInt; i++) {
-      final txinfo = Down4TX.fromCompressed(buf.sublist(offset));
-      txs.add(txinfo.first);
-      offset = offset + txinfo.second;
+      final (t, o) = Down4TX.fromCompressed(buf.sublist(offset));
+      txs.add(t);
+      offset = offset + o;
     }
 
     final tsBuf = buf.sublist(offset, offset + 7);
@@ -654,6 +654,7 @@ class Down4TXIN with Down4Object, Jsons, Locals {
   VarInt? _scriptSigLen;
   TXID utxoTXID;
   FourByteInt utxoIndex;
+  int satSpent;
   List<int>? _scriptSig;
   // dependance can be logically replaced by multiple order txs in a payment
   // TXID? dependance; // So I will probably remove it
@@ -662,6 +663,7 @@ class Down4TXIN with Down4Object, Jsons, Locals {
   Down4TXIN({
     required this.utxoIndex,
     required this.utxoTXID,
+    required this.satSpent,
     List<int>? scriptSig,
     this.spender,
     int? sequenceNo,
@@ -674,10 +676,14 @@ class Down4TXIN with Down4Object, Jsons, Locals {
 
   List<int> get compressed {
     final List<int>? encsp = spender?.value.codeUnits;
+    final ss = satSpent.toRadixString(34);
+
     // final encsp = spender == null ? [] : utf8.encode(spender!.value);
     return [
       ...raw,
       ...encsp == null ? [0x00] : [encsp.length, ...encsp],
+      ss.length,
+      ...ss.codeUnits,
     ];
   }
 
@@ -700,7 +706,7 @@ class Down4TXIN with Down4Object, Jsons, Locals {
     return buf;
   }
 
-  static Pair<Down4TXIN, int> fromCompressed(Uint8List d4) {
+  static (Down4TXIN, int) fromCompressed(Uint8List d4) {
     final utxoID = TXID(d4.sublist(0, 32));
     final utxoIX = FourByteInt.fromRaw(d4.sublist(32, 36));
     final scriptLenVarInt = VarInt.fromRaw(d4.sublist(36));
@@ -719,14 +725,21 @@ class Down4TXIN with Down4Object, Jsons, Locals {
       spender = Down4ID.fromString(spenderStr);
     }
 
+    final spOffset = d4Offset + 1 + d4[d4Offset];
+    final slen = d4[spOffset];
+    final spData = d4.sublist(spOffset + 1, spOffset + 1 + slen);
+    final spStr = String.fromCharCodes(spData);
+    final satSpent = int.parse(spStr, radix: 34);
+
     final txin = Down4TXIN(
         utxoIndex: utxoIX,
         utxoTXID: utxoID,
         scriptSig: script,
         sequenceNo: seqNo.asInt,
+        satSpent: satSpent,
         spender: spender);
 
-    return Pair(txin, d4Offset + 1 + d4[d4Offset]); // final offset
+    return (txin, spOffset + 1 + slen); // final offset
   }
 
   Down4ID get utxoID => down4UtxoID(utxoTXID, utxoIndex);
@@ -738,6 +751,7 @@ class Down4TXIN with Down4Object, Jsons, Locals {
       spender: Down4ID.fromString(decodedJson["spender"]),
       sequenceNo: int.parse(decodedJson["sequenceNo"]!),
       scriptSig: base64Decode(decodedJson["scriptSig"]!),
+      satSpent: int.parse(decodedJson["satSpent"]!),
     );
   }
 
@@ -749,6 +763,7 @@ class Down4TXIN with Down4Object, Jsons, Locals {
         if (spender != null) "spender": spender!.value,
         "sequenceNo": sequenceNo.asInt.toString(),
         "scriptSig": _scriptSig!.toBase64(),
+        "satSpent": satSpent.toString(),
       };
 
   List<int> get raw => [
@@ -924,7 +939,7 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
     return buf;
   }
 
-  static Pair<Down4TXOUT, int> fromCompressed(Uint8List d4) {
+  static (Down4TXOUT, int) fromCompressed(Uint8List d4) {
     print("parsing this utxo=\n$d4");
 
     final satInt = Uint8List.fromList(d4.sublist(0, 8))
@@ -962,7 +977,7 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
     final txout = Down4TXOUT(
         sats: Sats(satInt), script: script, receiver: receiver, type: type);
 
-    return Pair(txout, curOffset + 1 + receiverLen + 1);
+    return (txout, curOffset + 1 + receiverLen + 1);
   }
 }
 
@@ -1122,8 +1137,8 @@ class Down4TX with Down4Object, Jsons, Locals {
     final t1 = makeTimestamp();
 
     print("inCounter=${inCounter.asInt}, nTxins=${txsIn.length}");
-    print("outCounter=${outCounter.asInt}, nTxins=${txsOut.length}");    
-    
+    print("outCounter=${outCounter.asInt}, nTxins=${txsOut.length}");
+
     final buf = [
       ...versionNo.data,
       ...inCounter.data,
@@ -1178,7 +1193,7 @@ class Down4TX with Down4Object, Jsons, Locals {
     return buf;
   }
 
-  static Pair<Down4TX, int> fromCompressed(Uint8List buf) {
+  static (Down4TX, int) fromCompressed(Uint8List buf) {
     final vNo = FourByteInt.fromRaw(buf.sublist(0, 4));
     final inCountVarInt = VarInt.fromRaw(buf.sublist(4));
     print("there will be ${inCountVarInt.asInt} txins to decode!");
@@ -1186,9 +1201,9 @@ class Down4TX with Down4Object, Jsons, Locals {
     var offset = 4 + inCountVarInt.data.length;
     for (int i = 0; i < inCountVarInt.asInt; i++) {
       print("decoding txin #$i");
-      final txinInfo = Down4TXIN.fromCompressed(buf.sublist(offset));
-      txsIn.add(txinInfo.first);
-      offset = offset + txinInfo.second;
+      final (tin, o) = Down4TXIN.fromCompressed(buf.sublist(offset));
+      txsIn.add(tin);
+      offset = offset + o;
     }
 
     final outCounterVarInt = VarInt.fromRaw(buf.sublist(offset));
@@ -1196,10 +1211,10 @@ class Down4TX with Down4Object, Jsons, Locals {
     offset = offset + outCounterVarInt.data.length;
     print("There will be ${outCounterVarInt.asInt} txout to decode");
     for (int i = 0; i < outCounterVarInt.asInt; i++) {
-      print("decoding txout #$i");      
-      final txoutInfo = Down4TXOUT.fromCompressed(buf.sublist(offset));
-      txsOut.add(txoutInfo.first);
-      offset = offset + txoutInfo.second;
+      print("decoding txout #$i");
+      final (tout, o) = Down4TXOUT.fromCompressed(buf.sublist(offset));
+      txsOut.add(tout);
+      offset = offset + o;
     }
 
     final nLockTime = FourByteInt.fromRaw(buf.sublist(offset, offset + 4));
@@ -1231,7 +1246,7 @@ class Down4TX with Down4Object, Jsons, Locals {
         nLock: nLockTime,
         confirmations: conf.asInt);
 
-    return Pair(down4Tx, finalOffset);
+    return (down4Tx, finalOffset);
   }
 
   // List<TXID> get txidDeps {

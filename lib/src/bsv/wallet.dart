@@ -464,6 +464,7 @@ class Wallet with Down4Object, Jsons, Locals {
     List<Down4TXIN> txIns = [];
     for (var utxo in fetchedUtxos.values) {
       var txin = Down4TXIN(
+        satSpent: utxo.sats.asInt,
         utxoIndex: FourByteInt(utxo.outIndex!),
         utxoTXID: utxo.txid!,
         spender: utxo.receiver,
@@ -601,6 +602,7 @@ class Wallet with Down4Object, Jsons, Locals {
     var iUtxo = 0;
     for (final utxo in utxos) {
       var txin = Down4TXIN(
+          satSpent: utxo.sats.asInt,
           utxoTXID: utxo.txid!,
           utxoIndex: FourByteInt(utxo.outIndex!),
           spender: selfID,
