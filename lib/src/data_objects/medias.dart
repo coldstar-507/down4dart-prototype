@@ -114,6 +114,8 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   set cachedUrl(String? u) => _cachedUrl = u;
 
+  Offset get middlePoint => Offset(size.width / 2, size.height / 2);
+
   @override
   final ComposedID id;
   ComposedID? _tempID;
@@ -1149,15 +1151,15 @@ class _CustomListState extends State<CustomList> {
     final nRows = (mids(currentType).length / _mediasPerRow).ceil();
     return Container(
         clipBehavior: Clip.hardEdge,
-        alignment: AlignmentDirectional.topCenter,
+        alignment: AlignmentDirectional.centerEnd,
         decoration: BoxDecoration(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
-        ),
-        child: ConstrainedBox(
-            constraints: BoxConstraints(
-                maxHeight: nRows * mediaCelSize, maxWidth: Console.trueWidth),
-            child: ListView.builder(
+            borderRadius: BorderRadius.vertical(
+                top: Radius.circular(Console.consoleRad))),
+        child: // ConstrainedBox(
+            // constraints: BoxConstraints(
+            //     maxHeight: nRows * mediaCelSize, maxWidth: Console.trueWidth),
+            // child:
+            ListView.builder(
                 itemCount: nRows,
                 itemBuilder: (ctx, index) {
                   Widget f(int i) {
@@ -1181,6 +1183,8 @@ class _CustomListState extends State<CustomList> {
                       (j) => f((index * _mediasPerRow) + j),
                     ),
                   );
-                })));
+                })
+              //)
+              );
   }
 }

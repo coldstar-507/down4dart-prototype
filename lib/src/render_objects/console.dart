@@ -1293,7 +1293,8 @@ class Console3 {
         opacity: staticRow ? 0 : 1,
         child: ColoredBox(
             color: g.theme.buttonColor(),
-            child: Column(children: [
+            child: Column(
+              children: [
               AnimatedOpacity(
                 opacity: extension == null ? 0 : 1,
                 duration: Console.animationDuration,
@@ -1304,7 +1305,7 @@ class Console3 {
                   child: Stack(
                     children: [
                       AnimatedContainer(
-                          alignment: AlignmentDirectional.center,
+                          alignment: AlignmentDirectional.topCenter,
                           duration: Console.animationDuration,
                           width: g.sizes.w,
                           color: g.theme.extensionBackdropColor,
