@@ -368,67 +368,111 @@ class _SnipCameraState extends State<SnipCamera>
 
   @override
   Widget build(BuildContext context) {
-    return Andrew(pages: [
-      Down4Page(title: "SNIP", console: console, staticList: true, stackWidgets: [
-        hasPreview
-            ? previewsContainer(
-                reverse: toReverse,
-                child:
-                    isVideo ? VideoPlayer(vpc!) : Image.file(File(filePath!)))
-            : !readyCamera
-                ? Container(color: Colors.black)
-                : GestureDetector(
-                    onTap: () => print("LALALALALAL"),
-                    onScaleStart: (details) => _baseScale = _scale,
-                    onScaleUpdate: (details) {
-                      if (_baseScale * details.scale < minZoom) {
-                        _scale = minZoom;
-                      } else if (_baseScale * details.scale > maxZoom) {
-                        _scale = maxZoom;
-                      } else {
-                        _scale = _baseScale * details.scale;
-                      }
-                      if (_scale >= minZoom && _scale <= maxZoom) {
-                        ctrl.setZoomLevel(_scale);
-                      }
-                    },
-                    child: previewsContainer(child: CameraPreview(ctrl)),
-                  ),
-        hasInput ? input.snipInput : const SizedBox.shrink(),
-      ])
-    ]);
+    return Andrew(
+      backFunction: widget.cameraBack,
+      transparentHeader: true,
+      pages: [
+        Down4Page(
+          title: "",
+          console: console,
+          staticList: true,
+          backgroundStackWidgets: [
+            // hasPreview
+            //     ? previewsContainer(
+            //         reverse: toReverse,
+            //         child: isVideo
+            //             ? VideoPlayer(vpc!)
+            //             : Image.file(File(filePath!)))
+            //     : const SizedBox.shrink()
+          ],
+          stackWidgets: [
+            hasPreview
+                ? previewsContainer(
+                    reverse: toReverse,
+                    child: isVideo
+                        ? VideoPlayer(vpc!)
+                        : Image.file(File(filePath!)))
+                : !readyCamera
+                    ? Container(color: Colors.black)
+                    : GestureDetector(
+                        onTap: () => print("LALALALALAL"),
+                        onScaleStart: (details) => _baseScale = _scale,
+                        onScaleUpdate: (details) {
+                          if (_baseScale * details.scale < minZoom) {
+                            _scale = minZoom;
+                          } else if (_baseScale * details.scale > maxZoom) {
+                            _scale = maxZoom;
+                          } else {
+                            _scale = _baseScale * details.scale;
+                          }
+                          if (_scale >= minZoom && _scale <= maxZoom) {
+                            ctrl.setZoomLevel(_scale);
+                          }
+                        },
+                        child: previewsContainer(child: CameraPreview(ctrl)),
+                      ),
+            hasInput ? input.snipInput : const SizedBox.shrink(),
 
-    return Stack(
-      children: [
-        hasPreview
-            ? previewsContainer(
-                reverse: toReverse,
-                child:
-                    isVideo ? VideoPlayer(vpc!) : Image.file(File(filePath!)))
-            : !readyCamera
-                ? Container(color: Colors.black)
-                : GestureDetector(
-                    onTap: () => print("LALALALALAL"),
-                    onScaleStart: (details) => _baseScale = _scale,
-                    onScaleUpdate: (details) {
-                      if (_baseScale * details.scale < minZoom) {
-                        _scale = minZoom;
-                      } else if (_baseScale * details.scale > maxZoom) {
-                        _scale = maxZoom;
-                      } else {
-                        _scale = _baseScale * details.scale;
-                      }
-                      if (_scale >= minZoom && _scale <= maxZoom) {
-                        ctrl.setZoomLevel(_scale);
-                      }
-                    },
-                    child: previewsContainer(child: CameraPreview(ctrl)),
-                  ),
-        hasInput ? input.snipInput : const SizedBox.shrink(),
-        console.rowOfPage(index: 0),
-        // consoleBody(console.rowOfPage(index: 0)),
+            
+            // SizedBox(
+            //   height: g.sizes.h,
+            //   child: !readyCamera || hasPreview
+            //       ? const SizedBox.shrink()
+            //       : GestureDetector(
+            //           onTap: () => print("LALALALALAL"),
+            //           onScaleStart: (details) => _baseScale = _scale,
+            //           onScaleUpdate: (details) {
+            //             if (_baseScale * details.scale < minZoom) {
+            //               _scale = minZoom;
+            //             } else if (_baseScale * details.scale > maxZoom) {
+            //               _scale = maxZoom;
+            //             } else {
+            //               _scale = _baseScale * details.scale;
+            //             }
+            //             if (_scale >= minZoom && _scale <= maxZoom) {
+            //               ctrl.setZoomLevel(_scale);
+            //             }
+            //           },
+            //           child: previewsContainer(child: CameraPreview(ctrl)),
+            //         ),
+            // ),
+            // hasInput ? input.snipInput : const SizedBox.shrink(),
+          ],
+        )
       ],
     );
+
+    // return SafeArea(child: Stack(
+    //   children: [
+    //     hasPreview
+    //         ? previewsContainer(
+    //             reverse: toReverse,
+    //             child:
+    //                 isVideo ? VideoPlayer(vpc!) : Image.file(File(filePath!)))
+    //         : !readyCamera
+    //             ? Container(color: Colors.black)
+    //             : GestureDetector(
+    //                 onTap: () => print("LALALALALAL"),
+    //                 onScaleStart: (details) => _baseScale = _scale,
+    //                 onScaleUpdate: (details) {
+    //                   if (_baseScale * details.scale < minZoom) {
+    //                     _scale = minZoom;
+    //                   } else if (_baseScale * details.scale > maxZoom) {
+    //                     _scale = maxZoom;
+    //                   } else {
+    //                     _scale = _baseScale * details.scale;
+    //                   }
+    //                   if (_scale >= minZoom && _scale <= maxZoom) {
+    //                     ctrl.setZoomLevel(_scale);
+    //                   }
+    //                 },
+    //                 child: previewsContainer(child: CameraPreview(ctrl)),
+    //               ),
+    //     hasInput ? input.snipInput : const SizedBox.shrink(),
+    //     // console.rowOfPage(index: 0),
+    //     consoleBody(console.rowOfPage(index: 0)),
+    //   ],
+    // ),);
 
     // return _preview ?? capturingPage();
   }

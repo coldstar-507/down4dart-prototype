@@ -301,10 +301,13 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   Future<void> writeFromCachedPath() async {
     final File? f = mainCachedFile;
     if (f != null) {
+      // final Uint8List data = f.readAsBytesSync();
+      // await write(data);
       if (metadata.isSquared && !metadata.isVideo) {
         print("CROPPING IMAGE BRO");
         const idealSize = 512;
         final to = File(mainPath());
+
         await cropAndSaveToSquare(from: f, to: to, size: idealSize);
       } else {
         final Uint8List data = f.readAsBytesSync();
@@ -898,7 +901,7 @@ class ConsoleMedias {
   factory ConsoleMedias() => _instance;
 
   int _lastLoad = makeTimestamp();
-  final int _loadingGap = 2;
+  final int _loadingGap = 0;
 
   Stream<CustomMedia> throttledImages(Iterable<(Down4ID, String?)> keys,
       {Size? size}) async* {
@@ -968,6 +971,7 @@ class ConsoleMedias {
         diff=$diff
         """);
     if (!diff.isNegative) {
+      print("not waiting");
       _lastLoad = makeTimestamp();
       return fim;
     } else {
@@ -1149,42 +1153,33 @@ class _CustomListState extends State<CustomList> {
   @override
   Widget build(BuildContext context) {
     final nRows = (mids(currentType).length / _mediasPerRow).ceil();
-    return Container(
-        clipBehavior: Clip.hardEdge,
-        alignment: AlignmentDirectional.centerEnd,
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.vertical(
-                top: Radius.circular(Console.consoleRad))),
-        child: // ConstrainedBox(
-            // constraints: BoxConstraints(
-            //     maxHeight: nRows * mediaCelSize, maxWidth: Console.trueWidth),
-            // child:
-            ListView.builder(
-                itemCount: nRows,
-                itemBuilder: (ctx, index) {
-                  Widget f(int i) {
-                    if (i < currentMedias.length) {
-                      final im = currentMedias[i];
-                      return SizedBox.square(
-                          dimension: mediaCelSize,
-                          child: GestureDetector(
-                              onTap: () => widget.mediaPressFunc(im.media),
-                              child: im));
-                    } else {
-                      return SizedBox.square(dimension: mediaCelSize);
-                    }
-                  }
+    return ListView.builder(
+      padding: const EdgeInsets.all(0),
+      itemCount: nRows,
+      itemBuilder: (ctx, index) {
+        Widget f(int i) {
+          if (i < currentMedias.length) {
+            final im = currentMedias[i];
+            return SizedBox.square(
+              dimension: mediaCelSize,
+              child: GestureDetector(
+                onTap: () => widget.mediaPressFunc(im.media),
+                child: im,
+              ),
+            );
+          } else {
+            return SizedBox.square(dimension: mediaCelSize);
+          }
+        }
 
-                  return Row(
-                    // crossAxisAlignment: CrossAxisAlignment.start,
-                    key: Key(MediaType.images.name + index.toString()),
-                    children: List.generate(
-                      _mediasPerRow,
-                      (j) => f((index * _mediasPerRow) + j),
-                    ),
-                  );
-                })
-              //)
-              );
+        return Row(
+          key: Key(MediaType.images.name + index.toString()),
+          children: List.generate(
+            _mediasPerRow,
+            (j) => f((index * _mediasPerRow) + j),
+          ),
+        );
+      },
+    );
   }
 }

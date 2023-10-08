@@ -79,22 +79,18 @@ class DynamicList extends StatelessWidget {
     this.reversed = true,
     Key? key,
   }) : super(key: key);
-  // static double get gapSize => Palette.gapSize; //g.sizes.h * 0.02;
 
   @override
   Widget build(BuildContext context) {
     if (onRefresh != null) {
       return ScrollConfiguration(
-          // behavior: const CupertinoScrollBehavior(),
           behavior: NoGlow(),
           child: RefreshIndicator(
+              edgeOffset: g.sizes.viewPaddingHeight,
               onRefresh: onRefresh!,
               color: g.theme.refreshIndicatorColor,
               backgroundColor: g.theme.backGroundColor,
               child: ListView.builder(
-                // physics: const BouncingScrollPhysics(
-                //   decelerationRate: ScrollDecelerationRate.fast,
-                // ),
                 controller: scrollController,
                 padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
                 reverse: reversed,
@@ -107,12 +103,8 @@ class DynamicList extends StatelessWidget {
 
     return ScrollConfiguration(
       behavior: NoGlow(),
-      // behavior: const CupertinoScrollBehavior(),
       child: ListView.builder(
         controller: scrollController,
-        // physics: const BouncingScrollPhysics(
-        //   decelerationRate: ScrollDecelerationRate.fast,
-        // ),
         padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
         reverse: reversed,
         itemBuilder: (_, i) => asMap?[orderedKeys?[i]] ?? list[i],

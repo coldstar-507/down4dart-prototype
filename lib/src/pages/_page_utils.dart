@@ -583,6 +583,7 @@ mixin Forward2 {
 
 mixin Input2 on Pager2, WidgetsBindingObserver {
   List<MyTextEditor> get inputs;
+  double bottomInset = 0.0;
   set inputs(List<MyTextEditor> ic) => inputs = ic;
   void onInput(String s, double h) => setTheState();
 
@@ -610,8 +611,6 @@ mixin Input2 on Pager2, WidgetsBindingObserver {
     print("FOCUS CHANGE");
     setTheState();
   }
-  
-  // BuildContext get context;
 
   Future<bool> keyboardIsHidden() {
     return Future.delayed(const Duration(milliseconds: 200),
@@ -635,6 +634,8 @@ mixin Input2 on Pager2, WidgetsBindingObserver {
 
   @override
   void didChangeMetrics() async {
+    // bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    // setTheState();
     focusRoutine();
   }
 
@@ -950,7 +951,8 @@ mixin Medias2 on Pager2 {
                   Widget f(int i) {
                     if (i < ids.length) {
                       final id = ids[i];
-                      final readyImage = ConsoleMedias().readyMedia("console${id.unik}");
+                      final readyImage =
+                          ConsoleMedias().readyMedia("console${id.unik}");
                       if (readyImage != null) {
                         return GestureDetector(
                             onTap: () => forMediaMode != null
@@ -1055,11 +1057,11 @@ mixin Camera2 on Pager2 {
           final im = img.decodeImage(await f.readAsBytes());
           if (im == null) return changeConsole(backFromCameraConsoleName);
           tempInput = Down4Media.fromLocal(ComposedID(),
-              mainCachedPath: f.path,            
+              mainCachedPath: f.path,
               metadata: Down4MediaMetadata(
                   ownerID: g.self.id,
                   isSquared: true,
-                  isReversed: isReversed,                  
+                  isReversed: isReversed,
                   timestamp: makeTimestamp(),
                   width: im.width.toDouble(),
                   height: im.height.toDouble(),
@@ -1081,7 +1083,8 @@ mixin Camera2 on Pager2 {
         onLongPressUp: () async {
           final XFile f = await cameraController!.stopVideoRecording();
           final videoInfo = await FlutterVideoInfo().getVideoInfo(f.path);
-          if (videoInfo == null) return changeConsole(backFromCameraConsoleName);
+          if (videoInfo == null)
+            return changeConsole(backFromCameraConsoleName);
           tempInput = Down4Media.fromLocal(ComposedID(),
               mainCachedPath: f.path,
               metadata: Down4MediaMetadata(

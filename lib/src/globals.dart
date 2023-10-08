@@ -207,6 +207,7 @@ class Sizes {
     required this.fullHeight,
     required this.headerHeight,
   });
+  // double topPadding;
   double h;
   double w;
   double fullHeight;

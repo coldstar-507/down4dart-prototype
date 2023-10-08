@@ -48,9 +48,9 @@ class _Down4State extends State<Down4> {
   // }
 
   Future<void> logName([String? name]) async {
-      await _cred?.user?.updateDisplayName(name ?? g.self.id.value);
+    await _cred?.user?.updateDisplayName(name ?? g.self.id.value);
   }
-  
+
   Future<void> login() async {
     _cred = await FirebaseAuth.instance.signInAnonymously();
     g.loadExchangeRate(ExchangeRate.exchangeRate);
@@ -76,9 +76,9 @@ class _Down4State extends State<Down4> {
     required Down4Media media,
   }) async {
     _view = const LoadingPage2();
-    setState(() {});    
-    
-    // update login for database rules    
+    setState(() {});
+
+    // update login for database rules
     await logName(id.value);
 
     void onFailure(String msg) => createUser(errorMessage: msg);

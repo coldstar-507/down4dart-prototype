@@ -44,15 +44,21 @@ class Down4Page {
   final List<Down4ID>? orderedKeys;
   final Iterable<Widget>? _iterables;
   final int? iterableLen, trueLen;
-  final List<Widget>? stackWidgets;
+  final List<Widget>? stackWidgets, backgroundStackWidgets;
   final Console3 console;
-  final bool isChatPage, centerStackItems, reversedList, staticList;
+  final bool isChatPage,
+      centerStackItems,
+      reversedList,
+      staticList,
+      avoidKeyboardResize;
   Down4Page({
     required this.title,
     this.scrollController,
     this.asMap,
     this.stream,
     this.orderedKeys,
+    this.backgroundStackWidgets,
+    this.avoidKeyboardResize = false,
     this.trueLen,
     this.onRefresh,
     this.isChatPage = false,
@@ -76,6 +82,7 @@ class Andrew extends StatefulWidget {
   final List<Down4Page> pages;
   final int initialPageIndex;
   final void Function()? addFriends, themes;
+  final bool transparentHeader;
   final Function(int)? onPageChange;
   final void Function()? backFunction, previewFunction;
   final ConsoleRow? staticRow;
@@ -90,6 +97,7 @@ class Andrew extends StatefulWidget {
     this.addFriends,
     this.backFunction,
     this.previewFunction,
+    this.transparentHeader = false,
     required this.pages,
     this.onPageChange,
     this.initialPageIndex = 0,
@@ -100,7 +108,7 @@ class Andrew extends StatefulWidget {
   State<Andrew> createState() => _AndrewState();
 }
 
-class _AndrewState extends State<Andrew> {
+class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
   int curPos = 0;
 
   @override
@@ -264,50 +272,64 @@ class _AndrewState extends State<Andrew> {
 
     final (titleWidget, leftBoxWidth, rightBoxWidth) =
         titleList3(leftPad, rightPad);
-    return Container(
-      height: g.sizes.headerHeight,
-      width: g.sizes.w,
-      color: g.theme.headerColor,
-      child: Row(
-        textDirection: TextDirection.ltr,
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          GestureDetector(
-              onHorizontalDragUpdate: (_) {},
-              behavior: HitTestBehavior.opaque,
-              onTap: widget.backFunction ?? widget.addFriends,
-              onLongPress: widget.themes,
-              child: Row(children: [
-                // left pad
-                SizedBox(width: lateralHeaderPad, height: headerHeight),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            height: MediaQuery.of(context).padding.top,
+            width: g.sizes.w,
+            color: widget.transparentHeader
+              ? Colors.transparent
+              : g.theme.headerColor),
+        Container(
+          height: g.sizes.headerHeight,
+          width: g.sizes.w,
+          color: widget.transparentHeader
+              ? Colors.transparent
+              : g.theme.headerColor,
+          child: Row(
+            textDirection: TextDirection.ltr,
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              GestureDetector(
+                  onHorizontalDragUpdate: (_) {},
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.backFunction ?? widget.addFriends,
+                  onLongPress: widget.themes,
+                  child: Row(children: [
+                    // left pad
+                    SizedBox(width: lateralHeaderPad, height: headerHeight),
 
-                // (main icon / back arrow)
-                SizedBox.square(
-                  dimension: g.sizes.headerHeight,
-                  child: widget.backFunction != null
-                      ? backArrow()
-                      : Center(
-                          child: SizedBox.square(
-                            dimension: g.sizes.headerHeight, // / golden,
-                            child: g.theme.down4Icon(g.theme.backArrowColor),
-                          ),
-                        ),
-                ),
-              ])),
+                    // (main icon / back arrow)
+                    SizedBox.square(
+                      dimension: g.sizes.headerHeight,
+                      child: widget.backFunction != null
+                          ? backArrow()
+                          : Center(
+                              child: SizedBox.square(
+                                dimension: g.sizes.headerHeight, // / golden,
+                                child:
+                                    g.theme.down4Icon(g.theme.backArrowColor),
+                              ),
+                            ),
+                    ),
+                  ])),
 
-          // padding before reaching first title
-          SizedBox(width: leftBoxWidth),
-          // all the titles
-          titleWidget,
-          // padding until the righ pad
-          SizedBox(width: rightBoxWidth),
-          // top right widgets if there are
-          ...topRightWgts,
-          // the right pad
-          SizedBox(width: lateralHeaderPad, height: headerHeight),
-        ],
-      ),
+              // padding before reaching first title
+              SizedBox(width: leftBoxWidth),
+              // all the titles
+              titleWidget,
+              // padding until the righ pad
+              SizedBox(width: rightBoxWidth),
+              // top right widgets if there are
+              ...topRightWgts,
+              // the right pad
+              SizedBox(width: lateralHeaderPad, height: headerHeight),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -354,7 +376,19 @@ class _AndrewState extends State<Andrew> {
               opacity: pageTweenValue(index),
               child: Stack(
                 children: [
-                  ...widget.pages[curPos].stackWidgets ?? [],
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      widget.transparentHeader
+                          ? const SizedBox.shrink()
+                          : SizedBox(height: g.sizes.viewPaddingHeight),
+                      ...?widget.pages[curPos].stackWidgets
+                    ],
+                  ),
+                  // ...widget.pages[curPos].stackWidgets?.map((e) => Positioned(
+                  //         top: g.sizes.viewPaddingHeight, child: e)) ??
+                  //     [],
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -365,23 +399,26 @@ class _AndrewState extends State<Andrew> {
                                 trueLen: page.trueLen,
                                 reversed: page.reversedList,
                                 scrollController: page.scrollController,
-                                topPadding: page.isChatPage ? 4 : null,
+                                topPadding: g.sizes.viewPaddingHeight +
+                                    (page.isChatPage ? 4 : 0),
                                 list: page.list)
-                            : page.stream != null
-                                ? FutureList(stream: page.stream!)
-                                : DynamicList(
-                                    onRefresh: page.onRefresh,
-                                    reversed: page.reversedList,
-                                    asMap: page.asMap,
-                                    orderedKeys: page.orderedKeys,
-                                    scrollController: page.scrollController,
-                                    topPadding: page.isChatPage ? 4 : null,
-                                    iterables: page.iterables,
-                                    iterableLen: page.iterableLen,
-                                    list: page.list),
+//                         : page.stream != null
+//                                 ? FutureList(stream: page.stream!)
+                            : DynamicList(
+                                onRefresh: page.onRefresh,
+                                reversed: page.reversedList,
+                                asMap: page.asMap,
+                                orderedKeys: page.orderedKeys,
+                                scrollController: page.scrollController,
+                                topPadding: g.sizes.viewPaddingHeight +
+                                    (page.isChatPage ? 4 : 0),
+                                iterables: page.iterables,
+                                iterableLen: page.iterableLen,
+                                list: page.list),
                       ),
                       page.console.rowOfPage(
                           index: index, staticRow: g.vm.mode == Modes.append),
+                      SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
                     ],
                   ),
                 ],
@@ -389,11 +426,52 @@ class _AndrewState extends State<Andrew> {
             ),
           );
         }).toList(growable: false),
-        // ),
       );
+
+  Future<bool> onWillPop() async {
+    if (widget.backFunction == null) {
+      SystemNavigator.pop();
+    } else {
+      widget.backFunction!.call();
+    }
+    return false;
+  }
+
+  Widget buildAgain() {
+    return Container(
+      color: g.theme.backGroundColor,
+      // color: widget.transparentHeader
+      //     ? Colors.transparent
+      //     : g.theme.backGroundColor,
+      width: g.sizes.w,
+      height: g.sizes.fullHeight,
+      child: WillPopScope(
+        onWillPop: onWillPop,
+        child: Stack(
+          children: [
+            // ...?curPage.backgroundStackWidgets,
+            // SafeArea(
+            //   child:
+              Stack(
+                children: [
+                  pageBody2,
+                  ...curPage.console.extraButtons,
+                  staticConsole
+                ],
+              ),
+            // ),
+            Positioned(
+                top: 0, left: 0, child: pageHeader([forwardingIndicator])),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    return buildAgain();
+
     return Container(
       decoration: BoxDecoration(
         color: g.theme.backGroundColor,
@@ -401,33 +479,127 @@ class _AndrewState extends State<Andrew> {
         //     image: MemoryImage(g.background), fit: BoxFit.cover),
       ),
       child: WillPopScope(
-        onWillPop: () async {
-          if (widget.backFunction == null) {
-            SystemNavigator.pop();            
-          } else {
-            widget.backFunction!.call();          
-          }
-          return false;          
-        },
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            toolbarHeight: g.sizes.headerHeight,
-            backgroundColor: g.theme.headerColor,
-            leading: pageHeader([forwardingIndicator]),
-            leadingWidth: g.sizes.w,
-          ),
-          body: SafeArea(
-            child: Stack(
-              children: [
-                pageBody2,
-                ...curPage.console.extraButtons,
-                staticConsole
-              ],
+        onWillPop: onWillPop,
+        child: Stack(
+          children: [
+            ...?curPage.backgroundStackWidgets,
+            Scaffold(
+              resizeToAvoidBottomInset: !curPage.avoidKeyboardResize,
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                toolbarHeight: g.sizes.headerHeight,
+                elevation: 0.0,
+                backgroundColor: widget.transparentHeader
+                    ? Colors.transparent
+                    : g.theme.headerColor,
+                leading: pageHeader([forwardingIndicator]),
+                leadingWidth: g.sizes.w,
+              ),
+              body: SafeArea(
+                child: Stack(
+                  children: [
+                    pageBody2,
+                    ...curPage.console.extraButtons,
+                    staticConsole
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
+
+// class MyScreenWithoutScaffold extends StatefulWidget {
+//   @override
+//   _MyScreenWithoutScaffoldState createState() =>
+//       _MyScreenWithoutScaffoldState();
+// }
+
+// class _MyScreenWithoutScaffoldState extends State<MyScreenWithoutScaffold>
+//     with WidgetsBindingObserver {
+//   double _keyboardHeight = 0.0;
+
+//   @override
+//   void initState() {
+//     super.initState();
+
+//     // Add a listener to the MediaQuery for keyboard changes
+
+//     MediaQuery.of(context).removeObserver(_handleMediaQueryChange);
+//     MediaQuery.of(context).addObserver(_handleMediaQueryChange);
+//   }
+
+//   @override
+//   void dispose() {
+//     // Remove the MediaQuery listener to prevent memory leaks
+//     MediaQuery.of(context).removeObserver(_handleMediaQueryChange);
+//     super.dispose();
+//   }
+
+//   void _handleMediaQueryChange() {
+//     // Calculate the keyboard height by subtracting the screen height from the viewInsets
+//     setState(() {
+//       _keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+//     });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: LinearGradient(
+//           begin: Alignment.topCenter,
+//           end: Alignment.bottomCenter,
+//           colors: [Colors.blue, Colors.green],
+//         ),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.stretch,
+//         children: [
+//           Container(
+//             padding: EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0),
+//             child: Text(
+//               'Title',
+//               style: TextStyle(
+//                 color: Colors.white,
+//                 fontSize: 24.0,
+//                 fontWeight: FontWeight.bold,
+//               ),
+//             ),
+//           ),
+//           Expanded(
+//             child: SingleChildScrollView(
+//               // Adjust the padding to account for the keyboard height
+//               padding: EdgeInsets.only(bottom: _keyboardHeight),
+//               child: Column(
+//                 mainAxisAlignment: MainAxisAlignment.center,
+//                 children: [
+//                   TextField(
+//                     decoration: InputDecoration(
+//                       labelText: 'Input',
+//                     ),
+//                   ),
+//                   SizedBox(height: 20.0),
+//                   Container(
+//                     width: double.infinity,
+//                     height: 200.0,
+//                     color: Colors.blue,
+//                     child: Center(
+//                       child: Text(
+//                         'Resizable Content',
+//                         style: TextStyle(color: Colors.white),
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }

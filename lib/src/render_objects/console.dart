@@ -1196,7 +1196,7 @@ class Console3 {
         return Positioned(
           left: position.dx - Console.borderWidth,
           top: position.dy -
-              g.sizes.viewPaddingHeight -
+             // g.sizes.viewPaddingHeight -
               Console.borderWidth -
               (nButton * (buttonHeight)),
           child: Container(
@@ -1294,47 +1294,50 @@ class Console3 {
         child: ColoredBox(
             color: g.theme.buttonColor(),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
               AnimatedOpacity(
                 opacity: extension == null ? 0 : 1,
                 duration: Console.animationDuration,
                 child: AnimatedContainer(
-                  color: g.theme.buttonColor(),
+                  // color: g.theme.buttonColor(),
+                  color: g.theme.extensionBackdropColor,
                   duration: Console.animationDuration,
                   height: h ?? 0,
-                  child: Stack(
-                    children: [
-                      AnimatedContainer(
-                          alignment: AlignmentDirectional.topCenter,
-                          duration: Console.animationDuration,
-                          width: g.sizes.w,
-                          color: g.theme.extensionBackdropColor,
-                          child: ex ?? const SizedBox.shrink()),
-                      IgnorePointer(
-                        child: Row(
-                          children: [
-                            AnimatedContainer(
-                              duration: Console.animationDuration,
-                              width: extension == null ? g.sizes.w / 2 : 0,
-                              color: g.theme.buttonColor(),
-                            ),
-                            AnimatedContainer(
-                              duration: Console.animationDuration,
-                              width: extension == null ? 0 : g.sizes.w,
-                              color: Colors.transparent,
-                            ),
-                            AnimatedContainer(
-                              duration: Console.animationDuration,
-                              width: extension == null ? g.sizes.w / 2 : 0,
-                              color: g.theme.buttonColor(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                  child: ex // Stack(
+                  //   children: [
+                  //     AnimatedContainer(
+                  //         alignment: AlignmentDirectional.topCenter,
+                  //         duration: Console.animationDuration,
+                  //         width: g.sizes.w,
+                  //         height: h ?? 0,
+                  //         color: g.theme.extensionBackdropColor,
+                  //         child: ex ?? const SizedBox.shrink()),
+                  //     IgnorePointer(
+                  //       child: Row(
+                  //         children: [
+                  //           AnimatedContainer(
+                  //             duration: Console.animationDuration,
+                  //             width: extension == null ? g.sizes.w / 2 : 0,
+                  //             color: g.theme.buttonColor(),
+                  //           ),
+                  //           AnimatedContainer(
+                  //             duration: Console.animationDuration,
+                  //             width: extension == null ? 0 : g.sizes.w,
+                  //             color: Colors.transparent,
+                  //           ),
+                  //           AnimatedContainer(
+                  //             duration: Console.animationDuration,
+                  //             width: extension == null ? g.sizes.w / 2 : 0,
+                  //             color: g.theme.buttonColor(),
+                  //           ),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
+                ),),
               ...rows[index]
                   .map((name, c) {
                     double currentHeight;
