@@ -10,6 +10,7 @@ import 'package:down4/src/data_objects/_data_utils.dart';
 import 'package:down4/src/data_objects/medias.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:down4/src/web_requests.dart';
+import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:sqlite3/sqlite3.dart' as sql;
@@ -421,5 +422,6 @@ Future<void> main() async {
     );
   }
 
+  // debugRepaintRainbowEnabled = true;
   runApp(const MaterialApp(home: Material(child: Down4())));
 }

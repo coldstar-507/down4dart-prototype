@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:down4/src/render_objects/console.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
 import 'package:camera/camera.dart';
@@ -207,13 +208,13 @@ class Sizes {
     required this.fullHeight,
     required this.headerHeight,
   });
-  // double topPadding;
   double h;
   double w;
   double fullHeight;
   double headerHeight;
   Offset get middlePoint => Offset(w / 2, h / 2);
   Size get fullSize => Size(w, fullHeight);
+  Size get snipSize => Size(w, fullHeight - Console.buttonHeight);
   Size get paddedSize => Size(w, h);
   double get viewPaddingHeight => fullHeight - h;
   double get fullAspectRatio => w / fullHeight;

@@ -1153,33 +1153,36 @@ class _CustomListState extends State<CustomList> {
   @override
   Widget build(BuildContext context) {
     final nRows = (mids(currentType).length / _mediasPerRow).ceil();
-    return ListView.builder(
-      padding: const EdgeInsets.all(0),
-      itemCount: nRows,
-      itemBuilder: (ctx, index) {
-        Widget f(int i) {
-          if (i < currentMedias.length) {
-            final im = currentMedias[i];
-            return SizedBox.square(
-              dimension: mediaCelSize,
-              child: GestureDetector(
-                onTap: () => widget.mediaPressFunc(im.media),
-                child: im,
-              ),
-            );
-          } else {
-            return SizedBox.square(dimension: mediaCelSize);
+    return ScrollConfiguration(
+      behavior: NoGlow(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(0),
+        itemCount: nRows,
+        itemBuilder: (ctx, index) {
+          Widget f(int i) {
+            if (i < currentMedias.length) {
+              final im = currentMedias[i];
+              return SizedBox.square(
+                dimension: mediaCelSize,
+                child: GestureDetector(
+                  onTap: () => widget.mediaPressFunc(im.media),
+                  child: im,
+                ),
+              );
+            } else {
+              return SizedBox.square(dimension: mediaCelSize);
+            }
           }
-        }
 
-        return Row(
-          key: Key(MediaType.images.name + index.toString()),
-          children: List.generate(
-            _mediasPerRow,
-            (j) => f((index * _mediasPerRow) + j),
-          ),
-        );
-      },
+          return Row(
+            key: Key(MediaType.images.name + index.toString()),
+            children: List.generate(
+              _mediasPerRow,
+              (j) => f((index * _mediasPerRow) + j),
+            ),
+          );
+        },
+      ),
     );
   }
 }

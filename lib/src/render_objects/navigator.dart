@@ -44,21 +44,18 @@ class Down4Page {
   final List<Down4ID>? orderedKeys;
   final Iterable<Widget>? _iterables;
   final int? iterableLen, trueLen;
-  final List<Widget>? stackWidgets, backgroundStackWidgets;
+  final List<Widget>? stackWidgets; //, backgroundStackWidgets;
   final Console3 console;
-  final bool isChatPage,
-      centerStackItems,
-      reversedList,
-      staticList,
-      avoidKeyboardResize;
+  final bool isChatPage, centerStackItems, reversedList, staticList;
+  // avoidKeyboardResize;
   Down4Page({
     required this.title,
     this.scrollController,
     this.asMap,
     this.stream,
     this.orderedKeys,
-    this.backgroundStackWidgets,
-    this.avoidKeyboardResize = false,
+    // this.backgroundStackWidgets,
+    // this.avoidKeyboardResize = false,
     this.trueLen,
     this.onRefresh,
     this.isChatPage = false,
@@ -279,8 +276,8 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
             height: MediaQuery.of(context).padding.top,
             width: g.sizes.w,
             color: widget.transparentHeader
-              ? Colors.transparent
-              : g.theme.headerColor),
+                ? Colors.transparent
+                : g.theme.headerColor),
         Container(
           height: g.sizes.headerHeight,
           width: g.sizes.w,
@@ -365,67 +362,68 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
     );
   }
 
-  Widget get pageBody2 => PageView(
-        controller: pageCtrl,
-        onPageChanged: widget.onPageChange,
-        children: widget.pages.indexed.map((e) {
-          final page = e.$2;
-          final index = e.$1;
-          return KeepAlivePage(
-            child: Opacity(
-              opacity: pageTweenValue(index),
-              child: Stack(
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      widget.transparentHeader
-                          ? const SizedBox.shrink()
-                          : SizedBox(height: g.sizes.viewPaddingHeight),
-                      ...?widget.pages[curPos].stackWidgets
-                    ],
-                  ),
-                  // ...widget.pages[curPos].stackWidgets?.map((e) => Positioned(
-                  //         top: g.sizes.viewPaddingHeight, child: e)) ??
-                  //     [],
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: page.staticList
-                            ? StaticList(
-                                trueLen: page.trueLen,
-                                reversed: page.reversedList,
-                                scrollController: page.scrollController,
-                                topPadding: g.sizes.viewPaddingHeight +
-                                    (page.isChatPage ? 4 : 0),
-                                list: page.list)
+  Widget get pageBody2 => ScrollConfiguration(
+        behavior: NoGlow(),
+        child: PageView(
+          controller: pageCtrl,
+          onPageChanged: widget.onPageChange,
+          children: widget.pages.indexed.map((e) {
+            final page = e.$2;
+            final index = e.$1;
+            return KeepAlivePage(
+              child: Opacity(
+                opacity: pageTweenValue(index),
+                child: Stack(
+                  children: [
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        widget.transparentHeader
+                            ? const SizedBox.shrink()
+                            : SizedBox(height: g.sizes.viewPaddingHeight),
+                        ...?widget.pages[curPos].stackWidgets
+                      ],
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Flexible(
+                          child: page.staticList
+                              ? StaticList(
+                                  trueLen: page.trueLen,
+                                  reversed: page.reversedList,
+                                  scrollController: page.scrollController,
+                                  topPadding: g.sizes.viewPaddingHeight +
+                                      (page.isChatPage ? 4 : 0),
+                                  list: page.list)
 //                         : page.stream != null
 //                                 ? FutureList(stream: page.stream!)
-                            : DynamicList(
-                                onRefresh: page.onRefresh,
-                                reversed: page.reversedList,
-                                asMap: page.asMap,
-                                orderedKeys: page.orderedKeys,
-                                scrollController: page.scrollController,
-                                topPadding: g.sizes.viewPaddingHeight +
-                                    (page.isChatPage ? 4 : 0),
-                                iterables: page.iterables,
-                                iterableLen: page.iterableLen,
-                                list: page.list),
-                      ),
-                      page.console.rowOfPage(
-                          index: index, staticRow: g.vm.mode == Modes.append),
-                      SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
-                    ],
-                  ),
-                ],
+                              : DynamicList(
+                                  onRefresh: page.onRefresh,
+                                  reversed: page.reversedList,
+                                  asMap: page.asMap,
+                                  orderedKeys: page.orderedKeys,
+                                  scrollController: page.scrollController,
+                                  topPadding: g.sizes.viewPaddingHeight +
+                                      (page.isChatPage ? 4 : 0),
+                                  iterables: page.iterables,
+                                  iterableLen: page.iterableLen,
+                                  list: page.list),
+                        ),
+                        page.console.rowOfPage(
+                            index: index, staticRow: g.vm.mode == Modes.append),
+                        SizedBox(
+                            height: MediaQuery.of(context).viewInsets.bottom),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }).toList(growable: false),
+            );
+          }).toList(growable: false),
+        ),
       );
 
   Future<bool> onWillPop() async {
@@ -440,28 +438,20 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
   Widget buildAgain() {
     return Container(
       color: g.theme.backGroundColor,
-      // color: widget.transparentHeader
-      //     ? Colors.transparent
-      //     : g.theme.backGroundColor,
       width: g.sizes.w,
       height: g.sizes.fullHeight,
       child: WillPopScope(
         onWillPop: onWillPop,
         child: Stack(
           children: [
-            // ...?curPage.backgroundStackWidgets,
-            // SafeArea(
-            //   child:
-              Stack(
-                children: [
-                  pageBody2,
-                  ...curPage.console.extraButtons,
-                  staticConsole
-                ],
-              ),
-            // ),
+            pageBody2,
+            ...curPage.console.extraButtons,
+            staticConsole,
             Positioned(
-                top: 0, left: 0, child: pageHeader([forwardingIndicator])),
+              top: 0,
+              left: 0,
+              child: pageHeader([forwardingIndicator]),
+            ),
           ],
         ),
       ),
@@ -471,45 +461,46 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return buildAgain();
-
-    return Container(
-      decoration: BoxDecoration(
-        color: g.theme.backGroundColor,
-        // image: DecorationImage(
-        //     image: MemoryImage(g.background), fit: BoxFit.cover),
-      ),
-      child: WillPopScope(
-        onWillPop: onWillPop,
-        child: Stack(
-          children: [
-            ...?curPage.backgroundStackWidgets,
-            Scaffold(
-              resizeToAvoidBottomInset: !curPage.avoidKeyboardResize,
-              backgroundColor: Colors.transparent,
-              appBar: AppBar(
-                toolbarHeight: g.sizes.headerHeight,
-                elevation: 0.0,
-                backgroundColor: widget.transparentHeader
-                    ? Colors.transparent
-                    : g.theme.headerColor,
-                leading: pageHeader([forwardingIndicator]),
-                leadingWidth: g.sizes.w,
-              ),
-              body: SafeArea(
-                child: Stack(
-                  children: [
-                    pageBody2,
-                    ...curPage.console.extraButtons,
-                    staticConsole
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
+
+  //   return Container(
+  //     decoration: BoxDecoration(
+  //       color: g.theme.backGroundColor,
+  //       // image: DecorationImage(
+  //       //     image: MemoryImage(g.background), fit: BoxFit.cover),
+  //     ),
+  //     child: WillPopScope(
+  //       onWillPop: onWillPop,
+  //       child: Stack(
+  //         children: [
+  //           // ...?curPage.backgroundStackWidgets,
+  //           Scaffold(
+  //             // resizeToAvoidBottomInset: !curPage.avoidKeyboardResize,
+  //             backgroundColor: Colors.transparent,
+  //             appBar: AppBar(
+  //               toolbarHeight: g.sizes.headerHeight,
+  //               elevation: 0.0,
+  //               backgroundColor: widget.transparentHeader
+  //                   ? Colors.transparent
+  //                   : g.theme.headerColor,
+  //               leading: pageHeader([forwardingIndicator]),
+  //               leadingWidth: g.sizes.w,
+  //             ),
+  //             body: SafeArea(
+  //               child: Stack(
+  //                 children: [
+  //                   pageBody2,
+  //                   ...curPage.console.extraButtons,
+  //                   staticConsole
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 }
 
 // class MyScreenWithoutScaffold extends StatefulWidget {
@@ -603,3 +594,4 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
 //     );
 //   }
 // }
+
