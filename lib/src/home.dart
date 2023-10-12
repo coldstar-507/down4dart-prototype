@@ -199,7 +199,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     mediasDeletingRoutine();
     loadSavedMediasIDs();
     clearAppCache();
-    g.wallet.walletRoutine();
+    g.wallet.walletRoutine(callback: afterPayment);
     g.wallet.printWalletInfo();
     updateExchangeRate();
   }
@@ -463,10 +463,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               doFetch: true, doMergeIfFetch: true, tempID: tempPaymentID);
           if (payment == null) return print("no payment for download");
           print("compressed payment:\n${payment.compressed}");
-          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
-          if (page is MoneyPage && parsedPayment != null) {
-            setPage(moneyPage(payUpdate: parsedPayment));
-          }
+          // final parsedPayment =
+          g.wallet.parsePayment3(g.self.id, payment, callblack: afterPayment);
+          // if (page is MoneyPage && parsedPayment != null) {
+          //   setPage(moneyPage(payUpdate: parsedPayment));
+          // }
           break;
       }
     });
@@ -479,6 +480,30 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   // =============================== UTILS ============================== //
+
+  void openPay(Down4Payment payment) => setPage(paymentPage(payment));
+
+  List<ButtonsInfo2> payBGen(PaymentNode p) => [
+        ButtonsInfo2(
+            asset: Icon(Icons.arrow_forward_ios_rounded,
+                color: p.payment.spender == g.self.id
+                    ? g.theme.messageArrowColor
+                    : g.theme.noMessageArrowColor),
+            pressFunc: () => openPay(p.payment)),
+      ];
+
+  void afterPayment() {
+    final ref = page;
+    if (ref is MoneyPage) {
+      final payState = currentView.pages[1].pals<PaymentNode>();
+      for (final m in payState.values) {
+        writePalette<PaymentNode>(m.node, payState, payBGen, null);
+      }
+      setPage(moneyPage());
+    } else if (ref is PaymentPage) {
+      setPage(paymentPage(ref.payment));
+    }
+  }
 
   void reloadChatWithID(Down4ID chatableNodeID, {Chat? msgRe}) {
     if (currentView.id == "chat-${chatableNodeID.value}") {
@@ -794,19 +819,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     // Map<Down4ID, Palette> peopleState() => currentView.pages[0].state.cast();
     Map<Down4ID, Palette> paymentState() => currentView.pages[1].state.cast();
     void rf() => setPage(moneyPage());
-    void openPay(Down4Payment payment) => setPage(paymentPage(payment));
-    List<ButtonsInfo2> payBGen(Down4Payment p) {
-      if (p.spender == g.self.id) {
-        return [
-          ButtonsInfo2(
-              asset: Icon(Icons.arrow_forward_ios_rounded,
-                  color: g.theme.noMessageArrowColor),
-              pressFunc: () => openPay(p)),
-        ];
-      } else {
-        return [];
-      }
-    }
 
     void scanOrReceivePayment(Down4Payment pay) {
       // this will put the payment at the begining of the list
@@ -816,7 +828,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             node: p,
             key: Key(p.id.unik),
             messagePreview: pay.textNote,
-            buttonsInfo2: payBGen(pay)),
+            buttonsInfo2: payBGen(p)),
         ...paymentState(),
       };
       rf();
@@ -841,11 +853,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           setPage(moneyPage());
         },
         onScan: (payment) {
-          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
+          final parsedPayment = g.wallet
+              .parsePayment3(g.self.id, payment, callblack: afterPayment);
           if (parsedPayment != null) scanOrReceivePayment(parsedPayment);
         },
         makePayment: (payment) {
-          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment);
+          final parsedPayment = g.wallet
+              .parsePayment3(g.self.id, payment, callblack: afterPayment);
           unselectHomeSelection(updateActivity: true);
           viewManager.popUntilHome();
           if (parsedPayment != null) setPage(paymentPage(payment));

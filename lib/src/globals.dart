@@ -149,6 +149,11 @@ class PageState {
   double scroll;
   // a page has a state of objects
   Map<Down4ID, Down4Object> state;
+
+  Map<Down4ID, Palette<T>> pals<T extends PaletteN>() => state.cast();
+
+  Map<Down4ID, ChatMessage> chats() => state.cast();
+
   Iterable<Down4SelectionWidget> get pageSelection =>
       state.values.selectable().selected();
   PageState({double? scroll})
@@ -207,9 +212,11 @@ class Sizes {
     required this.w,
     required this.fullHeight,
     required this.headerHeight,
+    required this.statusBarHeight,
   });
   double h;
   double w;
+  double statusBarHeight;
   double fullHeight;
   double headerHeight;
   Offset get middlePoint => Offset(w / 2, h / 2);
@@ -302,12 +309,14 @@ void unselectedSelectedPalettes(Map<Down4ID, Palette> state) {
   }
 }
 
+typedef BGen<T extends PaletteN> = List<ButtonsInfo2> Function(T n);
+
 void writePalette<T extends PaletteN>(
   T c,
   Map<Down4ID, Down4Widget> s,
   List<ButtonsInfo2> Function(T n)? bGen,
   void Function()? onSel, {
-  required bool home,
+  bool home = false,
   bool? sel,
 }) {
   // isSelected will check first if it's an argument, else it will check
@@ -498,6 +507,19 @@ Future<void> writeMessages({
   }
 }
 
+void writePayment(
+  Map<Down4ID, Down4Widget> state,
+  PaymentNode paymentNode,
+  List<ButtonsInfo2> buttons,
+) {
+  state[paymentNode.id] = Palette(
+    key: GlobalKey(),
+    node: paymentNode,
+    messagePreview: paymentNode.payment.textNote,
+    buttonsInfo2: buttons,
+  );
+}
+
 void writePayments(
   Map<Down4ID, Down4Widget> state,
   void Function(Down4Payment) openPayment, [
@@ -509,15 +531,16 @@ void writePayments(
       key: Key(pay.id.unik),
       node: PaymentNode(payment: pay, selfID: g.self.id),
       messagePreview: pay.textNote,
-      buttonsInfo2: pay.spender == g.self.id
-          ? [
-              ButtonsInfo2(
-                  asset: Icon(Icons.arrow_forward_ios_rounded,
-                      color: g.theme.noMessageArrowColor),
-                  pressFunc: () => openPayment(pay),
-                  rightMost: true)
-            ]
-          : [],
+      buttonsInfo2: [
+        ButtonsInfo2(
+            asset: Icon(Icons.arrow_forward_ios_rounded,
+                color: pay.spender == g.self.id
+                    ? g.theme.messageArrowColor
+                    : g.theme.noMessageArrowColor),
+            pressFunc: () => openPayment(pay),
+            rightMost: true)
+      ],
+      //: [],
     );
   }
 }

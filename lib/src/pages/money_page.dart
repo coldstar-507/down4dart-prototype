@@ -29,19 +29,18 @@ class PaymentPage extends StatefulWidget implements Down4PageWidget {
   String get id => "payment";
   final void Function() back, ok;
   final Down4Payment payment;
-  final List<String> paymentAsList;
-  final List<String> paymentAsListFast;
+  // final List<String> paymentAsList;
+  // final List<String> paymentAsListFast;
   final void Function(Down4Payment) sendPayment;
 
-  PaymentPage({
+  const PaymentPage({
     required this.ok,
     required this.back,
     required this.payment,
     required this.sendPayment,
-    Key? key,
-  })  : paymentAsList = payment.asQrData,
-        paymentAsListFast = payment.asQrData2Fast,
-        super(key: key);
+    super.key,
+  }); // : // paymentAsList = payment.asQrData,
+  // paymentAsListFast = payment.asQrData2Fast;
 
   @override
   State<PaymentPage> createState() => _PaymentPageState();
@@ -53,21 +52,27 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   var qrs = <Widget Function(int)>[];
   var qrs2 = <Widget>[];
 
-  @override
-  void initState() {
-    super.initState();
-    print("THERE ARE ${widget.paymentAsList.length} QRS");
+  List<String>? _paymentAsList;
+  List<String> get paymentAsList {
+    return _paymentAsList ??= payment.asQrData;
   }
 
-  Timer get startedTimer =>
-      Timer.periodic(const Duration(milliseconds: 400), (timer) {
-        listIndex = (listIndex + 1) % widget.paymentAsList.length;
-        setState(() {});
-      });
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   print("THERE ARE ${widget.paymentAsList.length} QRS");
+  // }
+
+  Timer get startedTimer {
+    return Timer.periodic(const Duration(milliseconds: 400), (timer) {
+      listIndex = (listIndex + 1) % paymentAsList.length;
+      setState(() {});
+    });
+  }
 
   void loadQrsAsPaints() {
-    for (int i = 0; i < widget.paymentAsList.length; i++) {
-      var paymentData = widget.paymentAsList[i];
+    for (int i = 0; i < paymentAsList.length; i++) {
+      var paymentData = paymentAsList[i];
       qrs.add((int index) => Opacity(
           opacity: index == i ? 1 : 0,
           child: Align(
@@ -98,6 +103,10 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
 
   double get topPadding => g.sizes.w - qrDimension * 2 * 1 / golden;
 
+  Down4Payment get payment => widget.payment;
+  bool get validPayment =>
+      payment.spender == g.self.id && payment.validForBroadcast;
+
   @override
   Console3 get console => Console3(
           rows: [
@@ -105,13 +114,16 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
               "base": ConsoleRow(widgets: [
                 qrs.isEmpty
                     ? ConsoleButton(
-                        name: "GENERATE_QR", onPress: loadQrsAsPaints)
+                        name: "GENERATE_QR",
+                        onPress: loadQrsAsPaints,
+                        isGreyedOut: validPayment,
+                        isActivated: validPayment)
                     : ConsoleButton(name: "OK", onPress: widget.ok),
                 ConsoleButton(
                     name: "SEND",
+                    isGreyedOut: validPayment,
+                    isActivated: validPayment,
                     onPress: () {
-                      // final spender =
-                      //     widget.payment.txs.last.txsIn.first.spender;
                       if (widget.payment.spender == g.self.id) {
                         widget.sendPayment(widget.payment);
                         widget.ok();
@@ -122,6 +134,16 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
           ],
           currentConsolesName: currentConsolesName,
           currentPageIndex: currentPageIndex);
+
+  String get note {
+    if (payment.spender == null) {
+      return payment.textNote;
+    } else if (payment.textNote.isEmpty) {
+      return "";
+    } else {
+      return "${payment.spender!.unik}: ${payment.textNote}";
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,17 +156,40 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
           title: md5(widget.payment.id.value.codeUnits).toBase58(),
           stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
           list: [
-            Center(
-              child: Column(children: [
-                GestureDetector(
-                  onTap: () => launchUrl(Uri.parse(
-                      "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}")),
-                  child:
-                      Text("TXID: ${widget.payment.txid.asHex}", style: urltst),
-                ),
-                Text("Confirmations: ${widget.payment.confirmations}",
-                    style: tst),
-              ]),
+            Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(note, style: tst, maxLines: 10, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 20),
+                    // Text("QRs: ${qrs.isEmpty ? '?' : qrs.length.toString()}", style: tst),
+                    Row(
+                      children: [
+                        Text("TXID: ", style: tst),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => launchUrl(
+                              Uri.parse(
+                                "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}",
+                              ),
+                            ),
+                            child: Text(
+                              widget.payment.txid.asHex,
+                              maxLines: 1,
+                              style: urltst,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(children: [
+                      Text("Confirmations: ", style: tst),
+                      Text(widget.payment.confirmationsFmt,
+                          style: tst.copyWith(color: widget.payment.color))
+                    ]),
+                  ]),
             ),
           ],
           console: console,

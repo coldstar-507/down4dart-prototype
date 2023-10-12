@@ -82,6 +82,7 @@ class Andrew extends StatefulWidget {
   final bool transparentHeader;
   final Function(int)? onPageChange;
   final void Function()? backFunction, previewFunction;
+  final List<Widget>? extraHeaderWidgets;
   final ConsoleRow? staticRow;
   static Duration get pageSwitchAnimationDuration =>
       const Duration(milliseconds: 200);
@@ -89,6 +90,7 @@ class Andrew extends StatefulWidget {
       const Duration(milliseconds: 160);
 
   const Andrew({
+    this.extraHeaderWidgets,
     this.themes,
     this.staticRow,
     this.addFriends,
@@ -251,9 +253,9 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
     );
   }
 
-  double get lateralHeaderPad => g.sizes.w * 0.02;
-  double get mainHeaderIconWidth => g.sizes.headerHeight;
-  double get headerHeight => g.sizes.headerHeight;
+  static double get lateralHeaderPad => g.sizes.w * 0.02;
+  static double get mainHeaderIconWidth => g.sizes.headerHeight;
+  static double get headerHeight => g.sizes.headerHeight;
 
   Widget pageHeader([List<Widget?>? topRightWidgets]) {
     // final lateralPads = g.sizes.w * 0.02;
@@ -382,7 +384,9 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                         widget.transparentHeader
                             ? const SizedBox.shrink()
                             : SizedBox(height: g.sizes.viewPaddingHeight),
-                        ...?widget.pages[curPos].stackWidgets
+                        Stack(children: [
+                          ...?widget.pages[curPos].stackWidgets,
+                        ]),
                       ],
                     ),
                     Column(
@@ -450,7 +454,7 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
             Positioned(
               top: 0,
               left: 0,
-              child: pageHeader([forwardingIndicator]),
+              child: pageHeader([...?widget.extraHeaderWidgets, forwardingIndicator]),
             ),
           ],
         ),

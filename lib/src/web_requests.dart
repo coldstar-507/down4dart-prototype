@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
 import 'package:down4/src/data_objects/_data_utils.dart';
 import 'package:down4/src/data_objects/couch.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '_dart_utils.dart';
 import 'bsv/types.dart' show Down4TX;
@@ -59,7 +60,7 @@ Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
   return Pair(image, Pair(prompt.first, prompt.last));
 }
 
-Future<void> broadcastTxs(List<Down4TX> txs) async {
+Future<void> broadcastTxs(List<Down4TX> txs, {VoidCallback? cb}) async {
   final url = Uri.parse("https://api.whatsonchain.com/v1/bsv/test/tx/raw");
   List<Future<http.Response>> responses = [];
   // we can do 3 txs per seconds // let's make it 4

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:convert/convert.dart';
+import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'bsv/_bsv_utils.dart';
 import 'dart:typed_data';
@@ -59,7 +60,7 @@ extension MapEXT<T, M> on Map<T, M> {
     for (final e in entries) {
       if (filter(e.value)) return e.key;
     }
-    return null;    
+    return null;
   }
 }
 
@@ -97,6 +98,10 @@ extension TrySingleWhere<T> on Iterable<T> {
     }
     return null;
   }
+}
+
+double calcDistance2(Offset p1, Offset p2) {
+  return calcDistance(p1.dx, p1.dy, p2.dx, p2.dy);
 }
 
 double calcDistance(num x1, num y1, num x2, num y2) {

@@ -5,6 +5,8 @@ import 'dart:io' as io;
 import 'package:convert/convert.dart';
 import 'package:down4/src/bsv/wallet.dart';
 import 'package:down4/src/data_objects/couch.dart';
+import 'package:down4/src/data_objects/nodes.dart';
+import 'package:flutter/material.dart';
 import 'package:pointycastle/export.dart';
 import 'package:base85/base85.dart';
 
@@ -118,13 +120,14 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     merge(ifNotPresent: true);
   }
 
-  Future<void> trySettlement() async {
+  Future<void> trySettlement({VoidCallback? cb}) async {
     if (confirmations != -1) {
       return print("transactions has already been accepted!");
     }
 
     if (validForBroadcast) {
-      return r.broadcastTxs(txs);
+      await r.broadcastTxs(txs);
+      return cb?.call();
     } else {
       print("""
         ================== WARNING =====================
@@ -140,6 +143,31 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       return 100;
     } else {
       return txs.last.confirmations;
+    }
+  }
+
+  String get confirmationsFmt {
+    final confs = confirmations;
+    if (confs > 100) {
+      return "100+";
+    } else if (confs > 0) {
+      return confs.toString();
+    } else if (confs == -1) {
+      return "unsettled";
+    } else if (confs == 0) {
+      return "accepted";
+    }
+    throw "should never throw";
+  }
+
+  Color get color {
+    final confs = confirmations;
+    if (confs == -1) {
+      return g.theme.nodeColors[NodesColor.unsafeTx]!;
+    } else if (confs < 6) {
+      return g.theme.nodeColors[NodesColor.mediumTx]!;
+    } else {
+      return g.theme.nodeColors[NodesColor.safeTx]!;
     }
   }
 

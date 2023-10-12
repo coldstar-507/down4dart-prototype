@@ -185,6 +185,7 @@ class _Down4State extends State<Down4> {
     final sizes = Sizes(
         h: size.height - allPadding,
         w: size.width - truePadding.left - truePadding.right,
+        statusBarHeight: truePadding.top,
         fullHeight: size.height, // - truePadding.top - truePadding.bottom,
         headerHeight: headerHeight);
 

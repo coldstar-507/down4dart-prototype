@@ -110,7 +110,8 @@ extension Down4Objects<T extends Down4Object> on List<T> {
       if (e != null) {
         yield e;
       } else {
-        throw "$this doesn't contain element of id=${id.value}";
+        continue;
+        // throw "$this doesn't contain element of id=${id.value}";
       }
     }
   }

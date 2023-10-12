@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io' as io;
 
+import 'package:flutter/material.dart';
+
 import '../_dart_utils.dart';
 import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
@@ -37,11 +39,16 @@ class Wallet with Down4Object, Jsons, Locals {
 
   // Set<TXID> get allUnsettledTXID => allUnsettledTxs.map((unsTx) => unsTx.txID).toSet();
 
-  Future<void> walletRoutine() async {
+  Future<void> walletRoutine({VoidCallback? callback}) async {
     await _updateAllStatus();
     await Future.delayed(const Duration(seconds: 1));
     await Future.wait(await _settleUnsettledPayments());
-    return print("\$\$\$\$\$\$ TERMINATED WALLET ROUTINE \$\$\$\$\$\$");
+    callback?.call();
+    return print("""
+      /////////////////////////////////////////////////////////
+      // \$\$\$\$\$\$ TERMINATED WALLET ROUTINE \$\$\$\$\$\$ //
+      /////////////////////////////////////////////////////////
+      """);
   }
 
   Future<List<Future<void>>> _settleUnsettledPayments() async {
@@ -97,8 +104,8 @@ class Wallet with Down4Object, Jsons, Locals {
         confs     = ${lastTx.confirmations}
         secret    = ${lastTx.down4Secret}
         """);
-        print("==RAW==");
-        printWrapped(lastTx.raw.toHex());
+        // print("==RAW==");
+        // printWrapped(lastTx.raw.toHex());
 
         print("============TXIN===========");
         for (final txin in lastTx.txsIn) {
@@ -321,7 +328,8 @@ class Wallet with Down4Object, Jsons, Locals {
   //   return;
   // }
 
-  Down4Payment? parsePayment3(ComposedID selfID, Down4Payment pay) {
+  Down4Payment? parsePayment3(ComposedID selfID, Down4Payment pay,
+      {VoidCallback? callblack}) {
     printWrapped(pay.txs.last.raw.toHex());
 
     print("parsing payment: ${pay.id.value}");
@@ -357,7 +365,7 @@ class Wallet with Down4Object, Jsons, Locals {
       db.execute(txstr);
       print("\n============ VALIDATED TRANSACTION ============\n");
       return pay
-        ..trySettlement()
+        ..trySettlement(cb: callblack)
         ..calculatePlusMinus(selfID: selfID)
         ..fullMerge();
     } catch (e) {
