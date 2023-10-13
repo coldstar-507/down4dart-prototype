@@ -1,4 +1,3 @@
-// import 'package:cbl/cbl.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../bsv/types.dart';
@@ -11,6 +10,10 @@ import 'medias.dart';
 import 'nodes.dart';
 
 enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
+
+// class SnipStick {
+//   final double scale, bottom, right;
+// }
 
 abstract class Down4Message with Jsons {
   final String? _txt;
@@ -341,8 +344,7 @@ mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
   @override
   ComposedID get id;
 
-  DatabaseReference get ref =>
-      id.server.realtimeDB.ref("messages/${id.unik}");
+  DatabaseReference get ref => id.server.realtimeDB.ref("messages/${id.unik}");
 
   Future<bool> uploadMessageData(Map<String, String?> data) async {
     try {

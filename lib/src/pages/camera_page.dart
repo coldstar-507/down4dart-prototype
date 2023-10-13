@@ -103,22 +103,131 @@ class TW2 extends StatefulWidget {
 }
 
 class _TW2State extends State<TW2> {
-  double _scale = 1.0;
+  double _curScale = 1.0;
   double _prevScale = 1.0;
-  double _rotation = 0.0;
+  double _curRotation = 0.0;
   double _prevRotation = 0.0;
   late final Size s = widget.initSize;
   late final Offset ofs =
       Offset(widget.initSize.width / 2, widget.initSize.height / 2);
   late Offset _offset = g.sizes.middlePoint - ofs;
   int nPrevPointers = 0;
+
+  FractionalOffset fo(Offset currentOfs) {
+    return FractionalOffset.fromOffsetAndSize(currentOfs, g.sizes.snipSize);
+  }
+
+  Offset twoFingerPress = const Offset(0, 0);
+
+  Offset _position = Offset(0, 0);
+  Offset _previousPosition = Offset(0, 0);
+  double _scale = 1.0;
+  double _previousScale = 1.0;
+  double _rotation = 0.0;
+  double _previousRotation = 0.0;
+  Offset _focalPoint = Offset(0, 0);
+
+  late Offset cSize = Offset(widget.initSize.width, widget.initSize.height);
+
+  Offset transform(Offset ofs, double angle, double scale) {
+    return Offset(
+          (ofs.dx * math.cos(angle)) - (ofs.dy * math.sin(angle)),
+          (ofs.dx * math.sin(angle)) + (ofs.dy * math.cos(angle)),
+        ) *
+        scale;
+  }
+
+  Offset? get rbPos {
+    final k = widget.child.key as GlobalKey;
+    final rb = k.currentContext?.findRenderObject() as RenderBox?;
+    if (rb == null) return null;
+    final a = rb.localToGlobal(Offset.zero);
+    final b = transform(a + cSize, _rotation, _scale);
+
+    // final b_ = a + cSize;
+    // final c_ = a + (cSize / 2);
+    // final b = (Offset((b_.dx - c_.dx) * math.cos(_rotation),
+    //         (b_.dy - c_.dy) * math.sin(_rotation)) *
+    //     _scale) + c_;
+
+    print("a=$a\nb=$b\ncSize=$cSize");
+    // print("rb size: ${rb.size}");
+
+    return a;
+  }
+
+  Offset? get gbp {
+    final k = gb;
+    final rb = k.currentContext?.findRenderObject() as RenderBox?;
+    if (rb == null) return null;
+    print("gbp bounds: ${rb.paintBounds}");
+    final rbp = rb.localToGlobal(Offset.zero);
+    return rbp;
+  }
+
+  GlobalKey gb = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
+    final fractionalOffset =
+        rbPos == null ? FractionalOffset.center : FractionalOffset.center;
+
+    // print("FractionalOffset : $fractionalOffset");
+    print("RB POS           : $rbPos");
+    // print("FOCAL POINT      : $_focalPoint ");
+    print("GBP              : $gbp");
+
+    return GestureDetector(
+      key: gb,
+      onScaleUpdate: (ScaleUpdateDetails details) {
+        setState(() {
+          _scale = _previousScale * details.scale;
+
+          print(details.rotation);
+
+          // _rotation += details.rotation;
+          _rotation = _previousRotation + details.rotation;
+
+          // Calculate the position based on the touch position within the widget
+          print("details.focalPoint = ${details.focalPoint}");
+          print("local focal point = ${details.localFocalPoint}");
+          _position += details.focalPointDelta;
+
+          _focalPoint = details.focalPoint;
+
+          print("position: $_position");
+        });
+      },
+      onScaleEnd: (ScaleEndDetails details) {
+        setState(() {
+          _previousScale = _scale;
+          _previousPosition = _position;
+          _previousRotation = _rotation;
+        });
+      },
+      child: Center(
+        child: Transform(
+          // origin: _focalPoint,
+          transform: Matrix4.identity()
+            ..translate(_position.dx, _position.dy)
+            ..rotateZ(_rotation),
+          //..scale(_scale),
+          alignment: FractionalOffset.center,
+          child: Transform(
+            alignment: fractionalOffset,
+            transform: Matrix4.identity()..scale(_scale),
+            child: widget.child,
+          ), // Replace with your image asset
+        ),
+      ),
+    );
+
     return Positioned(
       bottom: _offset.dy,
       right: _offset.dx,
       child: Transform(
-        transform: Matrix4.identity()..scale(_scale),
+        // origin: twoFingerPress,
+        transform: Matrix4.identity()..scale(_curScale),
         alignment: FractionalOffset.center,
         child: GestureDetector(
           onScaleStart: (details) {
@@ -127,8 +236,8 @@ class _TW2State extends State<TW2> {
           },
           onScaleEnd: (details) {
             print("scale end");
-            _prevScale = _scale;
-            _prevRotation = _rotation;
+            _prevScale = _curScale;
+            _prevRotation = _curRotation;
             widget.pressing(widget.tid, false);
           },
           onScaleUpdate: (details) {
@@ -136,15 +245,16 @@ class _TW2State extends State<TW2> {
             widget.onMove(widget.tid, details.focalPoint);
             if (details.pointerCount == 1 && nPrevPointers == 1) {
               print("1 pointer scaling");
-              _offset -= details.focalPointDelta * _scale;
+              _offset -= details.focalPointDelta * _curScale;
             } else if (details.pointerCount == 2 && nPrevPointers == 2) {
-              _scale = _prevScale * details.scale;
-              _rotation = _prevRotation + details.rotation;
+              // twoFingerPress = details.focalPoint;
+              _curScale = _prevScale * details.scale;
+              _curRotation = _prevRotation + details.rotation;
             }
             nPrevPointers = details.pointerCount;
             setState(() {});
           },
-          child: Transform.rotate(angle: _rotation, child: widget.child),
+          child: Transform.rotate(angle: _curRotation, child: widget.child),
         ),
       ),
     );
@@ -216,7 +326,7 @@ class _SnipCameraState extends State<SnipCamera>
           final tw = TW2(
               tid: randomMediaID(),
               initSize: s,
-              child: m.display(size: s),
+              child: m.display(size: s, key: GlobalKey()),
               pressing: (tid, p) {
                 pressing[tid] = p;
                 if (!p) {
