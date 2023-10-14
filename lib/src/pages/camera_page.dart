@@ -113,10 +113,6 @@ class _TW2State extends State<TW2> {
   late Offset _offset = g.sizes.middlePoint - ofs;
   int nPrevPointers = 0;
 
-  FractionalOffset fo(Offset currentOfs) {
-    return FractionalOffset.fromOffsetAndSize(currentOfs, g.sizes.snipSize);
-  }
-
   Offset twoFingerPress = const Offset(0, 0);
 
   Offset _position = Offset(0, 0);
@@ -127,58 +123,88 @@ class _TW2State extends State<TW2> {
   double _previousRotation = 0.0;
   Offset _focalPoint = Offset(0, 0);
 
-  late Offset cSize = Offset(widget.initSize.width, widget.initSize.height);
+  late Offset sz = Offset(widget.initSize.width, widget.initSize.height);
 
-  Offset transform(Offset ofs, double angle, double scale) {
+  Offset rotate(Offset ofs, double angle) {
     return Offset(
-          (ofs.dx * math.cos(angle)) - (ofs.dy * math.sin(angle)),
-          (ofs.dx * math.sin(angle)) + (ofs.dy * math.cos(angle)),
-        ) *
-        scale;
+      (ofs.dx * math.cos(angle)) - (ofs.dy * math.sin(angle)),
+      (ofs.dx * math.sin(angle)) + (ofs.dy * math.cos(angle)),
+    );
   }
 
-  Offset? get rbPos {
+  FractionalOffset fo = FractionalOffset.center;
+
+  void calculateRbPos() {
     final k = widget.child.key as GlobalKey;
-    final rb = k.currentContext?.findRenderObject() as RenderBox?;
-    if (rb == null) return null;
-    final a = rb.localToGlobal(Offset.zero);
-    final b = transform(a + cSize, _rotation, _scale);
+    final ctx = k.currentContext;
+    final rb = ctx?.findRenderObject() as RenderBox?;
+    if (ctx == null || rb == null) return print("rb is null");
 
-    // final b_ = a + cSize;
-    // final c_ = a + (cSize / 2);
-    // final b = (Offset((b_.dx - c_.dx) * math.cos(_rotation),
-    //         (b_.dy - c_.dy) * math.sin(_rotation)) *
-    //     _scale) + c_;
+    if (_focalPoint.dx == 0.0 && _focalPoint.dy == 0.0) {
+      return print("FOCAL POINT NOT YET VALID");
+    }
 
-    print("a=$a\nb=$b\ncSize=$cSize");
-    // print("rb size: ${rb.size}");
+    final A = rb.localToGlobal(Offset.zero);
+    final B = A + (rotate(Offset(sz.dx, 0), _rotation) * _scale);
+    final C = A + (rotate(sz, _rotation) * _scale);
+    final D = A + (rotate(Offset(0, sz.dy), _rotation) * _scale);
 
-    return a;
+    final BCm = (B.dx == C.dx) ? double.infinity : (B.dy - C.dy) / (B.dx - C.dx);
+    final BCb = B.dy - (BCm * B.dx);
+
+    final DCm = (D.dx == C.dx) ? double.infinity : (D.dy - C.dy) / (D.dx - C.dx);
+    final DCb = D.dy - (DCm * D.dx);
+
+    final F = _focalPoint;
+    final FHm = DCm;
+    final FHb = F.dy - (FHm * F.dx);
+    final FWm = BCm;
+    final FWb = F.dy - (FWm * F.dx);
+    print("""
+      F = $F
+      FHm = $FHm
+      FHb = $FHb
+      FWm = $FWm
+      FWb = $FWb
+      
+      FH=y=x$FHm + $FHb
+      FW=y=x$FWm + $FWb
+      
+      """);
+
+    final Hdx = (FHb - BCb) / (BCm - FHm);
+    final Hdy = (Hdx * FHm) + FHb;
+    final H = Offset(Hdx, Hdy);
+
+    final Wdx = (FHb - DCb) / (DCm - FHm);
+    final Wdy = (Wdx * FHm) + FHb;
+    final W = Offset(Wdx, Wdy);
+
+    fo = FractionalOffset(
+      calcDistance2(W, D) / calcDistance2(C, D),
+      calcDistance2(H, B) / calcDistance2(C, B),
+    );
+
+    print("""
+      A = $A
+      B = $B
+      C = $C
+      D = $D
+
+      F = $F
+      H = $H
+      W = $W
+
+      FO = $fo
+      """);
   }
-
-  Offset? get gbp {
-    final k = gb;
-    final rb = k.currentContext?.findRenderObject() as RenderBox?;
-    if (rb == null) return null;
-    print("gbp bounds: ${rb.paintBounds}");
-    final rbp = rb.localToGlobal(Offset.zero);
-    return rbp;
-  }
-
-  GlobalKey gb = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
-    final fractionalOffset =
-        rbPos == null ? FractionalOffset.center : FractionalOffset.center;
-
-    // print("FractionalOffset : $fractionalOffset");
-    print("RB POS           : $rbPos");
-    // print("FOCAL POINT      : $_focalPoint ");
-    print("GBP              : $gbp");
+    Future(calculateRbPos);
+    print("Fractional Offset: $fo");
 
     return GestureDetector(
-      key: gb,
       onScaleUpdate: (ScaleUpdateDetails details) {
         setState(() {
           _scale = _previousScale * details.scale;
@@ -207,14 +233,13 @@ class _TW2State extends State<TW2> {
       },
       child: Center(
         child: Transform(
-          // origin: _focalPoint,
           transform: Matrix4.identity()
             ..translate(_position.dx, _position.dy)
             ..rotateZ(_rotation),
           //..scale(_scale),
           alignment: FractionalOffset.center,
           child: Transform(
-            alignment: fractionalOffset,
+            alignment: fo,
             transform: Matrix4.identity()..scale(_scale),
             child: widget.child,
           ), // Replace with your image asset
