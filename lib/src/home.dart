@@ -572,7 +572,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     required String path,
     required String mimetype,
     required bool isReversed,
-    required Size snipSize,    
+    required Size snipSize,
     required Size size,
     List<SnipStick> sticks = const [],
     String? text,
@@ -1361,6 +1361,31 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       await vpc.initialize();
       await vpc.setLooping(true);
       await vpc.play();
+    }
+
+    // fetch sticks
+    await globall<Down4Media>(s.sticks.map((e) => e.mediaID),
+        doFetch: true, doMergeIfFetch: true);
+    Widget makeSnip() {
+      final ratio = g.sizes.snipSize.width / s.snipSize.width;
+      return SizedBox.fromSize(
+          size: g.sizes.snipSize,
+          child: Stack(
+            children: [
+              ...s.sticks.map((e) {
+                final m = local<Down4Media>(e.mediaID);
+                if (m == null) return const SizedBox.shrink();
+                return Positioned(
+                  top: e.pos.dy,
+                  left: e.pos.dy * ratio,                  
+                  child: Transform(
+                    transform: Matrix4.identity()
+                      ..rotateZ(e.rotation)
+                      ..scale(e.scale * ratio),
+                    child: m.display(size: e.initSize)));
+              })
+            ],
+          ));
     }
 
     final displayMedia = await m.displaySnip(context: context, controller: vpc);

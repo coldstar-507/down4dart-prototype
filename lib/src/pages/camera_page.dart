@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:down4/src/_dart_utils.dart';
+import 'package:down4/src/data_objects/_data_utils.dart';
 import 'package:down4/src/data_objects/medias.dart';
 import 'package:down4/src/data_objects/messages.dart';
 import 'package:down4/src/render_objects/navigator.dart';
@@ -78,12 +79,14 @@ class TransformableWidget extends StatelessWidget {
 
 class TW2 extends StatefulWidget {
   final Widget child;
+  final ComposedID mediaID;
   final Size initSize;
   final String tid;
   final void Function(String, Offset, double, double) onMove;
   final void Function(String, bool, Offset) pressing;
 
   TW2({
+    required this.mediaID,
     required this.child,
     required this.initSize,
     required this.pressing,
@@ -336,6 +339,17 @@ class _SnipCameraState extends State<SnipCamera>
   List<TW2> sticks = [];
   Map<String, bool> pressing = {};
   Map<String, (Offset, double, double)> positions = {};
+  List<SnipStick> get readySticks {
+    return sticks.map((e) {
+      final (ofs, scl, rot) = positions[e.tid]!;
+      return SnipStick(
+          mediaID: e.mediaID,
+          pos: ofs,
+          initSize: e.initSize,
+          rotation: rot,
+          scale: scl);
+    }).toList();
+  }  
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode {
@@ -364,6 +378,7 @@ class _SnipCameraState extends State<SnipCamera>
 
           final tw = TW2(
               tid: randomMediaID(),
+              mediaID: m.id,
               initSize: s,
               child: m.display(size: s, key: GlobalKey()),
               pressing: (tid, p, dp) {
@@ -718,6 +733,7 @@ class _SnipCameraState extends State<SnipCamera>
                       isReversed: toReverse,
                       text: input.value,
                       size: ctrl.value.previewSize!.inverted,
+                      sticks: readySticks,
                     );
                   },
                 ),
@@ -727,6 +743,7 @@ class _SnipCameraState extends State<SnipCamera>
           ],
           currentConsolesName: currentConsolesName,
           currentPageIndex: currentPageIndex);
+        
 
   @override
   String get backFromMediasConsoleName => "preview";
