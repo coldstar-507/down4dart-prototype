@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/widgets.dart';
 
 import '../bsv/types.dart';
 import '../_dart_utils.dart';
@@ -11,9 +14,37 @@ import 'nodes.dart';
 
 enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
 
-// class SnipStick {
-//   final double scale, bottom, right;
-// }
+class SnipStick {
+  final ComposedID mediaID;
+  final Offset pos;
+  final Size initSize;
+  final double rotation, scale;
+  SnipStick({
+    required this.mediaID,
+    required this.pos,
+    required this.initSize,
+    required this.rotation,
+    required this.scale,
+  });
+
+  factory SnipStick.fromString(String b64) {
+    final str = String.fromCharCodes(base64Decode(b64));
+    final arr = str.split("@");
+    return SnipStick(
+        mediaID: ComposedID.fromString(arr[0])!,
+        pos: Offset(double.parse(arr[1]), double.parse(arr[2])),
+        initSize: Size(double.parse(arr[3]), double.parse(arr[4])),
+        rotation: double.parse(arr[5]),
+        scale: double.parse(arr[6]));
+  }
+
+  @override
+  String toString() {
+    final data =
+        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
+    return base64Encode(data.codeUnits);
+  }
+}
 
 abstract class Down4Message with Jsons {
   final String? _txt;
@@ -89,6 +120,16 @@ abstract class Down4Message with Jsons {
     final id = Down4ID.fromString(decodedJson["id"])!;
     final senderID = ComposedID.fromString(decodedJson["senderID"])!;
 
+    final sticks =
+        decodedJson["sticks"]?.split(" ").map((e) => SnipStick.fromString(e));
+
+    final snipSizeStr = decodedJson["snipSize"];
+    Size? snipSize;
+    if (snipSizeStr != null) {
+      final splt = snipSizeStr.split("@");
+      snipSize = Size(double.parse(splt[0]), double.parse(splt[1]));
+    }
+
     final root = decodedJson["root"];
 
     final nodes = decodedJson["nodes"].toComposedIDs();
@@ -147,6 +188,8 @@ abstract class Down4Message with Jsons {
       case MessageType.snip:
         return Snip(id as ComposedID,
             root: root!,
+            snipSize: snipSize!,
+            sticks: sticks!.toList(),
             senderID: senderID,
             mediaID: mediaID!,
             tempMediaID: tempMediaID,
@@ -225,26 +268,6 @@ mixin Medias on Down4Message {
   ComposedID? get mediaID => _mediaID;
   ComposedID? get tempMediaID => _tempMediaID;
   int? get tempMediaTS => _tempMediaTS;
-
-  // // returns the dataPayload if routine was successful
-  // Future<Map<String, String>?> _mediableRoutine({
-  //   Map<String, String>? preMsg,
-  // }) async {
-  //   final media = await global<Down4Media>(mediaID);
-  //   final fullJson = preMsg ?? toJson(includeLocal: false);
-  //   if (media != null) {
-  //     final upload = await media.temporaryUpload();
-  //     if (upload == null) return null;
-  //     if (upload.freshID != null) {
-  //       fullJson["tempMediaID"] = upload.freshID!.value;
-  //       fullJson["tempMediaTS"] = upload.freshTS!.toString();
-  //     } else {
-  //       fullJson["tempMediaID"] = media.tempID!.value;
-  //       fullJson["tempMediaTS"] = media.tempTS!.toString();
-  //     }
-  //   }
-  //   return fullJson;
-  // }
 }
 
 mixin Texts on Down4Message {
@@ -263,25 +286,6 @@ mixin Cash on Down4Message {
     final payment = await global<Down4Payment>(paymentID);
     return payment?.tempTS;
   }
-
-  // Future<Map<String, String>?> _paymentUploadRoutine({
-  //   Map<String, String>? preMsg,
-  // }) async {
-  //   final fullJson = preMsg ?? toJson(includeLocal: false);
-  //   final payment = await global<Down4Payment>(paymentID);
-  //   if (payment != null) {
-  //     final upload = await payment.temporaryUpload();
-  //     if (upload == null) return null;
-  //     if (upload.freshID != null) {
-  //       fullJson["tempPaymentID"] = upload.freshID!.value;
-  //       fullJson["tempPaymentTS"] = upload.freshTS!.toString();
-  //     } else {
-  //       fullJson["tempPaymentID"] = payment.tempID!.value;
-  //       fullJson["tempPaymentTS"] = payment.tempTS!.toString();
-  //     }
-  //   }
-  //   return fullJson;
-  // }
 }
 
 mixin Roots on Down4Message {
@@ -295,37 +299,6 @@ mixin Roots on Down4Message {
 }
 
 mixin Messages on Down4Message, Roots, Medias, Reads, Texts, Locals {
-  // Future<void> onReceipt(void Function(ChatN rootNode) callback) async {
-  //   // get the rootNode
-  //   final rootID = idOfRoot(root: root, selfID: g.self.id);
-
-  //   final rootNode =
-  //       await global<ChatN>(rootID, doFetch: true, doMergeIfFetch: true);
-  //   if (rootNode == null) return;
-
-  //   PersonN? senderNode = await global<User>(senderID);
-  //   Down4Media? msgMedia;
-
-  //   if (senderNode != null && senderNode.isConnected) {
-  //     // we predownload the media, else it's download on open
-  //     msgMedia = await global<Down4Media>(mediaID,
-  //         doFetch: true, doMergeIfFetch: true, tempID: tempMediaID);
-  //   }
-
-  //   // get the rootNode media
-  //   await global<Down4Media>(rootNode.mediaID,
-  //       doFetch: true, doMergeIfFetch: true);
-
-  //   // msg medias references are dynamic and always get updated
-  //   // this is because messages are not kept for ever on server
-  //   if (tempMediaID != null) {
-  //     await msgMedia?.updateTempReferences(tempMediaID!, tempMediaTS!);
-  //   }
-  //   merge();
-
-  //   return callback(rootNode);
-  // }
-
   @override
   Future<String?> uploadRoutine() async {
     final Map<String, String> msgData = toJson(includeLocal: false);
@@ -439,6 +412,10 @@ class Snip extends Down4Message
   @override
   ComposedID id;
 
+  List<SnipStick> sticks;
+
+  Size snipSize;
+
   @override
   ComposedID get mediaID => _mediaID!;
 
@@ -448,26 +425,26 @@ class Snip extends Down4Message
     required String root,
     required ComposedID mediaID,
     required super.txt,
+    required this.snipSize,
+    this.sticks = const [],
     super.tempMediaID,
     super.tempMediaTS,
     bool isRead = false,
   }) : super(isRead: isRead, root: root, mediaID: mediaID);
 
   @override
+  Map<String, String> toJson({bool includeLocal = false}) {
+    final sup = super.toJson(includeLocal: includeLocal);
+    sup["sticks"] = sticks.map((e) => e.toString()).join(" ");
+    sup["snipSize"] = "${snipSize.width}@${snipSize.height}";
+    return sup;
+  }
+
+  @override
   MessageType get type => MessageType.snip;
 
   @override
   String get table => "messages";
-  // Database get dbb => messagesDB;
-
-  // @override
-  // Future<String?> uploadRoutine() async {
-  //   final r = await _mediableRoutine();
-  //   if (r == null) return null;
-  //   final successfulUpload = await uploadMessageData(r);
-  //   if (!successfulUpload) return null;
-  //   return "s!${mediaID.value}!${r["tempMediaID"]}";
-  // }
 
   @override
   bool get isRead => _isRead!;

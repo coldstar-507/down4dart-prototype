@@ -422,6 +422,6 @@ Future<void> main() async {
     );
   }
 
-  debugRepaintRainbowEnabled = true;
+  // debugRepaintRainbowEnabled = true;
   runApp(const MaterialApp(home: Material(child: Down4())));
 }

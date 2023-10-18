@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/data_objects/medias.dart';
+import 'package:down4/src/data_objects/messages.dart';
 import 'package:down4/src/render_objects/navigator.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
@@ -79,23 +80,15 @@ class TW2 extends StatefulWidget {
   final Widget child;
   final Size initSize;
   final String tid;
-  final void Function(String, Offset global) onMove;
-  final void Function(String, bool) pressing;
-  // final double scale;
-  // final Offset offset;
-  // final double rotation;
-  // final String tid;
+  final void Function(String, Offset, double, double) onMove;
+  final void Function(String, bool, Offset) pressing;
 
   TW2({
     required this.child,
     required this.initSize,
-    // required this.scale,
-    // required this.offset,
-    // required this.rotation,
     required this.pressing,
     required this.onMove,
     required this.tid,
-    // required this.tid,
   }) : super(key: ValueKey(tid));
 
   @override
@@ -103,25 +96,18 @@ class TW2 extends StatefulWidget {
 }
 
 class _TW2State extends State<TW2> {
-  double _curScale = 1.0;
+  final origin = const Offset(0.0, 0.0);
   double _prevScale = 1.0;
-  double _curRotation = 0.0;
-  double _prevRotation = 0.0;
   late final Size s = widget.initSize;
-  late final Offset ofs =
-      Offset(widget.initSize.width / 2, widget.initSize.height / 2);
-  late Offset _offset = g.sizes.middlePoint - ofs;
   int nPrevPointers = 0;
 
-  Offset twoFingerPress = const Offset(0, 0);
+  late Offset _position = origin;
+  late Offset _focalPoint = origin;
 
-  Offset _position = Offset(0, 0);
-  Offset _previousPosition = Offset(0, 0);
   double _scale = 1.0;
-  double _previousScale = 1.0;
+  double _prevPrevScale = 1.0;
   double _rotation = 0.0;
   double _previousRotation = 0.0;
-  Offset _focalPoint = Offset(0, 0);
 
   late Offset sz = Offset(widget.initSize.width, widget.initSize.height);
 
@@ -132,157 +118,183 @@ class _TW2State extends State<TW2> {
     );
   }
 
-  FractionalOffset fo = FractionalOffset.center;
-
-  void calculateRbPos() {
-    final k = widget.child.key as GlobalKey;
-    final ctx = k.currentContext;
+  Offset get a_ {
+    final key = widget.child.key as GlobalKey;
+    final ctx = key.currentContext;
     final rb = ctx?.findRenderObject() as RenderBox?;
-    if (ctx == null || rb == null) return print("rb is null");
 
-    if (_focalPoint.dx == 0.0 && _focalPoint.dy == 0.0) {
-      return print("FOCAL POINT NOT YET VALID");
+    if (ctx == null || rb == null || _focalPoint == origin) {
+      final ss = g.sizes.snipSize;
+      final s = widget.initSize;
+      return Offset(ss.width - (s.width / 2), ss.height - (s.height / 2));
     }
 
-    final A = rb.localToGlobal(Offset.zero);
-    final B = A + (rotate(Offset(sz.dx, 0), _rotation) * _scale);
-    final C = A + (rotate(sz, _rotation) * _scale);
-    final D = A + (rotate(Offset(0, sz.dy), _rotation) * _scale);
-
-    final BCm = (B.dx == C.dx) ? double.infinity : (B.dy - C.dy) / (B.dx - C.dx);
-    final BCb = B.dy - (BCm * B.dx);
-
-    final DCm = (D.dx == C.dx) ? double.infinity : (D.dy - C.dy) / (D.dx - C.dx);
-    final DCb = D.dy - (DCm * D.dx);
-
-    final F = _focalPoint;
-    final FHm = DCm;
-    final FHb = F.dy - (FHm * F.dx);
-    final FWm = BCm;
-    final FWb = F.dy - (FWm * F.dx);
-    print("""
-      F = $F
-      FHm = $FHm
-      FHb = $FHb
-      FWm = $FWm
-      FWb = $FWb
-      
-      FH=y=x$FHm + $FHb
-      FW=y=x$FWm + $FWb
-      
-      """);
-
-    final Hdx = (FHb - BCb) / (BCm - FHm);
-    final Hdy = (Hdx * FHm) + FHb;
-    final H = Offset(Hdx, Hdy);
-
-    final Wdx = (FHb - DCb) / (DCm - FHm);
-    final Wdy = (Wdx * FHm) + FHb;
-    final W = Offset(Wdx, Wdy);
-
-    fo = FractionalOffset(
-      calcDistance2(W, D) / calcDistance2(C, D),
-      calcDistance2(H, B) / calcDistance2(C, B),
-    );
-
-    print("""
-      A = $A
-      B = $B
-      C = $C
-      D = $D
-
-      F = $F
-      H = $H
-      W = $W
-
-      FO = $fo
-      """);
+    return rb.localToGlobal(Offset.zero);
   }
+
+  (Offset, Offset) calculateKandJ(double nextAngle) {
+    final key = widget.child.key as GlobalKey;
+    final ctx = key.currentContext;
+    final rb = ctx?.findRenderObject() as RenderBox?;
+
+    if (ctx == null || rb == null || _focalPoint == origin) {
+      return (origin, origin);
+    }
+
+    final a = a_;
+    final c = a + (rotate(sz, _rotation) * _scale);
+    final p = (a / 2) + (c / 2);
+    final f = _focalPoint;
+
+    final k = p - f;
+
+    final f_ = rotate(f - p, nextAngle - _rotation) + p;
+    final j = f_ - f;
+
+    return (k, j);
+  }
+
+  // void calculateRbPos() {
+  //   final k = widget.child.key as GlobalKey;
+  //   final ctx = k.currentContext;
+  //   final rb = ctx?.findRenderObject() as RenderBox?;
+  //   if (ctx == null || rb == null) return print("rb is null");
+
+  //   if (_focalPoint.dx == 0.0 && _focalPoint.dy == 0.0) {
+  //     return print("FOCAL POINT NOT YET VALID");
+  //   }
+
+  //   final A = rb.localToGlobal(Offset.zero);
+  //   final B = A + (rotate(Offset(sz.dx, 0), _rotation) * _scale);
+  //   final C = A + (rotate(sz, _rotation) * _scale);
+  //   final D = A + (rotate(Offset(0, sz.dy), _rotation) * _scale);
+  //   final F = _focalPoint;
+
+  //   if ((_rotation / (math.pi / 2)) % 1 == 0) {
+  //     fo = FractionalOffset(
+  //       (F.dx - D.dx) / (C.dx - D.dx),
+  //       (F.dy - B.dy) / (C.dy - B.dy),
+  //     );
+  //     return print("angle is a divisable by pi/2");
+  //   }
+
+  //   final BCm =
+  //       (B.dx == C.dx) ? double.infinity : (B.dy - C.dy) / (B.dx - C.dx);
+  //   final BCb = B.dy - (BCm * B.dx);
+
+  //   final DCm =
+  //       (D.dx == C.dx) ? double.infinity : (D.dy - C.dy) / (D.dx - C.dx);
+  //   final DCb = D.dy - (DCm * D.dx);
+
+  //   final FHm = DCm;
+  //   final FHb = F.dy - (FHm * F.dx);
+  //   final FWm = BCm;
+  //   final FWb = F.dy - (FWm * F.dx);
+
+  //   final Hdx = (FHb - BCb) / (BCm - FHm);
+  //   final Hdy = (Hdx * FHm) + FHb;
+  //   final H = Offset(Hdx, Hdy);
+
+  //   final Wdx = (DCb - FWb) / (FWm - DCm);
+  //   final Wdy = (FWm * Wdx) + FWb;
+  //   final W = Offset(Wdx, Wdy);
+
+  //   fo = FractionalOffset(
+  //     calcDistance2(W, D) / calcDistance2(C, D),
+  //     calcDistance2(H, B) / calcDistance2(C, B),
+  //   );
+
+  //   isCalculation = true;
+  // }
+
+  // bool isCalculation = false;
 
   @override
   Widget build(BuildContext context) {
-    Future(calculateRbPos);
-    print("Fractional Offset: $fo");
-
     return GestureDetector(
       onScaleUpdate: (ScaleUpdateDetails details) {
-        setState(() {
-          _scale = _previousScale * details.scale;
+        final newScale = details.scale * _prevScale;
+        final newAngle = _previousRotation + details.rotation;
+        if (details.pointerCount == nPrevPointers) {
+          if (nPrevPointers == 2) {
+            final lastWidth = _prevPrevScale * widget.initSize.width;
+            final newWidth = newScale * widget.initSize.width;
+            // same result using height
+            final pixelScale = ((newWidth / lastWidth) - 1) / 2;
 
-          print(details.rotation);
+            final (k, j) = calculateKandJ(newAngle);
+            _position += (details.focalPointDelta) + (k * pixelScale) - j;
+          } else {
+            _position += details.focalPointDelta;
+          }
+        }
 
-          // _rotation += details.rotation;
-          _rotation = _previousRotation + details.rotation;
+        _prevPrevScale = _scale;
+        _scale = newScale;
+        _rotation = _previousRotation + details.rotation;
+        _focalPoint = details.focalPoint;
+        nPrevPointers = details.pointerCount;
 
-          // Calculate the position based on the touch position within the widget
-          print("details.focalPoint = ${details.focalPoint}");
-          print("local focal point = ${details.localFocalPoint}");
-          _position += details.focalPointDelta;
+        widget.onMove(widget.tid, a_, _scale, _rotation);
 
-          _focalPoint = details.focalPoint;
-
-          print("position: $_position");
-        });
+        setState(() {});
+      },
+      onScaleStart: (details) {
+        widget.pressing(widget.tid, true, _focalPoint);
       },
       onScaleEnd: (ScaleEndDetails details) {
-        setState(() {
-          _previousScale = _scale;
-          _previousPosition = _position;
-          _previousRotation = _rotation;
-        });
+        _prevScale = _scale;
+        _previousRotation = _rotation;
+        widget.pressing(widget.tid, false, _focalPoint);
       },
       child: Center(
         child: Transform(
           transform: Matrix4.identity()
             ..translate(_position.dx, _position.dy)
+            ..scale(_scale)
             ..rotateZ(_rotation),
-          //..scale(_scale),
           alignment: FractionalOffset.center,
-          child: Transform(
-            alignment: fo,
-            transform: Matrix4.identity()..scale(_scale),
-            child: widget.child,
-          ), // Replace with your image asset
+          child: widget.child,
         ),
       ),
     );
 
-    return Positioned(
-      bottom: _offset.dy,
-      right: _offset.dx,
-      child: Transform(
-        // origin: twoFingerPress,
-        transform: Matrix4.identity()..scale(_curScale),
-        alignment: FractionalOffset.center,
-        child: GestureDetector(
-          onScaleStart: (details) {
-            print("scale start");
-            widget.pressing(widget.tid, true);
-          },
-          onScaleEnd: (details) {
-            print("scale end");
-            _prevScale = _curScale;
-            _prevRotation = _curRotation;
-            widget.pressing(widget.tid, false);
-          },
-          onScaleUpdate: (details) {
-            print("scaling!");
-            widget.onMove(widget.tid, details.focalPoint);
-            if (details.pointerCount == 1 && nPrevPointers == 1) {
-              print("1 pointer scaling");
-              _offset -= details.focalPointDelta * _curScale;
-            } else if (details.pointerCount == 2 && nPrevPointers == 2) {
-              // twoFingerPress = details.focalPoint;
-              _curScale = _prevScale * details.scale;
-              _curRotation = _prevRotation + details.rotation;
-            }
-            nPrevPointers = details.pointerCount;
-            setState(() {});
-          },
-          child: Transform.rotate(angle: _curRotation, child: widget.child),
-        ),
-      ),
-    );
+    // return Positioned(
+    //   bottom: _offset.dy,
+    //   right: _offset.dx,
+    //   child: Transform(
+    //     // origin: twoFingerPress,
+    //     transform: Matrix4.identity()..scale(_curScale),
+    //     alignment: FractionalOffset.center,
+    //     child: GestureDetector(
+    //       onScaleStart: (details) {
+    //         print("scale start");
+    //         widget.pressing(widget.tid, true);
+    //       },
+    //       onScaleEnd: (details) {
+    //         print("scale end");
+    //         _prevScale = _curScale;
+    //         _prevRotation = _curRotation;
+    //         widget.pressing(widget.tid, false);
+    //       },
+    //       onScaleUpdate: (details) {
+    //         print("scaling!");
+    //         widget.onMove(widget.tid, details.focalPoint);
+    //         if (details.pointerCount == 1 && nPrevPointers == 1) {
+    //           print("1 pointer scaling");
+    //           _offset -= details.focalPointDelta * _curScale;
+    //         } else if (details.pointerCount == 2 && nPrevPointers == 2) {
+    //           // twoFingerPress = details.focalPoint;
+    //           _curScale = _prevScale * details.scale;
+    //           _curRotation = _prevRotation + details.rotation;
+    //         }
+    //         nPrevPointers = details.pointerCount;
+    //         setState(() {});
+    //       },
+    //       child: Transform.rotate(angle: _curRotation, child: widget.child),
+    //     ),
+    //   ),
+    // );
   }
 }
 
@@ -295,7 +307,9 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
     required String mimetype,
     required String path,
     required bool isReversed,
+    required Size snipSize,
     required Size size,
+    List<SnipStick> sticks,
     String? text,
   }) cameraCallBack;
   final bool enableVideo;
@@ -321,7 +335,7 @@ class _SnipCameraState extends State<SnipCamera>
 
   List<TW2> sticks = [];
   Map<String, bool> pressing = {};
-  Map<String, Offset> positions = {};
+  Map<String, (Offset, double, double)> positions = {};
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode {
@@ -352,13 +366,10 @@ class _SnipCameraState extends State<SnipCamera>
               tid: randomMediaID(),
               initSize: s,
               child: m.display(size: s, key: GlobalKey()),
-              pressing: (tid, p) {
+              pressing: (tid, p, dp) {
                 pressing[tid] = p;
                 if (!p) {
-                  print("delete button position: $xWidgetPos");
-                  print("drop off position     : ${positions[tid]}");
-                  final dropPos = positions[tid]!;
-                  final pixelDist = calcDistance2(xWidgetPos, dropPos);
+                  final pixelDist = calcDistance2(xWidgetPos, dp);
                   if (pixelDist < 60) {
                     sticks.removeWhere((e) => e.tid == tid);
                     pressing.remove(tid);
@@ -367,11 +378,13 @@ class _SnipCameraState extends State<SnipCamera>
                 }
                 setState(() {});
               },
-              onMove: (tid, ofs) {
+              onMove: (tid, ofs, scl, rot) {
+                positions[tid] = (ofs, scl, rot);
                 final ix = sticks.indexWhere((e) => e.tid == tid);
-                if (ix != 0) sticks.swap(0, ix);
-                positions[tid] = ofs;
-                setState(() {});
+                if (ix != 0) {
+                  sticks.swap(0, ix);
+                  setState(() {});
+                }
               });
           sticks.insert(0, tw);
           pressing[tw.tid] = false;
@@ -556,14 +569,11 @@ class _SnipCameraState extends State<SnipCamera>
       key: xKey,
       opacity: pressing.values.any((e) => e) ? 1 : 0,
       duration: Console.animationDuration,
-      child: // Center(
-          // child:
-          Icon(
+      child: Icon(
         Icons.block,
         color: Colors.white,
         size: g.sizes.headerHeight / 2,
       ),
-//      ),
     );
   }
 
@@ -703,6 +713,7 @@ class _SnipCameraState extends State<SnipCamera>
                     vpc?.dispose();
                     widget.cameraCallBack(
                       path: filePath!,
+                      snipSize: g.sizes.snipSize,
                       mimetype: mimetype!,
                       isReversed: toReverse,
                       text: input.value,

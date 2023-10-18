@@ -7,8 +7,7 @@ import '../render_objects/_render_utils.dart' show Down4PageWidget;
 
 import '_page_utils.dart';
 
-class SnipViewPage extends StatelessWidget
-    implements Down4PageWidget {
+class SnipViewPage extends StatefulWidget implements Down4PageWidget {
   @override
   String get id => "snipview";
 
@@ -24,9 +23,16 @@ class SnipViewPage extends StatelessWidget
     Key? key,
   }) : super(key: key);
 
+  @override
+  State<SnipViewPage> createState() => _SnipViewPage();
+}
+
+class _SnipViewPage extends State<SnipViewPage> with Pager2 {
+  String get text => widget.text ?? "";
+
   double get boxHeight {
     final tp = TextPainter(
-      text: TextSpan(text: text ?? "", style: g.theme.snipInputTextStyle),
+      text: TextSpan(text: text, style: g.theme.snipInputTextStyle),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: g.sizes.w);
     return tp.height;
@@ -35,8 +41,8 @@ class SnipViewPage extends StatelessWidget
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
-      displayMedia,
-      text != "" && text != null
+      widget.displayMedia,
+      text.isNotEmpty
           ? Center(
               child: Container(
                 width: g.sizes.w,
@@ -44,7 +50,7 @@ class SnipViewPage extends StatelessWidget
                 alignment: AlignmentDirectional.center,
                 decoration: BoxDecoration(color: g.theme.snipRibbon),
                 child: Text(
-                  text!,
+                  text,
                   textAlign: TextAlign.center,
                   style: g.theme.snipInputTextStyle,
                 ),
@@ -62,30 +68,25 @@ class SnipViewPage extends StatelessWidget
     ]);
   }
 
-  // @override
-  Console3 get console => Console3(
-          rows: [
-            {
-              "base": ConsoleRow(widgets: [
-                ConsoleButton(name: "BACK", onPress: back, isInverted: true),
-                ConsoleButton(name: "NEXT", onPress: next, isInverted: true),
-              ], extension: null, widths: null, inputMaxHeight: null)
-            }
-          ],
-          currentConsolesName: ["base"],
-          currentPageIndex: 0);
+  @override
+  Console3 get console => Console3(rows: [
+        {
+          "base": ConsoleRow(widgets: [
+            ConsoleButton(name: "BACK", onPress: widget.back, isInverted: true),
+            ConsoleButton(name: "NEXT", onPress: widget.next, isInverted: true),
+          ], extension: null, widths: null, inputMaxHeight: null)
+        }
+      ], currentConsolesName: [
+        "base"
+      ], currentPageIndex: 0);
 
-  // @override
-  // void setTheState() {}
+  @override
+  List<String> currentConsolesName = ["base"];
 
-  // @override
-  // set extras(List<Extra> e) {}
+  @override
+  List<Extra> extras = [];
 
-  // @override
-  // final List<Extra> extras = const [];
-
-  // @override
-  // List<String> get currentConsolesName => ["base"];
-  // @override
-  // set currentConsolesName(List<String> j) {}
+  @override
+  void setTheState() => setState(() {});
+  
 }

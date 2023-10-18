@@ -572,7 +572,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     required String path,
     required String mimetype,
     required bool isReversed,
+    required Size snipSize,    
     required Size size,
+    List<SnipStick> sticks = const [],
     String? text,
   }) async {
     // image from camera are cached files, so they are
@@ -600,7 +602,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     for (final sel in chats.selected().asNodes<ChatN>()) {
       final snip = Snip(ComposedID(),
-          root: sel.root_, senderID: g.self.id, txt: text, mediaID: media.id);
+          snipSize: snipSize,
+          sticks: sticks,
+          root: sel.root_,
+          senderID: g.self.id,
+          txt: text,
+          mediaID: media.id);
 
       await r.push(await sel.messageTargets, snip);
 
