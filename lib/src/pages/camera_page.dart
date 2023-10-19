@@ -307,13 +307,10 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
 
   final void Function() cameraBack;
   final void Function({
-    required String mimetype,
-    required String path,
-    required bool isReversed,
+    required (String path, String mimetype, bool isReversed, Size s)? m,
     required Size snipSize,
-    required Size size,
-    List<SnipStick> sticks,
-    String? text,
+    required List<(ComposedID, Offset, Size, double, double)> sticks,
+    required String? text,
   }) cameraCallBack;
   final bool enableVideo;
 
@@ -339,17 +336,12 @@ class _SnipCameraState extends State<SnipCamera>
   List<TW2> sticks = [];
   Map<String, bool> pressing = {};
   Map<String, (Offset, double, double)> positions = {};
-  List<SnipStick> get readySticks {
+  List<(ComposedID, Offset, Size, double, double)> get sticksInfo {
     return sticks.map((e) {
       final (ofs, scl, rot) = positions[e.tid]!;
-      return SnipStick(
-          mediaID: e.mediaID,
-          pos: ofs,
-          initSize: e.initSize,
-          rotation: rot,
-          scale: scl);
+      return (e.mediaID, ofs, e.initSize, scl, rot);
     }).toList();
-  }  
+  }
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode {
@@ -439,6 +431,7 @@ class _SnipCameraState extends State<SnipCamera>
   //     CameraController(g.cameras[camNum], ResolutionPreset.high);
 
   late double _ar;
+  late Size _camSize;
 
   void initCamera() async {
     if (ctrl.value.isInitialized) {
@@ -447,6 +440,7 @@ class _SnipCameraState extends State<SnipCamera>
     }
     await ctrl.initialize();
     _ar = ctrl.value.aspectRatio;
+    _camSize = ctrl.value.previewSize!.inverted;
     maxZoom = await ctrl.getMaxZoomLevel();
     minZoom = await ctrl.getMinZoomLevel();
     await ctrl.setFlashMode(FlashMode.off);
@@ -466,6 +460,12 @@ class _SnipCameraState extends State<SnipCamera>
   bool get toReverse => camNum != 0;
 
   Widget get inputBody => hasInput ? input.snipInput : const SizedBox.shrink();
+
+  (String, String, bool, Size)? get m {
+    if (filePath == null) return null;
+    ctrl.value.previewSize;
+    return (filePath!, mimetype!, toReverse, _camSize);
+  }
 
   @override
   void initState() {
@@ -727,14 +727,10 @@ class _SnipCameraState extends State<SnipCamera>
                   onPress: () {
                     vpc?.dispose();
                     widget.cameraCallBack(
-                      path: filePath!,
-                      snipSize: g.sizes.snipSize,
-                      mimetype: mimetype!,
-                      isReversed: toReverse,
-                      text: input.value,
-                      size: ctrl.value.previewSize!.inverted,
-                      sticks: readySticks,
-                    );
+                        m: m,
+                        snipSize: g.sizes.snipSize,
+                        text: input.value,
+                        sticks: sticksInfo);
                   },
                 ),
               ], extension: null, widths: null, inputMaxHeight: null),
@@ -743,7 +739,6 @@ class _SnipCameraState extends State<SnipCamera>
           ],
           currentConsolesName: currentConsolesName,
           currentPageIndex: currentPageIndex);
-        
 
   @override
   String get backFromMediasConsoleName => "preview";

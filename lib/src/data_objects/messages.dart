@@ -15,13 +15,14 @@ import 'nodes.dart';
 enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
 
 class SnipStick {
-  final ComposedID mediaID;
+  final ComposedID mediaID, tempID;
   final Offset pos;
   final Size initSize;
   final double rotation, scale;
   SnipStick({
     required this.mediaID,
     required this.pos,
+    required this.tempID,
     required this.initSize,
     required this.rotation,
     required this.scale,
@@ -31,17 +32,19 @@ class SnipStick {
     final str = String.fromCharCodes(base64Decode(b64));
     final arr = str.split("@");
     return SnipStick(
-        mediaID: ComposedID.fromString(arr[0])!,
-        pos: Offset(double.parse(arr[1]), double.parse(arr[2])),
-        initSize: Size(double.parse(arr[3]), double.parse(arr[4])),
-        rotation: double.parse(arr[5]),
-        scale: double.parse(arr[6]));
+      mediaID: ComposedID.fromString(arr[0])!,
+      pos: Offset(double.parse(arr[1]), double.parse(arr[2])),
+      initSize: Size(double.parse(arr[3]), double.parse(arr[4])),
+      rotation: double.parse(arr[5]),
+      scale: double.parse(arr[6]),
+      tempID: ComposedID.fromString(arr[7])!,
+    );
   }
 
   @override
   String toString() {
     final data =
-        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
+        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale@${tempID.value}";
     return base64Encode(data.codeUnits);
   }
 }
@@ -191,7 +194,7 @@ abstract class Down4Message with Jsons {
             snipSize: snipSize!,
             sticks: sticks!.toList(),
             senderID: senderID,
-            mediaID: mediaID!,
+            mediaID: mediaID,
             tempMediaID: tempMediaID,
             tempMediaTS: tempMediaTS,
             isRead: isRead,
@@ -417,13 +420,13 @@ class Snip extends Down4Message
   Size snipSize;
 
   @override
-  ComposedID get mediaID => _mediaID!;
+  ComposedID? get mediaID => _mediaID;
 
   Snip(
     this.id, {
     required super.senderID,
     required String root,
-    required ComposedID mediaID,
+    required ComposedID? mediaID,
     required super.txt,
     required this.snipSize,
     this.sticks = const [],

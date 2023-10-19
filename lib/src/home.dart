@@ -569,12 +569,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   Future<void> sendSnip({
-    required String path,
-    required String mimetype,
-    required bool isReversed,
     required Size snipSize,
-    required Size size,
-    List<SnipStick> sticks = const [],
+    required List<(ComposedID, Offset, Size, double scl, double)> sticks,
+    required (String path, String mimetype, bool isReversed, Size s)? m,
     String? text,
   }) async {
     // image from camera are cached files, so they are
@@ -583,31 +580,53 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final timestamp = makeTimestamp();
     setPage(loadingPage());
 
-    final media = Down4Media.fromLocal(ComposedID(),
-        mainCachedPath: path,
-        // writeFromCachedPath: selection.contains(g.self),
-        metadata: Down4MediaMetadata(
-            isSquared: false,
-            ownerID: g.self.id,
-            mime: mimetype,
-            timestamp: timestamp,
-            isReversed: isReversed,
-            txt: text,
-            width: size.width,
-            height: size.height))
-      ..cache();
+    Down4Media? backgroundMedia;
+    if (m != null) {
+      final (path, mime, isReversed, size) = m;
+      backgroundMedia = Down4Media.fromLocal(ComposedID(),
+          mainCachedPath: path,
+          // writeFromCachedPath: selection.contains(g.self),
+          metadata: Down4MediaMetadata(
+              isSquared: false,
+              ownerID: g.self.id,
+              mime: mime,
+              timestamp: timestamp,
+              isReversed: isReversed,
+              txt: text,
+              width: size.width,
+              height: size.height))
+        ..cache();
+    }
 
     final selection = chats.selected().asNodes<ChatN>();
-    if (selection.contains(g.self)) await media.writeFromCachedPath();
+    if (selection.contains(g.self)) {
+      await backgroundMedia?.writeFromCachedPath();
+    }
+
+    final fsticks = await Future.wait(sticks.map((e) async {
+      final (mediaID, ofs, initSize, scl, rot) = e;
+      final media = local<Down4Media>(mediaID);
+      if (media == null) return null;
+      final up = await media.temporaryUpload();
+      if (up == null) return null;
+      return SnipStick(
+          mediaID: mediaID,
+          pos: ofs,
+          tempID: up.freshID ?? media.tempID!,
+          initSize: initSize,
+          rotation: rot,
+          scale: scl);
+    }));
+    final stcks = fsticks.whereType<SnipStick>().toList();
 
     for (final sel in chats.selected().asNodes<ChatN>()) {
       final snip = Snip(ComposedID(),
           snipSize: snipSize,
-          sticks: sticks,
+          sticks: stcks,
           root: sel.root_,
           senderID: g.self.id,
           txt: text,
-          mediaID: media.id);
+          mediaID: backgroundMedia?.id);
 
       await r.push(await sel.messageTargets, snip);
 
@@ -1349,14 +1368,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final s = await global<Snip>(unreadSnips.first, doCache: false);
     s!.markRead();
 
-    final m = await global<Down4Media>(s.mediaID,
+    final bm = await global<Down4Media>(s.mediaID,
         doCache: false, doFetch: true, tempID: s.tempMediaID);
-    if (m == null) return snipView(node);
 
-    m.updateTempReferences(s.tempMediaID!, s.tempMediaTS!);
+    bm?.updateTempReferences(s.tempMediaID!, s.tempMediaTS!);
 
-    if (m is Down4Video) {
-      vpc = m.newReadyController() ?? await m.futureController();
+    if (bm is Down4Video) {
+      vpc = bm.newReadyController() ?? await bm.futureController();
       if (vpc == null) return snipView(node, unreadSnips.sublist(1));
       await vpc.initialize();
       await vpc.setLooping(true);
@@ -1365,34 +1383,43 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     // fetch sticks
     await globall<Down4Media>(s.sticks.map((e) => e.mediaID),
-        doFetch: true, doMergeIfFetch: true);
-    Widget makeSnip() {
+        doFetch: true,
+        doMergeIfFetch: true,
+        tempIDs: s.sticks.map((e) => e.tempID));
+    Future<Widget> makeSnip() async {
       final ratio = g.sizes.snipSize.width / s.snipSize.width;
+      if (bm is Down4Image) {}
+
       return SizedBox.fromSize(
           size: g.sizes.snipSize,
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              ...s.sticks.map((e) {
+              ...await Future.wait(s.sticks.map((e) async {
                 final m = local<Down4Media>(e.mediaID);
                 if (m == null) return const SizedBox.shrink();
+                m.updateTempReferences(m.tempID!, m.tempTS!);
+                if (m is Down4Image) {
+                  await precacheImage(m.readyImage(e.initSize)!.image, context);
+                }
                 return Positioned(
-                  top: e.pos.dy,
-                  left: e.pos.dy * ratio,                  
-                  child: Transform(
-                    transform: Matrix4.identity()
-                      ..rotateZ(e.rotation)
-                      ..scale(e.scale * ratio),
-                    child: m.display(size: e.initSize)));
-              })
+                    top: e.pos.dy,
+                    left: e.pos.dy * ratio,
+                    child: Transform(
+                        transform: Matrix4.identity()
+                          ..rotateZ(e.rotation)
+                          ..scale(e.scale * ratio),
+                        child: m.display(size: e.initSize)));
+              }))
             ],
           ));
     }
 
-    final displayMedia = await m.displaySnip(context: context, controller: vpc);
+    // final displayMedia = await bm.displaySnip(context: context, controller: vpc);
 
     return SnipViewPage(
-        displayMedia: displayMedia,
-        text: m.metadata.txt,
+        displayMedia: await makeSnip(),
+        text: s.txt,
         back: back_,
         next: next_);
   }

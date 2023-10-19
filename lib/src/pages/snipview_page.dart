@@ -1,3 +1,4 @@
+import 'package:down4/src/render_objects/navigator.dart';
 import 'package:flutter/material.dart';
 
 import '../globals.dart';
@@ -40,32 +41,38 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(children: [
-      widget.displayMedia,
-      text.isNotEmpty
-          ? Center(
-              child: Container(
-                width: g.sizes.w,
-                height: boxHeight + 4,
-                alignment: AlignmentDirectional.center,
-                decoration: BoxDecoration(color: g.theme.snipRibbon),
-                child: Text(
-                  text,
-                  textAlign: TextAlign.center,
-                  style: g.theme.snipInputTextStyle,
-                ),
-              ),
-            )
-          : const SizedBox.shrink(),
-      Positioned(
-        bottom: 0,
-        left: 0,
-        child: SizedBox(
-          width: g.sizes.w,
-          child: console.rowOfPage(index: 0),
-        ),
-      ),
+    return Andrew(
+      transparentHeader: true,
+      pages: [
+        Down4Page(title: "", console: console, stackWidgets: [widget.displayMedia])
     ]);
+
+    // return Stack(children: [
+    //   widget.displayMedia,
+    //   text.isNotEmpty
+    //       ? Center(
+    //           child: Container(
+    //             width: g.sizes.w,
+    //             height: boxHeight + 4,
+    //             alignment: AlignmentDirectional.center,
+    //             decoration: BoxDecoration(color: g.theme.snipRibbon),
+    //             child: Text(
+    //               text,
+    //               textAlign: TextAlign.center,
+    //               style: g.theme.snipInputTextStyle,
+    //             ),
+    //           ),
+    //         )
+    //       : const SizedBox.shrink(),
+    //   Positioned(
+    //     bottom: 0,
+    //     left: 0,
+    //     child: SizedBox(
+    //       width: g.sizes.w,
+    //       child: console.rowOfPage(index: 0),
+    //     ),
+    //   ),
+    // ]);
   }
 
   @override
@@ -88,5 +95,4 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
 
   @override
   void setTheState() => setState(() {});
-  
 }
