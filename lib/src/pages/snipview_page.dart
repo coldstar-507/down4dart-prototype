@@ -42,9 +42,12 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
   @override
   Widget build(BuildContext context) {
     return Andrew(
-      transparentHeader: true,
-      pages: [
-        Down4Page(title: "", console: console, stackWidgets: [widget.displayMedia])
+      transparentHeader: true, pages: [
+      Down4Page(
+        title: "",
+        console: console,
+        stackWidgets: [widget.displayMedia],
+      )
     ]);
 
     // return Stack(children: [
@@ -79,8 +82,8 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
   Console3 get console => Console3(rows: [
         {
           "base": ConsoleRow(widgets: [
-            ConsoleButton(name: "BACK", onPress: widget.back, isInverted: true),
-            ConsoleButton(name: "NEXT", onPress: widget.next, isInverted: true),
+            ConsoleButton(name: "BACK", onPress: widget.back, isInverted: false),
+            ConsoleButton(name: "NEXT", onPress: widget.next, isInverted: false),
           ], extension: null, widths: null, inputMaxHeight: null)
         }
       ], currentConsolesName: [

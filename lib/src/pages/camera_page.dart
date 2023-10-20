@@ -394,12 +394,17 @@ class _SnipCameraState extends State<SnipCamera>
                 }
               });
           sticks.insert(0, tw);
+          final s_ = s / 2;
+          final ofs = Offset(ss.width - s_.width, ss.height - s_.height);
+          positions[tw.tid] = (ofs, 1.0, 0.0);
           pressing[tw.tid] = false;
           setState(() {});
         }
       )
     ];
   }
+
+  Size get ss => g.sizes.snipSize;
 
   // Widget? _preview;
   double _scale = 1.0;

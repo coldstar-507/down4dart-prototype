@@ -10,7 +10,6 @@ import 'package:down4/src/data_objects/_data_utils.dart';
 import 'package:down4/src/data_objects/medias.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:down4/src/web_requests.dart';
-import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:sqlite3/sqlite3.dart' as sql;
@@ -173,9 +172,24 @@ void initSqlite() async {
       tempMediaID TEXT,
       tempMediaTS TEXT,
       tempPaymentID TEXT,
-      tempPaymentTS TEXT
+      tempPaymentTS TEXT,
+      sticks TEXT,
+      snipSize TEXT
     )
     """);
+
+  try {
+    db.execute("""
+      ALTER TABLE messages
+        ADD COLUMN sticks TEXT;
+      """);
+    db.execute("""
+      ALTER TABLE messages
+        ADD COLUMN snipSize TEXT;
+      """);
+  } catch (e) {
+    print("error altering table messages: $e");
+  }
 
   db.execute("""
     CREATE INDEX IF NOT EXISTS root_index

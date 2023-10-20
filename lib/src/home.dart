@@ -1365,13 +1365,16 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       writePalette(node, _chats, bGen, rfHome, home: true);
       setPage(homePage());
     }
+
     final s = await global<Snip>(unreadSnips.first, doCache: false);
     s!.markRead();
 
     final bm = await global<Down4Media>(s.mediaID,
         doCache: false, doFetch: true, tempID: s.tempMediaID);
 
-    bm?.updateTempReferences(s.tempMediaID!, s.tempMediaTS!);
+    if (s.tempMediaID != null && s.tempMediaTS != null) {
+      bm?.updateTempReferences(s.tempMediaID!, s.tempMediaTS!);
+    }
 
     if (bm is Down4Video) {
       vpc = bm.newReadyController() ?? await bm.futureController();
@@ -1380,6 +1383,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       await vpc.setLooping(true);
       await vpc.play();
     }
+
+    print("""
+      /////////////////////////////////////////////////////////
+      // there are ${s.sticks.length} sticks with this snip! //
+      /////////////////////////////////////////////////////////
+      """);
 
     // fetch sticks
     await globall<Down4Media>(s.sticks.map((e) => e.mediaID),
@@ -1393,8 +1402,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       return SizedBox.fromSize(
           size: g.sizes.snipSize,
           child: Stack(
-            fit: StackFit.expand,
+            // fit: StackFit.expand,
             children: [
+              bm?.display(size: g.sizes.snipSize, controller: vpc) ??
+                  const SizedBox.shrink(),
               ...await Future.wait(s.sticks.map((e) async {
                 final m = local<Down4Media>(e.mediaID);
                 if (m == null) return const SizedBox.shrink();
@@ -1402,9 +1413,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                 if (m is Down4Image) {
                   await precacheImage(m.readyImage(e.initSize)!.image, context);
                 }
+
+                print("positioning stick at ${e.pos}\nsnipSize = ${g.sizes.snipSize}");
+
                 return Positioned(
                     top: e.pos.dy,
-                    left: e.pos.dy * ratio,
+                    left: e.pos.dx * ratio,
                     child: Transform(
                         transform: Matrix4.identity()
                           ..rotateZ(e.rotation)
@@ -1418,10 +1432,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     // final displayMedia = await bm.displaySnip(context: context, controller: vpc);
 
     return SnipViewPage(
-        displayMedia: await makeSnip(),
-        text: s.txt,
-        back: back_,
-        next: next_);
+        displayMedia: await makeSnip(), text: s.txt, back: back_, next: next_);
   }
 
   @override
