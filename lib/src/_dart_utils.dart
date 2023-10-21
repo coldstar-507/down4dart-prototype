@@ -158,13 +158,17 @@ extension IterableNodes on Iterable<Down4Node> {
   Iterable<User> users() => whereType<User>();
 }
 
-extension ListExtensions on List {
-  (T? previous, T? next) surroundings<T>(T element) {
+extension ListExtensions<T> on List<T> {
+  (T? previous, T? next) surroundings(T element) {
     final index = indexOf(element);
     T? previous, next;
     if (index != 0) previous = this[index - 1];
     if (index != length - 1) next = this[index + 1];
     return (previous, next);
+  }
+
+  (T head, List<T> tail) headTail() {
+    return (this[0], sublist(1));
   }
 }
 

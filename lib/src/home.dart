@@ -66,12 +66,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   ViewState get currentView => viewManager.currentView;
 
   // homestate getters
-  Map<Down4ID, Palette> get _chats => homeView.pages[0].state.cast();
+  Map<Down4ID, Palette<ChatN>> get _chats => homeView.pages[0].state.cast();
   Map<Down4ID, Palette> get _otherConns => homeView.pages[1].state.cast();
 
-  Iterable<Palette> get chats => _chats.values.cast()..showing();
+  Iterable<Palette<ChatN>> get chats => _chats.values.cast()..showing();
   Iterable<ConnectN> get homeConnection =>
-      _chats.values.asNodes<ConnectN>().where((n) => n.isConnected);
+      _chats.values.asNodesCast<ConnectN>().where((n) => n.isConnected);
 
   List<Palette> get formattedHome => chats.toList().formatted();
   Map<Down4ID, ChatMessage>? chatMessages(ComposedID nodeID) {
@@ -526,13 +526,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   void unselectHomeSelection({bool updateActivity = true}) {
-    for (final p in List.of(chats)) {
-      if (p.selected) {
-        writePalette(p.node as ChatN, _chats, bGen, rfHome,
-            sel: false, home: true);
-      }
+    for (final p in chats.selected()) {
+      if (updateActivity) p.node.updateActivity();
+      writePalette(p.node, _chats, bGen, rfHome, home: true);
     }
-    return;
   }
 
   List<Palette> forwardables(List<Palette> ps) {
@@ -552,94 +549,110 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // =========================== PAGES FUNCTIONS ======================== //
 
   Future<void> processChats(Iterable<Chat> chats) async {
+    if (chats.isEmpty) return;
+    // final cns = locall<ChatN>(chats.map((e) => idOfRoot(root: e.root)));
     // these chats passed in parameter can also be forwarded chats
-    for (final c in chats) {
+    Future<void> pc_(Chat c, [VoidCallback? cb]) async {
       final rtID = idOfRoot(root: c.root);
-      final rt = await global<ChatN>(rtID);
+      final rt = local<ChatN>(rtID);
       if (rt == null) return;
-      final targets = await rt.messageTargets;
-      print("sending messages to ${targets.map((t) => t.id.unik)}");
-      final success = await r.push(await rt.messageTargets, c);
+      final fsuccess = r.push(rt.messageTargets, c, cb);
+      final success = await fsuccess;
       rt.updateActivity();
       writePalette(rt, _chats, bGen, rfHome, home: true);
       if (success) c.markSent();
       reloadChatWithID(rtID, msgRe: c);
-      if (page is HomePage) setPage(homePage());
     }
+
+    final (h, t) = chats.toList().headTail();
+    pc_(h, () async {
+      await Future.wait(t.map((e) => pc_(e)));
+      if (page is HomePage) setPage(homePage());
+    });
+
+    // for (final c in chats) {
+    //   final rtID = idOfRoot(root: c.root);
+    //   final rt = await global<ChatN>(rtID);
+    //   if (rt == null) return;
+    //   final targets = await rt.messageTargets;
+    //   print("sending messages to ${targets.map((t) => t.id.unik)}");
+    //   final success = await r.push(rt.messageTargets, c);
+    //   rt.updateActivity();
+    //   writePalette(rt, _chats, bGen, rfHome, home: true);
+    //   if (success) c.markSent();
+    //   reloadChatWithID(rtID, msgRe: c);
+    //   if (page is HomePage) setPage(homePage());
+    // }
   }
 
   Future<void> sendSnip({
-    required Size snipSize,
-    required List<(ComposedID, Offset, Size, double scl, double)> sticks,
-    required (String path, String mimetype, bool isReversed, Size s)? m,
+    required List<SnipStick> sticks,
+    required Down4Media? backgroundMedia,
     String? text,
   }) async {
-    // image from camera are cached files, so they are
-    // automatically deleted on boot
-
-    final timestamp = makeTimestamp();
     setPage(loadingPage());
 
-    Down4Media? backgroundMedia;
-    if (m != null) {
-      final (path, mime, isReversed, size) = m;
-      backgroundMedia = Down4Media.fromLocal(ComposedID(),
-          mainCachedPath: path,
-          // writeFromCachedPath: selection.contains(g.self),
-          metadata: Down4MediaMetadata(
-              isSquared: false,
-              ownerID: g.self.id,
-              mime: mime,
-              timestamp: timestamp,
-              isReversed: isReversed,
-              txt: text,
-              width: size.width,
-              height: size.height))
-        ..cache();
-    }
-
-    final selection = chats.selected().asNodes<ChatN>();
+    final selection = chats.selected().asNodes();
     if (selection.contains(g.self)) {
       await backgroundMedia?.writeFromCachedPath();
+      backgroundMedia
+        ?..cache()
+        ..merge();
     }
 
-    final fsticks = await Future.wait(sticks.map((e) async {
-      final (mediaID, ofs, initSize, scl, rot) = e;
-      final media = local<Down4Media>(mediaID);
-      if (media == null) return null;
-      final up = await media.temporaryUpload();
-      if (up == null) return null;
-      return SnipStick(
-          mediaID: mediaID,
-          pos: ofs,
-          tempID: up.freshID ?? media.tempID!,
-          initSize: initSize,
-          rotation: rot,
-          scale: scl);
-    }));
-    final stcks = fsticks.whereType<SnipStick>().toList();
+    List<Future<bool>> pushes = [];
+    final sels = chats.selected().asNodes().toList();
+    if (sels.isEmpty) return;
+    final (head, tail) = sels.headTail();
 
-    for (final sel in chats.selected().asNodes<ChatN>()) {
+    Future<void> sendSnip_(ChatN n, [VoidCallback? cb]) async {
       final snip = Snip(ComposedID(),
-          snipSize: snipSize,
-          sticks: stcks,
-          root: sel.root_,
+          snipSize: g.sizes.snipSize,
+          sticks: sticks,
+          root: n.root_,
           senderID: g.self.id,
           txt: text,
           mediaID: backgroundMedia?.id);
 
-      await r.push(await sel.messageTargets, snip);
-
-      if (sel.id == g.self.id) {
+      pushes.add(r.push(n.messageTargets, snip, cb));
+      if (n.id == g.self.id) {
         snip
           ..cache()
           ..merge();
       }
     }
 
-    unselectHomeSelection();
-    viewManager.popUntilHome();
-    setPage(homePage(prompt: "SNIPED"));
+    // the reason for this strange arrangement is in the case of sending
+    // the same snip to multiple target,
+    sendSnip_(head, () {
+      for (final n in tail) {
+        sendSnip_(n);
+      }
+      unselectHomeSelection();
+      viewManager.popUntilHome();
+      setPage(homePage(prompt: "SNIPED"));
+    });
+
+    // for (int i = 0; i < sels.length; i++) {
+    //   final sel = sels[i];
+    //   final snip = Snip(ComposedID(),
+    //       snipSize: g.sizes.snipSize,
+    //       sticks: sticks,
+    //       root: sel.root_,
+    //       senderID: g.self.id,
+    //       txt: text,
+    //       mediaID: backgroundMedia?.id);
+
+    //   pushes.add(r.push(await sel.messageTargets, snip));
+
+    //   if (sel.id == g.self.id) {
+    //     snip
+    //       ..cache()
+    //       ..merge();
+    //   }
+
+    //   writePalette(sel..updateActivity(), _chats, bGen, rfHome, home: true);
+    // }
   }
 
   // ============================== PAGES ============================== //
@@ -1382,13 +1395,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       await vpc.initialize();
       await vpc.setLooping(true);
       await vpc.play();
+    } else if (bm is Down4Image) {
+      await precacheImage(bm.readyImage(g.sizes.snipSize)!.image, context);
     }
-
-    print("""
-      /////////////////////////////////////////////////////////
-      // there are ${s.sticks.length} sticks with this snip! //
-      /////////////////////////////////////////////////////////
-      """);
 
     // fetch sticks
     await globall<Down4Media>(s.sticks.map((e) => e.mediaID),
@@ -1402,25 +1411,22 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       return SizedBox.fromSize(
           size: g.sizes.snipSize,
           child: Stack(
-            // fit: StackFit.expand,
+            fit: StackFit.expand,
             children: [
               bm?.display(size: g.sizes.snipSize, controller: vpc) ??
                   const SizedBox.shrink(),
-              ...await Future.wait(s.sticks.map((e) async {
+              ...await Future.wait(s.sticks.reversed.map((e) async {
                 final m = local<Down4Media>(e.mediaID);
                 if (m == null) return const SizedBox.shrink();
                 m.updateTempReferences(m.tempID!, m.tempTS!);
                 if (m is Down4Image) {
                   await precacheImage(m.readyImage(e.initSize)!.image, context);
                 }
-
-                print("positioning stick at ${e.pos}\nsnipSize = ${g.sizes.snipSize}");
-
-                return Positioned(
-                    top: e.pos.dy,
-                    left: e.pos.dx * ratio,
+                return Center(
                     child: Transform(
+                        alignment: FractionalOffset.center,
                         transform: Matrix4.identity()
+                          ..translate(e.pos.dx * ratio, e.pos.dy)
                           ..rotateZ(e.rotation)
                           ..scale(e.scale * ratio),
                         child: m.display(size: e.initSize)));
@@ -1428,8 +1434,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ],
           ));
     }
-
-    // final displayMedia = await bm.displaySnip(context: context, controller: vpc);
 
     return SnipViewPage(
         displayMedia: await makeSnip(), text: s.txt, back: back_, next: next_);

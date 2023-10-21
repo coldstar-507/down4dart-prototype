@@ -708,20 +708,20 @@ class _Down4VideoPlayerState extends State<_Down4VideoPlayer> {
   }
 }
 
-extension Down4ObjectExtension on Iterable<Down4Object> {
+extension Down4ObjectExtension<T extends Down4Object> on Iterable<T> {
   Iterable<Down4ID> d4IDs() => map((e) => e.id);
   Iterable<ComposedID> cpIDs() => map((e) => e.id).whereType<ComposedID>();
-  Iterable<T> ids<T extends Down4ID>() => map((e) => e.id).whereType<T>();
-  Iterable<T> wType<T extends Down4Object>() => whereType<T>();
+  Iterable<T> ids() => map((e) => e.id).whereType<T>();
+  Iterable<T> wType() => whereType<T>();
   Iterable<ChatMessage> chatMsgs() => whereType<ChatMessage>();
   Iterable<Palette> palettes() => whereType<Palette>();
-  Iterable<Down4SelectionWidget> selectable() =>
-      whereType<Down4SelectionWidget>();
+  Iterable<E> selectable<E extends Down4SelectionWidget>() => whereType<E>();  
 }
 
-extension Down4ObjectSelectionExtension on Iterable<Down4SelectionWidget> {
-  Iterable<Down4SelectionWidget> selected() => where((e) => e.selected);
-  Iterable<Down4SelectionWidget> notSelected() => where((e) => !e.selected);
+
+extension Down4ObjectSelectionExtension<T extends Down4SelectionWidget> on Iterable<T> {
+  Iterable<T> selected() => where((e) => e.selected);
+  Iterable<T> notSelected() => where((e) => !e.selected);
 }
 
 extension Down4WidgetIterables on Iterable<Down4Widget> {
@@ -751,22 +751,22 @@ extension Palette2Extensions on Iterable<Palette> {
     ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
 }
 
-extension IterablePalette2Extensions on Iterable<Palette> {
+extension IterablePalette2Extensions<E extends PaletteN> on Iterable<Palette<E>> {
   // Iterable<Palette> deactivated() => map((p) => p.deactivated());
-  Iterable<Palette> selected() => where((element) => element.selected);
-  Iterable<Palette> notSelected() => where((p) => !p.selected);
-  Iterable<Palette> whereNodeIsNot<T extends Down4Node>() =>
+  Iterable<Palette<E>> selected() => where((element) => element.selected);
+  Iterable<Palette<E>> notSelected() => where((p) => !p.selected);
+  Iterable<Palette<E>> whereNodeIsNot<T extends Down4Node>() =>
       where((p) => p.node is! T);
-  Iterable<Palette> whereNodeIs<T extends Down4Node>() =>
-      where((p) => p.node is T);
+  Iterable<Palette<T>> whereNodeIs<T extends PaletteN>() =>
+      where((p) => p.node is T).cast();
 
   Iterable<Palette> showing() => where((p) => p.show);
   Iterable<Palette> hidden() => where((p) => !p.show);
   // Iterable<Down4ID> asIDs() => map((e) => e.node.id);
   // Iterable<ComposedID> asComposedIDs() => asIDs().whereType<ComposedID>();
 
-  Iterable<T> asNodes<T extends PaletteN>() =>
-      map((p) => p.node).whereType<T>();
+  Iterable<K> asNodes<K extends E>() => map((p) => p.node).whereType<K>();
+  Iterable<K> asNodesCast<K extends PaletteN>() => map((p) => p.node).whereType<K>();  
   Iterable<Palette> those(Iterable<Down4ID> ids) =>
       where((p) => ids.contains(p.node.id));
   Iterable<Palette> notThose(Iterable<Down4ID> ids) =>

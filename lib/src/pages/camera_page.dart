@@ -34,17 +34,16 @@ class TransformableWidget extends StatelessWidget {
     required this.child,
   }) : super(key: ValueKey(tid));
 
-  TransformableWidget withNewPosition(Offset ofs, rot, scl) {
-    return TransformableWidget(
-      onPositionChange: onPositionChange,
-      currentOffset: ofs,
-      // previousScale: previousScale,
-      currentScale: scl,
-      currentRotation: rot,
-      tid: tid,
-      child: child,
-    );
-  }
+  // TransformableWidget withNewPosition(Offset ofs, rot, scl) {
+  //   return TransformableWidget(
+  //     onPositionChange: onPositionChange,
+  //     currentOffset: ofs,
+  //     currentScale: scl,
+  //     currentRotation: rot,
+  //     tid: tid,
+  //     child: child,
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +237,7 @@ class _TW2State extends State<TW2> {
         _focalPoint = details.focalPoint;
         nPrevPointers = details.pointerCount;
 
-        widget.onMove(widget.tid, a_, _scale, _rotation);
+        widget.onMove(widget.tid, _position, _scale, _rotation);
 
         setState(() {});
       },
@@ -307,9 +306,8 @@ class SnipCamera extends StatefulWidget implements Down4PageWidget {
 
   final void Function() cameraBack;
   final void Function({
-    required (String path, String mimetype, bool isReversed, Size s)? m,
-    required Size snipSize,
-    required List<(ComposedID, Offset, Size, double, double)> sticks,
+    required Down4Media? backgroundMedia,
+    required List<SnipStick> sticks,
     required String? text,
   }) cameraCallBack;
   final bool enableVideo;
@@ -389,14 +387,16 @@ class _SnipCameraState extends State<SnipCamera>
                 positions[tid] = (ofs, scl, rot);
                 final ix = sticks.indexWhere((e) => e.tid == tid);
                 if (ix != 0) {
-                  sticks.swap(0, ix);
+                  final e = sticks.removeAt(ix);
+                  sticks.insert(0, e);
+                  // sticks.swap(0, ix);
                   setState(() {});
                 }
               });
           sticks.insert(0, tw);
-          final s_ = s / 2;
-          final ofs = Offset(ss.width - s_.width, ss.height - s_.height);
-          positions[tw.tid] = (ofs, 1.0, 0.0);
+          // final s_ = s / 2;
+          // final ofs = Offset(ss.width - s_.width, ss.height - s_.height);
+          positions[tw.tid] = (const Offset(0, 0), 1.0, 0.0);
           pressing[tw.tid] = false;
           setState(() {});
         }
@@ -650,21 +650,21 @@ class _SnipCameraState extends State<SnipCamera>
     );
   }
 
-  TransformableWidget? _snipInput;
+  // TransformableWidget? _snipInput;
 
-  TransformableWidget get movableInput {
-    return _snipInput ??= TransformableWidget(
-        onPositionChange: (ofs, rot, scl, tid) {
-          print("moving snip input!");
-          _snipInput = _snipInput!.withNewPosition(ofs, rot, scl);
-          setState(() {});
-        },
-        currentOffset: g.sizes.middlePoint,
-        currentScale: 1.0,
-        currentRotation: 0.0,
-        tid: randomMediaID(),
-        child: input.snipInput);
-  }
+  // TransformableWidget get movableInput {
+  //   return _snipInput ??= TransformableWidget(
+  //       onPositionChange: (ofs, rot, scl, tid) {
+  //         print("moving snip input!");
+  //         _snipInput = _snipInput!.withNewPosition(ofs, rot, scl);
+  //         setState(() {});
+  //       },
+  //       currentOffset: g.sizes.middlePoint,
+  //       currentScale: 1.0,
+  //       currentRotation: 0.0,
+  //       tid: randomMediaID(),
+  //       child: input.snipInput);
+  // }
 
   @override
   List<Extra> extras = [];
@@ -730,12 +730,33 @@ class _SnipCameraState extends State<SnipCamera>
                 ConsoleButton(
                   name: "SEND",
                   onPress: () {
+                    Down4Media? m;
+                    if (filePath != null) {
+                      m = Down4Media.fromLocal(ComposedID(),
+                          mainCachedPath: filePath,
+                          metadata: Down4MediaMetadata(
+                              ownerID: g.self.id,
+                              timestamp: makeTimestamp(),
+                              width: _camSize.width,
+                              height: _camSize.height,
+                              mime: mimetype!));
+                    }
+
+                    final stx = sticks.map((e) {
+                      final (ofs, scl, rot) = positions[e.tid]!;
+                      return SnipStick(
+                          mediaID: e.mediaID,
+                          pos: ofs,
+                          tempID_: null, // will be defined on upload
+                          tempTS_: null, // will be defined on upload
+                          initSize: e.initSize,
+                          rotation: rot,
+                          scale: scl);
+                    }).toList();
+
                     vpc?.dispose();
                     widget.cameraCallBack(
-                        m: m,
-                        snipSize: g.sizes.snipSize,
-                        text: input.value,
-                        sticks: sticksInfo);
+                        backgroundMedia: m, text: input.value, sticks: stx);
                   },
                 ),
               ], extension: null, widths: null, inputMaxHeight: null),

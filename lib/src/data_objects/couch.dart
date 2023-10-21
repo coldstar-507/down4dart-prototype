@@ -46,7 +46,7 @@ Future<List<T>> globall<T extends Locals>(
 }
 
 List<T> locall<T extends Locals>(
-  Iterable<Down4ID>? ids, {
+  Iterable<Down4ID?>? ids, {
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
@@ -245,8 +245,9 @@ String gdb<T extends Locals>() {
   throw 'No db exists for type: $T';
 }
 
-T? local<T extends Locals>(Down4ID id,
+T? local<T extends Locals>(Down4ID? id,
     {bool doCache = false, Map<Down4ID, Locals>? sc, sql.Database? sdb}) {
+  if (id == null) return null;
   final cached = cache<T>(id, sc: sc);
   if (cached != null) return cached;
   return _local<T>(id, doCache: doCache, sc: sc, sdb: sdb);
@@ -444,15 +445,14 @@ Set<ComposedID> allMediaReferences() {
         if (reacs == null) return null;
         final jsnl = Map.from(youKnowDecode(reacs));
         return jsnl.map((k, v) {
-            final mid = ComposedID.fromString(v["mediaID"])!;
-            return MapEntry(k, mid);
+          final mid = ComposedID.fromString(v["mediaID"])!;
+          return MapEntry(k, mid);
         }).values;
       })
       .whereType<Iterable<ComposedID>>()
       .expand((b) => b);
 
   return (rmn.followedBy(rr)).toSet();
-
 }
 
 // TODO: could be optimized // how?

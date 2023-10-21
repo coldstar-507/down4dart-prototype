@@ -15,36 +15,49 @@ import 'nodes.dart';
 enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
 
 class SnipStick {
-  final ComposedID mediaID, tempID;
+  final ComposedID mediaID;
+  late ComposedID _tempID;
+  late int _tempTS;
   final Offset pos;
   final Size initSize;
   final double rotation, scale;
   SnipStick({
     required this.mediaID,
     required this.pos,
-    required this.tempID,
+    required ComposedID? tempID_,
+    required int? tempTS_,
     required this.initSize,
     required this.rotation,
     required this.scale,
-  });
+  }) {
+    if (tempID_ != null) _tempID = tempID_;
+    if (tempTS_ != null) _tempTS = tempTS_;
+  }
+
+  ComposedID get tempID => _tempID;
+  int get tempTS => _tempTS;
+  void setTemps(ComposedID id, int ts) {
+    _tempID = id;
+    _tempTS = ts;
+  }
 
   factory SnipStick.fromString(String b64) {
     final str = String.fromCharCodes(base64Decode(b64));
     final arr = str.split("@");
     return SnipStick(
-      mediaID: ComposedID.fromString(arr[0])!,
-      pos: Offset(double.parse(arr[1]), double.parse(arr[2])),
-      initSize: Size(double.parse(arr[3]), double.parse(arr[4])),
-      rotation: double.parse(arr[5]),
-      scale: double.parse(arr[6]),
-      tempID: ComposedID.fromString(arr[7])!,
-    );
+        mediaID: ComposedID.fromString(arr[0])!,
+        pos: Offset(double.parse(arr[1]), double.parse(arr[2])),
+        initSize: Size(double.parse(arr[3]), double.parse(arr[4])),
+        rotation: double.parse(arr[5]),
+        scale: double.parse(arr[6]),
+        tempID_: ComposedID.fromString(arr[7]),
+        tempTS_: int.parse(arr[8]));
   }
 
   @override
   String toString() {
     final data =
-        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale@${tempID.value}";
+        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale@${tempID.value}$tempTS";
     return base64Encode(data.codeUnits);
   }
 }
@@ -421,6 +434,43 @@ class Snip extends Down4Message
 
   @override
   ComposedID? get mediaID => _mediaID;
+
+  @override
+  Future<String?> uploadRoutine() async {
+
+    List<Future<({ComposedID? freshID, int? freshTS})?>> ups = [];
+    for (final mid in [mediaID, ...sticks.map((e) => e.mediaID)]) {
+      ups.add(local<Down4Media>(mid)?.temporaryUpload() ?? Future.value(null));
+    }
+
+    final l = await Future.wait(ups);
+    for (int i = 1; i < l.length; i++) {
+      final up = l[i];
+      if (up != null) {
+        final m = local<Down4Media>(sticks[i - 1].mediaID)!;
+        sticks[i - 1].setTemps(m.tempID!, m.tempTS!);
+      }
+    }
+
+    final Map<String, String> msgData = toJson(includeLocal: false);
+    final bgMediaUpload = l[0];
+    if (bgMediaUpload != null) {
+      final bg = local<Down4Media>(mediaID)!;
+      msgData["tempMediaID"] = bg.tempID!.value;
+      msgData["tempMediaTS"] = bg.tempTS!.toString();
+    }
+
+    // if (media != null) {
+    //   final upld = await media.temporaryUpload();
+    //   if (upld == null) return null;
+    //   msgData["tempMediaID"] = media.tempID!.value;
+    //   msgData["tempMediaTS"] = media.tempTS!.toString();
+    // }
+
+    final successfulMsgUpload = await uploadMessageData(msgData);
+    if (!successfulMsgUpload) return null;
+    return "m!${id.value}";
+  }
 
   Snip(
     this.id, {

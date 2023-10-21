@@ -469,9 +469,9 @@ mixin ChatN on Down4Node, Locals {
 
   String get root_ => root(g.self.id);
 
-  Future<List<PersonN>> get messageTargets async {
+  List<PersonN> get messageTargets {
     if (this is GroupN) {
-      final g = await globall<PersonN>(_members);
+      final g = locall<PersonN>(_members);
       return g;
     } else if (g.self == this) {
       return [g.self];

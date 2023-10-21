@@ -221,7 +221,11 @@ class MQ {
       };
 }
 
-Future<bool> push(List<PersonN> targets, Down4Message msg) async {
+Future<bool> push(
+  List<PersonN> targets,
+  Down4Message msg, [
+  VoidCallback? afterUploadRoutine,
+]) async {
   final List<MT> ts = [];
   String header = "";
   String body = "";
@@ -229,8 +233,8 @@ Future<bool> push(List<PersonN> targets, Down4Message msg) async {
   PersonN? sender;
 
   final push = await msg.uploadRoutine();
+  afterUploadRoutine?.call();
   if (push == null) return false;
-
   if (msg is ReactionIncrement) {
     for (final t in targets) {
       for (final v in t.messagingTokens.entries) {
