@@ -757,16 +757,16 @@ extension IterablePalette2Extensions<E extends PaletteN> on Iterable<Palette<E>>
   Iterable<Palette<E>> notSelected() => where((p) => !p.selected);
   Iterable<Palette<E>> whereNodeIsNot<T extends Down4Node>() =>
       where((p) => p.node is! T);
-  Iterable<Palette<T>> whereNodeIs<T extends PaletteN>() =>
-      where((p) => p.node is T).cast();
+  Iterable<Palette> whereNodeIs<T extends PaletteN>() =>
+      where((p) => p.node is T);
 
   Iterable<Palette> showing() => where((p) => p.show);
   Iterable<Palette> hidden() => where((p) => !p.show);
   // Iterable<Down4ID> asIDs() => map((e) => e.node.id);
   // Iterable<ComposedID> asComposedIDs() => asIDs().whereType<ComposedID>();
 
-  Iterable<K> asNodes<K extends E>() => map((p) => p.node).whereType<K>();
-  Iterable<K> asNodesCast<K extends PaletteN>() => map((p) => p.node).whereType<K>();  
+  Iterable<K> asNodes<K extends PaletteN>() => map((p) => p.node).whereType<K>();
+  // Iterable<K> asNodesCast<K extends PaletteN>() => map((p) => p.node).whereType<K>();  
   Iterable<Palette> those(Iterable<Down4ID> ids) =>
       where((p) => ids.contains(p.node.id));
   Iterable<Palette> notThose(Iterable<Down4ID> ids) =>

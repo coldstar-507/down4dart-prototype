@@ -71,7 +71,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   Iterable<Palette<ChatN>> get chats => _chats.values.cast()..showing();
   Iterable<ConnectN> get homeConnection =>
-      _chats.values.asNodesCast<ConnectN>().where((n) => n.isConnected);
+      _chats.values.asNodes<ConnectN>().where((n) => n.isConnected);
 
   List<Palette> get formattedHome => chats.toList().formatted();
   Map<Down4ID, ChatMessage>? chatMessages(ComposedID nodeID) {
@@ -556,6 +556,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final rtID = idOfRoot(root: c.root);
       final rt = local<ChatN>(rtID);
       if (rt == null) return;
+      final targets = rt.messageTargets;
+      if ()
+
       final fsuccess = r.push(rt.messageTargets, c, cb);
       final success = await fsuccess;
       rt.updateActivity();
@@ -601,7 +604,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
 
     List<Future<bool>> pushes = [];
-    final sels = chats.selected().asNodes().toList();
+    final sels = chats.selected().asNodes<ChatN>().toList();
     if (sels.isEmpty) return;
     final (head, tail) = sels.headTail();
 
@@ -1409,6 +1412,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       if (bm is Down4Image) {}
 
       return SizedBox.fromSize(
+          key: GlobalKey(),
           size: g.sizes.snipSize,
           child: Stack(
             fit: StackFit.expand,

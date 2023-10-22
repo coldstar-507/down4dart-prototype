@@ -16,8 +16,8 @@ enum MessageType { chat, snip, payment, bill, reaction, post, reactionInc }
 
 class SnipStick {
   final ComposedID mediaID;
-  late ComposedID _tempID;
-  late int _tempTS;
+  ComposedID? _tempID;
+  int? _tempTS;
   final Offset pos;
   final Size initSize;
   final double rotation, scale;
@@ -34,8 +34,8 @@ class SnipStick {
     if (tempTS_ != null) _tempTS = tempTS_;
   }
 
-  ComposedID get tempID => _tempID;
-  int get tempTS => _tempTS;
+  ComposedID? get tempID => _tempID;
+  int? get tempTS => _tempTS;
   void setTemps(ComposedID id, int ts) {
     _tempID = id;
     _tempTS = ts;
@@ -44,20 +44,25 @@ class SnipStick {
   factory SnipStick.fromString(String b64) {
     final str = String.fromCharCodes(base64Decode(b64));
     final arr = str.split("@");
+    final hasTempData = arr.length == 9;
     return SnipStick(
         mediaID: ComposedID.fromString(arr[0])!,
         pos: Offset(double.parse(arr[1]), double.parse(arr[2])),
         initSize: Size(double.parse(arr[3]), double.parse(arr[4])),
         rotation: double.parse(arr[5]),
         scale: double.parse(arr[6]),
-        tempID_: ComposedID.fromString(arr[7]),
-        tempTS_: int.parse(arr[8]));
+        tempID_: hasTempData ? ComposedID.fromString(arr[7]) : null,
+        tempTS_: hasTempData ? int.parse(arr[8]) : null);
   }
 
   @override
   String toString() {
-    final data =
-        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale@${tempID.value}$tempTS";
+    var data =
+        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
+    // @${tempID?.value}$tempTS";
+    if (tempID != null && tempTS != null) {
+      data = "$data@${tempID!.value}@$tempTS";
+    }
     return base64Encode(data.codeUnits);
   }
 }
@@ -437,7 +442,6 @@ class Snip extends Down4Message
 
   @override
   Future<String?> uploadRoutine() async {
-
     List<Future<({ComposedID? freshID, int? freshTS})?>> ups = [];
     for (final mid in [mediaID, ...sticks.map((e) => e.mediaID)]) {
       ups.add(local<Down4Media>(mid)?.temporaryUpload() ?? Future.value(null));

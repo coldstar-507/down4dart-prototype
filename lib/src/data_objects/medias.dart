@@ -1,19 +1,14 @@
 import 'dart:async';
-// import 'dart:convert';
 import 'dart:io';
-
-// import 'package:image/image.dart' as img;
 
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
-import 'package:down4/src/render_objects/console.dart';
 import 'package:down4/src/utils/encrypted_file_image.dart';
 import 'package:down4/src/utils/encryption_helper.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
-// import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -533,6 +528,7 @@ class Down4Image extends Down4Media {
     } else if (_cachedUrl != null) {
       print("cached url: $_cachedUrl");
       final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
+      return res;
     }
     return null;
   }
@@ -594,187 +590,6 @@ class Down4Image extends Down4Media {
     await File(mainPath()).writeAsBytes(mainData);
   }
 }
-
-// mixin Down4Image on Down4Media {
-//   (double? w, double? h) ss(Size ds) {
-//     if (metadata.width > metadata.height) {
-//       return (ds.width * golden, null);
-//     } else {
-//       return (null, ds.height * golden);
-//     }
-//   }
-
-//   Image? readySnipImage() {
-//     File? f;
-//     if ((f = mainCachedFile ?? mainFile()) != null) {
-//       return Image(image: FileImage(f!), fit: BoxFit.cover);
-//     } else if (_cachedUrl != null) {
-//       return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
-//     }
-//     return null;
-//   }
-
-//   Future<Image?> futureSnipImage() async {
-//     await tempUrl;
-//     if (_cachedUrl == null) {
-//       return null;
-//     }
-//     return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
-//   }
-
-//   String _profilePath([String? appDir]) => "${mainPath(appDir)}_prf";
-
-//   // returns or generate pofile image
-//   Future<String?> profilePath([String? appDir]) async {
-//     print("the app dir man g: $appDir");
-//     final File to = File(_profilePath(appDir));
-//     final File? from = mainFile(appDir);
-//     if (to.existsSync()) return _profilePath(appDir);
-//     if (from == null) return null;
-//     await cropAndSaveToSquare(from: from, to: to, size: 200);
-//     return _profilePath(appDir);
-//   }
-
-//   ImageProvider? localImage(Size s, {bool forceSquare = false}) {
-//     File? f;
-//     int? w, h;
-
-//     // we want cached (w or h) to be (golden * longest diplaySize side)
-//     if (size.aspectRatio < 1) {
-//       w = (s.width * golden).toInt();
-//     } else {
-//       h = (s.height * golden).toInt();
-//     }
-
-//     f ??= (mainCachedFile ?? mainFile());
-//     if (f != null) {
-//       if (isEncrypted) {
-//         final enc = EncryptedFileImage(f);
-//         final res = ResizeImage(enc, width: w, height: h);
-//         return res;
-//       } else {
-//         final res = ResizeImage(FileImage(f), width: w, height: h);
-//         return res;
-//       }
-//     } else if (_cachedUrl != null) {
-//       print("cached url: $_cachedUrl");
-//       final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
-//     }
-//     return null;
-//   }
-
-//   Image? readyImage(Size s, {bool forceSquare = false}) {
-//     File? f;
-//     int? w, h;
-
-//     // we want cached (w or h) to be (golden * longest diplaySize side)
-//     if (size.aspectRatio < 1) {
-//       w = (s.width * golden).toInt();
-//     } else {
-//       h = (s.height * golden).toInt();
-//     }
-
-//     if ((f = mainCachedFile ?? mainFile()) != null) {
-//       if (isEncrypted) {
-//         final enc = EncryptedFileImage(f!);
-//         final res = ResizeImage(enc, width: w, height: h);
-//         return Image(image: res, fit: BoxFit.cover);
-//       } else {
-//         final res = ResizeImage(FileImage(f!), width: w, height: h);
-//         return Image(image: res, fit: BoxFit.cover);
-//       }
-//     } else if (_cachedUrl != null) {
-//       print("cached url: $_cachedUrl");
-//       final res = ResizeImage(NetworkImage(_cachedUrl!), width: w, height: h);
-//       return Image(image: res, fit: BoxFit.cover);
-//     }
-//     return null;
-//   }
-
-//   bool get isEncrypted => metadata.isEncrypted;
-
-//   Future<Image?> futureImage(Size s, {bool forceSquare = false}) async {
-//     await url;
-//     return readyImage(s, forceSquare: forceSquare);
-//   }
-
-//   @override
-//   String? delete({bool stmt = false}) {
-//     super.delete(stmt: stmt);
-//     try {
-//       mainFile()?.delete();
-//     } catch (_) {}
-//     try {
-//       File(_profilePath()).delete();
-//     } catch (_) {}
-//     return null;
-//   }
-
-//   @override
-//   Future<void> write(Uint8List mainData) async {
-//     await File(mainPath()).writeAsBytes(mainData);
-//   }
-// }
-
-// mixin Down4Video on Down4Media {
-//   String get thumbnailPath => "${mainPath()}-tn";
-
-//   File? get thumbnailFile {
-//     final File f = File(thumbnailPath);
-//     if (f.existsSync()) return f;
-//     return null;
-//   }
-
-//   Image? thumbnail(Size s, {bool forceSquare = false}) {
-//     if (thumbnailFile == null) return null;
-//     int? w, h;
-
-//     // we want cached (w or h) to be (golden * longest diplaySize side)
-//     if (size.aspectRatio < 1) {
-//       w = (s.width * golden).toInt();
-//     } else {
-//       h = (s.height * golden).toInt();
-//     }
-
-//     return Image.file(thumbnailFile!,
-//         fit: BoxFit.cover, cacheWidth: w, cacheHeight: h);
-//   }
-
-//   VideoPlayerController? newReadyController() {
-//     if ((mainCachedFile ?? mainFile()) != null) {
-//       return VideoPlayerController.file((mainCachedFile ?? mainFile())!);
-//     }
-//     if (_cachedUrl != null) {
-//       final uri = Uri.parse(_cachedUrl!);
-//       return VideoPlayerController.networkUrl(uri);
-//     }
-
-//     return null;
-//   }
-
-//   Future<VideoPlayerController?> futureController() async {
-//     final url_ = await url;
-//     if (url_ != null) {
-//       final uri = Uri.parse(url_);
-//       return VideoPlayerController.networkUrl(uri);
-//     }
-//     return null;
-//   }
-
-//   @override
-//   String? delete({bool stmt = false}) {
-//     super.delete(stmt: stmt);
-//     mainFile()?.delete();
-//     thumbnailFile?.delete();
-//     return null;
-//   }
-
-//   @override
-//   Future<void> write(Uint8List mainData) async {
-//     await File(mainPath()).writeAsBytes(mainData);
-//     await VideoThumbnail.thumbnailData(video: mainPath(), quality: 75);
-//   }
-// }
 
 class Down4Video extends Down4Media {
   Down4Video(

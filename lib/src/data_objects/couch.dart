@@ -25,11 +25,11 @@ late sql.Database db;
 //     billsDB;
 
 Future<List<T>> globall<T extends Locals>(
-  Iterable<Down4ID>? ids, {
+  Iterable<Down4ID?>? ids, {
   bool doCache = true,
   bool doFetch = false,
   bool doMergeIfFetch = false,
-  Iterable<ComposedID>? tempIDs,
+  Iterable<ComposedID?>? tempIDs,
   sql.Database? sdb,
   Map<Down4ID, Locals>? sCache,
 }) async {
