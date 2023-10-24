@@ -240,9 +240,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     for (final nConn in _nodeConnections.values) {
       nConn.cancel();
     }
-    // for (final l in _mediasListeners.values) {
-    //   l.cancel();
-    // }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -326,13 +323,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         )
       ];
     } else {
-      final hasUnread = n.lastChatFromOtherIsUnread();
       return [
         ButtonsInfo2(
             asset: Icon(Icons.arrow_forward_ios_rounded,
-                color: !hasUnread
-                    ? g.theme.noMessageArrowColor
-                    : g.theme.messageArrowColor),
+                color: n.lastChatFromOtherIsUnread()
+                    ? g.theme.messageArrowColor
+                    : g.theme.noMessageArrowColor),
             pressFunc: () => setPage(chatPage(n, isPush: true)),
             longPressFunc: () =>
                 n is PersonN ? setPage(nodePage(n, isPush: true)) : null,
@@ -463,11 +459,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               doFetch: true, doMergeIfFetch: true, tempID: tempPaymentID);
           if (payment == null) return print("no payment for download");
           print("compressed payment:\n${payment.compressed}");
-          // final parsedPayment =
           g.wallet.parsePayment3(g.self.id, payment, callblack: afterPayment);
-          // if (page is MoneyPage && parsedPayment != null) {
-          //   setPage(moneyPage(payUpdate: parsedPayment));
-          // }
           break;
       }
     });
@@ -475,7 +467,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   void rewriteHomePalettes() {
     for (final p in chats) {
-      writePalette(p.node as ChatN, _chats, bGen, rfHome, home: true);
+      writePalette(p.node, _chats, bGen, rfHome, home: true);
     }
   }
 
@@ -550,15 +542,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   Future<void> processChats(Iterable<Chat> chats) async {
     if (chats.isEmpty) return;
-    // final cns = locall<ChatN>(chats.map((e) => idOfRoot(root: e.root)));
     // these chats passed in parameter can also be forwarded chats
     Future<void> pc_(Chat c, [VoidCallback? cb]) async {
       final rtID = idOfRoot(root: c.root);
       final rt = local<ChatN>(rtID);
       if (rt == null) return;
-      final targets = rt.messageTargets;
-      if ()
-
       final fsuccess = r.push(rt.messageTargets, c, cb);
       final success = await fsuccess;
       rt.updateActivity();
@@ -572,20 +560,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       await Future.wait(t.map((e) => pc_(e)));
       if (page is HomePage) setPage(homePage());
     });
-
-    // for (final c in chats) {
-    //   final rtID = idOfRoot(root: c.root);
-    //   final rt = await global<ChatN>(rtID);
-    //   if (rt == null) return;
-    //   final targets = await rt.messageTargets;
-    //   print("sending messages to ${targets.map((t) => t.id.unik)}");
-    //   final success = await r.push(rt.messageTargets, c);
-    //   rt.updateActivity();
-    //   writePalette(rt, _chats, bGen, rfHome, home: true);
-    //   if (success) c.markSent();
-    //   reloadChatWithID(rtID, msgRe: c);
-    //   if (page is HomePage) setPage(homePage());
-    // }
   }
 
   Future<void> sendSnip({
@@ -635,27 +609,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.popUntilHome();
       setPage(homePage(prompt: "SNIPED"));
     });
-
-    // for (int i = 0; i < sels.length; i++) {
-    //   final sel = sels[i];
-    //   final snip = Snip(ComposedID(),
-    //       snipSize: g.sizes.snipSize,
-    //       sticks: sticks,
-    //       root: sel.root_,
-    //       senderID: g.self.id,
-    //       txt: text,
-    //       mediaID: backgroundMedia?.id);
-
-    //   pushes.add(r.push(await sel.messageTargets, snip));
-
-    //   if (sel.id == g.self.id) {
-    //     snip
-    //       ..cache()
-    //       ..merge();
-    //   }
-
-    //   writePalette(sel..updateActivity(), _chats, bGen, rfHome, home: true);
-    // }
   }
 
   // ============================== PAGES ============================== //
@@ -674,7 +627,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         final selectedPals = chats.selected().asNodes<PersonN>();
         for (final n in selectedPals) {
           if (n is User) n.updateConnectionStatus(true);
-          writePalette(n, _chats, bGen2, rfHome, sel: false, home: true);
+          // writePalette(n, _chats, bGen2, rfHome, sel: false, home: true);
           writePalette(n, _chats, bGen, rfHome, home: true);
           (await global<Down4Image>(n.mediaID))?.downloadAndWriteIfNeeded();
         }
@@ -693,10 +646,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       search: () => setPage(searchPage(isPush: true)),
       themes: () => setPage(themePage(isPush: true)),
       delete: () async {
-        for (final p in List<Palette>.from(chats)) {
+        for (final p in List<Palette<ChatN>>.from(chats)) {
           if (p.selected && p.id != g.self.id) {
             _chats.remove(p.node.id);
-            await (p.node as ChatN).delete();
+            p.node.delete();
           }
         }
         setPage(homePage());
@@ -843,11 +796,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       }
     }
 
-    return ThemePage(
-      themes: themes(),
-      onSwap: rewriteHomePalettes,
-      back: back,
-    );
+    return ThemePage(themes: themes(), onSwap: rewriteHomePalettes, back: back);
   }
 
   Down4PageWidget moneyPage({
@@ -1302,7 +1251,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       },
       loadMore: loadMore,
       reactingTo: reactingTo,
-      react: (ComposedID mediaID, Chat msg) async {
+      react: (ComposedID mediaID, Chat msg) {
         final rct = Reaction(Down4ID(),
             senderID: g.self.id,
             mediaID: mediaID,
@@ -1310,7 +1259,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             reactors: {g.self.id});
         msg.addReaction(rct);
         reloadChatWithID(c.id, msgRe: msg);
-        r.push(await c.messageTargets, rct);
+        r.push(c.messageTargets, rct);
       },
       openNode: opn,
       send: (chats) {

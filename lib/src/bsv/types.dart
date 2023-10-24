@@ -296,16 +296,18 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   List<int> get compressed {
     final t1 = makeTimestamp();
     final tNote = textNote.codeUnits;
+    final spenderCodes = spender?.value.codeUnits;
+    final spenderLen = spenderCodes?.length ?? 0x00;
 
     print("compressing ${txs.length} txs");
     final buf = [
       safe ? 0x01 : 0x00,
+      spenderLen,
+      ...?spenderCodes,
       ...VarInt.fromInt(tNote.length).data,
       ...tNote,
-      // ...utf8.encode(textNote),
       ...VarInt.fromInt(txs.length).data,
       ...txs.fold<List<int>>(<int>[], (p, e) => p + e.compressed),
-      // ...utf8.encode(timestamp.toRadixString(34)),
       ...timestamp.toRadixString(34).codeUnits,
     ];
 
@@ -384,17 +386,25 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
   factory Down4Payment.fromCompressed(Uint8List buf) {
     final safe = buf[0] == 0x01;
-    final textNoteLenVarInt = VarInt.fromRaw(buf.sublist(1));
+    final spenderLen = buf[1];
+    ComposedID? spender;
+    if (spenderLen > 0) {
+      final spRaw = buf.sublist(2, 2 + spenderLen);
+      final spStr = String.fromCharCodes(spRaw);
+      spender = ComposedID.fromString(spStr);
+    }
+    
+    final spenderOfsEnd = 2 + spenderLen;
+    final textNoteLenVarInt = VarInt.fromRaw(buf.sublist(spenderOfsEnd));
     final textNoteDataLen = textNoteLenVarInt.data.length;
     final textNoteLen = textNoteLenVarInt.asInt;
-    final textOffset = 1 + textNoteDataLen;
+    final textOffset = spenderOfsEnd + textNoteDataLen;
     final textOffsetEnd = textOffset + textNoteLen;
     List<int> textNoteData = [];
     String textNote = "";
     if (textNoteLen != 0) {
       textNoteData = buf.sublist(textOffset, textOffset + textNoteLen);
       textNote = String.fromCharCodes(textNoteData);
-      // textNote = utf8.decode(textNoteData);
     }
 
     print("payment textnote: $textNote");
@@ -411,11 +421,10 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
     final tsBuf = buf.sublist(offset, offset + 7);
     final tsString = String.fromCharCodes(tsBuf);
-    // utf8.decode(tsBuf);
     final ts = int.parse(tsString, radix: 34);
 
     return Down4Payment(Down4ID(),
-        spender: g.self.id,
+        spender: spender,
         txid: txs.last.txID,
         txs: txs,
         safe: safe,
@@ -424,20 +433,11 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   }
 
   List<String> get asQrData {
-    final t1 = makeTimestamp();
-
-    // final rawFold = txs.fold<List<int>>(<int>[], (p, v) => p + v.raw);
-    // final compressedFold =
-    //     txs.fold<List<int>>(<int>[], (p, v) => p + v.compressed);
-
-    // print("COMPRESSING QR");
-    // print(txs.fold<String>("", (p, e) => "$p${e.txID.asHex}\n"));
-
+    // final t1 = makeTimestamp();
     var comp = compressed;
     while (comp.length % 4 != 0) {
       comp.add(0x00);
     }
-    // print("COMPRESSED\n${comp.toHex()}");
 
     const maxSize = 550;
     final codec = Base85Codec(Alphabets.z85);
@@ -459,20 +459,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       }
     }
 
-    final t2 = makeTimestamp();
-
-    // print("THERE ARE ${txs.length} TXS");
-    // print(
-    //   "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsIn.length)} INPUTS",
-    // );
-    // print(
-    //   "THERE ARE ${txs.fold<int>(0, (previousValue, element) => previousValue + element.txsOut.length)} OUTPUTS",
-    // );
-    // // print("RAW FOLDED LEN = ${rawFold.length}");
-    // print("COMPRESSED FOLDED LEN = ${compressedFold.length}");
-    // print("QR FOLDED LEN = ${listData.join().length}");
-
-    print("\n\tpayment.asQrData took: ${t2 - t1} ms\n");
+    // final t2 = makeTimestamp();
+    // print("\n\tpayment.asQrData took: ${t2 - t1} ms\n");
     return listData;
   }
 

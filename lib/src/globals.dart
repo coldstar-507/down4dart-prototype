@@ -222,6 +222,7 @@ class Sizes {
   Offset get middlePoint => Offset(w / 2, h / 2);
   Size get fullSize => Size(w, fullHeight);
   Size get snipSize => Size(w, fullHeight - Console.buttonHeight);
+  Size get bodySize => Size(w, h - Console.buttonHeight);
   Size get paddedSize => Size(w, h);
   double get viewPaddingHeight => fullHeight - h;
   double get fullAspectRatio => w / fullHeight;
@@ -527,6 +528,13 @@ void writePayments(
 ]) {
   final offset = state.length;
   for (final pay in Wallet.nPayments(limit: limit, offset: offset)) {
+    final deyEqual = pay.spender == g.self.id;
+    print("""
+      pay.spender = ${pay.spender?.value}
+      self        = ${g.self.id.value}
+      deyEqual    = $deyEqual
+      """);
+
     state[pay.id] = Palette(
       key: Key(pay.id.unik),
       node: PaymentNode(payment: pay, selfID: g.self.id),
@@ -540,7 +548,6 @@ void writePayments(
             pressFunc: () => openPayment(pay),
             rightMost: true)
       ],
-      //: [],
     );
   }
 }

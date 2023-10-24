@@ -29,16 +29,6 @@ class Wallet with Down4Object, Jsons, Locals {
 
   int get balance => utxos.fold(0, (bal, tx) => bal + tx.sats.asInt);
 
-  // Iterable<Down4TX> get allUnsettledTxs sync* {
-  //   const q = "SELECT * FROM transactions WHERE confirmations = '-1'";
-  //   for (final txJsn in db.select(q)) {
-  //     final jsns = Map<String, String?>.from(txJsn);
-  //     yield Down4TX.fromJson(jsns);
-  //   }
-  // }
-
-  // Set<TXID> get allUnsettledTXID => allUnsettledTxs.map((unsTx) => unsTx.txID).toSet();
-
   Future<void> walletRoutine({VoidCallback? callback}) async {
     await _updateAllStatus();
     await Future.delayed(const Duration(seconds: 1));
@@ -73,17 +63,6 @@ class Wallet with Down4Object, Jsons, Locals {
       }
     }
   }
-
-  // Future<List<Future<void>>> _updateAllStatus() async {
-  //   var futures = <Future<void>>[];
-  //   for (final payment in payments) {
-  //     if ((payment.lastConfirmations ?? 100) < 100) {
-
-  //       futures.add(_updateStatus(payment));
-  //     }
-  //   }
-  //   return futures;
-  // }
 
   Future<void> printWalletInfo() async {
     for (final p in payments) {
@@ -255,78 +234,8 @@ class Wallet with Down4Object, Jsons, Locals {
         spender: g.self.id,
         safe: true,
         textNote: textNote);
-
-    // final theTx = Down4TX(
-    //     vNo: versionNo,
-    //     txIns: txIns,
-    //     inCount: inCount,
-    //     ins: txIns.map((e) => e.id).toList(),
-    //     outCount: outCount,
-    //     txOuts: txOuts,
-    //     outs: txOuts.map((e) => e.id).toList(),
-    //     nLock: nLockTime,
-    //     down4Secret: txSecret);
-
-    // return Down4Payment(Down4ID(),
-    //     spender: null,
-    //     txid: theTx.txID,
-    //     txs: [theTx],
-    //     safe: false,
-    //     textNote: "Imported");
   }
 
-  // void parsePayment2(Down4ID selfID, Down4Payment pay) {
-  //   final sbuf = StringBuffer("BEGIN TRANSACTION;");
-  //   final List<String> args = [];
-
-  //   print("parsing payment: ${pay.id}");
-  //   for (final tx in pay.txs) {
-  //     tx.writeTxInfosToUTXOs();
-  //   }
-  //   for (final utxo in pay.txs.last.txsOut) {
-  //     final spent = isSpent(utxo.id);
-  //     print("utxo receiver: ${utxo.receiver}, isSpent: $spent");
-  //     if (utxo.receiver == selfID && !spent) {
-  //       final jsn = utxo.toJson(includeLocal: true);
-  //       final stmt = """
-  //       INSERT INTO txouts ${jsn.sqlInsertKeys}
-  //       VALUES ${jsn.sqlInsertValuesParams};
-  //       """;
-  //       sbuf.write(stmt);
-  //       args.addAll(jsn.values);
-  //     }
-  //   }
-  //   for (final txin in pay.txs.last.txsIn) {
-  //     if (txin.spender == selfID) {
-  //       const stmt = "DELETE FROM txouts WHERE id = ?;";
-  //       const stmt2 = "INSERT INTO spents (id) VALUES (?);";
-  //       sbuf.write(stmt);
-  //       sbuf.write(stmt2);
-  //       args.add(txin.utxoID.value);
-  //       args.add(txin.utxoID.value);
-  //     }
-  //   }
-
-  //   final jsn = pay.toJson(includeLocal: true);
-  //   final stmt = """
-  //   INSERT INTO payments ${jsn.sqlInsertKeys}
-  //   VALUES ${jsn.sqlInsertValuesParams};
-  //   """;
-  //   sbuf.write(stmt);
-  //   args.addAll(jsn.values);
-
-  //   sbuf.write("COMMIT;");
-
-  //   try {
-  //     db.execute(sbuf.toString(), args);
-  //   } catch (e) {
-  //     print("error parsing payment: $e");
-  //     db.execute("ROLLBACK;");
-  //   }
-
-  //   _trySettlement(pay);
-  //   return;
-  // }
 
   Down4Payment? parsePayment3(ComposedID selfID, Down4Payment pay,
       {VoidCallback? callblack}) {
@@ -564,39 +473,6 @@ class Wallet with Down4Object, Jsons, Locals {
         .toList()
         .specificOrder(txids);
   }
-
-  // Future<void> _updateStatus(Down4Payment payment) async {
-  //   // final ids = payment.txs.map((e) => e.txID.asHex).toList();
-
-  //   final confirmations = await r.confirmations(ids);
-  //   if (confirmations == null || confirmations.length != ids.length) return;
-
-  //   for (int i = 0; i < confirmations.length; i++) {
-  //     payment.txs[i].confirmations = confirmations[i];
-  //     setPayment(payment);
-  //   }
-  // }
-
-  // List<Down4TX> _chainedTxs(Down4TX from) {
-
-  // final unsettledIDs = uTXID;
-  // final unsettledTransactions = unsettledTxs;
-
-  // // final unsettledIDs = uTXID;
-  // Set<Down4TX> deps = {from};
-  // List<Down4TX> copy;
-  // do {
-  //   copy = List<Down4TX>.from(deps);
-  //   var depIDs = copy.map((tx) => tx.txidDeps).expand((dep) => dep).toSet();
-  //   for (final depID in depIDs) {
-  //     if (unsettledIDs.contains(depID)) {
-  //       deps.add(unsettledTransactions.singleWhere((tx) => tx.txID == depID));
-  //     }
-  //   }
-  // } while (deps.length != copy.length);
-
-  // return copy.reversed.toList(growable: false);
-  // }
 
   (List<Down4TXIN>, Sats, Sats)? _unsignedIns(
       Down4ID selfID, Sats pay, int currentTxSize) {

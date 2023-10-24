@@ -35,13 +35,13 @@ Future<void> handleTokenChange(String newToken) async {
 
 Future<void> showMessageNotification(
   Map<String, String?> data, {
-  ComposedID? selfID,
-  sql.Database? sdb,
-  String? appDir,
-  ComposedID? currentRoot,
+  required ComposedID selfID,
+  required sql.Database sdb,
+  required String appDir,
+  required ComposedID? currentRoot,
 }) async {
-  final db_ = sdb ?? db;
-  final self = selfID ?? g.self.id;
+  final db_ = sdb;//  ?? db;
+  final self = selfID;// ?? g.self.id;
 
   final sc = <Down4ID, Locals>{};
   if (data.isEmpty) return;
@@ -178,18 +178,18 @@ void initSqlite() async {
     )
     """);
 
-  try {
-    db.execute("""
-      ALTER TABLE messages
-        ADD COLUMN sticks TEXT;
-      """);
-    db.execute("""
-      ALTER TABLE messages
-        ADD COLUMN snipSize TEXT;
-      """);
-  } catch (e) {
-    print("error altering table messages: $e");
-  }
+  // try {
+  //   db.execute("""
+  //     ALTER TABLE messages
+  //       ADD COLUMN sticks TEXT;
+  //     """);
+  //   db.execute("""
+  //     ALTER TABLE messages
+  //       ADD COLUMN snipSize TEXT;
+  //     """);
+  // } catch (e) {
+  //   print("error altering table messages: $e");
+  // }
 
   db.execute("""
     CREATE INDEX IF NOT EXISTS root_index
@@ -297,15 +297,11 @@ void initSqlite() async {
     )
     """);
 
-  try {
-    db.execute("ALTER TABLE personals ADD currentPage TEXT");
-  } catch (_) {}
-
   db.execute("""
     CREATE TABLE IF NOT EXISTS themes (
     id TEXT NOT NULL PRIMARY KEY,
     themeName TEXT
-  )
+    )
     """);
 
   db.execute("""
@@ -313,12 +309,12 @@ void initSqlite() async {
     VALUES ('single')
     """);
 
-  db.execute("PRAGMA journal_mode=IMMEDIATE;");
+  db.execute("PRAGMA journal_mode=WAL;");
   print("done initing sqlite");
 }
 
 Future<void> fcmHandler(FcmSilentData silentData) async {
-  return print("notifs disabled for debugging payments");
+  // return print("notifs disabled for debugging payments");
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
 
@@ -341,11 +337,11 @@ Future<void> fcmHandler(FcmSilentData silentData) async {
   }
 
   if (currentPage != null) {
-    print("""\n
+    print("""
       \t APP IS LIVE, WAITING 2 SECONDS TO SHOW NOTIFICATION
-      \t TO AVOID DOUBLE FETCHING OF DATA\n
+      \t TO AVOID DOUBLE FETCHING OF DATA
       """);
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 3));
   }
 
   print("should be showing notification");

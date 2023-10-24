@@ -11,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:mime/mime.dart';
 import 'package:video_player/video_player.dart';
-import 'package:collection/collection.dart' show ListExtensions;
 
 import '../render_objects/_render_utils.dart';
 import '../render_objects/console.dart';
@@ -33,17 +32,6 @@ class TransformableWidget extends StatelessWidget {
     required this.tid,
     required this.child,
   }) : super(key: ValueKey(tid));
-
-  // TransformableWidget withNewPosition(Offset ofs, rot, scl) {
-  //   return TransformableWidget(
-  //     onPositionChange: onPositionChange,
-  //     currentOffset: ofs,
-  //     currentScale: scl,
-  //     currentRotation: rot,
-  //     tid: tid,
-  //     child: child,
-  //   );
-  // }
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +71,10 @@ class TW2 extends StatefulWidget {
   final String tid;
   final void Function(String, Offset, double, double) onMove;
   final void Function(String, bool, Offset) pressing;
+  final bool allowRotation,
+      allowScale,
+      allowHorizontalTranslation,
+      allowVerticalTranslation;
 
   TW2({
     required this.mediaID,
@@ -91,6 +83,10 @@ class TW2 extends StatefulWidget {
     required this.pressing,
     required this.onMove,
     required this.tid,
+    this.allowScale = true,
+    this.allowRotation = true,
+    this.allowHorizontalTranslation = true,
+    this.allowVerticalTranslation = true,
   }) : super(key: ValueKey(tid));
 
   @override
@@ -214,6 +210,7 @@ class _TW2State extends State<TW2> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.translucent,
       onScaleUpdate: (ScaleUpdateDetails details) {
         final newScale = details.scale * _prevScale;
         final newAngle = _previousRotation + details.rotation;
@@ -260,43 +257,6 @@ class _TW2State extends State<TW2> {
         ),
       ),
     );
-
-    // return Positioned(
-    //   bottom: _offset.dy,
-    //   right: _offset.dx,
-    //   child: Transform(
-    //     // origin: twoFingerPress,
-    //     transform: Matrix4.identity()..scale(_curScale),
-    //     alignment: FractionalOffset.center,
-    //     child: GestureDetector(
-    //       onScaleStart: (details) {
-    //         print("scale start");
-    //         widget.pressing(widget.tid, true);
-    //       },
-    //       onScaleEnd: (details) {
-    //         print("scale end");
-    //         _prevScale = _curScale;
-    //         _prevRotation = _curRotation;
-    //         widget.pressing(widget.tid, false);
-    //       },
-    //       onScaleUpdate: (details) {
-    //         print("scaling!");
-    //         widget.onMove(widget.tid, details.focalPoint);
-    //         if (details.pointerCount == 1 && nPrevPointers == 1) {
-    //           print("1 pointer scaling");
-    //           _offset -= details.focalPointDelta * _curScale;
-    //         } else if (details.pointerCount == 2 && nPrevPointers == 2) {
-    //           // twoFingerPress = details.focalPoint;
-    //           _curScale = _prevScale * details.scale;
-    //           _curRotation = _prevRotation + details.rotation;
-    //         }
-    //         nPrevPointers = details.pointerCount;
-    //         setState(() {});
-    //       },
-    //       child: Transform.rotate(angle: _curRotation, child: widget.child),
-    //     ),
-    //   ),
-    // );
   }
 }
 
@@ -394,8 +354,6 @@ class _SnipCameraState extends State<SnipCamera>
                 }
               });
           sticks.insert(0, tw);
-          // final s_ = s / 2;
-          // final ofs = Offset(ss.width - s_.width, ss.height - s_.height);
           positions[tw.tid] = (const Offset(0, 0), 1.0, 0.0);
           pressing[tw.tid] = false;
           setState(() {});
@@ -406,7 +364,6 @@ class _SnipCameraState extends State<SnipCamera>
 
   Size get ss => g.sizes.snipSize;
 
-  // Widget? _preview;
   double _scale = 1.0;
   double _baseScale = 1.0;
   late double maxZoom, minZoom;
@@ -431,9 +388,6 @@ class _SnipCameraState extends State<SnipCamera>
   ];
 
   int camNum = 0;
-
-  // CameraController newCameraController() =>
-  //     CameraController(g.cameras[camNum], ResolutionPreset.high);
 
   late double _ar;
   late Size _camSize;
@@ -626,7 +580,7 @@ class _SnipCameraState extends State<SnipCamera>
                             : Image.file(File(filePath!))
                         : const SizedBox.shrink())
                 : !readyCamera
-                    ? Container(color: Colors.black)
+                    ? const SizedBox.shrink()
                     : GestureDetector(
                         onTap: () => print("LALALALALAL"),
                         onScaleStart: (details) => _baseScale = _scale,
