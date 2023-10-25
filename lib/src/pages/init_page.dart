@@ -220,7 +220,8 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   List<Widget> get widgetList {
     return [
-      const Spacer(),      
+      const Spacer(),
+      SizedBox(height: g.sizes.headerHeight),
       imagePicker,
       SizedBox(height: spacerHeight),
       idInput.initInput,
@@ -234,20 +235,20 @@ class _UserMakerPageState extends State<UserMakerPage>
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: g.sizes.w * 0.04),
                 child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  regionButton(Region.america),
-                  SizedBox(width: spacerHeight),
-                  regionButton(Region.europe),
-                  SizedBox(width: spacerHeight),
-                  regionButton(Region.asia),
-                ],
-              ),)
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    regionButton(Region.america),
+                    SizedBox(width: spacerHeight),
+                    regionButton(Region.europe),
+                    SizedBox(width: spacerHeight),
+                    regionButton(Region.asia),
+                  ],
+                ),
+              )
             ]
           : [],
-      const Spacer(),                
+      const Spacer(),
     ];
-    // SizedBox(height: spacer),
   }
 
   Widget get full {
