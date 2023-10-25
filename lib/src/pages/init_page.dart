@@ -112,19 +112,17 @@ class _UserMakerPageState extends State<UserMakerPage>
               width: s.width,
               height: s.height,
               mime: lookupMimeType(p)!));
-
-      // cameraInput = await makeCameraMedia(
-      //     writeFromCachedPath: false,
-      //     cachedPath: p,
-      //     size: s,
-      //     isReversed: false,
-      //     isSquared: true,
-      //     owner: willBeReplacedID);
       setTheState();
     }
   }
 
-  Size get imageSize => Size.square(g.sizes.w * 0.3);
+  Size get imageSize => Size.square(imagePickerHeight);
+
+  double get availHeight => g.sizes.bodySize.height;
+
+  double get imagePickerHeight => availHeight * 0.16;
+
+  double get spacerHeight => availHeight * 0.013;
 
   Widget get userImage =>
       cameraInput?.display(
@@ -134,8 +132,8 @@ class _UserMakerPageState extends State<UserMakerPage>
   Widget get imagePicker => GestureDetector(
         onTap: selectFile,
         child: Container(
-          width: g.sizes.w * 0.3,
-          height: g.sizes.w * 0.3,
+          width: imagePickerHeight,
+          height: imagePickerHeight,
           clipBehavior: Clip.hardEdge,
           decoration: const BoxDecoration(
             borderRadius: BorderRadius.all(Radius.circular(5)),
@@ -217,40 +215,83 @@ class _UserMakerPageState extends State<UserMakerPage>
   MyTextEditor get firstNameInput => inputs[1];
   MyTextEditor get lastNameInput => inputs[2];
 
-  Widget get full => Container(
-        color: g.theme.backGroundColor,
-        padding: const EdgeInsets.symmetric(horizontal: 30),
-        child: Center(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              imagePicker,
-              const SizedBox(height: 20),
-              idInput.initInput,
-              const SizedBox(height: 20),
-              firstNameInput.initInput,
-              const SizedBox(height: 20),
-              lastNameInput.initInput,
-              ...widget.latitude == 0 && widget.longitude == 0
-                  ? [
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          regionButton(Region.america),
-                          const SizedBox(width: 20),
-                          regionButton(Region.europe),
-                          const SizedBox(width: 20),
-                          regionButton(Region.asia),
-                        ],
-                      )
-                    ]
-                  : []
-            ],
-          ),
+  double get bodyHeight =>
+      (spacerHeight * 4) + (Console.buttonHeight * 4) + imagePickerHeight;
+
+  List<Widget> get widgetList {
+    return [
+      const Spacer(),      
+      imagePicker,
+      SizedBox(height: spacerHeight),
+      idInput.initInput,
+      SizedBox(height: spacerHeight),
+      firstNameInput.initInput,
+      SizedBox(height: spacerHeight),
+      lastNameInput.initInput,
+      ...widget.latitude == 0 && widget.longitude == 0
+          ? [
+              SizedBox(height: spacerHeight),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: g.sizes.w * 0.04),
+                child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  regionButton(Region.america),
+                  SizedBox(width: spacerHeight),
+                  regionButton(Region.europe),
+                  SizedBox(width: spacerHeight),
+                  regionButton(Region.asia),
+                ],
+              ),)
+            ]
+          : [],
+      const Spacer(),                
+    ];
+    // SizedBox(height: spacer),
+  }
+
+  Widget get full {
+    final botPad = MediaQuery.of(context).viewInsets.bottom;
+    final space = availHeight - bodyHeight;
+    final spacer = (space - botPad) / 2;
+    print("spacer = $spacer");
+    return Container(
+      color: g.theme.backGroundColor,
+      padding: const EdgeInsets.symmetric(horizontal: 30),
+      child: SizedBox.fromSize(
+        size: g.sizes.bodySize,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            imagePicker,
+            SizedBox(height: spacerHeight),
+            idInput.initInput,
+            SizedBox(height: spacerHeight),
+            firstNameInput.initInput,
+            SizedBox(height: spacerHeight),
+            lastNameInput.initInput,
+            ...widget.latitude == 0 && widget.longitude == 0
+                ? [
+                    SizedBox(height: spacerHeight),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        regionButton(Region.america),
+                        SizedBox(width: spacerHeight),
+                        regionButton(Region.europe),
+                        SizedBox(width: spacerHeight),
+                        regionButton(Region.asia),
+                      ],
+                    )
+                  ]
+                : [],
+            // SizedBox(height: spacer),
+          ],
         ),
-      );
+      ),
+    );
+  }
 
   Widget regionButton(Region reg) => Expanded(
       child: GestureDetector(
@@ -309,13 +350,6 @@ class _UserMakerPageState extends State<UserMakerPage>
                   width: vinfo!.width!.toDouble(),
                   height: vinfo.height!.toDouble(),
                   mime: lookupMimeType(f.path)!));
-          // tempInput = await makeCameraMedia(
-          //     writeFromCachedPath: false,
-          //     cachedPath: f.path,
-          //     size: cameraController!.value.previewSize!.inverted,
-          //     isReversed: isReversed,
-          //     owner: willBeReplacedID,
-          //     isSquared: true);
           changeConsole(cameraConfirmationRowName);
         },
       );
@@ -329,7 +363,10 @@ class _UserMakerPageState extends State<UserMakerPage>
         title: "Initialization",
         console: console,
         staticList: true,
-        stackWidgets: [full],
+        // list: widgetList,
+        simplePageWidget: widgetList,
+        // list: [full],
+        // stackWidgets: [full],
       )
     ]);
   }

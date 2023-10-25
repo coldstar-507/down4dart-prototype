@@ -37,7 +37,7 @@ class _KeepAlivePageState extends State<KeepAlivePage>
 class Down4Page {
   final ScrollController? scrollController;
   final String title;
-  final List<Widget>? _list;
+  final List<Widget>? _list, simplePageWidget;
   final Stream<Widget>? stream;
   final Future<void> Function()? onRefresh;
   final Map<Down4ID, Widget>? asMap;
@@ -50,6 +50,7 @@ class Down4Page {
   // avoidKeyboardResize;
   Down4Page({
     required this.title,
+    this.simplePageWidget,
     this.scrollController,
     this.asMap,
     this.stream,
@@ -390,10 +391,11 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                       ],
                     ),
                     Column(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Flexible(
+                        ...?page.simplePageWidget,
+                       page.simplePageWidget == null ? Flexible(
                           child: page.staticList
                               ? StaticList(
                                   trueLen: page.trueLen,
@@ -402,8 +404,6 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                                   topPadding: g.sizes.viewPaddingHeight +
                                       (page.isChatPage ? 4 : 0),
                                   list: page.list)
-//                         : page.stream != null
-//                                 ? FutureList(stream: page.stream!)
                               : DynamicList(
                                   onRefresh: page.onRefresh,
                                   reversed: page.reversedList,
@@ -415,7 +415,7 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                                   iterables: page.iterables,
                                   iterableLen: page.iterableLen,
                                   list: page.list),
-                        ),
+                        ) : const SizedBox.shrink(),
                         page.console.rowOfPage(
                             index: index, staticRow: g.vm.mode == Modes.append),
                         SizedBox(
@@ -454,7 +454,8 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
             Positioned(
               top: 0,
               left: 0,
-              child: pageHeader([...?widget.extraHeaderWidgets, forwardingIndicator]),
+              child: pageHeader(
+                  [...?widget.extraHeaderWidgets, forwardingIndicator]),
             ),
           ],
         ),
