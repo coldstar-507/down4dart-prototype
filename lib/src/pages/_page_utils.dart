@@ -784,6 +784,7 @@ mixin Medias2 on Pager2 {
   static double get mediaCelSize => Console.trueWidth / _mediasPerRow;
   static Size get celSize => Size.square(mediaCelSize);
   double get mediaExtensionHeight => mediaCelSize * _nRows;
+  static Down4Media? toLoad;
 
   MediaType t = MediaType.images;
   void nextType({MediaType? specificType}) {
@@ -831,7 +832,10 @@ mixin Medias2 on Pager2 {
             forMediaMode!.$2.call(nodeMedia);
           }
         } else {
-          await importConsoleMedias(reload: setTheState);
+          await importConsoleMedias(reload: (m) {
+            toLoad = m;
+            setTheState();
+          });
         }
       });
 
@@ -853,143 +857,143 @@ mixin Medias2 on Pager2 {
 
   Widget get mediasExtension3 {
     print("media extension with type: ${t.name}");
-    return CustomList(forMediaMode?.$2 ?? curMode.$2, t);
+    return CustomList(forMediaMode?.$2 ?? curMode.$2, t, toLoad: toLoad);
   }
 
-  Widget get mediasExtension {
-    final ids = g.savedMediasIDs[t]!;
-    final nRows = (ids.length / _mediasPerRow).ceil();
-    return Container(
-      clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
-        // color: Colors.white10, //g.theme.buttonTextColor,
-      ),
-      // border: Border.all(
-      //     color: g.theme.consoleBorderColor, width: Console.borderWidth)),
-      child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
-          child: ListView.builder(
-              itemCount: nRows,
-              itemBuilder: ((context, index) {
-                Widget f(int i) {
-                  if (i < ids.length) {
-                    final cachedMedia = cache<Down4Media>(ids[i]);
-                    if (cachedMedia != null) {
-                      return GestureDetector(
-                          onTap: () => forMediaMode != null
-                              ? forMediaMode!.$2.call(cachedMedia as Down4Image)
-                              : curMode.$2(cachedMedia),
-                          child: cachedMedia is Down4Image
-                              ? cachedMedia.display(
-                                  key: Key("console${cachedMedia.id.value}"),
-                                  size: Size.square(mediaCelSize))
-                              : cachedMedia.display(
-                                  key: Key("console${cachedMedia.id.value}"),
-                                  size: Size.square(mediaCelSize),
-                                  forceSquare: true));
-                    }
-                    return FutureBuilder(
-                      future: global<Down4Media>(ids[i]),
-                      builder: (ctx, ans) {
-                        if (ans.connectionState == ConnectionState.done &&
-                            ans.hasData) {
-                          return GestureDetector(
-                              onTap: () => ans.data != null
-                                  ? curMode.$2(ans.data!)
-                                  : null,
-                              child: ans.requireData?.display(
-                                      key: Key(
-                                          "console-${ans.requireData?.id.value}"),
-                                      size: Size.square(mediaCelSize),
-                                      forceSquare: true) ??
-                                  SizedBox.square(dimension: mediaCelSize));
-                        } else {
-                          return SizedBox.square(dimension: mediaCelSize);
-                        }
-                      },
-                    );
-                  } else {
-                    return SizedBox.square(dimension: mediaCelSize);
-                  }
-                }
+  // Widget get mediasExtension {
+  //   final ids = g.savedMediasIDs[t]!;
+  //   final nRows = (ids.length / _mediasPerRow).ceil();
+  //   return Container(
+  //     clipBehavior: Clip.hardEdge,
+  //     decoration: BoxDecoration(
+  //       borderRadius:
+  //           BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+  //       // color: Colors.white10, //g.theme.buttonTextColor,
+  //     ),
+  //     // border: Border.all(
+  //     //     color: g.theme.consoleBorderColor, width: Console.borderWidth)),
+  //     child: ConstrainedBox(
+  //         constraints: BoxConstraints(
+  //             maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
+  //         child: ListView.builder(
+  //             itemCount: nRows,
+  //             itemBuilder: ((context, index) {
+  //               Widget f(int i) {
+  //                 if (i < ids.length) {
+  //                   final cachedMedia = cache<Down4Media>(ids[i]);
+  //                   if (cachedMedia != null) {
+  //                     return GestureDetector(
+  //                         onTap: () => forMediaMode != null
+  //                             ? forMediaMode!.$2.call(cachedMedia as Down4Image)
+  //                             : curMode.$2(cachedMedia),
+  //                         child: cachedMedia is Down4Image
+  //                             ? cachedMedia.display(
+  //                                 key: Key("console${cachedMedia.id.value}"),
+  //                                 size: Size.square(mediaCelSize))
+  //                             : cachedMedia.display(
+  //                                 key: Key("console${cachedMedia.id.value}"),
+  //                                 size: Size.square(mediaCelSize),
+  //                                 forceSquare: true));
+  //                   }
+  //                   return FutureBuilder(
+  //                     future: global<Down4Media>(ids[i]),
+  //                     builder: (ctx, ans) {
+  //                       if (ans.connectionState == ConnectionState.done &&
+  //                           ans.hasData) {
+  //                         return GestureDetector(
+  //                             onTap: () => ans.data != null
+  //                                 ? curMode.$2(ans.data!)
+  //                                 : null,
+  //                             child: ans.requireData?.display(
+  //                                     key: Key(
+  //                                         "console-${ans.requireData?.id.value}"),
+  //                                     size: Size.square(mediaCelSize),
+  //                                     forceSquare: true) ??
+  //                                 SizedBox.square(dimension: mediaCelSize));
+  //                       } else {
+  //                         return SizedBox.square(dimension: mediaCelSize);
+  //                       }
+  //                     },
+  //                   );
+  //                 } else {
+  //                   return SizedBox.square(dimension: mediaCelSize);
+  //                 }
+  //               }
 
-                return Row(
-                  key: Key(t.name + index.toString()),
-                  children: List.generate(
-                    _mediasPerRow,
-                    (j) => f((index * _mediasPerRow) + j),
-                  ),
-                );
-              }))),
-    );
-  }
+  //               return Row(
+  //                 key: Key(t.name + index.toString()),
+  //                 children: List.generate(
+  //                   _mediasPerRow,
+  //                   (j) => f((index * _mediasPerRow) + j),
+  //                 ),
+  //               );
+  //             }))),
+  //   );
+  // }
 
-  Widget get mediasExtension2 {
-    final ids = g.savedMediasIDs[t]!;
-    final idsWithPrefix = ids.map((id) => (id, "console"));
-    final s = Size.square(mediaCelSize);
-    final imStream = ConsoleMedias()
-        .throttledImages(idsWithPrefix, size: s)
-        .asBroadcastStream();
-    final nRows = (ids.length / _mediasPerRow).ceil();
+  // Widget get mediasExtension2 {
+  //   final ids = g.savedMediasIDs[t]!;
+  //   final idsWithPrefix = ids.map((id) => (id, "console"));
+  //   final s = Size.square(mediaCelSize);
+  //   final imStream = ConsoleMedias()
+  //       .throttledImages(idsWithPrefix, size: s)
+  //       .asBroadcastStream();
+  //   final nRows = (ids.length / _mediasPerRow).ceil();
 
-    return Container(
-        clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
-        ),
-        child: ConstrainedBox(
-            constraints: BoxConstraints(
-                maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
-            child: ListView.builder(
-                itemCount: nRows,
-                itemBuilder: (ctx, index) {
-                  Widget f(int i) {
-                    if (i < ids.length) {
-                      final id = ids[i];
-                      final readyImage =
-                          ConsoleMedias().readyMedia("console${id.unik}");
-                      if (readyImage != null) {
-                        return GestureDetector(
-                            onTap: () => forMediaMode != null
-                                ? forMediaMode!.$2.call(readyImage.media)
-                                : curMode.$2(readyImage.media),
-                            child: SizedBox.square(
-                                dimension: mediaCelSize, child: readyImage));
-                      }
-                      return FutureBuilder(
-                        future: imStream.elementAt(i),
-                        builder: (ctx, ans) {
-                          final isDone =
-                              ans.connectionState == ConnectionState.done;
-                          if (isDone && ans.hasData) {
-                            return GestureDetector(
-                                onTap: () => curMode.$2(ans.data!.media),
-                                child: SizedBox.square(
-                                    dimension: mediaCelSize, child: ans.data!));
-                          } else {
-                            return SizedBox.square(dimension: mediaCelSize);
-                          }
-                        },
-                      );
-                    } else {
-                      return SizedBox.square(dimension: mediaCelSize);
-                    }
-                  }
+  //   return Container(
+  //       clipBehavior: Clip.hardEdge,
+  //       decoration: BoxDecoration(
+  //         borderRadius:
+  //             BorderRadius.vertical(top: Radius.circular(Console.consoleRad)),
+  //       ),
+  //       child: ConstrainedBox(
+  //           constraints: BoxConstraints(
+  //               maxHeight: _nRows * mediaCelSize, maxWidth: Console.trueWidth),
+  //           child: ListView.builder(
+  //               itemCount: nRows,
+  //               itemBuilder: (ctx, index) {
+  //                 Widget f(int i) {
+  //                   if (i < ids.length) {
+  //                     final id = ids[i];
+  //                     final readyImage =
+  //                         ConsoleMedias().readyMedia("console${id.unik}");
+  //                     if (readyImage != null) {
+  //                       return GestureDetector(
+  //                           onTap: () => forMediaMode != null
+  //                               ? forMediaMode!.$2.call(readyImage.media)
+  //                               : curMode.$2(readyImage.media),
+  //                           child: SizedBox.square(
+  //                               dimension: mediaCelSize, child: readyImage));
+  //                     }
+  //                     return FutureBuilder(
+  //                       future: imStream.elementAt(i),
+  //                       builder: (ctx, ans) {
+  //                         final isDone =
+  //                             ans.connectionState == ConnectionState.done;
+  //                         if (isDone && ans.hasData) {
+  //                           return GestureDetector(
+  //                               onTap: () => curMode.$2(ans.data!.media),
+  //                               child: SizedBox.square(
+  //                                   dimension: mediaCelSize, child: ans.data!));
+  //                         } else {
+  //                           return SizedBox.square(dimension: mediaCelSize);
+  //                         }
+  //                       },
+  //                     );
+  //                   } else {
+  //                     return SizedBox.square(dimension: mediaCelSize);
+  //                   }
+  //                 }
 
-                  return Row(
-                    key: Key(t.name + index.toString()),
-                    children: List.generate(
-                      _mediasPerRow,
-                      (j) => f((index * _mediasPerRow) + j),
-                    ),
-                  );
-                })));
-  }
+  //                 return Row(
+  //                   key: Key(t.name + index.toString()),
+  //                   children: List.generate(
+  //                     _mediasPerRow,
+  //                     (j) => f((index * _mediasPerRow) + j),
+  //                   ),
+  //                 );
+  //               })));
+  // }
 
   String get basicMediaRowName => "medias";
 

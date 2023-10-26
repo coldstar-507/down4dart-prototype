@@ -805,6 +805,22 @@ class ConsoleMedias {
 
   final Map<String, CustomMedia> _consoleMediaCache = {};
 
+  Future<CustomMedia?> loadMediaFromFile(Down4Media m,
+      {Size? size, String? prefix}) async {
+    final t = m.type;
+    switch (t) {
+      case MediaType.images:
+        return ConsoleMedias()
+            ._loadImageFromFile(m as Down4Image, size: size, prefix: prefix);
+      case MediaType.videos:
+        return ConsoleMedias()
+            ._loadVideoFromFile(m as Down4Video, size: size, prefix: prefix);
+      case MediaType.gifs:
+        return ConsoleMedias()
+            ._loadGifFromFile(m as Down4Image, size: size, prefix: prefix);
+    }
+  }
+
   Future<CustomMedia?> _loadVideoFromFile(Down4Video vid,
       {Size? size, String? prefix}) async {
     final f = vid.mainFile();
@@ -902,7 +918,8 @@ class _CustomMedia2State extends State<CustomMedia> {
 class CustomList extends StatefulWidget {
   final void Function(Down4Media) mediaPressFunc;
   final MediaType t;
-  const CustomList(this.mediaPressFunc, this.t, {super.key});
+  final Down4Media? toLoad;
+  const CustomList(this.mediaPressFunc, this.t, {this.toLoad, super.key});
 
   @override
   State<CustomList> createState() => _CustomListState();
@@ -919,6 +936,7 @@ class _CustomListState extends State<CustomList> {
 
   final _mediasPerRow = 5;
   final mediaCelSize = Medias2.mediaCelSize;
+  final celSize = Size.square(Medias2.mediaCelSize);
   final Map<MediaType, StreamController<CustomMedia>> _streams = {};
 
   List<CustomMedia> get currentMedias => _medias[currentType]!;
@@ -933,15 +951,30 @@ class _CustomListState extends State<CustomList> {
   @override
   void didUpdateWidget(oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final m = widget.toLoad;
     if (oldWidget.t != widget.t) {
-      print("loading stream for type=${widget.t.name}");
       loadStream(widget.t);
+    } else if (m != null) {
+      final t = widget.toLoad!.type;
+      if (_medias[t]!.containsWhere((e) => e.media == m)) {
+        Medias2.toLoad = null;
+        return print("media already here dog");
+      }
+      Future(() async {
+        print("got extra media toLoad -> ${m.id.value}");
+        final cm = await ConsoleMedias()
+            .loadMediaFromFile(m, size: celSize, prefix: "console");
+        if (cm != null) {
+          print("adding media of type ${t.name} to console");
+          _medias[t]!.add(cm);
+          setState(() {});
+        }
+      });
     }
   }
 
   @override
   void initState() {
-    print("init that FUCKIGN shit");
     super.initState();
     loadStream(currentType);
   }
@@ -951,7 +984,6 @@ class _CustomListState extends State<CustomList> {
   void load(StreamController<CustomMedia> sc, MediaType t) async {
     final its = mids(t).map((id) => (id, "console"));
     print("there are ${its.length} medias to load of type=${t.name}");
-    final celSize = Size.square(Medias2.mediaCelSize);
     final strm = ConsoleMedias().throttledImages(its, size: celSize);
     strm.pipe(sc);
   }

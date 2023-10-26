@@ -715,11 +715,11 @@ extension Down4ObjectExtension<T extends Down4Object> on Iterable<T> {
   Iterable<T> wType() => whereType<T>();
   Iterable<ChatMessage> chatMsgs() => whereType<ChatMessage>();
   Iterable<Palette> palettes() => whereType<Palette>();
-  Iterable<E> selectable<E extends Down4SelectionWidget>() => whereType<E>();  
+  Iterable<E> selectable<E extends Down4SelectionWidget>() => whereType<E>();
 }
 
-
-extension Down4ObjectSelectionExtension<T extends Down4SelectionWidget> on Iterable<T> {
+extension Down4ObjectSelectionExtension<T extends Down4SelectionWidget>
+    on Iterable<T> {
   Iterable<T> selected() => where((e) => e.selected);
   Iterable<T> notSelected() => where((e) => !e.selected);
 }
@@ -751,7 +751,8 @@ extension Palette2Extensions on Iterable<Palette> {
     ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
 }
 
-extension IterablePalette2Extensions<E extends PaletteN> on Iterable<Palette<E>> {
+extension IterablePalette2Extensions<E extends PaletteN>
+    on Iterable<Palette<E>> {
   // Iterable<Palette> deactivated() => map((p) => p.deactivated());
   Iterable<Palette<E>> selected() => where((element) => element.selected);
   Iterable<Palette<E>> notSelected() => where((p) => !p.selected);
@@ -765,8 +766,9 @@ extension IterablePalette2Extensions<E extends PaletteN> on Iterable<Palette<E>>
   // Iterable<Down4ID> asIDs() => map((e) => e.node.id);
   // Iterable<ComposedID> asComposedIDs() => asIDs().whereType<ComposedID>();
 
-  Iterable<K> asNodes<K extends PaletteN>() => map((p) => p.node).whereType<K>();
-  // Iterable<K> asNodesCast<K extends PaletteN>() => map((p) => p.node).whereType<K>();  
+  Iterable<K> asNodes<K extends PaletteN>() =>
+      map((p) => p.node).whereType<K>();
+  // Iterable<K> asNodesCast<K extends PaletteN>() => map((p) => p.node).whereType<K>();
   Iterable<Palette> those(Iterable<Down4ID> ids) =>
       where((p) => ids.contains(p.node.id));
   Iterable<Palette> notThose(Iterable<Down4ID> ids) =>
@@ -1051,7 +1053,8 @@ String makeTiny(Uint8List bytes) {
   return base64Encode(d);
 }
 
-Future<void> importConsoleMedias({required VoidCallback reload}) async {
+Future<void> importConsoleMedias(
+    {required void Function(Down4Media) reload}) async {
   final results = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: extMap.values.expand((l) => l).toList(),
@@ -1088,11 +1091,12 @@ Future<void> importConsoleMedias({required VoidCallback reload}) async {
             height: size.height,
             mime: mime))
       ..cache()
-      ..merge()
-      ..writeFromCachedPath();
+      ..merge();
+
+    await m.writeFromCachedPath();
+    reload(m);
 
     g.savedMediasIDs[m.type] = savedMediaIDs(m.type).toList();
-    reload();
   }
 }
 

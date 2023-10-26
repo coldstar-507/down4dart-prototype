@@ -167,6 +167,13 @@ extension ListExtensions<T> on List<T> {
     return (previous, next);
   }
 
+  bool containsWhere(bool Function(T) test) {
+    for (final e in this) {
+      if (test(e)) return true;
+    }
+    return false;
+  }
+
   (T head, List<T> tail) headTail() {
     return (this[0], sublist(1));
   }
