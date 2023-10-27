@@ -744,10 +744,10 @@ extension NonNullObjects on Iterable<Down4Widget?> {
   Iterable<Down4Widget> noNull() => whereType<Down4Widget>();
 }
 
-extension Palette2Extensions on Iterable<Palette> {
+extension Palette2Extensions<T extends PaletteN> on Iterable<Palette<T>> {
   List<Palette> formattedReverse() => toList(growable: false)
     ..sort((a, b) => b.node.activity.compareTo(a.node.activity));
-  List<Palette> formatted() => toList(growable: false)
+  List<Palette<T>> formatted() => toList(growable: false)
     ..sort((a, b) => a.node.activity.compareTo(b.node.activity));
 }
 

@@ -531,7 +531,7 @@ mixin Pager2 {
 
   void setTheState();
 
-  Console3 get console;
+  Console get console;
 }
 
 mixin Sender2 {

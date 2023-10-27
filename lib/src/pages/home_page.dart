@@ -27,7 +27,10 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final void Function() forward;
   final void Function() hyperchat, themes, openPreview;
   final void Function() group, money, search, delete, snip, add;
+  final List<Palette<ChatN>> formattedChats;
+  
   const HomePage({
+    required this.formattedChats,
     required this.themes,
     required this.hyperchat,
     required this.group,
@@ -75,8 +78,7 @@ class _HomePageState extends State<HomePage>
   @override
   void setTheState() => setState(() {});
 
-  Map<ComposedID, Palette> get palettes =>
-      widget.homeState.currentPage.state.cast();
+  List<Palette<ChatN>> get palettes => widget.formattedChats;
 
   @override
   void initState() {
@@ -103,8 +105,7 @@ class _HomePageState extends State<HomePage>
             scrollController: scroller,
             staticList: true,
             title: "Down4",
-            trueLen: palettes.length,
-            list: palettes.values.toList().formatted(),
+            list: palettes,
             console: console)
       ],
     );
@@ -128,7 +129,7 @@ class _HomePageState extends State<HomePage>
       ConsoleButton(name: "SNIP", onPress: widget.snip);
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "home": ConsoleRow(
@@ -176,7 +177,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   Future<void> send({Down4Media? mediaInput}) async {
-    final sel = palettes.values.selected().asNodes<ChatN>();
+    final sel = palettes.selected().asNodes<ChatN>();
 
     var chts = <Chat>[];
 

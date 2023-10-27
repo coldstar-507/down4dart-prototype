@@ -173,7 +173,7 @@ class _AddFriendPageState extends State<AddFriendPage>
   }
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": ConsoleRow(

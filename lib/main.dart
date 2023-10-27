@@ -40,11 +40,11 @@ Future<void> showMessageNotification(
   required String appDir,
   required ComposedID? currentRoot,
 }) async {
-  final db_ = sdb;//  ?? db;
-  final self = selfID;// ?? g.self.id;
+  final db_ = sdb; //  ?? db;
+  final self = selfID; // ?? g.self.id;
 
   final sc = <Down4ID, Locals>{};
-  if (data.isEmpty) return;
+  if (data.isEmpty) return print("data is empty");
 
   final header = data["h"];
   final body = data["b"];
@@ -177,19 +177,6 @@ void initSqlite() async {
       snipSize TEXT
     )
     """);
-
-  // try {
-  //   db.execute("""
-  //     ALTER TABLE messages
-  //       ADD COLUMN sticks TEXT;
-  //     """);
-  //   db.execute("""
-  //     ALTER TABLE messages
-  //       ADD COLUMN snipSize TEXT;
-  //     """);
-  // } catch (e) {
-  //   print("error altering table messages: $e");
-  // }
 
   db.execute("""
     CREATE INDEX IF NOT EXISTS root_index

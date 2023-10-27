@@ -79,7 +79,7 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
   }
 
   @override
-  Console3 get console => Console3(rows: [
+  Console get console => Console(rows: [
         {
           "base": ConsoleRow(widgets: [
             ConsoleButton(name: "BACK", onPress: widget.back, isInverted: false),

@@ -86,7 +86,7 @@ class _ForwadingPageState extends State<ForwardingPage>
           ]);
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": baseRow,

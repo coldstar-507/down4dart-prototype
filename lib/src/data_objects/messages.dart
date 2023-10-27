@@ -57,14 +57,21 @@ class SnipStick {
 
   @override
   String toString() {
+    print("""
+      //////////////////////////
+      // SnipStick toString() //
+      //////////////////////////
+      """);
     var data =
-        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
-    // @${tempID?.value}$tempTS";
+      "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
+      
     if (tempID != null && tempTS != null) {
+      print("adding tempID and tempTS toString() at SnipStick!");
       data = "$data@${tempID!.value}@$tempTS";
     }
     return base64Encode(data.codeUnits);
   }
+  
 }
 
 abstract class Down4Message with Jsons {

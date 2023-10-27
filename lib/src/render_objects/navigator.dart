@@ -37,7 +37,8 @@ class _KeepAlivePageState extends State<KeepAlivePage>
 class Down4Page {
   final ScrollController? scrollController;
   final String title;
-  final List<Widget>? _list, simplePageWidget;
+  final List<Widget>? _list;
+  final Widget? simplePageWidget;
   final Stream<Widget>? stream;
   final Future<void> Function()? onRefresh;
   final Map<Down4ID, Widget>? asMap;
@@ -45,7 +46,7 @@ class Down4Page {
   final Iterable<Widget>? _iterables;
   final int? iterableLen, trueLen;
   final List<Widget>? stackWidgets; //, backgroundStackWidgets;
-  final Console3 console;
+  final Console console;
   final bool isChatPage, centerStackItems, reversedList, staticList;
   // avoidKeyboardResize;
   Down4Page({
@@ -359,7 +360,7 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
         duration: Console.animationDuration,
         opacity: widget.staticRow == null ? 0 : 1,
         child: widget.staticRow != null
-            ? Console3.staticRow(widget.staticRow!)
+            ? Console.staticRow(widget.staticRow!)
             : SizedBox(width: g.sizes.w),
       ),
     );
@@ -394,28 +395,28 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                       mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        ...?page.simplePageWidget,
-                       page.simplePageWidget == null ? Flexible(
-                          child: page.staticList
-                              ? StaticList(
-                                  trueLen: page.trueLen,
-                                  reversed: page.reversedList,
-                                  scrollController: page.scrollController,
-                                  topPadding: g.sizes.viewPaddingHeight +
-                                      (page.isChatPage ? 4 : 0),
-                                  list: page.list)
-                              : DynamicList(
-                                  onRefresh: page.onRefresh,
-                                  reversed: page.reversedList,
-                                  asMap: page.asMap,
-                                  orderedKeys: page.orderedKeys,
-                                  scrollController: page.scrollController,
-                                  topPadding: g.sizes.viewPaddingHeight +
-                                      (page.isChatPage ? 4 : 0),
-                                  iterables: page.iterables,
-                                  iterableLen: page.iterableLen,
-                                  list: page.list),
-                        ) : const SizedBox.shrink(),
+                        page.simplePageWidget ??
+                            Flexible(
+                              child: page.staticList
+                                  ? StaticList(
+                                      trueLen: page.trueLen,
+                                      reversed: page.reversedList,
+                                      scrollController: page.scrollController,
+                                      topPadding: g.sizes.viewPaddingHeight +
+                                          (page.isChatPage ? 4 : 0),
+                                      list: page.list)
+                                  : DynamicList(
+                                      onRefresh: page.onRefresh,
+                                      reversed: page.reversedList,
+                                      asMap: page.asMap,
+                                      orderedKeys: page.orderedKeys,
+                                      scrollController: page.scrollController,
+                                      topPadding: g.sizes.viewPaddingHeight +
+                                          (page.isChatPage ? 4 : 0),
+                                      iterables: page.iterables,
+                                      iterableLen: page.iterableLen,
+                                      list: page.list),
+                            ),
                         page.console.rowOfPage(
                             index: index, staticRow: g.vm.mode == Modes.append),
                         SizedBox(

@@ -624,7 +624,7 @@ class _SnipCameraState extends State<SnipCamera>
   List<Extra> extras = [];
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": ConsoleRow(widgets: [
@@ -710,7 +710,9 @@ class _SnipCameraState extends State<SnipCamera>
 
                     vpc?.dispose();
                     widget.cameraCallBack(
-                        backgroundMedia: m, text: input.value, sticks: stx);
+                        backgroundMedia: m?..cache(),
+                        text: input.value,
+                        sticks: stx);
                   },
                 ),
               ], extension: null, widths: null, inputMaxHeight: null),

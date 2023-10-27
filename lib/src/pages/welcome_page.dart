@@ -35,7 +35,7 @@ class _ThemePageState extends State<ThemePage> with Pager2 {
   ConsoleButton get giftButton => ConsoleButton(name: "GIFT", onPress: () {});
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": ConsoleRow(

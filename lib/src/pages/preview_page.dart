@@ -27,7 +27,7 @@ class _PreviewPageState extends State<PreviewPage> {
 
   void setTheState() => setState(() {});
 
-  Console3 get console => Console3(
+  Console get console => Console(
         currentPageIndex: 0,
         currentConsolesName: const ["base"],
         rows: [

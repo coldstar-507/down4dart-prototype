@@ -132,50 +132,15 @@ class StaticList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // final gapSize = 0; // g.sizes.h * 0.02;
-    // print("list len = ${list.length}");
-    // final spacerSize = ((7 - (trueLen ?? 100)) * Palette.fullHeight) + 1;
-    // print("spacer size = $spacerSize");
-
-    // return ScrollConfiguration(
-    //   behavior: NoGlow(),
-    //   // behavior: const CupertinoScrollBehavior(),
-    //   child: ListView(
-    //     shrinkWrap: true,
-    //     controller: scrollController,
-    //     physics: const BouncingScrollPhysics(
-    //       decelerationRate: ScrollDecelerationRate.fast,
-    //     ),
-    //     padding: EdgeInsets.only(top: topPadding ?? Palette.gapSize),
-    //     reverse: reversed,
-    //     children: [
-    //       SizedBox(
-    //         height: (trueLen ?? 7) <= 7 ? spacerSize : 0,
-    //       ),
-    //       ...list,
-    //     ],
-    //   ),
-    // );
-
     return ScrollConfiguration(
-      // behavior: const CupertinoScrollBehavior()
       behavior: NoGlow(),
-      // behavior: const MaterialScrollBehavior(),
       child: Align(
         alignment: Alignment.bottomCenter,
         child: SingleChildScrollView(
           reverse: reversed,
           controller: scrollController,
-          padding: EdgeInsets.only(top: topPadding ?? 0.0), //Palette.gapSize),
-          child: Column(children: list
-              //     [
-              //   SizedBox(
-              //     height: (trueLen ?? 7) <= 7 ? spacerSize : 0,
-              //   ),
-              //   ...list,
-              // ],
-
-              ),
+          padding: EdgeInsets.only(top: topPadding ?? 0.0),
+          child: Column(children: list),
         ),
       ),
     );

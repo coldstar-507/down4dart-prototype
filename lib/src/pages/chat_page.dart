@@ -229,8 +229,8 @@ class _ChatPageState extends State<ChatPage>
       );
 
   @override
-  Console3 get console {
-    return Console3(
+  Console get console {
+    return Console(
       rows: [
         {
           "base": baseRow,

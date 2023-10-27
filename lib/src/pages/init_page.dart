@@ -120,7 +120,7 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   double get availHeight => g.sizes.bodySize.height;
 
-  double get imagePickerHeight => availHeight * 0.16;
+  double get imagePickerHeight => availHeight * 0.12;
 
   double get spacerHeight => availHeight * 0.013;
 
@@ -159,7 +159,7 @@ class _UserMakerPageState extends State<UserMakerPage>
           media: cameraInput!));
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": ConsoleRow(
@@ -215,90 +215,55 @@ class _UserMakerPageState extends State<UserMakerPage>
   MyTextEditor get firstNameInput => inputs[1];
   MyTextEditor get lastNameInput => inputs[2];
 
+  double get sidePadding => g.sizes.w * 0.04;
+  
   double get bodyHeight =>
       (spacerHeight * 4) + (Console.buttonHeight * 4) + imagePickerHeight;
 
-  List<Widget> get widgetList {
-    return [
-      const Spacer(),
-      SizedBox(height: g.sizes.headerHeight),
-      imagePicker,
-      SizedBox(height: spacerHeight),
-      idInput.initInput,
-      SizedBox(height: spacerHeight),
-      firstNameInput.initInput,
-      SizedBox(height: spacerHeight),
-      lastNameInput.initInput,
-      ...widget.latitude == 0 && widget.longitude == 0
-          ? [
-              SizedBox(height: spacerHeight),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: g.sizes.w * 0.04),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    regionButton(Region.america),
-                    SizedBox(width: spacerHeight),
-                    regionButton(Region.europe),
-                    SizedBox(width: spacerHeight),
-                    regionButton(Region.asia),
-                  ],
-                ),
-              )
-            ]
-          : [],
-      const Spacer(),
-    ];
-  }
-
-  Widget get full {
-    final botPad = MediaQuery.of(context).viewInsets.bottom;
-    final space = availHeight - bodyHeight;
-    final spacer = (space - botPad) / 2;
-    print("spacer = $spacer");
-    return Container(
-      color: g.theme.backGroundColor,
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: SizedBox.fromSize(
-        size: g.sizes.bodySize,
+  Widget get fullWidg {
+    return Flexible(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: sidePadding),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            const Spacer(),
+            SizedBox(height: g.sizes.headerHeight),
             imagePicker,
             SizedBox(height: spacerHeight),
             idInput.initInput,
             SizedBox(height: spacerHeight),
-            firstNameInput.initInput,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(child: firstNameInput.initInput),
+                SizedBox(width: spacerHeight),
+                Expanded(child: lastNameInput.initInput),
+              ],
+            ),
             SizedBox(height: spacerHeight),
-            lastNameInput.initInput,
-            ...widget.latitude == 0 && widget.longitude == 0
-                ? [
-                    SizedBox(height: spacerHeight),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        regionButton(Region.america),
-                        SizedBox(width: spacerHeight),
-                        regionButton(Region.europe),
-                        SizedBox(width: spacerHeight),
-                        regionButton(Region.asia),
-                      ],
-                    )
-                  ]
-                : [],
-            // SizedBox(height: spacer),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                regionButton(Region.america),
+                SizedBox(width: spacerHeight),
+                regionButton(Region.europe),
+                SizedBox(width: spacerHeight),
+                regionButton(Region.asia),
+              ],
+            ),
+            const Spacer(),
           ],
         ),
       ),
     );
   }
 
+
   Widget regionButton(Region reg) => Expanded(
       child: GestureDetector(
           onTap: () => setState(() => region = reg),
           child: SizedBox(
-              height: Console.buttonHeight,
+              height: InitInput2.initInputHeight,
               child: DecoratedBox(
                   decoration: BoxDecoration(
                       color: region == reg
@@ -357,17 +322,12 @@ class _UserMakerPageState extends State<UserMakerPage>
 
   @override
   Widget build(BuildContext context) {
-    print(
-        "image id: ${cameraInput?.id.value}\nimage path: ${cameraInput?.mainCachedPath}\n");
     return Andrew(pages: [
       Down4Page(
         title: "Initialization",
         console: console,
         staticList: true,
-        // list: widgetList,
-        simplePageWidget: widgetList,
-        // list: [full],
-        // stackWidgets: [full],
+        simplePageWidget: fullWidg,
       )
     ]);
   }

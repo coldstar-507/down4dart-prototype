@@ -69,7 +69,7 @@ class _NodePageState extends State<NodePage>
   }
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": ConsoleRow(widgets: [

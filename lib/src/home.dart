@@ -547,18 +547,20 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final rtID = idOfRoot(root: c.root);
       final rt = local<ChatN>(rtID);
       if (rt == null) return;
-      final fsuccess = r.push(rt.messageTargets, c, cb);
-      final success = await fsuccess;
       rt.updateActivity();
       writePalette(rt, _chats, bGen, rfHome, home: true);
+      final fsuccess = r.push(rt.messageTargets, c, cb);
+      final success = await fsuccess;
       if (success) c.markSent();
       reloadChatWithID(rtID, msgRe: c);
     }
 
     final (h, t) = chats.toList().headTail();
-    pc_(h, () async {
-      await Future.wait(t.map((e) => pc_(e)));
-      if (page is HomePage) setPage(homePage());
+    pc_(h, () {
+      Future(() async {
+        await Future.wait(t.map((e) => pc_(e)));
+        if (page is HomePage) setPage(homePage());
+      });
     });
   }
 
@@ -572,12 +574,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final selection = chats.selected().asNodes();
     if (selection.contains(g.self)) {
       await backgroundMedia?.writeFromCachedPath();
-      backgroundMedia
-        ?..cache()
-        ..merge();
+      backgroundMedia?.merge();
     }
 
-    List<Future<bool>> pushes = [];
+    // List<Future<bool>> pushes = [];
     final sels = chats.selected().asNodes<ChatN>().toList();
     if (sels.isEmpty) return;
     final (head, tail) = sels.headTail();
@@ -591,7 +591,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           txt: text,
           mediaID: backgroundMedia?.id);
 
-      pushes.add(r.push(n.messageTargets, snip, cb));
+      r.push(n.messageTargets, snip, cb);
+      // pushes.add(r.push(n.messageTargets, snip, cb));
       if (n.id == g.self.id) {
         snip
           ..cache()
@@ -614,15 +615,18 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // ============================== PAGES ============================== //
 
   Down4PageWidget homePage({String? prompt}) {
+    // print(_chats.values.formattedReverse().map((e) => "${e.node.activity}\n${e.id.unik}\n").toList());
+
     return HomePage(
+      formattedChats: _chats.values.formatted(),
       openPreview: openPreview,
       forward: () => setPage(forwardPage(isPush: true)),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
-      send: (chats) {
-        processChats(chats);
-        unselectHomeSelection(updateActivity: true);
-        setPage(homePage());
-      },
+      send: processChats, //  (chats) {
+      //   processChats(chats);
+      //   // unselectHomeSelection(updateActivity: true);
+      //   // setPage(homePage());
+      // },
       add: () async {
         final selectedPals = chats.selected().asNodes<PersonN>();
         for (final n in selectedPals) {
@@ -1263,12 +1267,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       },
       openNode: opn,
       send: (chats) {
-        final wasForwarding = viewManager.mode == Modes.forward;
         processChats(chats);
+        final wasForwarding = viewManager.mode == Modes.forward;
         final ref = viewManager.currentView.orderedChats!;
         final or = chats.map((c) => c.id).followedBy(ref).toList();
         viewManager.currentView.orderedChats = or;
-
         // poping the forwarding page
         if (wasForwarding) viewManager.popInBetween();
         setPage(
@@ -1352,6 +1355,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
 
     // fetch sticks
+    print("""
+      ///////////////////////////////////////////////////////
+      // fetching ${s.sticks.length} snips                 //
+      // ids     = ${s.sticks.map((e) => e.mediaID.value)} //
+      // tempIDs = ${s.sticks.map((e) => e.tempID?.value)} //
+      ///////////////////////////////////////////////////////
+      """);
     await globall<Down4Media>(s.sticks.map((e) => e.mediaID),
         doFetch: true,
         doMergeIfFetch: true,
@@ -1368,21 +1378,21 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             children: [
               bm?.display(size: g.sizes.snipSize, controller: vpc) ??
                   const SizedBox.shrink(),
-              ...await Future.wait(s.sticks.reversed.map((e) async {
-                final m = local<Down4Media>(e.mediaID);
+              ...await Future.wait(s.sticks.reversed.map((s) async {
+                final m = local<Down4Media>(s.mediaID);
                 if (m == null) return const SizedBox.shrink();
-                m.updateTempReferences(m.tempID!, m.tempTS!);
+                m.updateTempReferences(s.tempID!, s.tempTS!);
                 if (m is Down4Image) {
-                  await precacheImage(m.readyImage(e.initSize)!.image, context);
+                  await precacheImage(m.readyImage(s.initSize)!.image, context);
                 }
                 return Center(
                     child: Transform(
                         alignment: FractionalOffset.center,
                         transform: Matrix4.identity()
-                          ..translate(e.pos.dx * ratio, e.pos.dy)
-                          ..rotateZ(e.rotation)
-                          ..scale(e.scale * ratio),
-                        child: m.display(size: e.initSize)));
+                          ..translate(s.pos.dx * ratio, s.pos.dy)
+                          ..rotateZ(s.rotation)
+                          ..scale(s.scale * ratio),
+                        child: m.display(size: s.initSize)));
               }))
             ],
           ));

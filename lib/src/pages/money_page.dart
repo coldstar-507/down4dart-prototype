@@ -108,7 +108,7 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
       payment.spender == g.self.id && payment.validForBroadcast;
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": ConsoleRow(widgets: [
@@ -553,7 +553,7 @@ class _MoneyPageState extends State<MoneyPage>
   }
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               "base": baseRow,

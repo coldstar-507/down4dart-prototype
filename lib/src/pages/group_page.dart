@@ -83,7 +83,7 @@ class _GroupPageState extends State<GroupPage>
   TickerProvider get ticker => this;
 
   @override
-  Console3 get console => Console3(
+  Console get console => Console(
           rows: [
             {
               basicComposeRowName: basicComposeRow,
