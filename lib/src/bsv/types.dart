@@ -122,12 +122,12 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
   Future<void> trySettlement({VoidCallback? cb}) async {
     if (confirmations != -1) {
+      cb?.call();
       return print("transactions has already been accepted!");
     }
 
     if (validForBroadcast) {
-      await r.broadcastTxs(txs);
-      return cb?.call();
+      await r.broadcastTxs(txs, cb: cb);
     } else {
       print("""
         ================== WARNING =====================
@@ -393,7 +393,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
       final spStr = String.fromCharCodes(spRaw);
       spender = ComposedID.fromString(spStr);
     }
-    
+
     final spenderOfsEnd = 2 + spenderLen;
     final textNoteLenVarInt = VarInt.fromRaw(buf.sublist(spenderOfsEnd));
     final textNoteDataLen = textNoteLenVarInt.data.length;
@@ -956,8 +956,6 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
   }
 
   static (Down4TXOUT, int) fromCompressed(Uint8List d4) {
-    print("parsing this utxo=\n$d4");
-
     final satInt = Uint8List.fromList(d4.sublist(0, 8))
         .buffer
         .asByteData()
@@ -967,7 +965,6 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
 
     final scriptPubKeyVarInt = VarInt.fromRaw(d4.sublist(8));
     final scriptLen = scriptPubKeyVarInt.asInt;
-    print("script is $scriptLen long!!!!");
     final offset = scriptPubKeyVarInt.data.length;
     final script = d4.sublist(8 + offset, 8 + offset + scriptLen);
 
@@ -975,16 +972,12 @@ class Down4TXOUT with Down4Object, Jsons, Locals {
 
     ComposedID? receiver;
     int receiverLen = d4[curOffset];
-    print("receiverLen=$receiverLen");
     if (receiverLen != 0x00) {
       print(d4.sublist(curOffset, curOffset + 1 + receiverLen));
       final receiverData =
           d4.sublist(curOffset + 1, curOffset + 1 + receiverLen);
-      print("receiverData=$receiverData");
       final receiverStr = String.fromCharCodes(receiverData);
-      print("receiverStr=$receiverStr");
       receiver = ComposedID.fromString(receiverStr);
-      // receiver = ComposedID.fromString(utf8.decode(receiverData));
     }
 
     final flag = d4[curOffset + 1 + receiverLen];
@@ -1150,11 +1143,8 @@ class Down4TX with Down4Object, Jsons, Locals {
   }
 
   List<int> get compressed {
-    final t1 = makeTimestamp();
-
     print("inCounter=${inCounter.asInt}, nTxins=${txsIn.length}");
-    print("outCounter=${outCounter.asInt}, nTxins=${txsOut.length}");
-
+    print("outCounter=${outCounter.asInt}, nTxouts=${txsOut.length}");
     final buf = [
       ...versionNo.data,
       ...inCounter.data,
@@ -1166,10 +1156,6 @@ class Down4TX with Down4Object, Jsons, Locals {
       ...down4Secret,
       ...VarInt.fromInt(confirmations).data,
     ];
-
-    final t2 = makeTimestamp();
-    print("Down4TX compressed took: ${t2 - t1} ms");
-
     return buf;
   }
 
@@ -1212,11 +1198,9 @@ class Down4TX with Down4Object, Jsons, Locals {
   static (Down4TX, int) fromCompressed(Uint8List buf) {
     final vNo = FourByteInt.fromRaw(buf.sublist(0, 4));
     final inCountVarInt = VarInt.fromRaw(buf.sublist(4));
-    print("there will be ${inCountVarInt.asInt} txins to decode!");
     var txsIn = <Down4TXIN>[];
     var offset = 4 + inCountVarInt.data.length;
     for (int i = 0; i < inCountVarInt.asInt; i++) {
-      print("decoding txin #$i");
       final (tin, o) = Down4TXIN.fromCompressed(buf.sublist(offset));
       txsIn.add(tin);
       offset = offset + o;
@@ -1225,9 +1209,7 @@ class Down4TX with Down4Object, Jsons, Locals {
     final outCounterVarInt = VarInt.fromRaw(buf.sublist(offset));
     var txsOut = <Down4TXOUT>[];
     offset = offset + outCounterVarInt.data.length;
-    print("There will be ${outCounterVarInt.asInt} txout to decode");
     for (int i = 0; i < outCounterVarInt.asInt; i++) {
-      print("decoding txout #$i");
       final (tout, o) = Down4TXOUT.fromCompressed(buf.sublist(offset));
       txsOut.add(tout);
       offset = offset + o;

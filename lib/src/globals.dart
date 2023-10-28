@@ -335,7 +335,7 @@ void writePalette<T extends PaletteN>(
 
   final node = c;
 
-  final lastChat = node is ChatN ? node.lastChatMessage() : null;
+  // final lastChat = node is ChatN ? node.lastChatMessage() : null;
 
   final hide = home && node is User && !node.isConnected && !node.hasMessages();
 
@@ -350,7 +350,7 @@ void writePalette<T extends PaletteN>(
       key: GlobalKey(),
       node: c,
       selected: isSelected,
-      messagePreview: lastChat?.messagePreview,
+      // messagePreview: lastChat?.messagePreview,
       imPress: onSelect,
       show: !hide,
       bodyPress: onSelect,
@@ -522,7 +522,7 @@ void writePayment(
   state[paymentNode.id] = Palette(
     key: GlobalKey(),
     node: paymentNode,
-    messagePreview: paymentNode.payment.textNote,
+    // messagePreview: paymentNode.payment.textNote,
     buttonsInfo2: buttons,
   );
 }
@@ -544,7 +544,7 @@ void writePayments(
     state[pay.id] = Palette(
       key: Key(pay.id.unik),
       node: PaymentNode(payment: pay, selfID: g.self.id),
-      messagePreview: pay.textNote,
+      // messagePreview: pay.textNote,
       buttonsInfo2: [
         ButtonsInfo2(
             asset: Icon(Icons.arrow_forward_ios_rounded,

@@ -55,6 +55,7 @@ mixin PaletteN on Down4Object {
   Nodes get type;
   String get displayID;
   String get displayName;
+  String get messagePreview;
   ComposedID? get mediaID;
   int get activity;
 }
@@ -459,6 +460,9 @@ mixin ChatN on Down4Node, Locals {
     super.delete();
     return null;
   }
+
+  @override
+  String get messagePreview => lastChatMessage()?.messagePreview ?? "";
 
   String root(ComposedID selfID) {
     if (this is GroupN) return id.value;
@@ -960,6 +964,9 @@ class PaymentNode with Down4Object implements PaletteN {
   Down4Payment get payment => _payment;
 
   @override
+  String get messagePreview => payment.textNote;
+
+  @override
   String get displayID {
     final buf = StringBuffer("Confirmations: ");
     final confs = payment.confirmations;
@@ -1009,6 +1016,9 @@ class PaymentNode with Down4Object implements PaletteN {
 class NodeTheme with Down4Object implements PaletteN {
   final Down4Theme theme;
   NodeTheme(this.theme);
+
+  @override
+  String get messagePreview => "";
 
   @override
   Color get color => g.theme.paletteTextColor;

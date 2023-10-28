@@ -239,8 +239,7 @@ class Wallet with Down4Object, Jsons, Locals {
 
   Down4Payment? parsePayment3(ComposedID selfID, Down4Payment pay,
       {VoidCallback? callblack}) {
-    printWrapped(pay.txs.last.raw.toHex());
-
+      
     print("parsing payment: ${pay.id.value}");
     if (pay.existsLocally() || !pay.receivers.contains(selfID)) {
       print("payment was already parsed");
@@ -274,8 +273,8 @@ class Wallet with Down4Object, Jsons, Locals {
       db.execute(txstr);
       print("\n============ VALIDATED TRANSACTION ============\n");
       return pay
-        ..trySettlement(cb: callblack)
         ..calculatePlusMinus(selfID: selfID)
+        ..trySettlement(cb: callblack)        
         ..fullMerge();
     } catch (e) {
       print("error parsing payment: $e");

@@ -444,7 +444,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               doFetch: true, doMergeIfFetch: true, tempID: tempPaymentID);
           if (payment == null) return print("no payment for download");
           print("compressed payment:\n${payment.compressed}");
-          g.wallet.parsePayment3(g.self.id, payment, callblack: afterPayment);
+          g.wallet.parsePayment3(g.self.id, payment,
+              callblack: () => afterPayment(payment));
           break;
       }
     });
@@ -469,12 +470,30 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             pressFunc: () => openPay(p.payment)),
       ];
 
-  void afterPayment() {
+  void afterPayment([Down4Payment? p]) {
+    print("""
+      ////////////////////////////////////////////////////////
+      // after payment got called, p == null = ${p == null} //
+      ////////////////////////////////////////////////////////
+      """);
     final ref = page;
     if (ref is MoneyPage) {
       final payState = currentView.pages[1].pals<PaymentNode>();
-      for (final m in payState.values) {
-        writePalette<PaymentNode>(m.node, payState, payBGen, null);
+      if (p != null) {
+        final newP = PaymentNode(payment: p, selfID: g.self.id);
+        final ps = <Down4ID, Palette<PaymentNode>>{};
+        for (final p in [newP].followedBy(payState.values.map((e) => e.node))) {
+          writePalette(p, ps, payBGen, null);
+        }
+        currentView.pages[1].state = ps;
+        // currentView.pages[1].state = {
+        //   p.id: Palette(node: newP, key: GlobalKey()),
+        //   ...payState,
+        // };
+      } else {
+        for (final m in payState.values) {
+          writePalette<PaymentNode>(m.node, payState, payBGen, null);
+        }
       }
       setPage(moneyPage());
     } else if (ref is PaymentPage) {
@@ -798,7 +817,7 @@ print(_chats.values
     List<Palette>? initPals,
     double? initScroll,
     PersonN? single,
-    Down4Payment? payUpdate,
+    // Down4Payment? payUpdate,
   }) {
     // Map<Down4ID, Palette> peopleState() => currentView.pages[0].state.cast();
     Map<Down4ID, Palette> paymentState() => currentView.pages[1].state.cast();
@@ -811,7 +830,7 @@ print(_chats.values
         pay.id: Palette(
             node: p,
             key: Key(p.id.unik),
-            messagePreview: pay.textNote,
+            // messagePreview: pay.textNote,
             buttonsInfo2: payBGen(p)),
         ...paymentState(),
       };
@@ -825,7 +844,7 @@ print(_chats.values
       writePayments(paymentState(), openPay, 10);
     }
 
-    if (payUpdate != null) scanOrReceivePayment(payUpdate);
+    // if (payUpdate != null) scanOrReceivePayment(payUpdate);
 
     return MoneyPage(
         single: single,
@@ -837,13 +856,13 @@ print(_chats.values
           setPage(moneyPage());
         },
         onScan: (payment) {
-          final parsedPayment = g.wallet
-              .parsePayment3(g.self.id, payment, callblack: afterPayment);
+          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment,
+              callblack: () => afterPayment(payment));
           if (parsedPayment != null) scanOrReceivePayment(parsedPayment);
         },
         makePayment: (payment) {
-          final parsedPayment = g.wallet
-              .parsePayment3(g.self.id, payment, callblack: afterPayment);
+          final parsedPayment = g.wallet.parsePayment3(g.self.id, payment,
+              callblack: () => afterPayment(payment));
           unselectHomeSelection(updateActivity: true);
           viewManager.popUntilHome();
           if (parsedPayment != null) setPage(paymentPage(payment));

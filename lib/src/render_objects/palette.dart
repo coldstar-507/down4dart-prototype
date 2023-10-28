@@ -82,7 +82,7 @@ class Palette<T extends PaletteN> extends StatelessWidget
   final bool show;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
   final List<ButtonsInfo2> buttonsInfo2;
-  final String? messagePreview;
+  final bool hidePreview;
   final Animation<double>? sizeAnim, fadeAnim, bFadeAnim;
 
   Palette({
@@ -91,7 +91,7 @@ class Palette<T extends PaletteN> extends StatelessWidget
     this.fadeAnim,
     this.bFadeAnim,
     this.show = true,
-    this.messagePreview,
+    this.hidePreview = false,
     this.buttonsInfo2 = const [],
     this.select,
     this.imPress,
@@ -112,7 +112,7 @@ class Palette<T extends PaletteN> extends StatelessWidget
       fadeAnim: fadeAnim,
       bFadeAnim: bFadeAnim,
       sizeAnim: sizeAnim,
-      messagePreview: messagePreview,
+      hidePreview: hidePreview,
       buttonsInfo2: buttonsInfo2,
       select: select,
       imPress: imPress,
@@ -131,7 +131,7 @@ class Palette<T extends PaletteN> extends StatelessWidget
       fadeAnim: fadeAnim,
       bFadeAnim: bFadeAnim,
       sizeAnim: sizeAnim,
-      messagePreview: messagePreview,
+      hidePreview: hidePreview,      
       buttonsInfo2: buttonsInfo2,
       select: select,
       imPress: imPress,
@@ -220,8 +220,8 @@ class Palette<T extends PaletteN> extends StatelessWidget
                     style: g.theme.paletteIDTextStyle(
                         selected: selected, color: node.color)),
                 const Spacer(),
-                messagePreview != null
-                    ? Text(messagePreview!,
+                !hidePreview
+                    ? Text(node.messagePreview,
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                         style:
