@@ -13,22 +13,6 @@ import '../data_objects/couch.dart';
 import '../globals.dart';
 import '../themes.dart';
 
-// String XORedStrings(List<String> strings) {
-//   if (strings.isEmpty) return "";
-//   final nStrings = strings.length;
-//   final singleLen = strings.first.length;
-//   if (!(strings.every((element) => element.length == singleLen))) {
-//     throw "XORedStrings: all strings must be of same length";
-//   }
-//   List<int> hash = List<int>.generate(singleLen, (_) => 0);
-//   for (int i = 0; i < singleLen; i++) {
-//     for (int j = 0; j < nStrings; j++) {
-//       hash[i] = hash[i] ^ strings[j].codeUnitAt(i);
-//     }
-//   }
-//   return String.fromCharCodes(hash);
-// }
-
 class Down4ID {
   late final String unik;
   Down4ID({String? unik}) : unik = unik ?? pushKey();

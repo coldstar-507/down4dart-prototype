@@ -167,7 +167,7 @@ class ViewState {
   // listens to changes
   // Pair<List<Down4ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
   // A view can be from a single node (chatPage, nodePage) both require a node
-  final Down4Node? node;
+  // final Down4Node? node;
   // Every view has an ID
   final String id;
   // A view has a least 1 page, limited to 3
@@ -198,7 +198,7 @@ class ViewState {
     required this.id,
     required this.pages,
     int? ix,
-    this.node,
+    // this.node,
     this.orderedChats,
   })  : currentIndex = ix ?? 0,
         notableReferences = {};
@@ -320,6 +320,12 @@ void writePalette<T extends PaletteN>(
   bool home = false,
   bool? sel,
 }) {
+  print("""
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    writing ${c.displayName}${home ? ' in home' : ''}
+    activity = ${c.activity}
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    """);
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false

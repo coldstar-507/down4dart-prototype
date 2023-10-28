@@ -75,7 +75,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   List<Palette> get formattedHome => chats.toList().formatted();
   Map<Down4ID, ChatMessage>? chatMessages(ComposedID nodeID) {
-    return viewManager.views["chat-${nodeID.value}"]?.pages[0].state.cast();
+    return viewManager.views["chat@${nodeID.value}"]?.pages[0].state.cast();
   }
 
   void setPage(Down4PageWidget p) {
@@ -96,27 +96,27 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       return print("closing app");
     }
     final (ViewState poppedView, bool wasPopped) = viewManager.pop();
-    final pID = poppedView.id.split('-');
+    final pID = poppedView.id.split('@');
     final pp0 = pID.first;
-    final n = poppedView.node;
-    if (pID.length > 1 && pp0 == "chat" && n is ChatN && wasPopped) {
-      // poppedView.chat?.second.cancel();
+    final pp1 = pID.length > 1 ? pID[1] : null;
+    final n = local<Down4Node>(Down4ID.fromString(pp1));
+    if (pp0 == "chat" && n is ChatN && wasPopped) {
       writePalette(n, _chats, bGen, rfHome, home: true);
     }
-    final id = currentView.id.split('-');
-    final p0 = id.first;
-    switch (p0) {
+    final pID_ = currentView.id.split('@');
+    final pp0_ = pID_.first;
+    final pp1_ = pID_.length > 1 ? pID_[1] : null;
+    final n_ = local<Down4Node>(Down4ID.fromString(pp1_));
+    switch (pp0_) {
       case 'home':
         print("backing to homepage");
         return setPage(homePage());
       case 'chat':
-        final node = currentView.node as ChatN;
         print("backing to chat page");
-        return setPage(chatPage(node, isReload: true));
+        return setPage(chatPage(n_ as ChatN, isReload: true));
       case 'node':
         print("backing to node page");
-        final node = currentView.node as Down4Node;
-        return setPage(nodePage(node));
+        return setPage(nodePage(n_!));
       case 'money':
         print("backing to money page");
         return setPage(moneyPage());
@@ -131,7 +131,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   void openPreview() async => setPage(await previewPage(isPush: true));
 
-  // final Map<MediaType, StreamSubscription> _mediasListeners = {};
   StreamSubscription? _forgroundMessageListener, _notificationListener;
 
   final Map<ComposedID, StreamSubscription> _nodeConnections = {};
@@ -139,20 +138,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   void homeScrollToZero() => homePageState.scroll = 0;
 
   // ========================= INITIALIZATION ============================ //
-
-  // void connectToNotifications() async {
-  //   // _notificationListener = FirebaseMessaging.onMessage.listen((remoteMsg) {
-  //   // _notificationListener = Push.instance.onMessage.listen((remoteMsg) {
-  //   //   print("\n\nRECEIVED A FUCKING MESSAGE BRO\n\n");
-
-  //   //   final ComposedID? currentRoot =
-  //   //       viewManager.currentView.node?.id as ComposedID?;
-
-  //   //   print("\n\nshowing notification from connectToNotifications\n\n");
-  //   //   // showNotification(remoteMsg);
-  //   //   // showMessageNotification(remoteMsg, currentRoot: currentRoot);
-  //   // });
-  // }
 
   void connectToNodes() async {
     for (final n in homeConnection) {
@@ -409,7 +394,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           writePalette(rootNode, _chats, bGen, rfHome, home: true);
 
           if (msg is Chat) {
-            final viewID = "chat-${rootNode.id.value}";
+            final viewID = "chat@${rootNode.id.value}";
             final refView = viewManager.views[viewID];
             refView?.orderedChats = [msg.id, ...refView.orderedChats!];
             if (page is ChatPage && currentView.id == viewID) {
@@ -498,8 +483,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   void reloadChatWithID(Down4ID chatableNodeID, {Chat? msgRe}) {
-    if (currentView.id == "chat-${chatableNodeID.value}") {
-      setPage(chatPage(currentView.node as ChatN, msgRe: msgRe));
+    if (currentView.id == "chat@${chatableNodeID.value}") {
+      setPage(chatPage(cache<ChatN>(chatableNodeID)!, msgRe: msgRe));
     }
   }
 
@@ -542,13 +527,21 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   Future<void> processChats(Iterable<Chat> chats) async {
     if (chats.isEmpty) return;
+
+    for (final root in chats.map((e) => e.root)) {
+      final rtID = idOfRoot(root: root);
+      final rt = local<ChatN>(rtID);
+      if (rt == null) return;
+      rt.updateActivity();
+      writePalette(rt, _chats, bGen, rfHome, home: true);      
+    }
+    if (page is HomePage) setPage(homePage());
+    
     // these chats passed in parameter can also be forwarded chats
     Future<void> pc_(Chat c, [VoidCallback? cb]) async {
       final rtID = idOfRoot(root: c.root);
       final rt = local<ChatN>(rtID);
       if (rt == null) return;
-      rt.updateActivity();
-      writePalette(rt, _chats, bGen, rfHome, home: true);
       final fsuccess = r.push(rt.messageTargets, c, cb);
       final success = await fsuccess;
       if (success) c.markSent();
@@ -556,12 +549,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
 
     final (h, t) = chats.toList().headTail();
-    pc_(h, () {
-      Future(() async {
-        await Future.wait(t.map((e) => pc_(e)));
-        if (page is HomePage) setPage(homePage());
-      });
-    });
+    pc_(h, () => t.map((e) => pc_(e)).toList());
   }
 
   Future<void> sendSnip({
@@ -577,10 +565,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       backgroundMedia?.merge();
     }
 
-    // List<Future<bool>> pushes = [];
     final sels = chats.selected().asNodes<ChatN>().toList();
     if (sels.isEmpty) return;
-    final (head, tail) = sels.headTail();
+
 
     Future<void> sendSnip_(ChatN n, [VoidCallback? cb]) async {
       final snip = Snip(ComposedID(),
@@ -592,7 +579,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           mediaID: backgroundMedia?.id);
 
       r.push(n.messageTargets, snip, cb);
-      // pushes.add(r.push(n.messageTargets, snip, cb));
       if (n.id == g.self.id) {
         snip
           ..cache()
@@ -602,6 +588,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     // the reason for this strange arrangement is in the case of sending
     // the same snip to multiple target,
+    final (head, tail) = sels.headTail();    
     sendSnip_(head, () {
       for (final n in tail) {
         sendSnip_(n);
@@ -615,14 +602,17 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // ============================== PAGES ============================== //
 
   Down4PageWidget homePage({String? prompt}) {
-    // print(_chats.values.formattedReverse().map((e) => "${e.node.activity}\n${e.id.unik}\n").toList());
+print(_chats.values
+        .formatted()
+        .map((e) => "${e.node.activity}:${e.node.displayName}\n")
+        .toList());
 
     return HomePage(
       formattedChats: _chats.values.formatted(),
       openPreview: openPreview,
       forward: () => setPage(forwardPage(isPush: true)),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
-      send: processChats, //  (chats) {
+      send: processChats,  //  (chats) {
       //   processChats(chats);
       //   // unselectHomeSelection(updateActivity: true);
       //   // setPage(homePage());
@@ -1057,7 +1047,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   Down4PageWidget nodePage(Down4Node n, {bool isPush = false}) {
-    String pageID() => "node-${n.id.value}";
+    String pageID() => "node@${n.id.value}";
     if (isPush) {
       final r = List<String>.from(route);
       if (r.contains(pageID())) {
@@ -1068,11 +1058,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       } else {
         // TODO, there will be more possible states for nodePage no doubt
         final ps = PageState();
-        viewManager.push(ViewState(id: pageID(), pages: [ps], node: n));
+        viewManager.push(ViewState(id: pageID(), pages: [ps]));
       }
     }
 
     return NodePage(
+        id: pageID(),
         viewState: viewManager.at(pageID()),
         openPreview: openPreview,
         openChat: (p_) => setPage(chatPage(p_, isPush: true)),
@@ -1090,7 +1081,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     Chat? msgRe,
     Chat? reactingTo,
   }) {
-    String chatID() => "chat-${c.id.value}";
+    String chatID() => "chat@${c.id.value}";
     ViewState chat() => viewManager.at(chatID());
 
     List<Down4ID> orderedMsgsIDs() => chat().orderedChats ?? [];
@@ -1107,7 +1098,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     void refreshChat({bool stopVid = false}) async {
       final pg = page;
-      if (pg is! ChatPage || pg.viewState.node!.id != c.id) return;
+      if (pg is! ChatPage || pg.nodeID != c.id) return;
       if (stopVid) {
         for (final v in msgsWithVideos()) {
           messages()[v] = messages()[v]!.onPageTransition();
@@ -1164,7 +1155,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       Future(() async {
         // is a reload, load all NEW messages, hence the break;
         final pg = page;
-        if (pg is! ChatPage || pg.viewState.node?.id != c.id) return;
+        if (pg is! ChatPage || pg.nodeID != c.id) return;
         final loaded = messages().keys.toList()
           ..sort((a, b) => b.unik.compareTo(a.unik));
 
@@ -1224,7 +1215,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       } else {
         final ps1 = PageState();
         final ps2 = PageState();
-        viewManager.push(ViewState(id: chatID(), pages: [ps1, ps2], node: c));
+        viewManager.push(ViewState(id: chatID(), pages: [ps1, ps2]));
         initChat();
       }
     }
@@ -1246,6 +1237,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     }
 
     return ChatPage(
+      id: chatID(),
       openPreview: openPreview,
       viewState: viewManager.at(chatID()),
       forward: () => setPage(forwardPage(isPush: true)),

@@ -22,6 +22,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   @override
   final String id;
 
+  Down4ID get nodeID => Down4ID.fromString(id.split("@")[1])!;
+
   final void Function(int) onPageChange;
   final void Function() back, add, money, hyper, openPreview;
   final Future<void> Function([int limit]) loadMore;
@@ -32,7 +34,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
   final void Function(ComposedID, Chat) react;
   final ViewState viewState;
 
-  ChatPage({
+  const ChatPage({
+    required this.id,
     required this.add,
     required this.money,
     required this.hyper,
@@ -46,9 +49,8 @@ class ChatPage extends StatefulWidget implements Down4PageWidget {
     required this.openPreview,
     required this.viewState,
     this.reactingTo,
-    Key? key,
-  })  : id = viewState.node!.id.value,
-        super(key: key);
+    super.key,
+  });
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -70,8 +72,11 @@ class _ChatPageState extends State<ChatPage>
         Forward2,
         Boost2,
         Append2 {
-  // TODO: this threw an error once
-  ChatN get node => widget.viewState.node as ChatN;
+  ChatN get node {
+    print("ChatPage id = ${widget.id}");
+    print("Getting node = ${widget.nodeID.value} from ChatPage");
+    return local<ChatN>(widget.nodeID)!;
+  }
 
   List<Down4ID> get orderedChats => widget.viewState.orderedChats ?? [];
 

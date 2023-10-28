@@ -1,3 +1,5 @@
+import 'package:down4/src/data_objects/_data_utils.dart';
+import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/pages/_page_utils.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +12,9 @@ import '../render_objects/profile.dart';
 
 class NodePage extends StatefulWidget implements Down4PageWidget {
   @override
-  String get id => "node-${viewState.node!.id.value}";
+  final String id;
+
+  Down4ID get nodeID => Down4ID.fromString(id.split("@")[1])!;
 
   final void Function(ChatN) openChat;
   final void Function(Down4Node) openNode;
@@ -20,6 +24,7 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   final ViewState viewState;
 
   const NodePage({
+    required this.id,
     required this.viewState,
     required this.openPreview,
     required this.payNode,
@@ -36,7 +41,8 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
 
 class _NodePageState extends State<NodePage>
     with Pager2, Boost2, Forward2, Append2 {
-  Down4Node get node => widget.viewState.node!;
+      
+  Down4Node get node => cache<Down4Node>(widget.nodeID)!;
 
   late final ScrollController scroller =
       ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
@@ -98,7 +104,6 @@ class _NodePageState extends State<NodePage>
 
   @override
   late List<Extra> extras = [];
-
 
   @override
   void boost() {
