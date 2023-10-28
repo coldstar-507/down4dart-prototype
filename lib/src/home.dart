@@ -505,7 +505,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   void unselectHomeSelection({bool updateActivity = true}) {
     for (final p in chats.selected()) {
       if (updateActivity) p.node.updateActivity();
-      writePalette(p.node, _chats, bGen, rfHome, home: true);
+      writePalette(p.node, _chats, bGen, rfHome, sel: false, home: true);
     }
   }
 
@@ -621,7 +621,6 @@ print(_chats.values
         final selectedPals = chats.selected().asNodes<PersonN>();
         for (final n in selectedPals) {
           if (n is User) n.updateConnectionStatus(true);
-          // writePalette(n, _chats, bGen2, rfHome, sel: false, home: true);
           writePalette(n, _chats, bGen, rfHome, home: true);
           (await global<Down4Image>(n.mediaID))?.downloadAndWriteIfNeeded();
         }

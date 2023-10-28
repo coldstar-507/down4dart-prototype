@@ -17,47 +17,34 @@ import '../render_objects/console.dart';
 import '../pages/_page_utils.dart';
 import '../globals.dart';
 
-class TransformableWidget extends StatelessWidget {
+class TW1 extends StatefulWidget {
   final Widget child;
-  final String tid;
-  final Offset currentOffset;
-  final double currentScale, currentRotation;
-  final void Function(Offset, double rot, double scl, String tid)
-      onPositionChange;
-  TransformableWidget({
-    required this.onPositionChange,
-    required this.currentOffset,
-    required this.currentScale,
-    required this.currentRotation,
-    required this.tid,
-    required this.child,
-  }) : super(key: ValueKey(tid));
+  final void Function(Offset) onMove;
+
+  const TW1({super.key, required this.onMove, required this.child});
+
+  @override
+  State<TW1> createState() => _TW1State();
+}
+
+class _TW1State extends State<TW1> {
+  final origin = const Offset(0.0, 0.0);
+  late Offset _position = origin;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onScaleUpdate: (details) {
-        if (details.pointerCount == 1) {
-          final pos = currentOffset + details.focalPointDelta;
-          onPositionChange(pos, currentRotation, currentScale, tid);
-        } else if (details.pointerCount == 2) {
-          print("details.scale: ${details.scale}");
-          double scl;
-          if (details.scale > 1.0) {
-            scl = currentScale * 1.05;
-          } else {
-            scl = currentScale * 0.95;
-          }
-          onPositionChange(currentOffset, currentRotation, scl, tid);
-        }
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragUpdate: (d) {
+        print("vertical drag my nigga\ndelta=${d.delta}");
+        _position += d.delta;
+        widget.onMove(_position);
       },
       child: Center(
         child: Transform(
-          transform: Matrix4.identity()
-            ..scale(currentScale)
-            ..rotateZ(currentRotation),
+          transform: Matrix4.identity()..translate(_position.dx, _position.dy),
           alignment: FractionalOffset.center,
-          child: Center(child: child),
+          child: widget.child,
         ),
       ),
     );
@@ -418,7 +405,7 @@ class _SnipCameraState extends State<SnipCamera>
 
   bool get toReverse => camNum != 0;
 
-  Widget get inputBody => hasInput ? input.snipInput : const SizedBox.shrink();
+  Widget get inputBody => hasInput ? snipInput : const SizedBox.shrink();
 
   (String, String, bool, Size)? get m {
     if (filePath == null) return null;
@@ -604,21 +591,8 @@ class _SnipCameraState extends State<SnipCamera>
     );
   }
 
-  // TransformableWidget? _snipInput;
-
-  // TransformableWidget get movableInput {
-  //   return _snipInput ??= TransformableWidget(
-  //       onPositionChange: (ofs, rot, scl, tid) {
-  //         print("moving snip input!");
-  //         _snipInput = _snipInput!.withNewPosition(ofs, rot, scl);
-  //         setState(() {});
-  //       },
-  //       currentOffset: g.sizes.middlePoint,
-  //       currentScale: 1.0,
-  //       currentRotation: 0.0,
-  //       tid: randomMediaID(),
-  //       child: input.snipInput);
-  // }
+  Offset so = const Offset(0, 0);
+  late TW1 snipInput = TW1(onMove: (so_) => so = so_, child: input.snipInput);
 
   @override
   List<Extra> extras = [];
