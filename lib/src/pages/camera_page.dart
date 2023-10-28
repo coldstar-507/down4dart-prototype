@@ -34,18 +34,19 @@ class _TW1State extends State<TW1> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      behavior: HitTestBehavior.translucent,
       onVerticalDragUpdate: (d) {
         print("vertical drag my nigga\ndelta=${d.delta}");
         _position += d.delta;
         widget.onMove(_position);
+        setState(() {});
       },
       child: Center(
         child: Transform(
-          transform: Matrix4.identity()..translate(_position.dx, _position.dy),
-          alignment: FractionalOffset.center,
-          child: widget.child,
-        ),
+            transform: Matrix4.identity()
+              ..translate(_position.dx, _position.dy),
+            alignment: FractionalOffset.center,
+            child: widget.child,
+            ),
       ),
     );
   }
@@ -510,7 +511,8 @@ class _SnipCameraState extends State<SnipCamera>
               ),
             ),
             ...sticks.reversed,
-            inputBody,
+            hasInput ? input.snipInput : const SizedBox.shrink()
+            // inputBody,
             // Positioned(
             //     right: g.sizes.headerHeight / 2,
             //     top: g.sizes.statusBarHeight, // + (g.sizes.headerHeight / 2),
