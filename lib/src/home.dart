@@ -179,6 +179,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     localPalettesRoutine(init: true);
     connectToMessages3();
     connectToNodes();
+    db.execute("""
+      DELETE FROM messages
+      WHERE type = 'snip'
+      """);
+
     processChats(unsentMessages());
     messagesDeletingRoutine();
     mediasDeletingRoutine();
@@ -552,10 +557,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final rt = local<ChatN>(rtID);
       if (rt == null) return;
       rt.updateActivity();
-      writePalette(rt, _chats, bGen, rfHome, home: true);      
+      writePalette(rt, _chats, bGen, rfHome, home: true);
     }
     if (page is HomePage) setPage(homePage());
-    
+
     // these chats passed in parameter can also be forwarded chats
     Future<void> pc_(Chat c, [VoidCallback? cb]) async {
       final rtID = idOfRoot(root: c.root);
@@ -587,7 +592,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final sels = chats.selected().asNodes<ChatN>().toList();
     if (sels.isEmpty) return;
 
-
     Future<void> sendSnip_(ChatN n, [VoidCallback? cb]) async {
       final snip = Snip(ComposedID(),
           snipSize: g.sizes.snipSize,
@@ -607,7 +611,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     // the reason for this strange arrangement is in the case of sending
     // the same snip to multiple target,
-    final (head, tail) = sels.headTail();    
+    final (head, tail) = sels.headTail();
     sendSnip_(head, () {
       for (final n in tail) {
         sendSnip_(n);
@@ -621,7 +625,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // ============================== PAGES ============================== //
 
   Down4PageWidget homePage({String? prompt}) {
-print(_chats.values
+    print(_chats.values
         .formatted()
         .map((e) => "${e.node.activity}:${e.node.displayName}\n")
         .toList());
@@ -631,7 +635,7 @@ print(_chats.values
       openPreview: openPreview,
       forward: () => setPage(forwardPage(isPush: true)),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
-      send: processChats,  //  (chats) {
+      send: processChats, //  (chats) {
       //   processChats(chats);
       //   // unselectHomeSelection(updateActivity: true);
       //   // setPage(homePage());
@@ -1379,12 +1383,47 @@ print(_chats.values
     Future<Widget> makeSnip() async {
       final ratio = g.sizes.snipSize.width / s.snipSize.width;
       if (bm is Down4Image) {}
+      final hasText = s.txt != null;
+      print("s.txt=${s.txt}");
+      final jeff = s.txt?.split(" ");
+      final txt = jeff?.sublist(1).join(" ");
+      final ofs = double.parse(jeff?[0] ?? "0.0");
+
+      double boxHeight() {
+        final tp = TextPainter(
+          text: TextSpan(text: txt, style: g.theme.snipInputTextStyle),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: g.sizes.w);
+        return tp.height;
+      }
+
+      print("boxheight=${boxHeight()}");
+
+      Widget ct() => Center(
+            child: Transform.translate(
+              offset: Offset(0.0, ofs),
+              child: SizedBox(
+                  width: g.sizes.w,
+                  height: boxHeight() + 4,
+                  child: ColoredBox(
+                      color: g.theme.snipRibbon,
+                      child: Center(
+                        child: Text(txt ?? "",
+                            textAlign: TextAlign.center,
+                            style: g.theme.snipInputTextStyle),
+                      ))
+                  // alignment: AlignmentDirectional.center,
+                  // decoration: BoxDecoration(color: g.theme.snipRibbon),
+                  // child:
+                  ),
+            ),
+          );
 
       return SizedBox.fromSize(
           key: GlobalKey(),
           size: g.sizes.snipSize,
           child: Stack(
-            fit: StackFit.expand,
+            // fit: StackFit.expand,
             children: [
               bm?.display(size: g.sizes.snipSize, controller: vpc) ??
                   const SizedBox.shrink(),
@@ -1403,7 +1442,8 @@ print(_chats.values
                           ..rotateZ(s.rotation)
                           ..scale(s.scale * ratio),
                         child: m.display(size: s.initSize)));
-              }))
+              })),
+              hasText ? ct() : const SizedBox.shrink(),
             ],
           ));
     }

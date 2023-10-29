@@ -207,7 +207,6 @@ class _TW2State extends State<TW2> {
             final newWidth = newScale * widget.initSize.width;
             // same result using height
             final pixelScale = ((newWidth / lastWidth) - 1) / 2;
-
             final (k, j) = calculateKandJ(newAngle);
             _position += (details.focalPointDelta) + (k * pixelScale) - j;
           } else {
@@ -673,6 +672,10 @@ class _SnipCameraState extends State<SnipCamera>
                               height: _camSize.height,
                               mime: mimetype!));
                     }
+                    String? txt;
+                    if (hasInput && input.value.isNotEmpty) {
+                      txt = "${so.dy} ${input.value}";
+                    }
 
                     final stx = sticks.map((e) {
                       final (ofs, scl, rot) = positions[e.tid]!;
@@ -689,7 +692,7 @@ class _SnipCameraState extends State<SnipCamera>
                     vpc?.dispose();
                     widget.cameraCallBack(
                         backgroundMedia: m?..cache(),
-                        text: input.value,
+                        text: txt,
                         sticks: stx);
                   },
                 ),
