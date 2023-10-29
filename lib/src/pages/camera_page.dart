@@ -42,11 +42,10 @@ class _TW1State extends State<TW1> {
       },
       child: Center(
         child: Transform(
-            transform: Matrix4.identity()
-              ..translate(_position.dx, _position.dy),
-            alignment: FractionalOffset.center,
-            child: widget.child,
-            ),
+          transform: Matrix4.identity()..translate(_position.dx, _position.dy),
+          alignment: FractionalOffset.center,
+          child: widget.child,
+        ),
       ),
     );
   }
@@ -198,7 +197,7 @@ class _TW2State extends State<TW2> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      behavior: HitTestBehavior.translucent,
+      // behavior: HitTestBehavior.translucent,
       onScaleUpdate: (ScaleUpdateDetails details) {
         final newScale = details.scale * _prevScale;
         final newAngle = _previousRotation + details.rotation;
@@ -406,7 +405,7 @@ class _SnipCameraState extends State<SnipCamera>
 
   bool get toReverse => camNum != 0;
 
-  Widget get inputBody => hasInput ? snipInput : const SizedBox.shrink();
+  // Widget get inputBody => hasInput ? snipInput : const SizedBox.shrink();
 
   (String, String, bool, Size)? get m {
     if (filePath == null) return null;
@@ -511,12 +510,12 @@ class _SnipCameraState extends State<SnipCamera>
               ),
             ),
             ...sticks.reversed,
-            hasInput ? input.snipInput : const SizedBox.shrink()
-            // inputBody,
-            // Positioned(
-            //     right: g.sizes.headerHeight / 2,
-            //     top: g.sizes.statusBarHeight, // + (g.sizes.headerHeight / 2),
-            //     child: xWidget),
+            hasInput
+                ? input.snipInput2((p0) => setState(() => so = p0))
+                : const SizedBox.shrink(),
+            // hasInput
+            //     ? input.snipInput(so, (p0) => setState(() => so = p0))
+            //     : const SizedBox.shrink(),
           ],
         ),
       );
@@ -594,7 +593,10 @@ class _SnipCameraState extends State<SnipCamera>
   }
 
   Offset so = const Offset(0, 0);
-  late TW1 snipInput = TW1(onMove: (so_) => so = so_, child: input.snipInput);
+  late SnipInput snipInput =
+      input.snipInput(so, (p0) => setState(() => so = p0));
+
+  // late SnipInput2 snipInput = input.snipInput2((p0) => so = p0);
 
   @override
   List<Extra> extras = [];

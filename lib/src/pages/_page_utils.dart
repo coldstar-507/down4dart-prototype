@@ -111,7 +111,10 @@ class MyTextEditor extends StatefulWidget {
   InitInput2 get initInput => InitInput2(this);
   ConsoleInput2 get consoleInput => ConsoleInput2(this);
   Widget get basicInput => BasicInput(this);
-  Widget get snipInput => SnipInput(this);
+  SnipInput snipInput(Offset ofs, void Function(Offset) onMove) =>
+      SnipInput(this, ofs, onMove);
+  SnipInput2 snipInput2(void Function(Offset) onMove) =>
+      SnipInput2(ed: this, onMove: onMove);
   bool get hasFocus => fn.hasFocus;
   String get value => ctrl.value;
   double get height => ctrl.height;

@@ -352,23 +352,77 @@ class BasicInput extends StatelessWidget {
 
 class SnipInput extends StatelessWidget {
   final MyTextEditor ed;
-  const SnipInput(this.ed, {Key? key}) : super(key: key);
+  final Offset ofs;
+  final void Function(Offset ofs) onMove;
+  const SnipInput(this.ed, this.ofs, this.onMove, {super.key});
 
   @override
   Widget build(BuildContext context) {
+    print("ofs=$ofs");
     return GestureDetector(
-        onTap: !ed.fn.hasFocus
-            ? () => FocusScope.of(context).requestFocus(ed.fn)
-            : null,
-        child: Center(
-            child: Container(
-                width: g.sizes.w,
-                height: ed.height,
-                color: g.theme.snipRibbon,
-                child: Align(
-                  alignment: AlignmentDirectional.center,
-                  child: ed,
-                ))));
+      onTap: !ed.fn.hasFocus
+          ? () => FocusScope.of(context).requestFocus(ed.fn)
+          : null,
+      onVerticalDragUpdate: (d) {
+        print("vertical drag my nigga\ndelta=${d.delta}");
+        onMove(ofs + Offset(0, d.delta.dy));
+      },
+      child: Center(
+        child: Transform.translate(
+          offset: ofs,
+          child: Container(
+            width: g.sizes.w,
+            height: ed.height,
+            color: g.theme.snipRibbon,
+            child: Align(
+              alignment: AlignmentDirectional.center,
+              child: ed,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SnipInput2 extends StatefulWidget {
+  final MyTextEditor ed;
+  final void Function(Offset) onMove;
+  const SnipInput2({required this.ed, required this.onMove, super.key});
+
+  @override
+  State<SnipInput2> createState() => _SnipInput2State();
+}
+
+class _SnipInput2State extends State<SnipInput2> {
+  Offset position = const Offset(0, 0);
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: !widget.ed.fn.hasFocus
+          ? () => FocusScope.of(context).requestFocus(widget.ed.fn)
+          : null,
+      onVerticalDragUpdate: (d) {
+        print("vertical drag my nigga\ndelta=${d.delta}");
+        position += Offset(0, d.delta.dy);
+        widget.onMove(position);
+        setState(() {});
+      },
+      child: Center(
+        child: Transform.translate(
+          offset: position,
+          child: Container(
+            width: g.sizes.w,
+            height: widget.ed.height,
+            color: g.theme.snipRibbon,
+            child: Align(
+              alignment: AlignmentDirectional.center,
+              child: widget.ed,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
