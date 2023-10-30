@@ -176,17 +176,16 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final homeChats = PageState();
     final homeConns = PageState();
     g.vm.push(ViewState(id: "home", pages: [homeChats, homeConns]));
-    localPalettesRoutine(init: true);
-    connectToMessages3();
-    connectToNodes();
-    db.execute("""
-      DELETE FROM messages
-      WHERE type = 'snip'
-      """);
-
+    // db.execute("""
+    //   DELETE FROM messages
+    //   WHERE type = 'snip'
+    //   """);
     processChats(unsentMessages());
     messagesDeletingRoutine();
     mediasDeletingRoutine();
+    localPalettesRoutine(init: true);
+    connectToMessages3();
+    connectToNodes();
     loadSavedMediasIDs();
     clearAppCache();
     g.wallet.walletRoutine(callback: afterPayment);
