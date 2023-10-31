@@ -88,6 +88,10 @@ Future<void> showMessageNotification(
   final senderImageProfilePath = await senderImage?.profilePath(appDir);
   final groupImageProfilePath = await groupImage?.profilePath(appDir);
 
+  final isGroup = group != null;
+  print("isGroup = $isGroup");
+
+  final pathForImage = groupImageProfilePath ?? senderImageProfilePath;
   print("PATH FOR IMAGE: ${groupImageProfilePath ?? senderImageProfilePath}");
 
   print("showing notification!");
@@ -100,12 +104,12 @@ Future<void> showMessageNotification(
       body: body,
       summary: '',
       roundedLargeIcon: true,
-      largeIcon: "file://$senderImageProfilePath",
-      bigPicture: groupImageProfilePath != null
-          ? "file://$groupImageProfilePath"
-          : null,
-      icon: 'resource://drawable/ic_stat_down4_white',
-      notificationLayout: group != null
+      largeIcon: "file://$pathForImage",
+      // bigPicture: groupImageProfilePath != null
+      //     ? "file://$groupImageProfilePath"
+      //     : null,
+      icon: 'resource://drawable/ic_down4_inverted_white',
+      notificationLayout: isGroup
           ? NotificationLayout.MessagingGroup
           : NotificationLayout.Messaging,
     ),
@@ -301,6 +305,12 @@ void initSqlite() async {
 }
 
 Future<void> fcmHandler(FcmSilentData silentData) async {
+  try {
+    print("Initializing firebase app in fcmHandler");
+    await Firebase.initializeApp();
+  } catch (e) {
+    print("Error initializing firebase app in fcmHandler: $e");    
+  }
   // return print("notifs disabled for debugging payments");
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
@@ -357,10 +367,10 @@ Future<void> main() async {
   {
     // inits notifications settings
     AwesomeNotifications().initialize(
-        'resource://drawable/ic_state_down4_white',
+      'resource://drawable/ic_down4_inverted_white',      
         [
           NotificationChannel(
-              icon: 'resource://drawable/ic_stat_down4_white',
+              icon: 'resource://drawable/ic_down4_inverted_white',      
               channelKey: 'def',
               channelName: 'default',
               channelDescription: 'default channel'),

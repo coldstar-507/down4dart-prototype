@@ -624,10 +624,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // ============================== PAGES ============================== //
 
   Down4PageWidget homePage({String? prompt}) {
-    print(_chats.values
-        .formatted()
-        .map((e) => "${e.node.activity}:${e.node.displayName}\n")
-        .toList());
 
     return HomePage(
       formattedChats: _chats.values.formatted(),
@@ -729,7 +725,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.popUntilHome();
       viewManager.push(ViewState(id: "forward", pages: [PageState()]));
       for (final c in formattedHome.asNodes<ChatN>()) {
-        writePalette<ChatN>(c, _fState(), fbGen, rf, home: false);
+        writePalette(c, _fState(), fbGen, rf, home: false);
       }
     }
 

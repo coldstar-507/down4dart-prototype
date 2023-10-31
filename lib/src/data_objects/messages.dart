@@ -63,15 +63,14 @@ class SnipStick {
       //////////////////////////
       """);
     var data =
-      "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
-      
+        "${mediaID.value}@${pos.dx}@${pos.dy}@${initSize.width}@${initSize.height}@$rotation@$scale";
+
     if (tempID != null && tempTS != null) {
       print("adding tempID and tempTS toString() at SnipStick!");
       data = "$data@${tempID!.value}@$tempTS";
     }
     return base64Encode(data.codeUnits);
   }
-  
 }
 
 abstract class Down4Message with Jsons {
@@ -217,7 +216,7 @@ abstract class Down4Message with Jsons {
         return Snip(id as ComposedID,
             root: root!,
             snipSize: snipSize!,
-            sticks: sticks!.toList(),
+            sticks: sticks?.toList() ?? [],
             senderID: senderID,
             mediaID: mediaID,
             tempMediaID: tempMediaID,
@@ -499,7 +498,9 @@ class Snip extends Down4Message
   @override
   Map<String, String> toJson({bool includeLocal = false}) {
     final sup = super.toJson(includeLocal: includeLocal);
-    sup["sticks"] = sticks.map((e) => e.toString()).join(" ");
+    if (sticks.isNotEmpty) {
+      sup["sticks"] = sticks.map((e) => e.toString()).join(" ");
+    }
     sup["snipSize"] = "${snipSize.width}@${snipSize.height}";
     return sup;
   }

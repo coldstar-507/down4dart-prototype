@@ -320,12 +320,6 @@ void writePalette<T extends PaletteN>(
   bool home = false,
   bool? sel,
 }) {
-  print("""
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    writing ${c.displayName}${home ? ' in home' : ''}
-    activity = ${c.activity}
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    """);
   // isSelected will check first if it's an argument, else it will check
   // if the palette is a reload and use it's current status, or else it will
   // default to false
@@ -334,8 +328,6 @@ void writePalette<T extends PaletteN>(
   final bool isSelected = sel ?? selectionIfReload ?? false;
 
   final node = c;
-
-  // final lastChat = node is ChatN ? node.lastChatMessage() : null;
 
   final hide = home && node is User && !node.isConnected && !node.hasMessages();
 
@@ -350,7 +342,6 @@ void writePalette<T extends PaletteN>(
       key: GlobalKey(),
       node: c,
       selected: isSelected,
-      // messagePreview: lastChat?.messagePreview,
       imPress: onSelect,
       show: !hide,
       bodyPress: onSelect,
