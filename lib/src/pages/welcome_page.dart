@@ -8,7 +8,7 @@ import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
 import '_page_utils.dart';
 
-class ThemePage extends StatefulWidget implements Down4PageWidget {
+class ThemePage extends StatefulWidget with Down4PageWidget {
   final void Function() back, onSwap;
   final Map<Down4ID, Palette> themes;
   const ThemePage({

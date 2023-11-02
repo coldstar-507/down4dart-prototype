@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../globals.dart';
 import '../render_objects/_render_utils.dart' show down4Logo, Down4PageWidget;
 
-class LoadingPage2 extends StatefulWidget implements Down4PageWidget {
+class LoadingPage2 extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "loading";
 
@@ -46,10 +46,7 @@ class _LoadingPage2State extends State<LoadingPage2>
   Widget build(BuildContext context) {
     return Container(
       color: g.theme.backGroundColor,
-      child: Align(
-        alignment: AlignmentDirectional.center,
-        child: rotatingLogo,
-      ),
+      child: Align(alignment: AlignmentDirectional.center, child: rotatingLogo),
     );
   }
 }

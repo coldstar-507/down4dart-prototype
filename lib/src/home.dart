@@ -825,7 +825,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         single: single,
         initPalettes: initPals,
         initScroll: initScroll,
-        viewState: currentView,
+        // viewState: currentView,
         loadMorePayments: () async {
           writePayments(paymentState(), openPay, 10);
           setPage(moneyPage());
@@ -1049,7 +1049,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         // but we don't create a new state, we reuse the same sate
         viewManager.route.add(pageID());
       } else {
-        // TODO, there will be more possible states for nodePage no doubt
+        // TODO, there will be more possible viewStates for nodePage no doubt
         final ps = PageState();
         viewManager.push(ViewState(id: pageID(), pages: [ps]));
       }
@@ -1057,7 +1057,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     return NodePage(
         id: pageID(),
-        viewState: viewManager.at(pageID()),
         openPreview: openPreview,
         openChat: (p_) => setPage(chatPage(p_, isPush: true)),
         openNode: (p_) => setPage(nodePage(p_, isPush: true)),

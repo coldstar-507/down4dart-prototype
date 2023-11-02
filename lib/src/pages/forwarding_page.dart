@@ -14,10 +14,9 @@ import '../render_objects/palette.dart';
 import '../render_objects/navigator.dart';
 import '../globals.dart';
 
-class ForwardingPage extends StatefulWidget implements Down4PageWidget {
+class ForwardingPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "forward";
-  ViewState get viewState => g.vm.currentView;
 
   final void Function() back, openPreview;
   final void Function() hyper;
@@ -46,13 +45,13 @@ class _ForwadingPageState extends State<ForwardingPage>
         Sender2,
         Compose2,
         Hyper2 {
+  ViewState get vs => widget.vs;
+
   Set<Down4Object> get fo => widget.fObjects;
 
   late ScrollController scroller =
-      ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
-        ..addListener(() {
-          widget.viewState.pages[0].scroll = scroller.offset;
-        });
+      ScrollController(initialScrollOffset: vs.pages[0].scroll)
+        ..addListener(() => vs.pages[0].scroll = scroller.offset);
 
   @override
   void initState() {
@@ -67,8 +66,7 @@ class _ForwadingPageState extends State<ForwardingPage>
     super.dispose();
   }
 
-  Map<Down4ID, Palette> get _forwardState =>
-      widget.viewState.pages[0].state.cast();
+  Map<Down4ID, Palette> get _forwardState => vs.pages[0].state.cast();
 
   Iterable<Palette> get _fList => _forwardState.values;
 
@@ -96,7 +94,7 @@ class _ForwadingPageState extends State<ForwardingPage>
             }
           ],
           currentConsolesName: currentConsolesName,
-          currentPageIndex: widget.viewState.currentIndex);
+          currentPageIndex: vs.currentIndex);
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode => [
@@ -194,7 +192,7 @@ class _ForwadingPageState extends State<ForwardingPage>
   List<String> currentConsolesName = ["base"];
 
   @override
-  int get currentPageIndex => widget.viewState.currentIndex;
+  int get currentPageIndex => vs.currentIndex;
 
   @override
   String get backFromCameraConsoleName => "base";
@@ -205,10 +203,9 @@ class _ForwadingPageState extends State<ForwardingPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-      onInput: onInput,
-      onFocusChange: onFocusChange,
-      config: Input2.multiLine,
-    ),
+        onInput: onInput,
+        onFocusChange: onFocusChange,
+        config: Input2.multiLine)
   ];
 
   @override

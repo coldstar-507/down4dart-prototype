@@ -8,7 +8,7 @@ import '../render_objects/_render_utils.dart' show Down4PageWidget;
 
 import '_page_utils.dart';
 
-class SnipViewPage extends StatefulWidget implements Down4PageWidget {
+class SnipViewPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "snipview";
 

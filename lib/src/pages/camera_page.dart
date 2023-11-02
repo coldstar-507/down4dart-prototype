@@ -246,7 +246,7 @@ class _TW2State extends State<TW2> {
   }
 }
 
-class SnipCamera extends StatefulWidget implements Down4PageWidget {
+class SnipCamera extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "snip";
 

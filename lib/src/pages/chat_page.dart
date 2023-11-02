@@ -18,7 +18,7 @@ import '../render_objects/navigator.dart';
 
 import '_page_utils.dart';
 
-class ChatPage extends StatefulWidget implements Down4PageWidget {
+class ChatPage extends StatefulWidget with Down4PageWidget {
   @override
   final String id;
 
@@ -72,13 +72,11 @@ class _ChatPageState extends State<ChatPage>
         Forward2,
         Boost2,
         Append2 {
-  ChatN get node {
-    print("ChatPage id = ${widget.id}");
-    print("Getting node = ${widget.nodeID.value} from ChatPage");
-    return local<ChatN>(widget.nodeID)!;
-  }
+  ViewState get vs => widget.vs;
 
-  List<Down4ID> get orderedChats => widget.viewState.orderedChats ?? [];
+  ChatN get node => local<ChatN>(widget.nodeID)!;
+
+  List<Down4ID> get orderedChats => vs.orderedChats ?? [];
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode => [
@@ -102,21 +100,16 @@ class _ChatPageState extends State<ChatPage>
   void setTheState() => setState(() {});
 
   late ScrollController scroller0 =
-      ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
-        ..addListener(() {
-          widget.viewState.pages[0].scroll = scroller0.offset;
-        });
+      ScrollController(initialScrollOffset: vs.pages[0].scroll)
+        ..addListener(() => vs.pages[0].scroll = scroller0.offset);
 
   late ScrollController? scroller1 = node is GroupN
-      ? (ScrollController(initialScrollOffset: widget.viewState.pages[1].scroll)
-        ..addListener(() {
-          widget.viewState.pages[1].scroll = scroller1!.offset;
-        }))
+      ? (ScrollController(initialScrollOffset: vs.pages[1].scroll)
+        ..addListener(() => vs.pages[1].scroll = scroller1!.offset))
       : null;
 
-  Map<Down4ID, ChatMessage> get _messages =>
-      widget.viewState.pages[0].state.cast();
-  Map<ComposedID, Palette> get _group => widget.viewState.pages[1].state.cast();
+  Map<Down4ID, ChatMessage> get _messages => vs.pages[0].state.cast();
+  Map<ComposedID, Palette> get _group => vs.pages[1].state.cast();
 
   var lastOffsetUpdate = 0.0;
 
@@ -324,7 +317,7 @@ class _ChatPageState extends State<ChatPage>
 
   @override
   void forward() {
-    final sel = g.vm.currentView.allPageSelection();
+    final sel = vs.allPageSelection();
     g.vm.forwardingObjects.addAll(sel);
     g.vm.mode = Modes.forward;
     widget.forward();

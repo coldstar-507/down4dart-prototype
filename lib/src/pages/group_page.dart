@@ -17,7 +17,7 @@ import '../render_objects/navigator.dart';
 import '../render_objects/palette_maker.dart';
 import '../render_objects/_render_utils.dart';
 
-class GroupPage extends StatefulWidget implements Down4PageWidget {
+class GroupPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "group";
   final List<Palette> initialPalettes;

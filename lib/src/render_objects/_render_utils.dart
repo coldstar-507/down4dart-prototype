@@ -179,8 +179,9 @@ Widget backArrow() {
   );
 }
 
-abstract class Down4PageWidget extends Widget {
+mixin Down4PageWidget on Widget {
   String get id;
+  ViewState get vs => g.vm.at(id);
 }
 
 class Down4TextPainter extends CustomPainter {
@@ -1106,131 +1107,96 @@ Future<void> cropAndSaveToSquare(
   print(
       "\n====================\nCROP AND SAVE TO SQUARE\n====================\n");
   if (ogImage == null) return;
-
-  // get the exif metadata for orientation tag
-  final xd = await exif.readExifFromFile(from);
-  print("============EXIF PRE RESIZE============");
-  for (final e in xd.entries) {
-    print("${e.key} : ${e.value} (tag=${e.value.tag})");
-  }
-
-  final int idRot = xd["Image Orientation"]?.tag ?? 1;
-
-  // do the resize of the image
+  
+  final xf = await exif.readExifFromFile(from);
+  final ori = xf["Image Orientation"]?.values.firstAsInt() ?? 1;
+  print("PICTURE ORIENTATION = $ori");
+  // for (final x in xf.entries) {
+  //   print("""
+  //     key=${x.key}
+  //     tag=${x.value.tag}
+  //     tgt=${x.value.tagType}
+  //     vls=${x.value.values.toList()}
+  //     prt=${x.value.printable}
+  //     """);
+  // }
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
-
   final cropRz = img.copyResizeCropSquare(ogImage, resize);
-  // final cropCircle = img.copyCropCircle(cropRz, radius: 4);
-  // final rz = img.copyResize(ogImage);
 
-  // img.Image res;
-  // switch (idRot) {
-  //   case 1:
-  //     res = cropRz;
-  //     print("straight");
-  //     break;
-  //   case 2:
-  //     res = img.flipHorizontal(cropRz);
-  //     print("straight mirrored");
-  //     break;
-  //   case 3:
-  //     res = img.flipVertical(cropRz);
-  //     print("flipped");
-  //     break;
-  //   case 4:
-  //     res = img.flipHorizontal(img.flipVertical(cropRz));
-  //     print("flipped mirrored");
-  //     break;
-  //   case 5:
-  //     res = img.flipHorizontal(img.copyRotate(cropRz, 270));
-  //     print("90-CW mirrored");
-  //     break;
-  //   case 6:
-  //     res = img.copyRotate(cropRz, 270);
-  //     print("90-CW");
-  //     break;
-  //   case 7:
-  //     res = img.flipHorizontal(img.copyRotate(cropRz, 90));
-  //     print("90 mirrored");
-  //     break;
-  //   case 8:
-  //     res = img.copyRotate(cropRz, 90);
-  //     print("90");
-  //     break;
-  //   default:
-  //     throw "error: $idRot is not a valid Image Orientation tag";
-  // }
-
-  final xd_ = await exif.readExifFromBytes(cropRz.data);
-  print("============EXIF POST RESIZE============");
-  for (final e in xd_.entries) {
-    print("${e.key} : ${e.value}");
+  img.Image res;
+  switch (ori) {
+    case 1:
+      res = cropRz;
+      print("straight");
+      break;
+    case 2:
+      res = img.flipHorizontal(cropRz);
+      print("straight mirrored");
+      break;
+    case 3:
+      res = img.flipVertical(cropRz);
+      print("flipped");
+      break;
+    case 4:
+      res = img.flip(cropRz, img.Flip.both);
+      print("flipped mirrored");
+      break;
+    case 5:
+      res = img.flipHorizontal(img.copyRotate(cropRz, 90));
+      print("90-CW mirrored");
+      break;
+    case 6:
+      res = img.copyRotate(cropRz, 90);
+      print("90-CW");
+      break;
+    case 7:
+      res = img.flipHorizontal(img.copyRotate(cropRz, 270));
+      print("90 mirrored");
+      break;
+    case 8:
+      res = img.copyRotate(cropRz, 270);
+      print("90");
+      break;
+    default:
+      throw "error: $ori is not a valid Image Orientation tag";
   }
 
-
-  // final xd__ = await exif.readExifFromBytes(cropCircle.data);
-  // print("============EXIF POST CIRCLE============");
-  // for (final e in xd__.entries) {
-  //   print("${e.key} : ${e.value}");
-  // }
-  await to.writeAsBytes(img.encodeJpg(cropRz));
+  await to.writeAsBytes(img.encodeJpg(res));
 }
 
-// Future<ui.Image?> cropBitmapToSquare(Uint8List originalBytes) async {
-//   try {
-//     final ui.Codec codec = await ui.instantiateImageCodec(originalBytes);
-//     final ui.Image image = (await codec.getNextFrame()).image;
-//     final int size = image.width < image.height ? image.width : image.height;
-
-//     final recorder = ui.PictureRecorder();
-//     final canvas = Canvas(recorder);
-//     canvas.drawImageRect(
-//       image,
-//       Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
-//       Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
-//       Paint(),
-//     );
-
-//     final picture = recorder.endRecording();
-//     return picture.toImage(size, size);
-//   } catch (e) {
-//     print('Error while cropping bitmap: $e');
-//     return null;
-//   }
-// }
-
-Future<Uint8List?> applyCircularMask(ui.Image image) async {
-  final byteData = await image.toByteData();
-  final bytes = byteData?.buffer.asUint8List();
-
-  try {
-    final int size = image.width;
-
-    final paint = Paint()
-      ..shader = ImageShader(
-        image,
-        TileMode.clamp,
-        TileMode.clamp,
-        Matrix4.identity().storage,
-      );
-
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    canvas.drawCircle(
-      Offset(size / 2, size / 2),
-      size / 2,
-      paint,
-    );
-
-    final picture = recorder.endRecording();
-    final pictureImage = await picture.toImage(size, size);
-    final ByteData? byteData =
-        await pictureImage.toByteData(format: ui.ImageByteFormat.png);
-
-    return byteData?.buffer.asUint8List();
-  } catch (e) {
-    print('Error while applying circular mask: $e');
-    return null;
+Future<img.Image> applyCircularMask(img.Image inputImage, int radius) async {
+  for (var y = 0; y < inputImage.height; y++) {
+    for (var x = 0; x < inputImage.width; x++) {
+      if (x < radius &&
+          y < radius &&
+          (x - radius) * (x - radius) + (y - radius) * (y - radius) >
+              radius * radius) {
+        inputImage.setPixelRgba(x, y, 0, 0, 0, 0);
+      } else if (x < radius &&
+          y >= inputImage.height - radius &&
+          (x - radius) * (x - radius) +
+                  (y - (inputImage.height - radius)) *
+                      (y - (inputImage.height - radius)) >
+              radius * radius) {
+        inputImage.setPixelRgba(x, y, 0, 0, 0, 0);
+      } else if (x >= inputImage.width - radius &&
+          y < radius &&
+          (x - (inputImage.width - radius)) *
+                      (x - (inputImage.width - radius)) +
+                  (y - radius) * (y - radius) >
+              radius * radius) {
+        inputImage.setPixelRgba(x, y, 0, 0, 0, 0);
+      } else if (x >= inputImage.width - radius &&
+          y >= inputImage.height - radius &&
+          (x - (inputImage.width - radius)) *
+                      (x - (inputImage.width - radius)) +
+                  (y - (inputImage.height - radius)) *
+                      (y - (inputImage.height - radius)) >
+              radius * radius) {
+        inputImage.setPixelRgba(x, y, 0, 0, 0, 0);
+      }
+    }
   }
+  return inputImage;
 }

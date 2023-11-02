@@ -14,7 +14,7 @@ import '../globals.dart';
 import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
 
-class HyperchatPage extends StatefulWidget implements Down4PageWidget {
+class HyperchatPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "hyper";
   final void Function(String text) ping;
@@ -54,6 +54,7 @@ class _HyperchatPageState extends State<HyperchatPage>
         Input2,
         Sender2,
         Compose2 {
+          
   @override
   late var mainScroll =
       ScrollController(initialScrollOffset: widget.initialOffset);

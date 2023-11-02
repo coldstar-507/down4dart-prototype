@@ -22,7 +22,7 @@ import '../render_objects/_render_utils.dart';
 
 import '_page_utils.dart';
 
-class AddFriendPage extends StatefulWidget implements Down4PageWidget {
+class AddFriendPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "search";
 

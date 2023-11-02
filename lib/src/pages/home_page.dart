@@ -15,11 +15,11 @@ import '../globals.dart';
 
 import '_page_utils.dart';
 
-class HomePage extends StatefulWidget implements Down4PageWidget {
+class HomePage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "home";
   final String? promptMessage;
-  ViewState get homeState => g.vm.currentView;
+  // ViewState get homeState => g.vm.currentView;
 
   final void Function(String text) ping;
   final void Function(ChatN, List<Locals>) openChat; // TODO what is this?
@@ -28,7 +28,7 @@ class HomePage extends StatefulWidget implements Down4PageWidget {
   final void Function() hyperchat, themes, openPreview;
   final void Function() group, money, search, delete, snip, add;
   final List<Palette<ChatN>> formattedChats;
-  
+
   const HomePage({
     required this.formattedChats,
     required this.themes,
@@ -69,11 +69,11 @@ class _HomePageState extends State<HomePage>
         Add2 {
   late String placeHolder = widget.promptMessage ?? ":)";
 
+  ViewState get vs => widget.vs;
+
   late ScrollController scroller =
-      ScrollController(initialScrollOffset: widget.homeState.currentPage.scroll)
-        ..addListener(() {
-          widget.homeState.currentPage.scroll = scroller.offset;
-        });
+      ScrollController(initialScrollOffset: vs.currentPage.scroll)
+        ..addListener(() => vs.currentPage.scroll = scroller.offset);
 
   @override
   void setTheState() => setState(() {});

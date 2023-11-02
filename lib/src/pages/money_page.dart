@@ -24,13 +24,11 @@ import '_page_utils.dart';
 
 final base85 = Base85Codec(Alphabets.z85);
 
-class PaymentPage extends StatefulWidget implements Down4PageWidget {
+class PaymentPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "payment";
   final void Function() back, ok;
   final Down4Payment payment;
-  // final List<String> paymentAsList;
-  // final List<String> paymentAsListFast;
   final void Function(Down4Payment) sendPayment;
 
   const PaymentPage({
@@ -39,9 +37,8 @@ class PaymentPage extends StatefulWidget implements Down4PageWidget {
     required this.payment,
     required this.sendPayment,
     super.key,
-  }); // : // paymentAsList = payment.asQrData,
-  // paymentAsListFast = payment.asQrData2Fast;
-
+  });
+  
   @override
   State<PaymentPage> createState() => _PaymentPageState();
 }
@@ -56,12 +53,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   List<String> get paymentAsList {
     return _paymentAsList ??= payment.asQrData;
   }
-
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   print("THERE ARE ${widget.paymentAsList.length} QRS");
-  // }
 
   Timer get startedTimer {
     return Timer.periodic(const Duration(milliseconds: 400), (timer) {
@@ -163,8 +154,7 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
                   children: [
                     Text(note, style: tst, maxLines: 10, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 20),
-                    // Text("QRs: ${qrs.isEmpty ? '?' : qrs.length.toString()}", style: tst),
-                    Row(
+                       Row(
                       children: [
                         Text("TXID: ", style: tst),
                         Expanded(
@@ -213,15 +203,13 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   late List<Extra> extras = [];
 }
 
-class MoneyPage extends StatefulWidget implements Down4PageWidget {
+class MoneyPage extends StatefulWidget with Down4PageWidget {
+  
   @override
   String get id => "money";
   final List<Palette>? initPalettes;
   final double? initScroll;
-  // final Transition? transition;
   final PersonN? single;
-  final ViewState viewState;
-  // final List<Palette2> payments;
   final void Function(Down4Payment) onScan;
   final Future<void> Function() loadMorePayments;
   final void Function() back;
@@ -232,11 +220,8 @@ class MoneyPage extends StatefulWidget implements Down4PageWidget {
     required this.onScan,
     required this.back,
     required this.makePayment,
-    required this.viewState,
     this.initPalettes,
     this.initScroll,
-    // required this.payments,
-    // this.transition,
     this.single,
     Key? key,
   }) : super(key: key);
@@ -393,24 +378,22 @@ class _MoneyPageState extends State<MoneyPage>
   late var palettes =
       widget.initPalettes ?? _users.values.toList(growable: false);
 
+  ViewState get vs => widget.vs;
+
   late ScrollController scroller0 = ScrollController(
-      initialScrollOffset:
-          widget.initScroll ?? g.vm.currentView.pages[0].scroll)
-    ..addListener(() {
-      widget.viewState.pages[0].scroll = scroller0.offset;
-    });
-  late ScrollController scroller1 = ScrollController(
-    initialScrollOffset: widget.viewState.pages[1].scroll,
-  )..addListener(() {
-      widget.viewState.pages[1].scroll = scroller1.offset;
-    });
+      initialScrollOffset: widget.initScroll ?? vs.pages[0].scroll)
+    ..addListener(() => vs.pages[0].scroll = scroller0.offset);
+
+  late ScrollController scroller1 =
+      ScrollController(initialScrollOffset: vs.pages[1].scroll)
+        ..addListener(() => vs.pages[1].scroll = scroller1.offset);
 
   @override
   ScrollController get mainScroll => scroller0;
 
-  Map<Down4ID, Palette> get _payments => widget.viewState.pages[1].state.cast();
+  Map<Down4ID, Palette> get _payments => vs.pages[1].state.cast();
 
-  Map<ComposedID, Palette> get _users => widget.viewState.pages[0].state.cast();
+  Map<ComposedID, Palette> get _users => vs.pages[0].state.cast();
 
   Set<PersonN> get people => _users.values.asNodes<PersonN>().toSet();
 
@@ -904,10 +887,8 @@ class _MoneyPageState extends State<MoneyPage>
   Widget build(BuildContext context) {
     return Andrew(
       backFunction: widget.back,
-      initialPageIndex: widget.viewState.currentIndex,
-      onPageChange: (idx) => setState(() {
-        widget.viewState.currentIndex = idx;
-      }),
+      initialPageIndex: vs.currentIndex,
+      onPageChange: (idx) => setState(() => vs.currentIndex = idx),
       pages: [
         Down4Page(
             scrollController: scroller0,
@@ -918,6 +899,7 @@ class _MoneyPageState extends State<MoneyPage>
                 _users.values.toList(),
             console: console),
         Down4Page(
+            scrollController: scroller1,
             onRefresh: widget.loadMorePayments,
             title: "Status",
             list: _payments.values.toList(),
@@ -945,7 +927,7 @@ class _MoneyPageState extends State<MoneyPage>
   ];
 
   @override
-  int get currentPageIndex => widget.viewState.currentIndex;
+  int get currentPageIndex => vs.currentIndex;
 
   @override
   void setTheState() => setState(() {});

@@ -7,10 +7,9 @@ import '../render_objects/console.dart';
 import '../render_objects/navigator.dart';
 import '../globals.dart';
 
-class PreviewPage extends StatefulWidget implements Down4PageWidget {
+class PreviewPage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "preview";
-  ViewState get viewState => g.vm.currentView;
 
   final void Function() back;
   Set<Down4Object> get fObjects => g.vm.forwardingObjects;
@@ -23,7 +22,7 @@ class PreviewPage extends StatefulWidget implements Down4PageWidget {
 
 class _PreviewPageState extends State<PreviewPage> {
   Map<Down4ID, Down4SelectionWidget> get previewObjects =>
-    g.vm.currentView.pages[0].state.cast();
+    widget.vs.pages[0].state.cast();
 
   void setTheState() => setState(() {});
 

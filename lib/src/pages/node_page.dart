@@ -10,7 +10,7 @@ import '../render_objects/_render_utils.dart' show Down4PageWidget;
 import '../render_objects/navigator.dart';
 import '../render_objects/profile.dart';
 
-class NodePage extends StatefulWidget implements Down4PageWidget {
+class NodePage extends StatefulWidget with Down4PageWidget {
   @override
   final String id;
 
@@ -21,11 +21,11 @@ class NodePage extends StatefulWidget implements Down4PageWidget {
   final void Function(PersonN) payNode;
   final void Function() back, openPreview, forward;
 
-  final ViewState viewState;
+  // final ViewState viewState;
 
   const NodePage({
     required this.id,
-    required this.viewState,
+    // required this.viewState,
     required this.openPreview,
     required this.payNode,
     required this.openNode,
@@ -45,10 +45,8 @@ class _NodePageState extends State<NodePage>
   Down4Node get node => cache<Down4Node>(widget.nodeID)!;
 
   late final ScrollController scroller =
-      ScrollController(initialScrollOffset: widget.viewState.pages[0].scroll)
-        ..addListener(() {
-          widget.viewState.pages[0].scroll = scroller.offset;
-        });
+      ScrollController(initialScrollOffset: widget.vs.pages[0].scroll)
+        ..addListener(() => widget.vs.pages[0].scroll = scroller.offset);
 
   @override
   void dispose() {
