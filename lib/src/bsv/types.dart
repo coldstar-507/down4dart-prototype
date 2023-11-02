@@ -5,6 +5,7 @@ import 'dart:io' as io;
 import 'package:convert/convert.dart';
 import 'package:down4/src/bsv/wallet.dart';
 import 'package:down4/src/data_objects/couch.dart';
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:flutter/material.dart';
 import 'package:pointycastle/export.dart';
@@ -1019,7 +1020,7 @@ class Down4TX with Down4Object, Jsons, Locals {
       // TODO: SAME PROBLEM OF ORDER WITH TRANSACTIONS IN PAYMENTS!!
       // this doesn't specify the order! order is important dummy!!
       final q = "SELECT * FROM txins WHERE id IN (${sbuf.toString()})";
-      return db
+      return Down4Local().db
           .select(q)
           .map((e) {
             final jsns = Map<String, String?>.from(e);
@@ -1038,7 +1039,7 @@ class Down4TX with Down4Object, Jsons, Locals {
       final sbuf = StringBuffer();
       sbuf.writeAll(outs.map((e) => e.value.sqlReady), ",");
       final q = "SELECT * FROM txouts WHERE id IN (${sbuf.toString()})";
-      return db
+      return Down4Local().db
           .select(q)
           .map((e) {
             final jsns = Map<String, String?>.from(e);

@@ -91,6 +91,7 @@ Future<void> broadcastTxs(List<Down4TX> txs, {VoidCallback? cb}) async {
       );
     }
   }
+  cb?.call();
 }
 
 Future<Map<String, int?>> confirmations(List<String> txids) async {

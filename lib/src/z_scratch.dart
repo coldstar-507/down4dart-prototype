@@ -31,23 +31,11 @@ bool isPrime(int number) {
   return true;
 }
 
+late int jeff;
+int? andrew;
 void main() async {
-  var (bc, jc, nc) = (0, 0, 0);
-  int n = 500;
-
-  int i, j;
-  for (i = 0; i < n; i++) {
-    double k = 0;
-    var m = goldenHat(i);
-    for (j = 0; j <= i; j++) {
-      k += goldenHat(j);
-    }
-    final baseIsPrime = isPrime(m.round());
-    final jeffIsPrime = isPrime(k.round());
-    if (isPrime(i)) nc++;
-    if (baseIsPrime) bc++;
-    if (jeffIsPrime) jc++;
-  }
-
-  print("njeff=$jc, nbase=$bc, nname=$nc");
+  print("nigga");
+  final scott = andrew ?? jeff;
+  print("lol");
+  print(scott);
 }

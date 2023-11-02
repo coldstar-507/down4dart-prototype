@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:down4/src/data_objects/couch.dart';
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
@@ -244,40 +245,30 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
           isLocked: isLocked,
           isPaidToOwn: isPaidToOwn,
           isPaidToView: isPaidToView,
-          // tinyThumbnail: tinyThumbnail,
           tempID: tempID,
           tempTS: tempTS);
     }
   }
 
-  // Image? tinyImage(Size s, {bool forceSquare = false}) {
-  //   if (tinyThumbnail == null) return null;
-  //   return Image.memory(base64Decode(tinyThumbnail!),
-  //       fit: BoxFit.cover,
-  //       cacheWidth: (s.width * golden).toInt(),
-  //       cacheHeight: (s.height * golden).toInt());
-  // }
-
-  String mainPath([String? appDir]) {
-    return "${appDir ?? g.appDirPath}${Platform.pathSeparator}${id.unik}";
+  String get mainPath {
+    return "${Down4Local().appDirPath}${Platform.pathSeparator}${id.unik}";
   }
 
   static String mainPath_(Down4ID id) {
-    return "${g.appDirPath}${Platform.pathSeparator}${id.unik}";
+    return "${Down4Local().appDirPath}${Platform.pathSeparator}${id.unik}";
   }
 
   static String cachePath_(Down4ID id) {
-    return "${g.cacheDirPath}${Platform.pathSeparator}${id.unik}";
+    return "${Down4Local().cacheDirPath}${Platform.pathSeparator}${id.unik}";
   }
 
-  File? mainFile([String? appDir]) {
-    final f = File(mainPath(appDir));
+  File? get mainFile {
+    final f = File(mainPath);
     if (!f.existsSync()) return null;
     return f;
   }
 
   File? get mainCachedFile {
-    // print("main cached path: $mainCachedPath");
     File? f;
     if (mainCachedPath == null) return null;
     f = File(mainCachedPath!);
@@ -296,12 +287,10 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   Future<void> writeFromCachedPath() async {
     final File? f = mainCachedFile;
     if (f != null) {
-      // final Uint8List data = f.readAsBytesSync();
-      // await write(data);
       if (metadata.isSquared && !metadata.isVideo) {
         print("CROPPING IMAGE BRO");
         const idealSize = 512;
-        final to = File(mainPath());
+        final to = File(mainPath);
 
         await cropAndSaveToSquare(from: f, to: to, size: idealSize);
       } else {
@@ -323,14 +312,14 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     final jsn = toJson(includeLocal: false);
     final setMetadata = SettableMetadata(customMetadata: jsn);
     try {
-      File? f;
-      if ((f = mainCachedFile ?? mainFile()) != null) {
+      File? f = mainCachedFile ?? mainFile;
+      if (f != null) {
         if (metadata.isEncrypted) {
-          final d = f!.readAsBytesSync();
+          final d = f.readAsBytesSync();
           final dec = Cy4.decrypt(d);
           await ref.putData(dec, setMetadata);
         } else {
-          await ref.putFile(f!, setMetadata);
+          await ref.putFile(f, setMetadata);
         }
       } else {
         print("PROBLEM: NO MEDIA TO UPLOAD BRO, RETURNING A FAILURE");
@@ -352,7 +341,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
   }
 
   Future<void> downloadAndWriteIfNeeded() async {
-    if (mainFile() != null) return;
+    if (mainFile != null) return;
     final ref = tempID == null ? id.staticStoreRef : id.tempStoreRef;
     final data = await ref.getData();
     if (data != null) await write(data);
@@ -393,7 +382,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   @override
   Uint8List? get tempPayload {
-    File? f = mainFile();
+    File? f = mainFile;
     if (f == null) {
       print("mainfile is null, checking cached file.");
     } else {
@@ -406,7 +395,6 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   @override
   String get table => "medias";
-  // Database get dbb => mediasDB;
 
   Future<Down4Media> userInitRecalculation(ComposedID oid) async {
     return Down4Media.fromLocal(id,
@@ -418,22 +406,6 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
             height: metadata.height,
             isReversed: metadata.isReversed,
             mime: metadata.mime));
-
-    // return makeCameraMedia(
-    //     cachedPath: mainCachedPath!,
-    //     size: Size(metadata.width, metadata.height),
-    //     isReversed: metadata.isReversed,
-    //     owner: oid,
-    //     isSquared: metadata.isSquared,
-    //     writeFromCachedPath: false);
-
-    // final metadataJson = metadata.toJson();
-    // metadataJson["ownerID"] = oid.value;
-    // return Down4Media.fromLocal2(id,
-    //     writeFromCachedPath: true,
-    //     mainCachedPath: mainCachedPath,
-    //     metadata: Down4MediaMetadata.fromJson(metadataJson));
-    // tinyThumbnail: tinyThumbnail);
   }
 }
 
@@ -442,7 +414,6 @@ class Down4Image extends Down4Media {
     super.id, {
     required super.metadata,
     super.mainCachedPath,
-    // super.tinyThumbnail,
     super.lastUse,
     super.tempID,
     super.tempTS,
@@ -468,15 +439,15 @@ class Down4Image extends Down4Media {
   }
 
   File? get profileFile {
-    final f = File(_profilePath());
+    final f = File(_profilePath);
     if (!f.existsSync()) return null;
     return f;
   }
 
   Image? readySnipImage() {
-    File? f;
-    if ((f = mainCachedFile ?? mainFile()) != null) {
-      return Image(image: FileImage(f!), fit: BoxFit.cover);
+    File? f = mainCachedFile ?? mainFile;
+    if (f != null) {
+      return Image(image: FileImage(f), fit: BoxFit.cover);
     } else if (_cachedUrl != null) {
       return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
     }
@@ -491,17 +462,16 @@ class Down4Image extends Down4Media {
     return Image(image: NetworkImage(_cachedUrl!), fit: BoxFit.cover);
   }
 
-  String _profilePath([String? appDir]) => "${mainPath(appDir)}_prf";
+  String get _profilePath => "${mainPath}_prf";
 
   // returns or generate pofile image
-  Future<String?> profilePath([String? appDir]) async {
-    print("the app dir man g: $appDir");
-    final File to = File(_profilePath(appDir));
-    final File? from = mainFile(appDir);
-    if (to.existsSync()) return _profilePath(appDir);
+  Future<String?> get profilePath async {
+    final File to = File(_profilePath);
+    final File? from = mainFile;
+    if (to.existsSync()) return _profilePath;
     if (from == null) return null;
     await cropAndSaveToSquare(from: from, to: to, size: 200);
-    return _profilePath(appDir);
+    return _profilePath;
   }
 
   ImageProvider? localImage(Size s, {bool forceSquare = false}) {
@@ -515,7 +485,7 @@ class Down4Image extends Down4Media {
       h = (s.height * golden).toInt();
     }
 
-    f ??= (mainCachedFile ?? mainFile());
+    f ??= (mainCachedFile ?? mainFile);
     if (f != null) {
       if (isEncrypted) {
         final enc = EncryptedFileImage(f);
@@ -534,7 +504,7 @@ class Down4Image extends Down4Media {
   }
 
   Image? readyImage(Size s, {bool forceSquare = false}) {
-    File? f = mainFile() ?? mainCachedFile;
+    File? f = mainFile ?? mainCachedFile;
     int? w, h;
 
     // we want cached (w or h) to be (golden * longest diplaySize side)
@@ -572,12 +542,12 @@ class Down4Image extends Down4Media {
   String? delete({bool stmt = false}) {
     super.delete(stmt: stmt);
     try {
-      mainFile()?.delete();
+      mainFile?.delete();
     } catch (_) {
       print("error deleting main file");
     }
     try {
-      File(_profilePath()).delete();
+      File(_profilePath).delete();
     } catch (_) {
       print("error deleting profile file");
     }
@@ -586,8 +556,7 @@ class Down4Image extends Down4Media {
 
   @override
   Future<void> write(Uint8List mainData) async {
-    // tinyThumbnail ??= makeTiny(mainData);
-    await File(mainPath()).writeAsBytes(mainData);
+    await File(mainPath).writeAsBytes(mainData);
   }
 }
 
@@ -596,7 +565,6 @@ class Down4Video extends Down4Media {
     super.id, {
     required super.metadata,
     super.mainCachedPath,
-    // super.tinyThumbnail,
     super.lastUse,
     super.tempID,
     super.tempTS,
@@ -655,14 +623,14 @@ class Down4Video extends Down4Media {
   }
 
   VideoPlayerController? newReadyController() {
-    if ((mainCachedFile ?? mainFile()) != null) {
-      return VideoPlayerController.file((mainCachedFile ?? mainFile())!);
+    final f = mainCachedFile ?? mainFile;
+    if (f != null) {
+      return VideoPlayerController.file(f);
     }
     if (_cachedUrl != null) {
       final uri = Uri.parse(_cachedUrl!);
       return VideoPlayerController.networkUrl(uri);
     }
-
     return null;
   }
 
@@ -679,7 +647,7 @@ class Down4Video extends Down4Media {
   String? delete({bool stmt = false}) {
     super.delete(stmt: stmt);
     try {
-      mainFile()?.delete();
+      mainFile?.delete();
     } catch (_) {
       print("error deleting main file");
     }
@@ -697,16 +665,13 @@ class Down4Video extends Down4Media {
     return f;
   }
 
-  String get thumbnailPath => "${mainPath()}-tn";
+  String get thumbnailPath => "$mainPath-tn";
 
   @override
   Future<void> write(Uint8List mainData) async {
-    await File(mainPath()).writeAsBytes(mainData);
-    final d =
-        await VideoThumbnail.thumbnailData(video: mainPath(), quality: 80);
-    if (d != null) {
-      await File(thumbnailPath).writeAsBytes(d);
-    }
+    await File(mainPath).writeAsBytes(mainData);
+    final d = await VideoThumbnail.thumbnailData(video: mainPath, quality: 80);
+    if (d != null) await File(thumbnailPath).writeAsBytes(d);
   }
 }
 
@@ -823,7 +788,7 @@ class ConsoleMedias {
 
   Future<CustomMedia?> _loadVideoFromFile(Down4Video vid,
       {Size? size, String? prefix}) async {
-    final f = vid.mainFile();
+    final f = vid.mainFile;
     if (f == null) return null;
     final s = size ?? vid.size;
     final thumbnail = await vid.rawThumbnail(s, forceSquare: true);
@@ -835,7 +800,7 @@ class ConsoleMedias {
 
   Future<CustomMedia?> _loadGifFromFile(Down4Image gif,
       {Size? size, String? prefix}) async {
-    final f = gif.mainFile();
+    final f = gif.mainFile;
     if (f == null) return null;
     final Uint8List bytes = f.readAsBytesSync();
     final Completer<ui.Image> completer = Completer();
@@ -855,7 +820,7 @@ class ConsoleMedias {
   Future<CustomMedia?> _loadImageFromFile(Down4Image im,
       {Size? size, String? prefix}) async {
     print("cached len: ${_consoleMediaCache.length}");
-    final f = im.mainCachedFile ?? im.mainFile();
+    final f = im.mainCachedFile ?? im.mainFile;
     if (f == null) return null;
     final Uint8List imageBytes = await f.readAsBytes();
     final s = size ?? Size(im.metadata.width, im.metadata.height);

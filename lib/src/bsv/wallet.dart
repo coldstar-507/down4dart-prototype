@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' as io;
 
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:flutter/material.dart';
 
 import '../_dart_utils.dart';
@@ -270,7 +271,7 @@ class Wallet with Down4Object, Jsons, Locals {
     try {
       final txstr = sbuf.toString();
       print("============ EXECUTING TRANSACTION ============\n\n$txstr\n");
-      db.execute(txstr);
+      Down4Local().db.execute(txstr);
       print("\n============ VALIDATED TRANSACTION ============\n");
       return pay
         ..calculatePlusMinus(selfID: selfID)
@@ -278,7 +279,7 @@ class Wallet with Down4Object, Jsons, Locals {
         ..fullMerge();
     } catch (e) {
       print("error parsing payment: $e");
-      db.execute("ROLLBACK;");
+      Down4Local().db.execute("ROLLBACK;");
     }
 
     return null;
@@ -289,7 +290,7 @@ class Wallet with Down4Object, Jsons, Locals {
       SELECT * FROM transactions
       WHERE CAST(confirmations AS INTEGER) > 80
     """;
-    final xs = db.select(q).map((e) {
+    final xs = Down4Local().db.select(q).map((e) {
       final jsns = Map<String, String?>.from(e);
       return Down4TX.fromJson(jsns);
     });
@@ -442,7 +443,7 @@ class Wallet with Down4Object, Jsons, Locals {
         SELECT * FROM transactions
         WHERE confirmations = '-1' AND id IN ($refstr)
         """;
-      final r = db.select(q).map((e) {
+      final r = Down4Local().db.select(q).map((e) {
         final jsns = Map<String, String?>.from(e);
         return Down4TX.fromJson(jsns);
       });
@@ -463,7 +464,7 @@ class Wallet with Down4Object, Jsons, Locals {
         SELECT * FROM transactions
         WHERE id IN ($refstr)
         """;
-    return db
+    return Down4Local().db
         .select(q)
         .map((e) {
           final jsns = Map<String, String?>.from(e);
@@ -533,7 +534,7 @@ class Wallet with Down4Object, Jsons, Locals {
   /////////////////////////////////////////////////////////////////////
   static Iterable<Down4Payment> get payments sync* {
     const raw = "SELECT * FROM payments ORDER BY ts DESC";
-    final rows = db.select(raw);
+    final rows = Down4Local().db.select(raw);
     for (final row in rows) {
       final jsns = Map<String, String?>.from(row);
       yield Down4Payment.fromJson(jsns);
@@ -548,7 +549,7 @@ class Wallet with Down4Object, Jsons, Locals {
         LIMIT $limit OFFSET $offset
         """;
 
-    final rows = db.select(raw);
+    final rows = Down4Local().db.select(raw);
     for (final row in rows) {
       final jsns = Map<String, String?>.from(row);
       yield Down4Payment.fromJson(jsns);
@@ -560,7 +561,7 @@ class Wallet with Down4Object, Jsons, Locals {
     SELECT * FROM txouts
     WHERE spent = 'false' AND receiver = ${g.self.id.sqlReady}
     """;
-    final rows = db.select(raw);
+    final rows = Down4Local().db.select(raw);
     for (final row in rows) {
       final jsns = Map<String, String?>.from(row);
       yield Down4TXOUT.fromJson(jsns);
@@ -574,7 +575,7 @@ class Wallet with Down4Object, Jsons, Locals {
   static String? removeUtxo(Down4ID id, {bool stmt = false}) {
     final raw = "DELETE FROM txouts WHERE id = ${id.sqlReady};";
     if (stmt) return raw;
-    db.execute(raw);
+    Down4Local().db.execute(raw);
     return null;
   }
 
@@ -583,7 +584,7 @@ class Wallet with Down4Object, Jsons, Locals {
       SELECT * FROM transactions
       WHERE CAST(confirmations AS INTEGER) < 100
     """;
-    final jsnL = db.select(raw);
+    final jsnL = Down4Local().db.select(raw);
     print("there are ${jsnL.length} sub 100 confs txs!");
     for (final jsn in jsnL) {
       final jsns = Map<String, String?>.from(jsn);
@@ -593,7 +594,7 @@ class Wallet with Down4Object, Jsons, Locals {
 
   static Iterable<Down4TX> allTxs() sync* {
     const raw = "SELECT * FROM transactions";
-    final jsnL = db.select(raw);
+    final jsnL = Down4Local().db.select(raw);
     for (final jsn in jsnL) {
       final jsns = Map<String, String?>.from(jsn);
       yield Down4TX.fromJson(jsns);
@@ -602,7 +603,7 @@ class Wallet with Down4Object, Jsons, Locals {
 
   static Down4TX? loadTX(String id) {
     const raw = "SELECT * FROM transactions WHERE id = ?";
-    final r = db.select(raw, [id]);
+    final r = Down4Local().db.select(raw, [id]);
     if (r.isEmpty) return null;
     final jsns = Map<String, String?>.from(r.single);
     return Down4TX.fromJson(jsns);
@@ -629,7 +630,7 @@ class Wallet with Down4Object, Jsons, Locals {
   static String? removePayment(Down4ID id, {bool stmt = false}) {
     final raw = "DELETE FROM payments WHERE id = ${id.value.sqlReady};";
     if (stmt) return raw;
-    db.execute(raw);
+    Down4Local().db.execute(raw);
     return null;
   }
 
@@ -643,12 +644,12 @@ class Wallet with Down4Object, Jsons, Locals {
 
   static bool isSpent(Down4ID utxoID) {
     final raw = "SELECT * FROM spents WHERE id = ${utxoID.value.sqlReady};";
-    return db.select(raw).isNotEmpty;
+    return Down4Local().db.select(raw).isNotEmpty;
   }
 
   static Iterable<String> allSpents() sync* {
     const raw = "SELECT * FROM spents";
-    for (final r in db.select(raw)) {
+    for (final r in Down4Local().db.select(raw)) {
       yield r["id"] as String;
     }
   }
@@ -658,14 +659,14 @@ class Wallet with Down4Object, Jsons, Locals {
     INSERT INTO spents (id) VALUES (${id.value.sqlReady});
     """;
     if (stmt) return raw;
-    db.execute(raw);
+    Down4Local().db.execute(raw);
     return null;
   }
 
   // still no use, intended as a possible control mechanism
   static void unSpend(Down4ID id) {
     final raw = "DELETE FROM spents WHERE id = ${id.value.sqlReady}";
-    db.execute(raw);
+    Down4Local().db.execute(raw);
   }
 
   static Wallet? load() {

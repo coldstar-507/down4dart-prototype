@@ -8,9 +8,6 @@ import 'package:down4/src/pages/loading_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-// import 'package:firebase_messaging/firebase_messaging.dart';
-// import 'package:push/push.dart';
-
 import 'data_objects/_data_utils.dart';
 import 'data_objects/medias.dart';
 import 'globals.dart';
@@ -19,7 +16,6 @@ import 'home.dart';
 import 'bsv/_bsv_utils.dart';
 
 import 'pages/init_page.dart';
-// import 'pages/loading_page.dart';
 
 class Down4 extends StatefulWidget {
   const Down4({Key? key}) : super(key: key);
@@ -38,15 +34,6 @@ class _Down4State extends State<Down4> {
     login();
   }
 
-  // void loadTokenChangeListener() {
-  //   // // FirebaseMessaging.instance.onTokenRefresh.listen((newToken)
-  //   // Push.instance.onNewToken.listen((newToken)
-  //   //     async {
-  //   //   final res = await r.refreshTokenRequest(newToken);
-  //   //   if (res == 200) g.self.updateMessagingToken({g.self.deviceID: newToken});
-  //   // });
-  // }
-
   Future<void> logName([String? name]) async {
     await _cred?.user?.updateDisplayName(name ?? g.self.id.value);
   }
@@ -58,8 +45,6 @@ class _Down4State extends State<Down4> {
     if (g.notYetInitialized) {
       createUser();
     } else {
-      // final isEnabled = await Push.instance.areNotificationsEnabled();
-      // if (!isEnabled) await Push.instance.requestPermission();
       await logName();
       g.loadWallet();
       home();
@@ -83,9 +68,7 @@ class _Down4State extends State<Down4> {
 
     void onFailure(String msg) => createUser(errorMessage: msg);
 
-    // final token = await FirebaseMessaging.instance.getToken();
     final token = await AwesomeNotificationsFcm().requestFirebaseAppToken();
-    // final token = await Push.instance.token;
     if (token.isEmpty) {
       print("error getting firebase messaging token");
       return onFailure("Check if valid internet connection!");
@@ -107,7 +90,7 @@ class _Down4State extends State<Down4> {
     g.initWallet(seed1, seed2);
     final neuter = g.wallet.neuter;
 
-    final fs = Down4Server.instance.masterFS;
+    final fs = Down4Server().masterFS;
     final ref = fs.collection("users").doc(id.unik);
     final success = await fs.runTransaction<bool>((transaction) async {
       final exists = await transaction.get(ref).then((value) => value.exists);
@@ -148,7 +131,6 @@ class _Down4State extends State<Down4> {
   }
 
   void home() {
-    // loadTokenChangeListener();
     _view = const Home();
     setState(() {});
   }

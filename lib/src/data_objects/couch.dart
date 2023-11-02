@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:down4/src/_dart_utils.dart';
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 
@@ -13,7 +14,7 @@ import '../globals.dart';
 import '../bsv/types.dart';
 import '../bsv/wallet.dart';
 
-late sql.Database db;
+// late sql.Database db;
 
 // late AsyncDatabase nodesDB,
 //     tempDB,
@@ -30,15 +31,12 @@ Future<List<T>> globall<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   Iterable<ComposedID?>? tempIDs,
-  sql.Database? sdb,
-  Map<Down4ID, Locals>? sCache,
 }) async {
   if (ids == null) return [];
   final reqs = await Future.wait(ids.indexed
       .map((e) => global<T>(e.$2,
           doCache: doCache,
           doFetch: doFetch,
-          sdb: sdb,
           doMergeIfFetch: doMergeIfFetch,
           tempID: tempIDs?.elementAt(e.$1)))
       .toList());
@@ -51,28 +49,11 @@ List<T> locall<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   Iterable<ComposedID>? tempIDs,
-  sql.Database? sdb,
-  Map<Down4ID, Locals>? sCache,
 }) {
   if (ids == null) return [];
-  final reqs = ids.indexed
-      .map((e) => local<T>(e.$2, doCache: doCache, sdb: sdb))
-      .toList();
+  final reqs =
+      ids.indexed.map((e) => local<T>(e.$2, doCache: doCache)).toList();
   return reqs.whereType<T>().toList();
-}
-
-Map<Down4ID, Locals> _globalCache = {};
-
-Locals? unCache(Down4ID id) => _globalCache.remove(id);
-
-void cacheObj(Locals obj,
-    {bool ifAbsent = false, Map<Down4ID, Locals>? sCache}) {
-  final c = sCache ?? _globalCache;
-  if (ifAbsent) {
-    c[obj.id] ??= obj;
-  } else {
-    c[obj.id] = obj;
-  }
 }
 
 Future<T?> fetch<T extends Locals>(
@@ -80,8 +61,6 @@ Future<T?> fetch<T extends Locals>(
   bool doMerge = false,
   bool doCache = true,
   ComposedID? tempID,
-  sql.Database? sdb,
-  Map<Down4ID, Locals>? sc,
 }) async {
   Future<T?> fetchNode() async {
     if (id is! ComposedID) return null;
@@ -89,8 +68,8 @@ Future<T?> fetch<T extends Locals>(
     if (!ss.exists) return null;
     final jsn = Map<String, String?>.from(ss.value as Map);
     final node = Down4Node.fromJson(jsn);
-    if (doCache) node.cache(sc: sc);
-    if (doMerge) node.merge(sdb: sdb);
+    if (doCache) node.cache();
+    if (doMerge) node.merge();
     return node as T;
   }
 
@@ -100,12 +79,12 @@ Future<T?> fetch<T extends Locals>(
     if (!m.exists) return null;
     final jsn = Map<String, String?>.from(m.value as Map);
     final msg = Down4Message.fromJson(jsn) as Messages;
-    if (doCache) msg.cache(sc: sc);
-    if (doMerge) msg.merge(sdb: sdb);
+    if (doCache) msg.cache();
+    if (doMerge) msg.merge();
     return msg as T;
   }
 
-  Future<Down4Media?> fetchMedia() async {
+  Future<T?> fetchMedia() async {
     Reference ref;
     if (id is ComposedID && tempID == null) {
       ref = id.staticStoreRef;
@@ -126,26 +105,26 @@ Future<T?> fetch<T extends Locals>(
       // will throw if no metadata, so we can use !
       final mediaJson = (await futureMedia).customMetadata!;
       final media = Down4Media.fromJson(mediaJson);
-      if (doCache) media.cache(sc: sc);
+      if (doCache) media.cache();
 
       if (doMerge) {
-        media.merge(sdb: sdb);
+        media.merge();
         if (rawData != null) await media.write(rawData);
       }
-      return media;
+      return media as T;
     } catch (e) {
       print("Error downloading media id: $id from storage, err: $e");
       return null;
     }
   }
 
-  Future<Down4Payment?> fetchPayment() async {
+  Future<T?> fetchPayment() async {
     if (id == null || tempID == null) return null;
     final ref = tempID.tempStoreRef;
     final compressed = await ref.getData();
     if (compressed == null) return null;
     printWrapped("compressed payment:\n$compressed");
-    return Down4Payment.fromCompressed(compressed);
+    return Down4Payment.fromCompressed(compressed) as T;
     try {
       print("TODO");
     } catch (e) {
@@ -182,13 +161,13 @@ Future<T?> fetch<T extends Locals>(
     case Hyperchat:
       return fetchNode();
     case Down4Media:
-      return fetchMedia() as Future<T?>;
+      return fetchMedia();
     case Down4Video:
-      return fetchMedia() as Future<T?>;
+      return fetchMedia();
     case Down4Image:
-      return fetchMedia() as Future<T?>;
+      return fetchMedia();
     case Down4Payment:
-      return fetchPayment() as Future<T?>;
+      return fetchPayment();
   }
 
   throw 'Unsupported type for fetching $T';
@@ -245,28 +224,26 @@ String gdb<T extends Locals>() {
   throw 'No db exists for type: $T';
 }
 
-T? local<T extends Locals>(Down4ID? id,
-    {bool doCache = false, Map<Down4ID, Locals>? sc, sql.Database? sdb}) {
+T? local<T extends Locals>(Down4ID? id, {bool doCache = false}) {
   if (id == null) return null;
-  final cached = cache<T>(id, sc: sc);
+  final cached = cache<T>(id);
   if (cached != null) return cached;
-  return _local<T>(id, doCache: doCache, sc: sc, sdb: sdb);
+  return _local<T>(id, doCache: doCache);
 }
 
-T? _local<T extends Locals>(Down4ID id,
-    {bool doCache = false, Map<Down4ID, Locals>? sc, sql.Database? sdb}) {
-  final db_ = sdb ?? db;
-  final r = db_.select("SELECT * FROM ${gdb<T>()} WHERE id = '${id.value}'");
+T? _local<T extends Locals>(Down4ID id, {bool doCache = false}) {
+  final r = Down4Local()
+      .db
+      .select("SELECT * FROM ${gdb<T>()} WHERE id = '${id.value}'");
   if (r.isEmpty) return null;
   final jsns = Map<String, String?>.from(r.single);
   final element = fromJson<T>(jsns);
-  if (doCache) element.cache(sc: sc);
+  if (doCache) element.cache();
   return element;
 }
 
-T? cache<T extends Locals>(Down4ID? id, {Map<Down4ID, Locals>? sc}) {
-  final c = sc ?? _globalCache;
-  final element = id == null ? null : c[id] as T?;
+T? cache<T extends Locals>(Down4ID? id) {
+  final element = id == null ? null : Down4Cache().at(id) as T?;
   return element;
 }
 
@@ -276,28 +253,22 @@ Future<T?> global<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   ComposedID? tempID,
-  sql.Database? sdb,
-  Map<Down4ID, Locals>? sc,
 }) async {
   if (id == null) return null;
-  final cached = cache<T>(id, sc: sc);
+  final cached = cache<T>(id);
   if (cached != null) {
     print("RETRIEVED $T ID: ${id.value} FROM CACHE");
     return cached;
   }
-  final localed = _local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
+  final localed = _local<T>(id, doCache: doCache);
   if (localed != null) {
     print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
-    if (doCache) localed.cache(sc: sc);
+    if (doCache) localed.cache();
     return localed;
   }
   if (!doFetch) return null;
   final fetched = await fetch<T>(id,
-      doCache: doCache,
-      doMerge: doMergeIfFetch,
-      tempID: tempID,
-      sc: sc,
-      sdb: sdb);
+      doCache: doCache, doMerge: doMergeIfFetch, tempID: tempID);
   if (fetched != null) {
     print("RETRIEVED $T ID: ${id.value} FROM FETCH");
     return fetched;
@@ -313,28 +284,22 @@ Future<(T?, GetType)> globalgt<T extends Locals>(
   bool doFetch = false,
   bool doMergeIfFetch = false,
   ComposedID? tempID,
-  sql.Database? sdb,
-  Map<Down4ID, Locals>? sc,
 }) async {
   if (id == null) return (null, GetType.miss);
-  final cached = cache<T>(id, sc: sc);
+  final cached = cache<T>(id);
   if (cached != null) {
     print("RETRIEVED $T ID: ${id.value} FROM CACHE");
     return (cached, GetType.cache);
   }
-  final localed = _local<T>(id, sdb: sdb, doCache: doCache, sc: sc);
+  final localed = _local<T>(id, doCache: doCache);
   if (localed != null) {
     print("RETRIEVED $T ID: ${id.value} FROM LOCAL");
-    if (doCache) localed.cache(sc: sc);
+    if (doCache) localed.cache();
     return (localed, GetType.local);
   }
   if (!doFetch) return (null, GetType.miss);
   final fetched = await fetch<T>(id as ComposedID,
-      doCache: doCache,
-      doMerge: doMergeIfFetch,
-      tempID: tempID,
-      sc: sc,
-      sdb: sdb);
+      doCache: doCache, doMerge: doMergeIfFetch, tempID: tempID);
   if (fetched != null) {
     print("RETRIEVED $T ID: ${id.value} FROM FETCH");
     return (fetched, GetType.fetch);
@@ -396,7 +361,7 @@ Iterable<Chat> unsentMessages() sync* {
           AND senderID = '${g.self.id.value}'
         """;
 
-  final r = db.select(q);
+  final r = Down4Local().db.select(q);
 
   for (final row in r) {
     final jsn = Map<String, String?>.from(row);
@@ -409,7 +374,7 @@ Iterable<PersonN> searchLocalsByUnique(Iterable<String> uniques) sync* {
   sbuf.writeAll(uniques.map((_) => "?"), ",");
   sbuf.write(")");
 
-  final r = db.select(sbuf.toString(), uniques.toList());
+  final r = Down4Local().db.select(sbuf.toString(), uniques.toList());
   for (final row in r) {
     final jsns = Map<String, String?>.from(row);
     yield Down4Node.fromJson(jsns) as PersonN;
@@ -422,7 +387,7 @@ Set<ComposedID> allGroupIDs() {
     WHERE type in ('hyperchat', 'group')
     """;
 
-  final r = db.select(q);
+  final r = Down4Local().db.select(q);
   return r.fold<Set<ComposedID>>(Set<ComposedID>.identity(), (value, element) {
     final sGroup = element["group"] as String;
     value.addAll(sGroup.split(" ").map((e) => ComposedID.fromString(e)!));
@@ -431,14 +396,15 @@ Set<ComposedID> allGroupIDs() {
 }
 
 Set<ComposedID> allMediaReferences() {
-  final rn = db.select("SELECT mediaID FROM nodes");
-  final rm = db.select("SELECT mediaID FROM messages");
+  final rn = Down4Local().db.select("SELECT mediaID FROM nodes");
+  final rm = Down4Local().db.select("SELECT mediaID FROM messages");
   final rmn = (rn.followedBy(rm))
       .map((e) => ComposedID.fromString(e["mediaID"]))
       .whereType<ComposedID>();
 
   const q = "SELECT reactions FROM messages";
-  final Iterable<ComposedID> rr = db
+  final Iterable<ComposedID> rr = Down4Local()
+      .db
       .select(q)
       .map((e) {
         final reacs = e["reactions"];
@@ -466,7 +432,7 @@ void messagesDeletingRoutine() {
       AND ((root != ${g.self.id.sqlReady} AND type = 'chat') OR type = 'snip'))
     OR (type = 'snip' AND isRead = 'true')
   """;
-  final count = db.select(countStmt).single["c"] as int;
+  final count = Down4Local().db.select(countStmt).single["c"] as int;
   print("""
     //////////////////////////////
     // DELETING $count MESSAGES //
@@ -481,7 +447,7 @@ void messagesDeletingRoutine() {
     OR (type = 'snip' AND isRead = 'true')
   """;
 
-  db.execute(msgDeleteStmt);
+  Down4Local().db.execute(msgDeleteStmt);
 }
 
 // This should be called after messages and palettes routine
@@ -498,7 +464,7 @@ void mediasDeletingRoutine() {
     AND id NOT in (${sbuf.toString()})
   """;
 
-  final mediasToDelete = db.select(mediasToDeleteStmt).map((e) {
+  final mediasToDelete = Down4Local().db.select(mediasToDeleteStmt).map((e) {
     final jsns = Map<String, String?>.from(e);
     return Down4Media.fromJson(jsns);
   });
@@ -524,7 +490,7 @@ Iterable<ChatN> loadHome() sync* {
     SELECT * FROM nodes
     WHERE type in ('hyperchat', 'group', 'user')
     """;
-  final r = db.select(q);
+  final r = Down4Local().db.select(q);
   for (final row in r) {
     final jsns = Map<String, String?>.from(row);
     yield fromJson<ChatN>(jsns)..cache();
@@ -537,7 +503,7 @@ Iterable<ConnectN> loadConnectionNodes() sync* {
     WHERE isConnected = 'true'
     """;
 
-  final r = db.select(q);
+  final r = Down4Local().db.select(q);
   for (final row in r) {
     final jsns = Map<String, String?>.from(row);
     yield Down4Node.fromJson(jsns) as ConnectN;
@@ -546,7 +512,7 @@ Iterable<ConnectN> loadConnectionNodes() sync* {
 
 Iterable<Down4Node> loadAllNodes() sync* {
   const q = "SELECT * FROM nodes";
-  final r = db.select(q);
+  final r = Down4Local().db.select(q);
 
   for (final row in r) {
     final jsns = Map<String, String?>.from(row);
@@ -561,7 +527,7 @@ Iterable<Down4ID> savedMediaIDs(MediaType t) sync* {
     ORDER BY lastUse DESC
     """;
 
-  final rows = db.select(q);
+  final rows = Down4Local().db.select(q);
   for (final row in rows) {
     yield Down4ID.fromString(row['id'])!;
   }

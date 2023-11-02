@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:awesome_notifications/awesome_notifications.dart';
@@ -7,12 +6,10 @@ import 'package:awesome_notifications_fcm/awesome_notifications_fcm.dart';
 
 import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/data_objects/_data_utils.dart';
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/medias.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:down4/src/web_requests.dart';
-import 'package:path_provider/path_provider.dart';
-
-import 'package:sqlite3/sqlite3.dart' as sql;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,14 +33,9 @@ Future<void> handleTokenChange(String newToken) async {
 Future<void> showMessageNotification(
   Map<String, String?> data, {
   required ComposedID selfID,
-  required sql.Database sdb,
-  required String appDir,
   required ComposedID? currentRoot,
 }) async {
-  final db_ = sdb; //  ?? db;
-  final self = selfID; // ?? g.self.id;
-
-  final sc = <Down4ID, Locals>{};
+  final self = selfID;
   if (data.isEmpty) return print("data is empty");
 
   final header = data["h"];
@@ -65,34 +57,37 @@ Future<void> showMessageNotification(
   Down4Image? senderImage, groupImage;
 
   print("### getting the sender");
-  sender = await global<PersonN>(sdrID,
-      sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
+  sender = await global<PersonN>(sdrID, doFetch: true, doMergeIfFetch: true);
 
   if (sender != null) {
     print("### getting senderMedia");
     senderImage = await global<Down4Image>(sender.mediaID,
-        sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
+        doFetch: true, doMergeIfFetch: true);
   }
 
   if (rtID != null) {
-    final rootNode = await global<ChatN>(rtID,
-        sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
+    final rootNode =
+        await global<ChatN>(rtID, doFetch: true, doMergeIfFetch: true);
     if (rootNode is GroupN) {
       group = rootNode;
       print("### getting groupMedia");
       groupImage = await global<Down4Image>(group.mediaID,
-          sc: sc, sdb: db_, doFetch: true, doMergeIfFetch: true);
+          doFetch: true, doMergeIfFetch: true);
     }
   }
 
-  final senderImageProfilePath = await senderImage?.profilePath(appDir);
-  final groupImageProfilePath = await groupImage?.profilePath(appDir);
+  // final senderImagePath = senderImage?.mainPath;
+  // final groupImagePath = groupImage?.mainPath;
+  final senderImagePath = await senderImage?.profilePath;
+  final groupImagePath = await groupImage?.profilePath;
 
   final isGroup = group != null;
   print("isGroup = $isGroup");
 
-  final pathForImage = groupImageProfilePath ?? senderImageProfilePath;
-  print("PATH FOR IMAGE: ${groupImageProfilePath ?? senderImageProfilePath}");
+  // final pathForImage = groupImageProfilePath ?? senderImageProfilePath;
+  final pathForImage = groupImagePath ?? senderImagePath;
+
+  print("PATH FOR IMAGE: $pathForImage");
 
   print("showing notification!");
   AwesomeNotifications().createNotification(
@@ -103,7 +98,7 @@ Future<void> showMessageNotification(
       title: header,
       body: body,
       summary: '',
-      roundedLargeIcon: true,
+      roundedLargeIcon: !isGroup,
       largeIcon: "file://$pathForImage",
       // bigPicture: groupImageProfilePath != null
       //     ? "file://$groupImageProfilePath"
@@ -117,212 +112,20 @@ Future<void> showMessageNotification(
   print("showed notification!");
 }
 
-void initSqlite() async {
-  print("initing sqlite");
-
-  final appdir = await getApplicationDocumentsDirectory();
-  final appDirPath = appdir.path;
-  final dbPath = "$appDirPath${Platform.pathSeparator}down4.db";
-  db = sql.sqlite3.open(dbPath);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS nodes (
-      id TEXT NOT NULL PRIMARY KEY,
-      type TEXT NOT NULL,
-      name TEXT NOT NULL,
-      connection TEXT NOT NULL,
-      unik TEXT NOT NULL,
-      messagingTokens TEXT,
-      mainDeviceID TEXT,
-      treeHash TEXT,
-      ownerID TEXT,
-      lastName TEXT,
-      isPrivate TEXT,
-      longitude TEXT,
-      latitude TEXT,
-      mediaID TEXT,
-      children TEXT,
-      posts TEXT,
-      privates TEXT,
-      admins TEXT,
-      neuter TEXT,
-      members TEXT,
-      deviceID TEXT,
-      isConnected TEXT,
-      activity TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT NOT NULL PRIMARY KEY,
-      type TEXT NOT NULL,
-      senderID TEXT NOT NULL,
-      root TEXT,
-      reactions TEXT,
-      isSent TEXT,
-      isRead TEXT,
-      reactionID TEXT,
-      forwardedFromID TEXT,
-      paymentID TEXT,
-      nodes TEXT,
-      replies TEXT,
-      tips TEXT,
-      reactors TEXT,
-      txt TEXT,
-      timestamp TEXT,
-      mediaID TEXT,
-      messageID TEXT,
-      tempMediaID TEXT,
-      tempMediaTS TEXT,
-      tempPaymentID TEXT,
-      tempPaymentTS TEXT,
-      sticks TEXT,
-      snipSize TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE INDEX IF NOT EXISTS root_index
-      ON messages (root)
-      """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS medias (
-      id TEXT NOT NULL PRIMARY KEY,
-      ownerID TEXT NOT NULL,
-      timestamp TEXT NOT NULL,
-      mime TEXT NOT NULL,
-      isReversed TEXT NOT NULL,
-      isSquared TEXT NOT NULL,
-      isEncrypted TEXT NOT NULL,
-      width TEXT NOT NULL,
-      height TEXT NOT NULL,
-      isPaidToView TEXT NOT NULL,
-      isPaidToOwn TEXT NOT NULL,
-      isLocked TEXT NOT NULL,
-      tinyThumbnail TEXT,
-      isSaved TEXT NOT NULL,
-      lastUse TEXT NOT NULL,
-      tempID TEXT,
-      tempTS TEXT,
-      txt TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE INDEX IF NOT EXISTS is_saved_index
-      ON medias (isSaved, mime)
-      """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS payments (
-      id TEXT NOT NULL PRIMARY KEY,
-      txid TEXT NOT NULL,
-      safe TEXT NOT NULL,
-      ts TEXT NOT NULL,
-      plusMinus TEXT NOT NULL,      
-      spender TEXT,
-      tempTS TEXT,
-      tempID TEXT,
-      txt TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS txouts (
-      id TEXT NOT NULL PRIMARY KEY,
-      txid TEXT NOT NULL,
-      secret TEXT NOT NULL,
-      outIndex TEXT NOT NULL,
-      spent TEXT NOT NULL,
-      sats TEXT NOT NULL,
-      type TEXT NOT NULL,
-      script TEXT NOT NULL,
-      receiver TEXT
-    )
-    """);
-
-  db.execute("DROP TABLE IF EXISTS utxos");
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS transactions (
-      id TEXT NOT NULL PRIMARY KEY,
-      secret TEXT NOT NULL,
-      ins TEXT NOT NULL,
-      outs TEXT NOT NULL,
-      versionNo TEXT NOT NULL,
-      nLockTime TEXT NOT NULL,
-      confirmations TEXT NOT NULL,
-      maker TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS txins (
-      id TEXT NOT NULL PRIMARY KEY,
-      utxoTXID TEXT NOT NULL,
-      utxoIndex TEXT NOT NULL,
-      sequenceNo TEXT NOT NULL,
-      scriptSig TEXT NOT NULL,
-      satSpent TEXT NOT NULL,
-      spender TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS spents (
-      id TEXT NOT NULL PRIMARY KEY
-    )
-    """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS personals (
-      id TEXT NOT NULL PRIMARY KEY,
-      keys TEXT,
-      ix TEXT,
-      themeName TEXT,
-      rate TEXT,
-      lastUpdate TEXT,
-      currentPage TEXT
-    )
-    """);
-
-  db.execute("""
-    CREATE TABLE IF NOT EXISTS themes (
-    id TEXT NOT NULL PRIMARY KEY,
-    themeName TEXT
-    )
-    """);
-
-  db.execute("""
-    INSERT OR IGNORE INTO personals (id)
-    VALUES ('single')
-    """);
-
-  db.execute("PRAGMA journal_mode=WAL;");
-  print("done initing sqlite");
-}
-
 Future<void> fcmHandler(FcmSilentData silentData) async {
   try {
     print("Initializing firebase app in fcmHandler");
     await Firebase.initializeApp();
   } catch (e) {
-    print("Error initializing firebase app in fcmHandler: $e");    
+    print("Error initializing firebase app in fcmHandler: $e");
   }
-  // return print("notifs disabled for debugging payments");
+
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
-
-  final appdir = await getApplicationDocumentsDirectory();
-  final appDirPath = appdir.path;
-  final db_ = sql.sqlite3.open("$appDirPath${Platform.pathSeparator}down4.db");
-  db_.execute("PRAGMA journal_mode=WAL;");
-
-  final r = db_.select("SELECT id FROM nodes WHERE type = 'self'");
+  final loc = await Down4Local().initDb();
+  final r = loc.db.select("SELECT id FROM nodes WHERE type = 'self'");
   final r2 =
-      db_.select("SELECT currentPage FROM personals WHERE id = 'single'");
+      loc.db.select("SELECT currentPage FROM personals WHERE id = 'single'");
 
   print("got ${r.length} self");
   final id = ComposedID.fromString(r.single["id"])!;
@@ -342,8 +145,7 @@ Future<void> fcmHandler(FcmSilentData silentData) async {
   }
 
   print("should be showing notification");
-  await showMessageNotification(data,
-      selfID: id, sdb: db_, appDir: appDirPath, currentRoot: rtID);
+  await showMessageNotification(data, selfID: id, currentRoot: rtID);
   print("should have shown notification");
 }
 
@@ -357,20 +159,16 @@ Future<void> main() async {
     print("\n\n xx ERROR INITIALIZING FIREBASE APP xx \n\n");
     print(e);
   }
-  // load application directory folder
-  {
-    await g.loadAppDirPaths();
-  }
 
-  initSqlite();
+  await Down4Local().initDb();
 
   {
     // inits notifications settings
     AwesomeNotifications().initialize(
-      'resource://drawable/ic_down4_inverted_white',      
+        'resource://drawable/ic_down4_inverted_white',
         [
           NotificationChannel(
-              icon: 'resource://drawable/ic_down4_inverted_white',      
+              icon: 'resource://drawable/ic_down4_inverted_white',
               channelKey: 'def',
               channelName: 'default',
               channelDescription: 'default channel'),

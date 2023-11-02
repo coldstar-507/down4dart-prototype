@@ -1,16 +1,13 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/pages/preview_page.dart';
 import 'package:down4/src/themes.dart';
-// import 'package:firebase_auth/firebase_auth.dart' as auth;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
-
-// import 'package:push/push.dart';
-// import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'data_objects/couch.dart';
 import 'data_objects/_data_utils.dart';
@@ -82,7 +79,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     if (page.id != p.id) {
       const raw = "UPDATE personals SET currentPage = ? WHERE id = 'single'";
       try {
-        db.execute(raw, [p.id]);
+        Down4Local().db.execute(raw, [p.id]);
       } catch (e) {
         print("\n\tERROR IN SETPAGE: $e\n");
       }
@@ -196,10 +193,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      db.execute("UPDATE personals SET currentPage = ?", [page.id]);
+      Down4Local()
+          .db
+          .execute("UPDATE personals SET currentPage = ?", [page.id]);
       connectToMessages3();
     } else {
-      db.execute("UPDATE personals SET currentPage = ?", [null]);
+      Down4Local().db.execute("UPDATE personals SET currentPage = ?", [null]);
       _forgroundMessageListener?.cancel();
     }
     switch (state) {
@@ -259,19 +258,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final shouldDump = hiddenIDs.difference(groupUserIDs);
     final sbuf = StringBuffer("DELETE FROM nodes WHERE id IN (");
     sbuf.writeAll(shouldDump.map((id) {
-      unCache(id);
+      Down4Cache().unCache(id);
       return "?";
     }), ",");
     sbuf.write(")");
-    db.execute(sbuf.toString(), shouldDump.toList());
+    Down4Local().db.execute(sbuf.toString(), shouldDump.toList());
 
     print("TO DUMP: ${shouldDump.map((id) => id.unik)}");
-    // for (final dump in shouldDump) {
-    //   db.execute(sbuf..write(")").toString());
-    //   // gdb<Down4Node>().purgeDocumentById(dump.value);
-    //   unCache(dump);
-    // }
-
     for (final n in allHomeNodes) {
       writePalette(n, _chats, bGen, rfHome, home: true);
     }
@@ -490,18 +483,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           writePalette(p, ps, payBGen, null);
         }
         currentView.pages[1].state = ps;
-        // currentView.pages[1].state = {
-        //   p.id: Palette(node: newP, key: GlobalKey()),
-        //   ...payState,
-        // };
       } else {
         for (final m in payState.values) {
-          writePalette<PaymentNode>(m.node, payState, payBGen, null);
+          writePalette(m.node, payState, payBGen, null);
         }
       }
       setPage(moneyPage());
     } else if (ref is PaymentPage) {
-      setPage(paymentPage(ref.payment));
+      setPage(paymentPage(p ?? ref.payment));
     }
   }
 
@@ -624,17 +613,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // ============================== PAGES ============================== //
 
   Down4PageWidget homePage({String? prompt}) {
-
     return HomePage(
       formattedChats: _chats.values.formatted(),
       openPreview: openPreview,
       forward: () => setPage(forwardPage(isPush: true)),
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
-      send: processChats, //  (chats) {
-      //   processChats(chats);
-      //   // unselectHomeSelection(updateActivity: true);
-      //   // setPage(homePage());
-      // },
+      send: processChats,
       add: () async {
         final selectedPals = chats.selected().asNodes<PersonN>();
         for (final n in selectedPals) {
@@ -812,11 +796,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   Down4PageWidget moneyPage({
     bool isPush = false,
-    bool isReload = false,
     List<Palette>? initPals,
     double? initScroll,
     PersonN? single,
-    // Down4Payment? payUpdate,
   }) {
     // Map<Down4ID, Palette> peopleState() => currentView.pages[0].state.cast();
     Map<Down4ID, Palette> paymentState() => currentView.pages[1].state.cast();
@@ -826,11 +808,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       // this will put the payment at the begining of the list
       final p = PaymentNode(payment: pay, selfID: g.self.id);
       currentView.pages[1].state = {
-        pay.id: Palette(
-            node: p,
-            key: Key(p.id.unik),
-            // messagePreview: pay.textNote,
-            buttonsInfo2: payBGen(p)),
+        pay.id: Palette(node: p, key: Key(p.id.unik), buttonsInfo2: payBGen(p)),
         ...paymentState(),
       };
       rf();
@@ -842,8 +820,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.push(ViewState(id: "money", pages: [ppl, pay]));
       writePayments(paymentState(), openPay, 10);
     }
-
-    // if (payUpdate != null) scanOrReceivePayment(payUpdate);
 
     return MoneyPage(
         single: single,
@@ -1330,10 +1306,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     void next_() async {
       vpc?.dispose();
-      if (unreadSnips.sublist(1).isEmpty) {
+      final sl = unreadSnips.sublist(1);
+      if (sl.isEmpty) {
         back_();
       } else {
-        setPage(await snipView(node, unreadSnips.sublist(1)));
+        setPage(await snipView(node, sl));
       }
     }
 
@@ -1406,11 +1383,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                         child: Text(txt ?? "",
                             textAlign: TextAlign.center,
                             style: g.theme.snipInputTextStyle),
-                      ))
-                  // alignment: AlignmentDirectional.center,
-                  // decoration: BoxDecoration(color: g.theme.snipRibbon),
-                  // child:
-                  ),
+                      ))),
             ),
           );
 
@@ -1418,7 +1391,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           key: GlobalKey(),
           size: g.sizes.snipSize,
           child: Stack(
-            // fit: StackFit.expand,
             children: [
               bm?.display(size: g.sizes.snipSize, controller: vpc) ??
                   const SizedBox.shrink(),

@@ -5,10 +5,10 @@ import 'dart:typed_data';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:sqlite3/sqlite3.dart' as sql;
+// import 'package:sqlite3/sqlite3.dart' as sql;
 
 import '../_dart_utils.dart';
-import '../data_objects/couch.dart';
+// import '../data_objects/couch.dart';
 
 import '../globals.dart';
 import '../themes.dart';
@@ -45,7 +45,7 @@ class ComposedID extends Down4ID {
     this.shard = calculateShard(super.unik);
   }
 
-  Down4ServerShard get server => Down4Server.instance.shards[region]![shard];
+  Down4ServerShard get server => Down4Server().shards[region]![shard];
 
   DatabaseReference get nodeRef => server.realtimeDB.ref('nodes/$unik/node');
 
@@ -181,24 +181,24 @@ extension SQLStatements on Map<String, String> {
 mixin Locals on Down4Object, Jsons {
   String get table;
 
-  void cache({bool ifAbsent = false, Map<Down4ID, Locals>? sc}) =>
-      cacheObj(this, ifAbsent: ifAbsent, sCache: sc);
+  void cache({bool ifAbsent = false}) =>
+      Down4Cache().cache(this, ifAbsent: ifAbsent);
 
   String? delete({bool stmt = false}) {
     final q = "DELETE FROM $table WHERE id = ${id.value.sqlReady};";
     if (stmt) return q;
     try {
-      db.execute(q);
+      Down4Local().db.execute(q);
     } catch (e) {
       print("error deleting $runtimeType ${id.value}: $e");
     }
-    unCache(id);
+    Down4Cache().unCache(id);
     return null;
   }
 
   bool existsLocally() {
     final q = "SELECT id FROM $table WHERE id = ${id.sqlReady}";
-    return db.select(q).isNotEmpty;
+    return Down4Local().db.select(q).isNotEmpty;
   }
 
   @override
@@ -206,59 +206,31 @@ mixin Locals on Down4Object, Jsons {
 
   String? merge({
     Map<String, String>? vals,
-    sql.Database? sdb,
     bool stmt = false,
     bool ifNotPresent = false,
   }) {
-    final db_ = sdb ?? db;
 
     print("TABLE NAME=$table");
     final bool isLocal = existsLocally();
     if (isLocal && ifNotPresent) return null;
 
     Map<String, String> toMerge;
-    String pre, prt, qStr;
+    String qStr;
     if (!isLocal) {
       // then we need to merge the whole thing with the parameter values
       toMerge = {...toJson(includeLocal: true), ...?vals};
       qStr = toMerge.sqlInsertStr(table);
-      // pre = """
-      // INSERT INTO $table
-      // ${toMerge.sqlInsertKeys}
-      // VALUES ${toMerge.sqlInsertValuesParams};
-      // """;
-
-      // // just for print/debugging, will remove
-      // prt = """\n
-      // INSERT INTO $table
-      // ${toMerge.sqlInsertKeys}
-      // VALUES ${toMerge.sqlInsertValues};
-      // \n
-      // """;
     } else {
       // we merge given values, or the values from the probably freshly
       // fetched object without the local values to not overwrite them
       toMerge = vals ?? toJson(includeLocal: false);
       qStr = toMerge.sqlUpdateStr(table, id.value);
-      // pre = """
-      // UPDATE $table
-      // SET ${toMerge.sqlUpdateFmtParams}
-      // WHERE id = '${id.value}';
-      // """;
-
-      // // just for print/debugging, will remove
-      // prt = """\n
-      // UPDATE $table
-      // SET ${toMerge.sqlUpdateFmt}
-      // WHERE id = '${id.value}';
-      // \n
-      // """;
     }
+
     print("merge statement:\n$qStr");
     if (stmt) return qStr;
 
-    db_.execute(qStr);
-    // db_.execute(pre, toMerge.values.toList());
+    Down4Local().db.execute(qStr);
     return null;
   }
 }
@@ -266,9 +238,7 @@ mixin Locals on Down4Object, Jsons {
 enum Region { america, europe, asia }
 
 mixin Temps on Locals {
-  // @override
-  // ComposedID get id;
-
+  
   ComposedID? get tempID;
   int? get tempTS;
 
@@ -321,9 +291,6 @@ class CurrentTheme with Down4Object, Jsons, Locals {
   @override
   Down4ID get id => Down4ID(unik: "single");
 
-  // @override
-  // Database get dbb => personalDB;
-
   @override
   String get table => "personals";
 
@@ -335,7 +302,7 @@ class CurrentTheme with Down4Object, Jsons, Locals {
 
   static Future<CurrentTheme> get currentTheme async {
     const q = "SELECT themeName FROM personals WHERE id = 'single'";
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     return CurrentTheme(r.single['themeName'] ?? themesRegistry.keys.first)
       ..merge();
   }
@@ -388,7 +355,6 @@ final Map<Region, GeoLoc> regionsMap = {
 class ExchangeRate with Down4Object, Jsons, Locals {
   @override
   String get table => "personals";
-  //Database get dbb => personalDB;
 
   int lastUpdate;
   double rate;
@@ -400,13 +366,9 @@ class ExchangeRate with Down4Object, Jsons, Locals {
 
   static ExchangeRate get exchangeRate {
     const q = "SELECT * FROM personals WHERE id = 'single'";
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     if (r.isEmpty) return ExchangeRate(lastUpdate: 0, rate: 0);
     return ExchangeRate.fromJson(Map<String, String?>.from(r.single));
-
-    // final doc = await personalDB.document("exchangeRate");
-    // if (doc == null) return ExchangeRate(lastUpdate: 0, rate: 0)..merge();
-    // return ExchangeRate.fromJson(Map<String, String?>.from(doc.toPlainMap()));
   }
 
   factory ExchangeRate.fromJson(Map<String, String?> decodedJson) {

@@ -1119,8 +1119,9 @@ Future<void> cropAndSaveToSquare(
   // do the resize of the image
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
-  final cropRz = img.copyResizeCropSquare(ogImage, resize);
 
+  final cropRz = img.copyResizeCropSquare(ogImage, resize);
+  // final cropCircle = img.copyCropCircle(cropRz, radius: 4);
   // final rz = img.copyResize(ogImage);
 
   // img.Image res;
@@ -1166,6 +1167,13 @@ Future<void> cropAndSaveToSquare(
   for (final e in xd_.entries) {
     print("${e.key} : ${e.value}");
   }
+
+
+  // final xd__ = await exif.readExifFromBytes(cropCircle.data);
+  // print("============EXIF POST CIRCLE============");
+  // for (final e in xd__.entries) {
+  //   print("${e.key} : ${e.value}");
+  // }
   await to.writeAsBytes(img.encodeJpg(cropRz));
 }
 

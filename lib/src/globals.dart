@@ -237,12 +237,12 @@ class Singletons {
 
   late CurrentTheme myTheme;
 
-  String makeMainMediaPath(String unique) {
-    return "${g.appDirPath}${Platform.pathSeparator}$unique";
-  }
+  // String makeMainMediaPath(String unique) {
+  //   return "${g.appDirPath}${Platform.pathSeparator}$unique";
+  // }
 
   Down4Theme get theme => themesRegistry[myTheme.themeName]!;
-  late String appDirPath, cacheDirPath;
+  // late String appDirPath, cacheDirPath;
   late Self self;
   late Wallet wallet;
   late Sizes sizes;
@@ -273,10 +273,10 @@ class Singletons {
 
   void loadSizes(Sizes s) => sizes = s;
 
-  Future<void> loadAppDirPaths() async {
-    appDirPath = (await getApplicationDocumentsDirectory()).path;
-    cacheDirPath = (await getApplicationCacheDirectory()).path;
-  }
+  // Future<void> loadAppDirPaths() async {
+  //   appDirPath = (await getApplicationDocumentsDirectory()).path;
+  //   cacheDirPath = (await getApplicationCacheDirectory()).path;
+  // }
 
   void loadWallet() {
     final wallet_ = Wallet.load();

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:down4/src/bsv/_bsv_utils.dart';
+import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/themes.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -448,7 +449,7 @@ mixin ChatN on Down4Node, Locals {
     print("DELETING ChatN, unik: ${id.unik}");
     // must also delete all related chats
     const q = "SELECT * FROM messages WHERE root = ?";
-    final r = db.select(q, [root_]);
+    final r = Down4Local().db.select(q, [root_]);
     final msgs = r.map((m) {
       final jsns = Map<String, String?>.from(m);
       return Down4Message.fromJson(jsns) as Messages;
@@ -490,7 +491,7 @@ mixin ChatN on Down4Node, Locals {
         WHERE root = '$root_' AND type = 'chat'
         ORDER BY id DESC
         """;
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     for (final row in r) {
       yield ComposedID.fromString(row['id'])!;
     }
@@ -502,7 +503,7 @@ mixin ChatN on Down4Node, Locals {
         WHERE root = '$root_' AND type = 'snip' AND isRead = 'false'
         ORDER BY id ASC
         """;
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     for (final row in r) {
       yield ComposedID.fromString(row['id'])!;
     }
@@ -510,7 +511,7 @@ mixin ChatN on Down4Node, Locals {
 
   Iterable<Snip> loadSnips() sync* {
     final q = "SELECT * FROM messages WHERE type = 'snip' AND root = '$root_'";
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     for (final row in r) {
       final jsns = Map<String, String?>.from(row);
       yield Down4Message.fromJson(jsns) as Snip;
@@ -524,7 +525,7 @@ mixin ChatN on Down4Node, Locals {
             ORDER BY id DESC LIMIT 1
             """;
 
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     if (r.isEmpty) return null;
     final jsns = Map<String, String?>.from(r.single);
     return Down4Message.fromJson(jsns) as Chat;
@@ -540,7 +541,7 @@ mixin ChatN on Down4Node, Locals {
             ORDER BY id DESC LIMIT 1
             """;
 
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     return r.isNotEmpty;
   }
 }
@@ -718,7 +719,7 @@ class User extends Down4Node
       LIMIT 1
       """;
 
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
     return r.isNotEmpty;
   }
 
@@ -825,7 +826,7 @@ class Self extends Down4Node
 
   static Self? loadSelf() {
     const q = "SELECT * FROM nodes WHERE type = 'self'";
-    final r = db.select(q);
+    final r = Down4Local().db.select(q);
 
     if (r.isEmpty) return null;
     final sMap = Map<String, String?>.from(r.single);
