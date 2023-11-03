@@ -1200,3 +1200,21 @@ Future<img.Image> applyCircularMask(img.Image inputImage, int radius) async {
   }
   return inputImage;
 }
+
+
+Size calculateSnipFit(Size source, Size target) {
+  Size sourceSize, destinationSize;
+  sourceSize = source;
+  if (target.width / target.height > sourceSize.width / sourceSize.height) {
+    destinationSize = Size(
+      sourceSize.width * target.height / sourceSize.height,
+      target.height,
+    );
+  } else {
+    destinationSize = Size(
+      target.width,
+      sourceSize.height * target.width / sourceSize.width,
+    );
+  }
+  return destinationSize;
+}

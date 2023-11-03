@@ -197,7 +197,6 @@ class _TW2State extends State<TW2> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      // behavior: HitTestBehavior.translucent,
       onScaleUpdate: (ScaleUpdateDetails details) {
         final newScale = details.scale * _prevScale;
         final newAngle = _previousRotation + details.rotation;
@@ -293,29 +292,32 @@ class _SnipCameraState extends State<SnipCamera>
       (
         "PUT",
         (m) {
-          print("putting that fucking shit in nigga");
-          Size scaleFor(Size from, Size to) {
-            // we want the largest side of (from) to be (smallest size of (to) / 2)
-            double width, height;
-            // aspectRatio :  width / height
-            if (from.aspectRatio > 1) {
-              // large media
-              width = to.width / 2;
-              height = width / from.aspectRatio;
-            } else {
-              // long media
-              height = to.height / 2;
-              width = height * from.aspectRatio;
-            }
-            return Size(width, height);
-          }
+          final s = applyBoxFit(BoxFit.fitWidth, m.size, g.sizes.snipSize)
+              .destination;
 
-          final s = scaleFor(m.size, g.sizes.snipSize);
+          // print("putting that fucking shit in nigga");
+          // Size scaleFor(Size from, Size to) {
+          //   // we want the largest side of (from) to be (smallest size of (to) / 2)
+          //   double width, height;
+          //   // aspectRatio :  width / height
+          //   if (from.aspectRatio > 1) {
+          //     // large media
+          //     width = to.width / 2;
+          //     height = width / from.aspectRatio;
+          //   } else {
+          //     // long media
+          //     height = to.height / 2;
+          //     width = height * from.aspectRatio;
+          //   }
+          //   return Size(width, height);
+          // }
+
+          // final s = scaleFor(m.size, g.sizes.snipSize);
 
           final tw = TW2(
               tid: randomMediaID(),
               mediaID: m.id,
-              initSize: s,
+              initSize: s * 0.9,
               child: m.display(size: s, key: GlobalKey()),
               pressing: (tid, p, dp) {
                 pressing[tid] = p;
@@ -335,7 +337,6 @@ class _SnipCameraState extends State<SnipCamera>
                 if (ix != 0) {
                   final e = sticks.removeAt(ix);
                   sticks.insert(0, e);
-                  // sticks.swap(0, ix);
                   setState(() {});
                 }
               });
@@ -512,9 +513,6 @@ class _SnipCameraState extends State<SnipCamera>
             hasInput
                 ? input.snipInput2((p0) => setState(() => so = p0))
                 : const SizedBox.shrink(),
-            // hasInput
-            //     ? input.snipInput(so, (p0) => setState(() => so = p0))
-            //     : const SizedBox.shrink(),
           ],
         ),
       );
@@ -691,9 +689,7 @@ class _SnipCameraState extends State<SnipCamera>
 
                     vpc?.dispose();
                     widget.cameraCallBack(
-                        backgroundMedia: m?..cache(),
-                        text: txt,
-                        sticks: stx);
+                        backgroundMedia: m?..cache(), text: txt, sticks: stx);
                   },
                 ),
               ], extension: null, widths: null, inputMaxHeight: null),

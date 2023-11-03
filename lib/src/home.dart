@@ -1386,6 +1386,16 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
           );
 
+      final Size fittedSize = calculateSnipFit(s.snipSize, g.sizes.snipSize);
+      return Center(
+        key: GlobalKey(),
+        child: SizedBox.fromSize(size: fittedSize,
+        child: Stack(
+          children: [
+          ],
+      ))
+      );
+
       return SizedBox.fromSize(
           key: GlobalKey(),
           size: g.sizes.snipSize,
