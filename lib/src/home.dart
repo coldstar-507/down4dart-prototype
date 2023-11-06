@@ -1386,15 +1386,56 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
           );
 
-      final Size fittedSize = calculateSnipFit(s.snipSize, g.sizes.snipSize);
-      return Center(
-        key: GlobalKey(),
-        child: SizedBox.fromSize(size: fittedSize,
-        child: Stack(
-          children: [
-          ],
-      ))
-      );
+      final tsizes = applyBoxFit(BoxFit.cover, s.snipSize, g.sizes.snipSize);
+      final tsize = tsizes.destination;
+      print("""
+        sourceSize = ${s.snipSize}
+        targetSize = ${g.sizes.snipSize}
+        destinSize = $tsize
+        inputpSize =  ${tsizes.source}
+        """);
+      // final Size fittedSize = calculateSnipFit(s.snipSize, g.sizes.snipSize);
+      return SizedBox.fromSize(
+          key: GlobalKey(),
+          size: g.sizes.snipSize,
+          child: ClipRect(
+              child: SizedBox.fromSize(
+                  size: s.snipSize,
+                  child: Stack(
+                    children: [
+                      Align(
+                        alignment: AlignmentDirectional.bottomCenter,
+                        child: bm?.display(size: tsize, controller: vpc) ??
+                          const SizedBox.shrink()),
+                      ...await Future.wait(s.sticks.reversed.map((s) async {
+                        final m = local<Down4Media>(s.mediaID);
+                        if (m == null) return const SizedBox.shrink();
+                        m.updateTempReferences(s.tempID!, s.tempTS!);
+                        if (m is Down4Image) {
+                          final rm = m.readyImage(s.initSize);
+                          if (rm == null) return const SizedBox.shrink();
+                          await precacheImage(rm.image, context);
+                        }
+                        return Center(
+                            child: Transform(
+                                alignment: FractionalOffset.center,
+                                transform: Matrix4.identity()
+                                  ..translate(s.pos.dx * ratio, s.pos.dy)
+                                  ..rotateZ(s.rotation)
+                                  ..scale(s.scale * ratio),
+                                child: m.display(size: s.initSize)));
+                      })),
+                      hasText ? ct() : const SizedBox.shrink(),
+                    ],
+                  ))));
+
+      // return Center(
+      //     key: GlobalKey(),
+      //     child: SizedBox.fromSize(
+      //         size: fittedSize,
+      //         child: Stack(
+      //           children: [],
+      //         )));
 
       return SizedBox.fromSize(
           key: GlobalKey(),
