@@ -1336,7 +1336,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       await vpc.setLooping(true);
       await vpc.play();
     } else if (bm is Down4Image) {
-      await precacheImage(bm.readyImage(g.sizes.snipSize)!.image, context);
+      Image? rm = bm.readyImage(g.sizes.snipSize);
+      rm ??= await bm.futureImage(g.sizes.snipSize);
+      if (rm != null) await precacheImage(rm.image, context);
+      // await precacheImage(bm.readyImage(g.sizes.snipSize)!.image, context);
     }
 
     // fetch sticks
@@ -1351,9 +1354,24 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         doFetch: true,
         doMergeIfFetch: true,
         tempIDs: s.sticks.map((e) => e.tempID));
+
+    double calcK() {
+      double k;
+      final (src, tgt) = (s.snipSize, g.sizes.snipSize);
+      if (src.height / tgt.height > src.width / tgt.width) {
+        k = tgt.width / src.width;
+      } else {
+        k = tgt.height / src.height;
+      }
+      return k;
+    }
+      
     Future<Widget> makeSnip() async {
-      final ratio = g.sizes.snipSize.width / s.snipSize.width;
-      if (bm is Down4Image) {}
+      final k = calcK();
+      final r = s.snipSize * k;
+      
+      // final ratio = g.sizes.snipSize.width / s.snipSize.width;
+      // if (bm is Down4Image) {}
       final hasText = s.txt != null;
       print("s.txt=${s.txt}");
       final jeff = s.txt?.split(" ");
@@ -1372,7 +1390,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
       Widget ct() => Center(
             child: Transform.translate(
-              offset: Offset(0.0, ofs),
+              offset: Offset(0.0, ofs * k),
               child: SizedBox(
                   width: g.sizes.w,
                   height: boxHeight() + 4,
@@ -1386,26 +1404,19 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
           );
 
-      final tsizes = applyBoxFit(BoxFit.cover, s.snipSize, g.sizes.snipSize);
-      final tsize = tsizes.destination;
-      print("""
-        sourceSize = ${s.snipSize}
-        targetSize = ${g.sizes.snipSize}
-        destinSize = $tsize
-        inputpSize =  ${tsizes.source}
-        """);
-      // final Size fittedSize = calculateSnipFit(s.snipSize, g.sizes.snipSize);
       return SizedBox.fromSize(
           key: GlobalKey(),
           size: g.sizes.snipSize,
           child: ClipRect(
-              child: SizedBox.fromSize(
-                  size: s.snipSize,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: SizedBox.fromSize(
+                  size: r,
                   child: Stack(
                     children: [
                       Align(
                         alignment: AlignmentDirectional.bottomCenter,
-                        child: bm?.display(size: tsize, controller: vpc) ??
+                        child: bm?.display(size: r, controller: vpc) ??
                           const SizedBox.shrink()),
                       ...await Future.wait(s.sticks.reversed.map((s) async {
                         final m = local<Down4Media>(s.mediaID);
@@ -1420,14 +1431,58 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                             child: Transform(
                                 alignment: FractionalOffset.center,
                                 transform: Matrix4.identity()
-                                  ..translate(s.pos.dx * ratio, s.pos.dy)
+                                  ..translate(s.pos.dx * k, s.pos.dy * k)
                                   ..rotateZ(s.rotation)
-                                  ..scale(s.scale * ratio),
+                                  ..scale(s.scale * k),
                                 child: m.display(size: s.initSize)));
                       })),
                       hasText ? ct() : const SizedBox.shrink(),
                     ],
-                  ))));
+                  )))));
+          
+
+      // final tsizes = applyBoxFit(BoxFit.cover, s.snipSize, g.sizes.snipSize);
+      // final tsize = tsizes.destination;
+      // print("""
+      //   sourceSize = ${s.snipSize}
+      //   targetSize = ${g.sizes.snipSize}
+      //   destinSize = $tsize
+      //   inputpSize =  ${tsizes.source}
+      //   """);
+      // final Size fittedSize = calculateSnipFit(s.snipSize, g.sizes.snipSize);
+      // return SizedBox.fromSize(
+      //     key: GlobalKey(),
+      //     size: g.sizes.snipSize,
+      //     child: ClipRect(
+      //         child: SizedBox.fromSize(
+      //             size: s.snipSize,
+      //             child: Stack(
+      //               children: [
+      //                 Align(
+      //                   alignment: AlignmentDirectional.bottomCenter,
+      //                   child: bm?.display(size: r, controller: vpc) ??
+      //                     const SizedBox.shrink()),
+      //                 ...await Future.wait(s.sticks.reversed.map((s) async {
+      //                   final m = local<Down4Media>(s.mediaID);
+      //                   if (m == null) return const SizedBox.shrink();
+      //                   m.updateTempReferences(s.tempID!, s.tempTS!);
+      //                   if (m is Down4Image) {
+      //                     final rm = m.readyImage(s.initSize);
+      //                     if (rm == null) return const SizedBox.shrink();
+      //                     await precacheImage(rm.image, context);
+      //                   }
+      //                   return Center(
+      //                       child: Transform(
+      //                           alignment: FractionalOffset.center,
+      //                           transform: Matrix4.identity()
+      //                             ..translate(s.pos.dx * k, s.pos.dy)
+      //                             ..rotateZ(s.rotation)
+      //                             ..scale(s.scale * k),
+      //                           child: m.display(size: s.initSize)));
+      //                 })),
+      //                 hasText ? ct() : const SizedBox.shrink(),
+      //               ],
+      //             ))));
 
       // return Center(
       //     key: GlobalKey(),
@@ -1437,32 +1492,32 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       //           children: [],
       //         )));
 
-      return SizedBox.fromSize(
-          key: GlobalKey(),
-          size: g.sizes.snipSize,
-          child: Stack(
-            children: [
-              bm?.display(size: g.sizes.snipSize, controller: vpc) ??
-                  const SizedBox.shrink(),
-              ...await Future.wait(s.sticks.reversed.map((s) async {
-                final m = local<Down4Media>(s.mediaID);
-                if (m == null) return const SizedBox.shrink();
-                m.updateTempReferences(s.tempID!, s.tempTS!);
-                if (m is Down4Image) {
-                  await precacheImage(m.readyImage(s.initSize)!.image, context);
-                }
-                return Center(
-                    child: Transform(
-                        alignment: FractionalOffset.center,
-                        transform: Matrix4.identity()
-                          ..translate(s.pos.dx * ratio, s.pos.dy)
-                          ..rotateZ(s.rotation)
-                          ..scale(s.scale * ratio),
-                        child: m.display(size: s.initSize)));
-              })),
-              hasText ? ct() : const SizedBox.shrink(),
-            ],
-          ));
+      // return SizedBox.fromSize(
+      //     key: GlobalKey(),
+      //     size: g.sizes.snipSize,
+      //     child: Stack(
+      //       children: [
+      //         bm?.display(size: g.sizes.snipSize, controller: vpc) ??
+      //             const SizedBox.shrink(),
+      //         ...await Future.wait(s.sticks.reversed.map((s) async {
+      //           final m = local<Down4Media>(s.mediaID);
+      //           if (m == null) return const SizedBox.shrink();
+      //           m.updateTempReferences(s.tempID!, s.tempTS!);
+      //           if (m is Down4Image) {
+      //             await precacheImage(m.readyImage(s.initSize)!.image, context);
+      //           }
+      //           return Center(
+      //               child: Transform(
+      //                   alignment: FractionalOffset.center,
+      //                   transform: Matrix4.identity()
+      //                     ..translate(s.pos.dx * ratio, s.pos.dy)
+      //                     ..rotateZ(s.rotation)
+      //                     ..scale(s.scale * ratio),
+      //                   child: m.display(size: s.initSize)));
+      //         })),
+      //         hasText ? ct() : const SizedBox.shrink(),
+      //       ],
+      //     ));
     }
 
     return SnipViewPage(

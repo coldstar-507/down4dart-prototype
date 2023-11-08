@@ -29,15 +29,15 @@ class SnipViewPage extends StatefulWidget with Down4PageWidget {
 }
 
 class _SnipViewPage extends State<SnipViewPage> with Pager2 {
-  String get text => widget.text ?? "";
+  // String get text => widget.text ?? "";
 
-  double get boxHeight {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: g.theme.snipInputTextStyle),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: g.sizes.w);
-    return tp.height;
-  }
+  // double get boxHeight {
+  //   final tp = TextPainter(
+  //     text: TextSpan(text: text, style: g.theme.snipInputTextStyle),
+  //     textDirection: TextDirection.ltr,
+  //   )..layout(maxWidth: g.sizes.w);
+  //   return tp.height;
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -45,21 +45,22 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
       Down4Page(
         title: "",
         console: console,
-        stackWidgets: [widget.displayMedia],
+        list: [widget.displayMedia],
+        // stackWidgets: [widget.displayMedia],
       )
     ]);    
 
-    Widget ct() => Container(
-          width: g.sizes.w,
-          height: boxHeight + 4,
-          alignment: AlignmentDirectional.center,
-          decoration: BoxDecoration(color: g.theme.snipRibbon),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: g.theme.snipInputTextStyle,
-          ),
-        );
+    // Widget ct() => Container(
+    //       width: g.sizes.w,
+    //       height: boxHeight + 4,
+    //       alignment: AlignmentDirectional.center,
+    //       decoration: BoxDecoration(color: g.theme.snipRibbon),
+    //       child: Text(
+    //         text,
+    //         textAlign: TextAlign.center,
+    //         style: g.theme.snipInputTextStyle,
+    //       ),
+    //     );
 
     // return Stack(children: [
     //   widget.displayMedia,

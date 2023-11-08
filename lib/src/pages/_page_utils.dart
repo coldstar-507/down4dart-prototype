@@ -111,6 +111,7 @@ class MyTextEditor extends StatefulWidget {
   InitInput2 get initInput => InitInput2(this);
   ConsoleInput2 get consoleInput => ConsoleInput2(this);
   Widget get basicInput => BasicInput(this);
+  SnipInput1 snipInput1(void Function(Offset delta) onMove) => SnipInput1(this, onMove);
   SnipInput snipInput(Offset ofs, void Function(Offset) onMove) =>
       SnipInput(this, ofs, onMove);
   SnipInput2 snipInput2(void Function(Offset) onMove) =>

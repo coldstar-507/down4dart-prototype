@@ -386,7 +386,9 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                         widget.transparentHeader
                             ? const SizedBox.shrink()
                             : SizedBox(height: g.sizes.viewPaddingHeight),
-                        Stack(children: [
+                        Stack(
+                          alignment: AlignmentDirectional.center,
+                          children: [
                           ...?widget.pages[curPos].stackWidgets,
                         ]),
                       ],

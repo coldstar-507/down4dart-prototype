@@ -350,6 +350,36 @@ class BasicInput extends StatelessWidget {
   }
 }
 
+class SnipInput1 extends StatelessWidget {
+  final MyTextEditor ed;
+  final void Function(Offset delta) onMove;
+  const SnipInput1(this.ed, this.onMove, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: !ed.fn.hasFocus
+          ? () => FocusScope.of(context).requestFocus(ed.fn)
+          : null,
+      onVerticalDragUpdate: (d) {
+        print("vertical drag my nigga\ndelta=${d.delta}");
+        onMove(Offset(0, d.delta.dy));
+      },
+      child: Center(
+        child: Container(
+          width: g.sizes.w,
+          height: ed.height,
+          color: g.theme.snipRibbon,
+          child: Align(
+            alignment: AlignmentDirectional.center,
+            child: ed,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SnipInput extends StatelessWidget {
   final MyTextEditor ed;
   final Offset ofs;

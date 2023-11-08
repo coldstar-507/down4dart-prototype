@@ -19,9 +19,28 @@ import '../globals.dart';
 
 class TW1 extends StatefulWidget {
   final Widget child;
-  final void Function(Offset) onMove;
+  final ComposedID mediaID;
+  final Size initSize;
+  final String tid;
+  final void Function(String, Offset, double, double) onMove;
+  final void Function(String, bool, Offset) pressing;
+  final bool allowRotation,
+      allowScale,
+      allowHorizontalTranslation,
+      allowVerticalTranslation;
 
-  const TW1({super.key, required this.onMove, required this.child});
+  TW1({
+    required this.mediaID,
+    required this.child,
+    required this.initSize,
+    required this.pressing,
+    required this.onMove,
+    required this.tid,
+    this.allowScale = true,
+    this.allowRotation = true,
+    this.allowHorizontalTranslation = true,
+    this.allowVerticalTranslation = true,
+  }) : super(key: ValueKey(tid));
 
   @override
   State<TW1> createState() => _TW1State();
@@ -29,24 +48,112 @@ class TW1 extends StatefulWidget {
 
 class _TW1State extends State<TW1> {
   final origin = const Offset(0.0, 0.0);
-  late Offset _position = origin;
+  double _prevScale = 1.0;
+  late final Size s = widget.initSize;
+  int nPrevPointers = 0;
 
+  
+  late Offset _position = origin;
+  late Offset _focalPoint = origin;
+
+  double _scale = 1.0;
+  double _prevPrevScale = 1.0;
+  double _rotation = 0.0;
+  double _previousRotation = 0.0;
+
+  late Offset sz = Offset(widget.initSize.width, widget.initSize.height);
+
+  Offset rotate(Offset ofs, double angle) {
+    return Offset(
+      (ofs.dx * math.cos(angle)) - (ofs.dy * math.sin(angle)),
+      (ofs.dx * math.sin(angle)) + (ofs.dy * math.cos(angle)),
+    );
+  }
+
+  Offset get a_ {
+    final key = widget.child.key as GlobalKey;
+    final ctx = key.currentContext;
+    final rb = ctx?.findRenderObject() as RenderBox?;
+
+    if (ctx == null || rb == null || _focalPoint == origin) {
+      final ss = g.sizes.snipSize;
+      final s = widget.initSize;
+      return Offset(ss.width - (s.width / 2), ss.height - (s.height / 2));
+    }
+
+    return rb.localToGlobal(Offset.zero);
+  }
+
+  (Offset, Offset) calculateKandJ(double nextAngle) {
+    final key = widget.child.key as GlobalKey;
+    final ctx = key.currentContext;
+    final rb = ctx?.findRenderObject() as RenderBox?;
+
+    if (ctx == null || rb == null || _focalPoint == origin) {
+      return (origin, origin);
+    }
+
+    final a = a_;
+    final c = a + (rotate(sz, _rotation) * _scale);
+    final p = (a / 2) + (c / 2);
+    final f = _focalPoint;
+
+    final k = p - f;
+
+    final f_ = rotate(f - p, nextAngle - _rotation) + p;
+    final j = f_ - f;
+
+    return (k, j);
+  }
+  
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onVerticalDragUpdate: (d) {
-        print("vertical drag my nigga\ndelta=${d.delta}");
-        _position += d.delta;
-        widget.onMove(_position);
-        setState(() {});
-      },
-      child: Center(
-        child: Transform(
-          transform: Matrix4.identity()..translate(_position.dx, _position.dy),
-          alignment: FractionalOffset.center,
-          child: widget.child,
+    return // Positioned(
+      // left: _position.dx,
+      // top: _position.dy,
+      // child:
+      GestureDetector(
+        onScaleUpdate: (ScaleUpdateDetails details) {
+          final newScale = details.scale * _prevScale;
+          final newAngle = _previousRotation + details.rotation;
+          if (details.pointerCount == nPrevPointers) {
+            if (nPrevPointers == 2) {
+              final lastWidth = _prevPrevScale * widget.initSize.width;
+              final newWidth = newScale * widget.initSize.width;
+              final pixelScale = ((newWidth / lastWidth) - 1) / 2;
+              final (k, j) = calculateKandJ(newAngle);
+              _position += (details.focalPointDelta) + (k * pixelScale) - j;
+            } else {
+              _position += details.focalPointDelta;
+            }
+          }
+          _prevPrevScale = _scale;
+          _scale = newScale;
+          _rotation = _previousRotation + details.rotation;
+          _focalPoint = details.focalPoint;
+          nPrevPointers = details.pointerCount;
+          widget.onMove(widget.tid, _position, _scale, _rotation);
+          setState(() {});
+        },
+        onScaleStart: (details) {
+          widget.pressing(widget.tid, true, _focalPoint);
+        },
+        onScaleEnd: (ScaleEndDetails details) {
+          _prevScale = _scale;
+          _previousRotation = _rotation;
+          widget.pressing(widget.tid, false, _focalPoint);
+        },
+        child: Center(
+          child: Transform(
+            transform: Matrix4.identity()
+              ..translate(_position.dx, _position.dy)
+              ..scale(_scale)
+              ..rotateZ(_rotation),
+            alignment: FractionalOffset.center,
+            child: widget.child,
+          ),
         ),
-      ),
+      // ),
     );
   }
 }
@@ -212,15 +319,12 @@ class _TW2State extends State<TW2> {
             _position += details.focalPointDelta;
           }
         }
-
         _prevPrevScale = _scale;
         _scale = newScale;
         _rotation = _previousRotation + details.rotation;
         _focalPoint = details.focalPoint;
         nPrevPointers = details.pointerCount;
-
         widget.onMove(widget.tid, _position, _scale, _rotation);
-
         setState(() {});
       },
       onScaleStart: (details) {
@@ -276,7 +380,8 @@ class _SnipCameraState extends State<SnipCamera>
   String? text;
   bool hasInput = false;
 
-  List<TW2> sticks = [];
+  // List<TW2> sticks = [];
+  List<TW1> sticks = [];  
   Map<String, bool> pressing = {};
   Map<String, (Offset, double, double)> positions = {};
   List<(ComposedID, Offset, Size, double, double)> get sticksInfo {
@@ -292,32 +397,16 @@ class _SnipCameraState extends State<SnipCamera>
       (
         "PUT",
         (m) {
-          final s = applyBoxFit(BoxFit.fitWidth, m.size, g.sizes.snipSize)
-              .destination;
+          final s = applyBoxFit(BoxFit.fitWidth, m.size, snipSize).destination;
 
-          // print("putting that fucking shit in nigga");
-          // Size scaleFor(Size from, Size to) {
-          //   // we want the largest side of (from) to be (smallest size of (to) / 2)
-          //   double width, height;
-          //   // aspectRatio :  width / height
-          //   if (from.aspectRatio > 1) {
-          //     // large media
-          //     width = to.width / 2;
-          //     height = width / from.aspectRatio;
-          //   } else {
-          //     // long media
-          //     height = to.height / 2;
-          //     width = height * from.aspectRatio;
-          //   }
-          //   return Size(width, height);
-          // }
+          print("k=$k_");
+          print("init size with k = ${s * k_}");
+          print("init size without k = $s");
 
-          // final s = scaleFor(m.size, g.sizes.snipSize);
-
-          final tw = TW2(
+          final tw = TW1(
               tid: randomMediaID(),
               mediaID: m.id,
-              initSize: s * 0.9,
+              initSize: s * 0.5,
               child: m.display(size: s, key: GlobalKey()),
               pressing: (tid, p, dp) {
                 pressing[tid] = p;
@@ -377,7 +466,7 @@ class _SnipCameraState extends State<SnipCamera>
   int camNum = 0;
 
   late double _ar;
-  late Size _camSize;
+  Size _camSize = const Size(0, 0);
 
   void initCamera() async {
     if (ctrl.value.isInitialized) {
@@ -489,33 +578,34 @@ class _SnipCameraState extends State<SnipCamera>
       ..play();
   }
 
-  Widget previewsContainer({bool reverse = false, required Widget child}) =>
-      SizedBox.fromSize(
-        size: g.sizes.snipSize,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Center(
-              child: Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.rotationY(reverse ? math.pi : 0),
-                child: Transform.scale(
-                  scale: scale > 1 ? scale : 1 / scale,
-                  child: SizedBox(
-                    height: g.sizes.w * _ar, // ctrl.value.aspectRatio,
-                    width: g.sizes.w,
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
-            ...sticks.reversed,
-            hasInput
-                ? input.snipInput2((p0) => setState(() => so = p0))
-                : const SizedBox.shrink(),
-          ],
-        ),
-      );
+  // Widget previewsContainer({bool reverse = false, required Widget child}) =>
+  //     SizedBox.fromSize(
+  //       size: g.sizes.snipSize,
+  //       child: Stack(
+  //         fit: StackFit.expand,
+  //         children: [
+  //           child,
+  //           // Center(
+  //           //   child: Transform(
+  //           //     alignment: Alignment.center,
+  //           //     transform: Matrix4.rotationY(reverse ? math.pi : 0),
+  //           //     child: Transform.scale(
+  //           //       scale: scale > 1 ? scale : 1 / scale,
+  //           //       child: SizedBox(
+  //           //         height: g.sizes.w * _ar, // ctrl.value.aspectRatio,
+  //           //         width: g.sizes.w,
+  //           //         child: child,
+  //           //       ),
+  //           //     ),
+  //           //   ),
+  //           // ),
+  //           ...sticks.reversed,
+  //           hasInput
+  //               ? input.snipInput2((p0) => setState(() => so = p0))
+  //               : const SizedBox.shrink(),
+  //         ],
+  //       ),
+  //     );
 
   Offset get xWidgetPos {
     final rb = xKey.currentContext!.findRenderObject() as RenderBox;
@@ -544,6 +634,121 @@ class _SnipCameraState extends State<SnipCamera>
     super.dispose();
   }
 
+  Size get snipSize => g.sizes.snipSize;
+
+  Size get cs => applyBoxFit(BoxFit.contain, _camSize, snipSize).destination;
+
+  double calcK(Size src, Size tgt) {
+    double k;
+    print("src=$src\ntgt=$tgt\n");
+    if (src.height / tgt.height > src.width / tgt.width) {
+      k = tgt.width / src.width;
+    } else {
+      k = tgt.height / src.height;
+    }
+    return k;
+  }
+
+  double get k_ => calcK(cs, snipSize);
+
+  Widget backWidget() {
+    Widget chld() {
+      if (hasPreview) {
+        // these have an automatic *contained* fit, that must be transformed
+        // which is why we calculate containedSize (cs) then k and r
+        if (filePath == null) {
+          return const SizedBox.shrink();
+        } else if (isVideo) {
+          return VideoPlayer(vpc!);
+        } else {
+          return Image.file(File(filePath!));
+        }
+      } else if (!readyCamera) {
+        return const SizedBox.shrink();
+      } else {
+        return GestureDetector(
+          onTap: () => print("LALALALALAL"),
+          onScaleStart: (details) => _baseScale = _scale,
+          onScaleUpdate: (details) {
+            if (_baseScale * details.scale < minZoom) {
+              _scale = minZoom;
+            } else if (_baseScale * details.scale > maxZoom) {
+              _scale = maxZoom;
+            } else {
+              _scale = _baseScale * details.scale;
+            }
+            if (_scale >= minZoom && _scale <= maxZoom) {
+              ctrl.setZoomLevel(_scale);
+            }
+          },
+          child: CameraPreview(ctrl),
+        );
+      }
+    }
+
+    return Transform.scale(
+      scale: k_,
+      alignment: AlignmentDirectional.bottomCenter,
+      child: SizedBox.fromSize(
+        size: g.sizes.snipSize,
+        child: chld(),
+      ),
+    );
+  }
+
+  // Widget makeBody() {
+  //   Widget chld() {
+  //     if (hasPreview) {
+  //       // these have an automatic *contained* fit, that must be transformed
+  //       // which is why we calculate containedSize (cs) then k and r
+  //       if (filePath == null) {
+  //         return const SizedBox.shrink();
+  //       } else if (isVideo) {
+  //         return VideoPlayer(vpc!);
+  //       } else {
+  //         return Image.file(File(filePath!));
+  //       }
+  //     } else if (!readyCamera) {
+  //       return const SizedBox.shrink();
+  //     } else {
+  //       return GestureDetector(
+  //         onTap: () => print("LALALALALAL"),
+  //         onScaleStart: (details) => _baseScale = _scale,
+  //         onScaleUpdate: (details) {
+  //           if (_baseScale * details.scale < minZoom) {
+  //             _scale = minZoom;
+  //           } else if (_baseScale * details.scale > maxZoom) {
+  //             _scale = maxZoom;
+  //           } else {
+  //             _scale = _baseScale * details.scale;
+  //           }
+  //           if (_scale >= minZoom && _scale <= maxZoom) {
+  //             ctrl.setZoomLevel(_scale);
+  //           }
+  //         },
+  //         child: CameraPreview(ctrl),
+  //       );
+  //     }
+  //   }
+
+  //   return Transform.scale(
+  //       scale: k_,
+  //       alignment: AlignmentDirectional.bottomCenter,
+  //       child: SizedBox.fromSize(
+  //         size: g.sizes.snipSize,
+  //         child: Stack(
+  //           alignment: AlignmentDirectional.bottomCenter,
+  //           children: [
+  //             chld(),
+  //             ...sticks.reversed,
+  //             hasInput
+  //                 ? input.snipInput2((p0) => so = p0)
+  //                 : const SizedBox.shrink(),
+  //           ],
+  //         ),
+  //       ));
+  // }
+
   @override
   Widget build(BuildContext context) {
     return Andrew(
@@ -556,44 +761,88 @@ class _SnipCameraState extends State<SnipCamera>
           console: console,
           staticList: true,
           stackWidgets: [
-            hasPreview
-                ? previewsContainer(
-                    reverse: toReverse,
-                    child: filePath != null
-                        ? isVideo
-                            ? VideoPlayer(vpc!)
-                            : Image.file(File(filePath!))
-                        : const SizedBox.shrink())
-                : !readyCamera
-                    ? const SizedBox.shrink()
-                    : GestureDetector(
-                        onTap: () => print("LALALALALAL"),
-                        onScaleStart: (details) => _baseScale = _scale,
-                        onScaleUpdate: (details) {
-                          if (_baseScale * details.scale < minZoom) {
-                            _scale = minZoom;
-                          } else if (_baseScale * details.scale > maxZoom) {
-                            _scale = maxZoom;
-                          } else {
-                            _scale = _baseScale * details.scale;
-                          }
-                          if (_scale >= minZoom && _scale <= maxZoom) {
-                            ctrl.setZoomLevel(_scale);
-                          }
-                        },
-                        child: previewsContainer(child: CameraPreview(ctrl)),
-                      ),
+            backWidget(),
+            ...sticks.reversed,
+            hasInput
+                ? Positioned(left: 0, top: so1.dy, child: input.snipInput1((delta) => setState(() => so1 += delta)))
+                : const SizedBox.shrink(),
+                
+                //Positioned(left: 0, top: so1.dy, child: snipInput1)                
+                // snipInput,
           ],
+
+          // stackWidgets: [makeBody()],
+          // list: [
+          // hasPreview
+          //     ? previewsContainer(
+          //         reverse: toReverse,
+          //         child: filePath != null
+          //             ? isVideo
+          //                 ? VideoPlayer(vpc!)
+          //                 : Image.file(File(filePath!))
+          //             : const SizedBox.shrink())
+          //     : !readyCamera
+          //         ? const SizedBox.shrink()
+          //         : GestureDetector(
+          //             onTap: () => print("LALALALALAL"),
+          //             onScaleStart: (details) => _baseScale = _scale,
+          //             onScaleUpdate: (details) {
+          //               if (_baseScale * details.scale < minZoom) {
+          //                 _scale = minZoom;
+          //               } else if (_baseScale * details.scale > maxZoom) {
+          //                 _scale = maxZoom;
+          //               } else {
+          //                 _scale = _baseScale * details.scale;
+          //               }
+          //               if (_scale >= minZoom && _scale <= maxZoom) {
+          //                 ctrl.setZoomLevel(_scale);
+          //               }
+          //             },
+          //             child: previewsContainer(child: CameraPreview(ctrl)),
+          //           ),
+          // ],
+
+          // stackWidgets: [
+          //   hasPreview
+          //       ? previewsContainer(
+          //           reverse: toReverse,
+          //           child: filePath != null
+          //               ? isVideo
+          //                   ? VideoPlayer(vpc!)
+          //                   : Image.file(File(filePath!))
+          //               : const SizedBox.shrink())
+          //       : !readyCamera
+          //           ? const SizedBox.shrink()
+          //           : GestureDetector(
+          //               onTap: () => print("LALALALALAL"),
+          //               onScaleStart: (details) => _baseScale = _scale,
+          //               onScaleUpdate: (details) {
+          //                 if (_baseScale * details.scale < minZoom) {
+          //                   _scale = minZoom;
+          //                 } else if (_baseScale * details.scale > maxZoom) {
+          //                   _scale = maxZoom;
+          //                 } else {
+          //                   _scale = _baseScale * details.scale;
+          //                 }
+          //                 if (_scale >= minZoom && _scale <= maxZoom) {
+          //                   ctrl.setZoomLevel(_scale);
+          //                 }
+          //               },
+          //               child: previewsContainer(child: CameraPreview(ctrl)),
+          //             ),
+          // ],
         )
       ],
     );
   }
 
   Offset so = const Offset(0, 0);
-  late SnipInput snipInput =
-      input.snipInput(so, (p0) => setState(() => so = p0));
+  late SnipInput2 snipInput = input.snipInput2((p0) => so = p0);
 
-  // late SnipInput2 snipInput = input.snipInput2((p0) => so = p0);
+  Size get middleSize => snipSize / 2;  
+  late Offset so1 = Offset(middleSize.width, middleSize.height);
+  late SnipInput1 snipInput1 =
+      input.snipInput1((delta) => setState(() => so1 += delta));
 
   @override
   List<Extra> extras = [];
