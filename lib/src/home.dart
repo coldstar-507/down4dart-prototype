@@ -563,11 +563,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final (h, t) = chats.toList().headTail();
     pc_(h, () => t.map((e) => pc_(e)).toList());
   }
-
+  
   Future<void> sendSnip({
+    required Down4Media? backgroundMedia,      
     required List<SnipStick> sticks,
-    required Down4Media? backgroundMedia,
-    String? text,
+    required Size ps,    
+    required String? text,
+    required double? pdy,
   }) async {
     setPage(loadingPage());
 
