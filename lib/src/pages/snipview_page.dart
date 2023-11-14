@@ -8,58 +8,89 @@ import '../render_objects/_render_utils.dart' show Down4PageWidget;
 
 import '_page_utils.dart';
 
-class SnipViewPage extends StatefulWidget with Down4PageWidget {
+// class SnipViewPage extends StatefulWidget with Down4PageWidget {
+//   @override
+//   String get id => "snipview";
+
+//   final Widget displayMedia;
+//   // final String? text;
+//   final void Function() back;
+//   final void Function() next;
+//   const SnipViewPage({
+//     required this.displayMedia,
+//     required this.back,
+//     required this.next,
+//     // this.text,
+//     Key? key,
+//   }) : super(key: key);
+
+//   @override
+//   State<SnipViewPage> createState() => _SnipViewPage();
+// }
+
+class SnipViewPage extends StatelessWidget //State<SnipViewPage>
+  with Down4PageWidget {//, Pager2 {
   @override
   String get id => "snipview";
 
   final Widget displayMedia;
-  final String? text;
+  // final String? text;
   final void Function() back;
   final void Function() next;
-  const SnipViewPage({
+  SnipViewPage({
     required this.displayMedia,
     required this.back,
     required this.next,
-    this.text,
+    // this.text,
     Key? key,
   }) : super(key: key);
 
-  @override
-  State<SnipViewPage> createState() => _SnipViewPage();
-}
 
-class _SnipViewPage extends State<SnipViewPage> with Pager2 {
-  String get text => widget.text ?? "";
+    // String get text => widget.text ?? "";
 
-  double get boxHeight {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: g.theme.snipInputTextStyle),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: g.sizes.w);
-    return tp.height;
-  }
+  // double get boxHeight {
+  //   final tp = TextPainter(
+  //     text: TextSpan(text: text, style: g.theme.snipInputTextStyle),
+  //     textDirection: TextDirection.ltr,
+  //   )..layout(maxWidth: g.sizes.w);
+  //   return tp.height;
+  // }
 
+  // @override
+  Console get console => Console(rows: [
+        {
+          "base": ConsoleRow(widgets: [
+            ConsoleButton(
+                name: "BACK", onPress: back, isInverted: false),
+            ConsoleButton(
+                name: "NEXT", onPress: next, isInverted: false),
+          ], extension: null, widths: null, inputMaxHeight: null)
+        }
+      ], currentConsolesName: [
+        "base"
+      ], currentPageIndex: 0);
+  
   @override
   Widget build(BuildContext context) {
     return Andrew(transparentHeader: true, pages: [
       Down4Page(
         title: "",
         console: console,
-        stackWidgets: [widget.displayMedia],
+        stackWidgets: [displayMedia],
       )
     ]);    
 
-    Widget ct() => Container(
-          width: g.sizes.w,
-          height: boxHeight + 4,
-          alignment: AlignmentDirectional.center,
-          decoration: BoxDecoration(color: g.theme.snipRibbon),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: g.theme.snipInputTextStyle,
-          ),
-        );
+    // Widget ct() => Container(
+    //       width: g.sizes.w,
+    //       height: boxHeight + 4,
+    //       alignment: AlignmentDirectional.center,
+    //       decoration: BoxDecoration(color: g.theme.snipRibbon),
+    //       child: Text(
+    //         text,
+    //         textAlign: TextAlign.center,
+    //         style: g.theme.snipInputTextStyle,
+    //       ),
+    //     );
 
     // return Stack(children: [
     //   widget.displayMedia,
@@ -89,26 +120,14 @@ class _SnipViewPage extends State<SnipViewPage> with Pager2 {
     // ]);
   }
 
-  @override
-  Console get console => Console(rows: [
-        {
-          "base": ConsoleRow(widgets: [
-            ConsoleButton(
-                name: "BACK", onPress: widget.back, isInverted: false),
-            ConsoleButton(
-                name: "NEXT", onPress: widget.next, isInverted: false),
-          ], extension: null, widths: null, inputMaxHeight: null)
-        }
-      ], currentConsolesName: [
-        "base"
-      ], currentPageIndex: 0);
 
-  @override
-  List<String> currentConsolesName = ["base"];
 
-  @override
-  List<Extra> extras = [];
+  // @override
+  // List<String> currentConsolesName = ["base"];
 
-  @override
-  void setTheState() => setState(() {});
+  // @override
+  // List<Extra> extras = [];
+
+  // @override
+  // void setTheState() {}// => setState(() {});
 }

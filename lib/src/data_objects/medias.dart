@@ -454,6 +454,16 @@ class Down4Image extends Down4Media {
     return null;
   }
 
+  Image? basicImage() {
+    File? f = mainCachedFile ?? mainFile;
+    if (f != null) {
+      return Image(image: FileImage(f));
+    } else if (_cachedUrl != null) {
+      return Image(image: NetworkImage(_cachedUrl!));
+    }
+    return null;
+  }
+
   Future<Image?> futureSnipImage() async {
     await tempUrl;
     if (_cachedUrl == null) {

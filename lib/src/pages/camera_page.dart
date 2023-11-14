@@ -17,41 +17,41 @@ import '../render_objects/console.dart';
 import '../pages/_page_utils.dart';
 import '../globals.dart';
 
-typedef Stx = (double pdx, double pdy, double scl, double rot, Size pis);
+// typedef Stx = (double pdx, double pdy, double scl, double rot, Size pis);
 
-class TW1 extends StatefulWidget {
-  final Widget child;
-  final void Function(Offset) onMove;
+// class TW1 extends StatefulWidget {
+//   final Widget child;
+//   final void Function(Offset) onMove;
 
-  const TW1({super.key, required this.onMove, required this.child});
+//   const TW1({super.key, required this.onMove, required this.child});
 
-  @override
-  State<TW1> createState() => _TW1State();
-}
+//   @override
+//   State<TW1> createState() => _TW1State();
+// }
 
-class _TW1State extends State<TW1> {
-  final origin = const Offset(0.0, 0.0);
-  late Offset _position = origin;
+// class _TW1State extends State<TW1> {
+//   final origin = const Offset(0.0, 0.0);
+//   late Offset _position = origin;
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onVerticalDragUpdate: (d) {
-        print("vertical drag my nigga\ndelta=${d.delta}");
-        _position += d.delta;
-        widget.onMove(_position);
-        setState(() {});
-      },
-      child: Center(
-        child: Transform(
-          transform: Matrix4.identity()..translate(_position.dx, _position.dy),
-          alignment: FractionalOffset.center,
-          child: widget.child,
-        ),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return GestureDetector(
+//       onVerticalDragUpdate: (d) {
+//         print("vertical drag my nigga\ndelta=${d.delta}");
+//         _position += d.delta;
+//         widget.onMove(_position);
+//         setState(() {});
+//       },
+//       child: Center(
+//         child: Transform(
+//           transform: Matrix4.identity()..translate(_position.dx, _position.dy),
+//           alignment: FractionalOffset.center,
+//           child: widget.child,
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 class TW2 extends StatefulWidget {
   final Widget child;
@@ -122,14 +122,6 @@ class _TW2State extends State<TW2> {
   }
 
   (Offset, Offset) calculateKandJ(double nextAngle) {
-    // final key = widget.child.key as GlobalKey;
-    // final ctx = key.currentContext;
-    // final rb = ctx?.findRenderObject() as RenderBox?;
-
-    // if (ctx == null || rb == null || _focalPoint == origin) {
-    //   return (origin, origin);
-    // }
-
     final a = a_;
     final c = a + (rotate(sz, _rotation) * _scale);
     final p = (a / 2) + (c / 2);
@@ -142,61 +134,6 @@ class _TW2State extends State<TW2> {
 
     return (k, j);
   }
-
-  // void calculateRbPos() {
-  //   final k = widget.child.key as GlobalKey;
-  //   final ctx = k.currentContext;
-  //   final rb = ctx?.findRenderObject() as RenderBox?;
-  //   if (ctx == null || rb == null) return print("rb is null");
-
-  //   if (_focalPoint.dx == 0.0 && _focalPoint.dy == 0.0) {
-  //     return print("FOCAL POINT NOT YET VALID");
-  //   }
-
-  //   final A = rb.localToGlobal(Offset.zero);
-  //   final B = A + (rotate(Offset(sz.dx, 0), _rotation) * _scale);
-  //   final C = A + (rotate(sz, _rotation) * _scale);
-  //   final D = A + (rotate(Offset(0, sz.dy), _rotation) * _scale);
-  //   final F = _focalPoint;
-
-  //   if ((_rotation / (math.pi / 2)) % 1 == 0) {
-  //     fo = FractionalOffset(
-  //       (F.dx - D.dx) / (C.dx - D.dx),
-  //       (F.dy - B.dy) / (C.dy - B.dy),
-  //     );
-  //     return print("angle is a divisable by pi/2");
-  //   }
-
-  //   final BCm =
-  //       (B.dx == C.dx) ? double.infinity : (B.dy - C.dy) / (B.dx - C.dx);
-  //   final BCb = B.dy - (BCm * B.dx);
-
-  //   final DCm =
-  //       (D.dx == C.dx) ? double.infinity : (D.dy - C.dy) / (D.dx - C.dx);
-  //   final DCb = D.dy - (DCm * D.dx);
-
-  //   final FHm = DCm;
-  //   final FHb = F.dy - (FHm * F.dx);
-  //   final FWm = BCm;
-  //   final FWb = F.dy - (FWm * F.dx);
-
-  //   final Hdx = (FHb - BCb) / (BCm - FHm);
-  //   final Hdy = (Hdx * FHm) + FHb;
-  //   final H = Offset(Hdx, Hdy);
-
-  //   final Wdx = (DCb - FWb) / (FWm - DCm);
-  //   final Wdy = (FWm * Wdx) + FWb;
-  //   final W = Offset(Wdx, Wdy);
-
-  //   fo = FractionalOffset(
-  //     calcDistance2(W, D) / calcDistance2(C, D),
-  //     calcDistance2(H, B) / calcDistance2(C, B),
-  //   );
-
-  //   isCalculation = true;
-  // }
-
-  // bool isCalculation = false;
 
   @override
   Widget build(BuildContext context) {
@@ -504,7 +441,6 @@ class _SnipCameraState extends State<SnipCamera>
 
   Size? _scaledCamSize;
   Size get scaledCamSize => _scaledCamSize ??= _camSize / k;
-  
 
   double? k_;
   double get k {
@@ -518,9 +454,48 @@ class _SnipCameraState extends State<SnipCamera>
       }
       return k;
     }
+
     return k_ ??= calcK();
   }
 
+  Widget cameraChild() {
+    if (!readyCamera) {
+      return const SizedBox.shrink();
+    } else {
+      return GestureDetector(
+        onTap: () => print("LALALALALAL"),
+        onScaleStart: (details) => _baseScale = _scale,
+        onScaleUpdate: (details) {
+          if (_baseScale * details.scale < minZoom) {
+            _scale = minZoom;
+          } else if (_baseScale * details.scale > maxZoom) {
+            _scale = maxZoom;
+          } else {
+            _scale = _baseScale * details.scale;
+          }
+          if (_scale >= minZoom && _scale <= maxZoom) {
+            ctrl.setZoomLevel(_scale);
+          }
+        },
+        child: previewsContainer(child: CameraPreview(ctrl)),
+      );
+    }
+  }
+
+  Widget previewChild() {
+    Widget widg() {
+      if (filePath != null) {
+        if (isVideo) {
+          return VideoPlayer(vpc!);
+        } else {
+          return Image.file(File(filePath!));
+        }
+      }
+      return const SizedBox.shrink();
+    }
+
+    return previewsContainer(reverse: toReverse, child: widg());
+  }
 
   Widget previewsContainer({bool reverse = false, required Widget child}) {
     return SizedBox.fromSize(
@@ -546,6 +521,12 @@ class _SnipCameraState extends State<SnipCamera>
           }),
           hasInput
               ? input.snipInput2((p0) => setState(() => so = p0))
+              : const SizedBox.shrink(),
+          hasInput
+              ? Positioned(
+                  left: so.dx,
+                  top: so.dy,
+                  child: Container(color: Colors.blue, height: 5, width: 5))
               : const SizedBox.shrink(),
         ],
       ),
@@ -582,8 +563,6 @@ class _SnipCameraState extends State<SnipCamera>
     );
   }
 
-  
-
   Offset get xWidgetPos {
     final rb = xKey.currentContext!.findRenderObject() as RenderBox;
     return rb.localToGlobal(Offset.zero);
@@ -609,45 +588,6 @@ class _SnipCameraState extends State<SnipCamera>
     killCamera();
     // ctrl.dispose();
     super.dispose();
-  }
-
-  Widget previewChild() {
-    Widget widg() {
-      if (filePath != null) {
-        if (isVideo) {
-          return VideoPlayer(vpc!);
-        } else {
-          return Image.file(File(filePath!));
-        }
-      }
-      return const SizedBox.shrink();
-    }
-
-    return previewsContainer(reverse: toReverse, child: widg());
-  }
-
-  Widget cameraChild() {
-    if (!readyCamera) {
-      return const SizedBox.shrink();
-    } else {
-      return GestureDetector(
-        onTap: () => print("LALALALALAL"),
-        onScaleStart: (details) => _baseScale = _scale,
-        onScaleUpdate: (details) {
-          if (_baseScale * details.scale < minZoom) {
-            _scale = minZoom;
-          } else if (_baseScale * details.scale > maxZoom) {
-            _scale = maxZoom;
-          } else {
-            _scale = _baseScale * details.scale;
-          }
-          if (_scale >= minZoom && _scale <= maxZoom) {
-            ctrl.setZoomLevel(_scale);
-          }
-        },
-        child: previewsContainer(child: CameraPreview(ctrl)),
-      );
-    }
   }
 
   @override
@@ -746,15 +686,11 @@ class _SnipCameraState extends State<SnipCamera>
                           metadata: Down4MediaMetadata(
                               ownerID: g.self.id,
                               timestamp: makeTimestamp(),
+                              isReversed: toReverse,
                               width: _camSize.width,
                               height: _camSize.height,
                               mime: mimetype!));
                     }
-                    String? txt;
-                    if (hasInput && input.value.isNotEmpty) {
-                      txt = "${so.dy} ${input.value}";
-                    }
-
                     // final stx = sticks.map((e) {
                     //   final (ofs, scl, rot) = positions[e.tid]!;
                     //   return SnipStick(
@@ -767,7 +703,21 @@ class _SnipCameraState extends State<SnipCamera>
                     //       scale: scl);
                     // }).toList();
                     final (ps, stx) = relativeGs();
+                    String? txt;
+                    if (hasInput && input.value.isNotEmpty) {
+                      txt = "${so.dy / ps.height} ${input.value}";
+                    }
+                    for (final s in stx) {
+                      print("""
+                        stxid=${s.mediaID}
+                        initS=${s.initSize}
+                        pos  =${s.pos}
+                        rot  =${s.rotation}
+                        scl  =${s.scale}
+                        """);
+                    }
                     vpc?.dispose();
+                    print("ps=$ps\ntxt=$txt\n");
                     widget.cameraCallBack(
                         ps: ps,
                         backgroundMedia: m?..cache(),
