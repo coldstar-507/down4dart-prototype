@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/data_objects/_data_utils.dart';
@@ -17,56 +18,24 @@ import '../render_objects/console.dart';
 import '../pages/_page_utils.dart';
 import '../globals.dart';
 
-// typedef Stx = (double pdx, double pdy, double scl, double rot, Size pis);
-
-// class TW1 extends StatefulWidget {
-//   final Widget child;
-//   final void Function(Offset) onMove;
-
-//   const TW1({super.key, required this.onMove, required this.child});
-
-//   @override
-//   State<TW1> createState() => _TW1State();
-// }
-
-// class _TW1State extends State<TW1> {
-//   final origin = const Offset(0.0, 0.0);
-//   late Offset _position = origin;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return GestureDetector(
-//       onVerticalDragUpdate: (d) {
-//         print("vertical drag my nigga\ndelta=${d.delta}");
-//         _position += d.delta;
-//         widget.onMove(_position);
-//         setState(() {});
-//       },
-//       child: Center(
-//         child: Transform(
-//           transform: Matrix4.identity()..translate(_position.dx, _position.dy),
-//           alignment: FractionalOffset.center,
-//           child: widget.child,
-//         ),
-//       ),
-//     );
-//   }
-// }
-
 class TW2 extends StatefulWidget {
   final Widget child;
   final ComposedID mediaID;
   final Size initSize;
+  final Offset inita;
   final String tid;
   final void Function(String, Offset, double, double) onMove;
   final void Function(String, bool, Offset) pressing;
-  final void Function(Offset) ona;
+  final void Function(Offset, String) ona;
   final bool allowRotation,
       allowScale,
       allowHorizontalTranslation,
       allowVerticalTranslation;
 
+  Offset get sizeOfs => Offset(initSize.width, initSize.height);
+
   TW2({
+    required this.inita,
     required this.mediaID,
     required this.child,
     required this.initSize,
@@ -85,6 +54,14 @@ class TW2 extends StatefulWidget {
 }
 
 class _TW2State extends State<TW2> {
+  Size get snipSize => g.sizes.snipSize;
+  Size get initSize => widget.initSize;
+  Offset get oo => Offset(
+        0,
+        (snipSize.height - s.height) / 2,
+      );
+  Offset get ob => oo + _position;
+
   final origin = const Offset(0.0, 0.0);
   double _prevScale = 1.0;
   late final Size s = widget.initSize;
@@ -113,9 +90,7 @@ class _TW2State extends State<TW2> {
     final rb = ctx?.findRenderObject() as RenderBox?;
 
     if (ctx == null || rb == null || _focalPoint == origin) {
-      final ss = g.sizes.snipSize;
-      final s = widget.initSize;
-      return Offset(ss.width - (s.width / 2), ss.height - (s.height / 2));
+      return widget.inita;
     }
 
     return rb.localToGlobal(Offset.zero);
@@ -137,8 +112,7 @@ class _TW2State extends State<TW2> {
 
   @override
   Widget build(BuildContext context) {
-    Future(() => widget.ona(a_));
-
+    Future(() => widget.ona(a_, widget.tid));
     return GestureDetector(
       onScaleUpdate: (ScaleUpdateDetails details) {
         final newScale = details.scale * _prevScale;
@@ -162,7 +136,7 @@ class _TW2State extends State<TW2> {
         nPrevPointers = details.pointerCount;
 
         print("_position = $_position, a_ = $a_");
-        widget.onMove(widget.tid, _position, _scale, _rotation);
+        widget.onMove(widget.tid, ob, _scale, _rotation);
 
         setState(() {});
       },
@@ -180,7 +154,7 @@ class _TW2State extends State<TW2> {
             ..translate(_position.dx, _position.dy)
             ..scale(_scale)
             ..rotateZ(_rotation),
-          alignment: FractionalOffset.center,
+          alignment: AlignmentDirectional.center,
           child: widget.child,
         ),
       ),
@@ -224,6 +198,7 @@ class _SnipCameraState extends State<SnipCamera>
   List<TW2> sticks = [];
   Map<String, bool> pressing = {};
   Map<String, (Offset, double, double)> positions = {};
+  Map<String, Offset> trueOffset = {};
   List<(ComposedID, Offset, Size, double, double)> get sticksInfo {
     return sticks.map((e) {
       final (ofs, scl, rot) = positions[e.tid]!;
@@ -239,32 +214,25 @@ class _SnipCameraState extends State<SnipCamera>
         (m) {
           final s = applyBoxFit(BoxFit.fitWidth, m.size, g.sizes.snipSize)
               .destination;
+          final scl = s * 0.9;
+          final gx = (s.width - scl.width) / 2;
+          final gy = (s.height - scl.height) / 2;          
 
-          // print("putting that fucking shit in nigga");
-          // Size scaleFor(Size from, Size to) {
-          //   // we want the largest side of (from) to be (smallest size of (to) / 2)
-          //   double width, height;
-          //   // aspectRatio :  width / height
-          //   if (from.aspectRatio > 1) {
-          //     // large media
-          //     width = to.width / 2;
-          //     height = width / from.aspectRatio;
-          //   } else {
-          //     // long media
-          //     height = to.height / 2;
-          //     width = height * from.aspectRatio;
-          //   }
-          //   return Size(width, height);
-          // }
+          final inita = Offset(gx, ((snipSize.height - s.height) / 2) + gy);
 
-          // final s = scaleFor(m.size, g.sizes.snipSize);
+          print("""
+            initSize: $s
+            inita: $inita
+            scaledInitSize: ${s * 0.9}
+            """);
 
           final tw = TW2(
+              inita: inita,
               tid: randomMediaID(),
               mediaID: m.id,
               initSize: s * 0.9,
-              child: m.display(size: s, key: GlobalKey()),
-              ona: (a) {},
+              child: m.display(size: s * 0.9, key: GlobalKey()),
+              ona: (a, tid) => trueOffset[tid] = a,
               pressing: (tid, p, dp) {
                 pressing[tid] = p;
                 if (!p) {
@@ -439,8 +407,8 @@ class _SnipCameraState extends State<SnipCamera>
   Offset get snipo => Offset(snipSize.width, snipSize.height);
   Offset get centerSnip => snipo / 2.0;
 
-  Size? _scaledCamSize;
-  Size get scaledCamSize => _scaledCamSize ??= _camSize / k;
+  // Size? _scaledCamSize;
+  // Size get scaledCamSize => _scaledCamSize ??= _camSize / k;
 
   double? k_;
   double get k {
@@ -512,12 +480,11 @@ class _SnipCameraState extends State<SnipCamera>
           ),
           ...sticks.reversed,
           ...sticks.map((e) {
-            final (o, r, d) = positions[e.tid]!;
-            final to = o + centerSnip;
+            final o = trueOffset[e.tid] ?? e.inita;
             return Positioned(
-                left: to.dx,
-                top: to.dy,
-                child: Container(color: Colors.red, height: 5, width: 5));
+                left: o.dx,
+                top: o.dy,
+                child: Container(color: Colors.red, height: 10, width: 10));
           }),
           hasInput
               ? input.snipInput2((p0) => setState(() => so = p0))
@@ -533,30 +500,30 @@ class _SnipCameraState extends State<SnipCamera>
     );
   }
 
-  Size get ps_ => _blank ? snipSize : scaledCamSize;
+  // Size get ps_ => _blank ? snipSize : scaledCamSize;
+  Size get start => _blank ? snipSize : _camSize;
   (Size, List<SnipStick>) relativeGs() {
-    final ps = ps_;
+    // final ps = ps_;
+    final s_ = applyBoxFit(BoxFit.contain, start, snipSize).destination;
+    final (k, d, s) = kds(s_, snipSize);
+    print("s from snip $s");
     return (
-      ps,
+      s,
       sticks.map((e) {
-        final (o, scl, rot) = positions[e.tid]!;
-        var c = o + centerSnip;
-        if (ps.width > snipSize.width) {
-          final d = (ps.width - snipSize.width) / 2;
-          c = Offset(c.dx + d, c.dy);
-        } else {
-          final d = ps.height - snipSize.height;
-          c = Offset(c.dx, c.dy + d);
-        }
-        final (pdx, pdy) = (c.dx / ps.width, c.dy / ps.height);
-        final psx = e.initSize.width / ps.width;
-        final psy = e.initSize.height / ps.height;
+        final (_, scl, rot) = positions[e.tid]!;
+        final o = trueOffset[e.tid] ?? e.inita;        
+        final relo = o + d;
+        // final relo = trueOffset[e.tid]! + d;
+
+        final pos = Offset(relo.dx / s.width, relo.dy / s.height);
+        // final psx = e.initSize.width / ps.width;
+        // final psy = e.initSize.height / ps.height;
         return SnipStick(
             mediaID: e.mediaID,
-            pos: Offset(pdx, pdy),
+            pos: pos,
             tempID_: null,
             tempTS_: null,
-            initSize: Size(psx, psy),
+            initSize: e.initSize,
             rotation: rot,
             scale: scl);
       }).toList()

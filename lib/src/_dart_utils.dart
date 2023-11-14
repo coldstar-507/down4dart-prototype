@@ -21,6 +21,26 @@ void printWrapped(String text) {
   pattern.allMatches(text).forEach((match) => print(match.group(0)));
 }
 
+(double, Offset, Size) kds(Size start, Size goal) {
+  double k;
+  Offset d;
+  Size s;
+
+  if (start.aspectRatio < goal.aspectRatio) {
+    // need to fit width
+    k = start.width / goal.width;
+    s = start / k;
+    d = Offset(0, s.height - goal.height);
+  } else {
+    // need to fit height
+    k = start.height / goal.height;
+    s = start / k;
+    d = Offset((s.width - goal.width) / 2, 0);
+  }
+  print("k=$k\nd=$d\ns=$s\n");
+  return (k, d, s);
+}
+
 const videoExtensions = ["mp4", "3gp", "webm", "mkv", "m4a", "mov"];
 const videoMimes = [
   "video/mp4",
