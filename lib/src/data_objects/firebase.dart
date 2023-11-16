@@ -211,6 +211,7 @@ class Down4Local {
     dbPath = "$appDirPath${Platform.pathSeparator}down4.db";
     db = sql.sqlite3.open(dbPath);
     db.execute("PRAGMA journal_mode=WAL;");
+    createDbIfNotExists();
     return _instance;
   }
 

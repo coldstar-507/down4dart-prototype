@@ -387,7 +387,7 @@ class SnipInput extends StatelessWidget {
 
 class SnipInput2 extends StatefulWidget {
   final MyTextEditor ed;
-  final void Function(Offset) onMove;
+  final void Function(Offset diff) onMove;
   const SnipInput2({required this.ed, required this.onMove, super.key});
 
   @override
@@ -395,6 +395,7 @@ class SnipInput2 extends StatefulWidget {
 }
 
 class _SnipInput2State extends State<SnipInput2> {
+
   Offset position = const Offset(0, 0);
   @override
   Widget build(BuildContext context) {
@@ -404,8 +405,9 @@ class _SnipInput2State extends State<SnipInput2> {
           : null,
       onVerticalDragUpdate: (d) {
         print("vertical drag my nigga\ndelta=${d.delta}");
-        position += Offset(0, d.delta.dy);
-        widget.onMove(position);
+        final delta = Offset(0, d.delta.dy);
+        position += delta;
+        widget.onMove(delta);
         setState(() {});
       },
       child: Center(

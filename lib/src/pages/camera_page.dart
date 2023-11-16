@@ -216,7 +216,7 @@ class _SnipCameraState extends State<SnipCamera>
               .destination;
           final scl = s * 0.9;
           final gx = (s.width - scl.width) / 2;
-          final gy = (s.height - scl.height) / 2;          
+          final gy = (s.height - scl.height) / 2;
 
           final inita = Offset(gx, ((snipSize.height - s.height) / 2) + gy);
 
@@ -406,30 +406,28 @@ class _SnipCameraState extends State<SnipCamera>
   Size get snipSize => g.sizes.snipSize;
   Offset get snipo => Offset(snipSize.width, snipSize.height);
   Offset get centerSnip => snipo / 2.0;
-
-  // Size? _scaledCamSize;
-  // Size get scaledCamSize => _scaledCamSize ??= _camSize / k;
-
-  double? k_;
-  double get k {
-    double calcK() {
+  Widget cameraChild() {
+    Widget readyCam() {
       final cs = applyBoxFit(BoxFit.contain, _camSize, snipSize).destination;
-      double k;
-      if (cs.height == snipSize.height) {
-        k = cs.width / snipSize.width;
-      } else {
-        k = cs.height / snipSize.height;
-      }
-      return k;
+      final (k, d, s) = kds(cs, snipSize);
+      return Transform.scale(
+        alignment: FractionalOffset.bottomCenter,
+        scale: 1 / k,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: SizedBox.fromSize(
+            size: cs,
+            child: CameraPreview(ctrl),
+          ),
+        ),
+      );
     }
 
-    return k_ ??= calcK();
-  }
-
-  Widget cameraChild() {
     if (!readyCamera) {
       return const SizedBox.shrink();
     } else {
+      final scl = _camSize.aspectRatio / snipSize.aspectRatio;
+      print("SCLL = $scl");
       return GestureDetector(
         onTap: () => print("LALALALALAL"),
         onScaleStart: (details) => _baseScale = _scale,
@@ -445,7 +443,7 @@ class _SnipCameraState extends State<SnipCamera>
             ctrl.setZoomLevel(_scale);
           }
         },
-        child: previewsContainer(child: CameraPreview(ctrl)),
+        child: previewsContainer(child: readyCam()),
       );
     }
   }
@@ -456,7 +454,16 @@ class _SnipCameraState extends State<SnipCamera>
         if (isVideo) {
           return VideoPlayer(vpc!);
         } else {
-          return Image.file(File(filePath!));
+          final im = Image.file(File(filePath!));
+          final cs = applyBoxFit(BoxFit.contain, _camSize, snipSize);
+          final (k, _, _) = kds(cs.destination, snipSize);
+          return Transform(
+            alignment: FractionalOffset.bottomCenter,
+            transform: Matrix4.identity()
+              ..scale(1 / k)
+              ..rotateY(toReverse ? math.pi : 0),
+            child: Align(alignment: Alignment.bottomCenter, child: im),
+          );
         }
       }
       return const SizedBox.shrink();
@@ -467,17 +474,10 @@ class _SnipCameraState extends State<SnipCamera>
 
   Widget previewsContainer({bool reverse = false, required Widget child}) {
     return SizedBox.fromSize(
-      size: g.sizes.snipSize,
+      size: snipSize,
       child: Stack(
-        fit: StackFit.expand,
         children: [
-          Transform(
-            transform: Matrix4.identity()
-              ..scale(1 / k)
-              ..rotateY(reverse ? math.pi : 0),
-            alignment: AlignmentDirectional.bottomCenter,
-            child: child,
-          ),
+          child,
           ...sticks.reversed,
           ...sticks.map((e) {
             final o = trueOffset[e.tid] ?? e.inita;
@@ -487,12 +487,12 @@ class _SnipCameraState extends State<SnipCamera>
                 child: Container(color: Colors.red, height: 10, width: 10));
           }),
           hasInput
-              ? input.snipInput2((p0) => setState(() => so = p0))
+              ? input.snipInput2((p0) => setState(() => so += p0))
               : const SizedBox.shrink(),
           hasInput
               ? Positioned(
-                  left: so.dx,
-                  top: so.dy,
+                  left: sio.dx,
+                  top: sio.dy,
                   child: Container(color: Colors.blue, height: 5, width: 5))
               : const SizedBox.shrink(),
         ],
@@ -502,22 +502,18 @@ class _SnipCameraState extends State<SnipCamera>
 
   // Size get ps_ => _blank ? snipSize : scaledCamSize;
   Size get start => _blank ? snipSize : _camSize;
-  (Size, List<SnipStick>) relativeGs() {
-    // final ps = ps_;
+  (Size, Offset, List<SnipStick>) relativeGs() {
     final s_ = applyBoxFit(BoxFit.contain, start, snipSize).destination;
-    final (k, d, s) = kds(s_, snipSize);
+    final (_, d, s) = kds(s_, snipSize);
     print("s from snip $s");
     return (
       s,
+      d,
       sticks.map((e) {
         final (_, scl, rot) = positions[e.tid]!;
-        final o = trueOffset[e.tid] ?? e.inita;        
+        final o = trueOffset[e.tid] ?? e.inita;
         final relo = o + d;
-        // final relo = trueOffset[e.tid]! + d;
-
         final pos = Offset(relo.dx / s.width, relo.dy / s.height);
-        // final psx = e.initSize.width / ps.width;
-        // final psy = e.initSize.height / ps.height;
         return SnipStick(
             mediaID: e.mediaID,
             pos: pos,
@@ -577,10 +573,7 @@ class _SnipCameraState extends State<SnipCamera>
   }
 
   Offset so = const Offset(0, 0);
-  late SnipInput snipInput =
-      input.snipInput(so, (p0) => setState(() => so = p0));
-
-  // late SnipInput2 snipInput = input.snipInput2((p0) => so = p0);
+  Offset get sio => Offset(0, (snipSize.height - input.ctrl.height) / 2) + so;
 
   @override
   List<Extra> extras = [];
@@ -658,35 +651,27 @@ class _SnipCameraState extends State<SnipCamera>
                               height: _camSize.height,
                               mime: mimetype!));
                     }
-                    // final stx = sticks.map((e) {
-                    //   final (ofs, scl, rot) = positions[e.tid]!;
-                    //   return SnipStick(
-                    //       mediaID: e.mediaID,
-                    //       pos: ofs,
-                    //       tempID_: null, // will be defined on upload
-                    //       tempTS_: null, // will be defined on upload
-                    //       initSize: e.initSize,
-                    //       rotation: rot,
-                    //       scale: scl);
-                    // }).toList();
-                    final (ps, stx) = relativeGs();
+
+                    final (s, d, stx) = relativeGs();
                     String? txt;
                     if (hasInput && input.value.isNotEmpty) {
-                      txt = "${so.dy / ps.height} ${input.value}";
+                      final relo = sio + d;
+                      final pos = Offset(0, relo.dy / s.height);
+                      txt = "${pos.dy / s.height} ${input.value}";
                     }
-                    for (final s in stx) {
-                      print("""
-                        stxid=${s.mediaID}
-                        initS=${s.initSize}
-                        pos  =${s.pos}
-                        rot  =${s.rotation}
-                        scl  =${s.scale}
-                        """);
-                    }
+                    // for (final st in stx) {
+                    //   print("""
+                    //     stxid=${st.mediaID}
+                    //     initS=${st.initSize}
+                    //     pos  =${st.pos}
+                    //     rot  =${st.rotation}
+                    //     scl  =${st.scale}
+                    //     """);
+                    // }
                     vpc?.dispose();
-                    print("ps=$ps\ntxt=$txt\n");
+                    print("ps=$s\ntxt=$txt\n");
                     widget.cameraCallBack(
-                        ps: ps,
+                        ps: s,
                         backgroundMedia: m?..cache(),
                         pdy: so.dy,
                         text: txt,

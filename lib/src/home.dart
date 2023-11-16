@@ -577,7 +577,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final selection = chats.selected().asNodes();
     if (selection.contains(g.self)) {
       await backgroundMedia?.writeFromCachedPath();
-      backgroundMedia?.merge();
+      backgroundMedia
+        ?..cache()
+        ..merge();
     }
 
     final sels = chats.selected().asNodes<ChatN>().toList();
@@ -1351,22 +1353,21 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final (start, goal) = (snip.snipSize, g.sizes.snipSize);
 
       final cs = applyBoxFit(BoxFit.contain, start, goal).destination;
-      final (k_, _, __) = kds(cs, goal);
-
-      final (k, d, ts) = kds(start, goal);
+      final (k_, _, _) = kds(snip.snipSize, g.sizes.snipSize);
+      final (k, d, s) = kds(cs, goal);
       final hasText = snip.txt != null;
       final jeff = snip.txt?.split(" ");
       final txt = jeff?.sublist(1).join(" ");
       final ro = double.parse(jeff?[0] ?? "0.0"); // relative offset for txt
 
       print("""
+        k =$k
+        k_=$k_
+        d =$d
+        s =$s
         cs=$cs
         ps=$start
         ss=$goal
-        ts=$ts
-        k =$k
-        d =$d
-        k_=$k_
         ro=$ro
         """);
 
@@ -1380,8 +1381,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
       Widget ct() {
         if (!hasText) return const SizedBox.shrink();
+        final ros = Offset(0, ro * s.height);
+        final pos = ros - Offset(0, d.dy);        
         return Positioned(
-          top: ro * ts.height,
+          top: pos.dy,
           // offset: Offset(0.0, ro * ts.height),
           child: SizedBox(
               width: g.sizes.w,
@@ -1397,53 +1400,52 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       }
 
       Future<Widget> backGroundMedia() async {
-        if (bm == null) return const SizedBox.shrink();
-        final rv = bm.isReversed;
-        Widget? m;
+        final rv = bm?.isReversed ?? false;
         if (bm is Down4Image) {
           final im = bm.basicImage();
-          m = im;
           if (im != null) {
             await precacheImage(im.image, context);
           }
+          return Transform(
+            alignment: FractionalOffset.bottomCenter,
+            transform: Matrix4.identity()
+              ..scale(1 / k)
+              ..rotateY(rv ? math.pi : 0),
+            child: Align(alignment: Alignment.bottomCenter, child: im),
+          );
         } else if (bm is Down4Video) {
           vpc = bm.newReadyController() ?? await bm.futureController();
           if (vpc != null) {
-            m = VideoPlayer(vpc!
+            return VideoPlayer(vpc!
               ..setLooping(true)
               ..play());
           }
         }
 
-        return Transform(
-            alignment: AlignmentDirectional.bottomCenter,
-            transform: Matrix4.identity()
-              ..scale(1 / k_)
-              ..rotateY(rv ? math.pi : 0),
-            child: m);
+        return const SizedBox.shrink();
       }
 
       Future<List<Widget>> stxs() async {
-        return await Future.wait(snip.sticks.reversed.map((s) async {
-          final m = local<Down4Media>(s.mediaID);
+        return await Future.wait(snip.sticks.reversed.map((stx) async {
+          final m = local<Down4Media>(stx.mediaID);
           if (m == null) return const SizedBox.shrink();
-          m.updateTempReferences(s.tempID!, s.tempTS!);
+          m.updateTempReferences(stx.tempID!, stx.tempTS!);
           if (m is Down4Image) {
-            final rm = m.readyImage(s.initSize);
+            final rm = m.readyImage(stx.initSize);
             if (rm == null) return const SizedBox.shrink();
             await precacheImage(rm.image, context);
           }
 
-          final spos = Offset(s.pos.dx * ts.width, s.pos.dy * ts.height);
+          final spos = Offset(stx.pos.dx * s.width, stx.pos.dy * s.height);
           final pos = spos - d;
           print("""
             ==sticks==
-            pos  =${s.pos}
+            pos  =${stx.pos}
             spos =$spos
-            size =${s.initSize}
-            scale=${s.scale}
+            size =${stx.initSize}
+            scale=${stx.scale}
             k    =$k
-            """);          
+            """);
           return Positioned(
               left: pos.dx,
               top: pos.dy,
@@ -1452,9 +1454,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                     alignment: FractionalOffset.topLeft,
                     transform: Matrix4.identity()
                       // ..translate(pw, ph)
-                      ..rotateZ(s.rotation)
-                      ..scale(s.scale * k),
-                    child: m.display(size: s.initSize)),
+                      ..rotateZ(stx.rotation)
+                      ..scale(stx.scale / k_),
+                    child: m.display(size: stx.initSize)),
                 Container(height: 5, width: 5, color: Colors.red)
               ]));
         }));
@@ -1463,7 +1465,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       return SizedBox.fromSize(
         size: goal,
         child: Stack(
-          fit: StackFit.expand,
+          // fit: StackFit.expand,
           children: [
             await backGroundMedia(),
             ...await stxs(),
