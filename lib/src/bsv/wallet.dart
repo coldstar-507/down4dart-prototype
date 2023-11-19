@@ -227,7 +227,7 @@ class Wallet with Down4Object, Jsons, Locals {
         outs: txOuts.map((e) => e.id).toList(),
         nLock: nLockTime);
 
-    return Down4Payment(Down4ID(),
+    return Down4Payment( // Down4ID(),
         txid: theTx.txID,
         txs: fullChain(theTx),
         tip: tip,
@@ -239,7 +239,7 @@ class Wallet with Down4Object, Jsons, Locals {
 
 
   Down4Payment? parsePayment3(ComposedID selfID, Down4Payment pay,
-      {VoidCallback? callblack}) {
+      {VoidCallback? callback}) {
       
     print("parsing payment: ${pay.id.value}");
     if (pay.existsLocally() || !pay.receivers.contains(selfID)) {
@@ -275,7 +275,7 @@ class Wallet with Down4Object, Jsons, Locals {
       print("\n============ VALIDATED TRANSACTION ============\n");
       return pay
         ..calculatePlusMinus(selfID: selfID)
-        ..trySettlement(cb: callblack)        
+        ..trySettlement(cb: callback)        
         ..fullMerge();
     } catch (e) {
       print("error parsing payment: $e");
@@ -420,7 +420,7 @@ class Wallet with Down4Object, Jsons, Locals {
         nLock: nLockTime,
         down4Secret: txSecret);
 
-    return Down4Payment(Down4ID(),
+    return Down4Payment( // Down4ID(),
         spender: null,
         txid: theTx.txID,
         txs: [theTx],

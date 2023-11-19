@@ -591,7 +591,6 @@ class Chat extends Down4Message
 
   @override
   String get table => "messages";
-  // Database get dbb => messagesDB;
 
   Chat copiedFor(String root) {
     final map = Map<String, String?>.from(toJson(includeLocal: false));

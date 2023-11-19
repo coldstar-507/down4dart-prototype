@@ -38,7 +38,7 @@ class PaymentPage extends StatefulWidget with Down4PageWidget {
     required this.sendPayment,
     super.key,
   });
-  
+
   @override
   State<PaymentPage> createState() => _PaymentPageState();
 }
@@ -139,7 +139,13 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   @override
   Widget build(BuildContext context) {
     final tst = g.theme.paletteNameStyle(selected: false);
-    final urltst = tst.copyWith(color: Colors.blue);
+    final smaller = tst.copyWith(fontSize: tst.fontSize! - 2);
+    final bolded = tst.copyWith(fontWeight: FontWeight.bold);
+    final urltst = smaller.copyWith(color: Colors.blue);
+
+    // final sender = payment.spender?.unik ?? "";
+    // TextPainter(text: TextSpan(text: sender, style: bolded));
+
     return Andrew(
       backFunction: widget.back,
       pages: [
@@ -147,38 +153,63 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
           title: md5(widget.payment.id.value.codeUnits).toBase58(),
           stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
           list: [
+            // Padding(
+            //   padding: const EdgeInsets.all(40),
+            //   child: Column(
+            //       crossAxisAlignment: CrossAxisAlignment.start,
+            //       children: [
+            //         Text(note,
+            //             style: tst,
+            //             maxLines: 10,
+            //             overflow: TextOverflow.ellipsis),
+            //         const SizedBox(height: 20),
+            //         Row(
+            //           children: [
+            //             Text("TXID: ", style: tst),
+            //             Expanded(
+            //               child: GestureDetector(
+            //                 onTap: () => launchUrl(
+            //                   Uri.parse(
+            //                     "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}",
+            //                   ),
+            //                 ),
+            //                 child: Text(
+            //                   widget.payment.txid.asHex,
+            //                   maxLines: 1,
+            //                   style: urltst,
+            //                   overflow: TextOverflow.ellipsis,
+            //                 ),
+            //               ),
+            //             ),
+            //           ],
+            //         ),
+            //         Row(children: [
+            //           Text("Confirmations: ", style: tst),
+            //           Text(widget.payment.confirmationsFmt,
+            //               style: tst.copyWith(color: widget.payment.color))
+            //         ]),
+            //       ]),
+            // ),
             Padding(
               padding: const EdgeInsets.all(40),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(note, style: tst, maxLines: 10, overflow: TextOverflow.ellipsis),
+                    Text(payment.spender?.unik ?? "", style: bolded),
+                    Text(payment.textNote, style: smaller),
                     const SizedBox(height: 20),
-                       Row(
-                      children: [
-                        Text("TXID: ", style: tst),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => launchUrl(
-                              Uri.parse(
-                                "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}",
-                              ),
-                            ),
-                            child: Text(
-                              widget.payment.txid.asHex,
-                              maxLines: 1,
-                              style: urltst,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(children: [
-                      Text("Confirmations: ", style: tst),
-                      Text(widget.payment.confirmationsFmt,
-                          style: tst.copyWith(color: widget.payment.color))
-                    ]),
+                    Text("Transaction ID", style: bolded),
+                    GestureDetector(
+                        onTap: () => launchUrl(Uri.parse(
+                            "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}")),
+                        child: Text(widget.payment.txid.asHex,
+                            maxLines: 1,
+                            style: urltst,
+                            overflow: TextOverflow.ellipsis)),
+                    const SizedBox(height: 20),
+                    Text("Confirmations", style: bolded),
+                    Text(widget.payment.confirmationsFmt,
+                        style: smaller.copyWith(color: widget.payment.color)),
                   ]),
             ),
           ],
@@ -204,7 +235,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
 }
 
 class MoneyPage extends StatefulWidget with Down4PageWidget {
-  
   @override
   String get id => "money";
   final List<Palette>? initPalettes;
@@ -637,8 +667,11 @@ class _MoneyPageState extends State<MoneyPage>
         changeConsole("base");
       });
 
-  ConsoleButton get confirmPaymentButton =>
-      ConsoleButton(name: "CONFIRM", onPress: confirmPayment);
+  ConsoleButton get confirmPaymentButton => ConsoleButton(
+      name: "CONFIRM",
+      isSpecial: true,
+      onPress: () {},
+      onLongPress: confirmPayment);
 
   ConsoleButton get withTipButton =>
       ConsoleButton(name: "W/TIP", onPress: () => changeConsole("tip"));
@@ -690,97 +723,69 @@ class _MoneyPageState extends State<MoneyPage>
   ConsoleButton get backButton =>
       ConsoleButton(name: "BACK", onPress: () => changeConsole("base"));
 
-  (Column, double?) doublerWidget(List<(String name, String format)> ins) {
-    Widget doubler(String name, String format) {
+  (Widget, double?) doublerWidget(List<(String name, String format)> ins) {
+    double singleRowHeight() {
+      final tp = TextPainter(
+          textDirection: TextDirection.ltr,
+          text: TextSpan(text: "0", style: g.theme.consoleTextStyle))
+        ..layout(maxWidth: g.sizes.w);
+      return tp.height;
+    }
+
+    final tStyle = g.theme.consoleTextStyle;
+    Widget doubler2(String name, String format) {
       return Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(width: g.sizes.w * 0.05),
-          SizedBox(
-            width: g.sizes.w * 0.40,
-            child: ConsoleText(
-                text: " $name",
-                textAlign: TextAlign.start,
-                align: AlignmentDirectional.centerStart),
-          ),
-          SizedBox(
-            width: g.sizes.w * 0.50,
-            child: ConsoleText(
-                text: "$format  ",
-                textAlign: TextAlign.end,
-                align: AlignmentDirectional.centerEnd),
-          ),
-          SizedBox(width: g.sizes.w * 0.05),
+          Text(name, style: tStyle),
+          const Spacer(),
+          Text(format, style: tStyle),
         ],
       );
     }
 
-    final doublers = ins.map((e) => doubler(e.$1, e.$2));
-    final (textWidget, textWidgetHeight) = singler();
+    final doublers = ins.map((e) => doubler2(e.$1, e.$2));
 
-    return (
-      Column(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [...doublers, textWidget],
-      ),
-      (singleRowHeight() * ins.length) +
-          (1 / 4 * Console.buttonHeight) +
-          textWidgetHeight,
-    );
-  }
-
-  double singleRowHeight() {
-    final tp = TextPainter(
+    final tNoteTp = TextPainter(
         textDirection: TextDirection.ltr,
-        text: TextSpan(text: "0", style: g.theme.consoleTextStyle))
-      ..layout(maxWidth: g.sizes.w);
-    return tp.height;
-  }
-
-  (Widget, double) singler() {
-    if (textNoteInput.value.isEmpty) return (const SizedBox.shrink(), 0);
-    final tp = TextPainter(
-        textDirection: TextDirection.ltr,
-        text: TextSpan(
-            text: textNoteInput.value, style: g.theme.consoleTextStyle))
+        text: TextSpan(text: textNoteInput.value, style: tStyle))
       ..layout(maxWidth: g.sizes.w * 0.9);
 
-    final w = Row(
-      mainAxisSize: MainAxisSize.max,
-      children: [
-        SizedBox(width: g.sizes.w * 0.05),
-        SizedBox(
-          width: g.sizes.w * 0.9,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            textDirection: TextDirection.ltr,
-            children: [
-              Text(
-                  "-----------------------------------------------------------------------------------------------------------------------------------------------------------------------",
-                  maxLines: 1,
-                  overflow: TextOverflow.clip,
-                  softWrap: true,
-                  style: g.theme.consoleTextStyle),
-              Text(textNoteInput.value,
-                  maxLines: 20,
-                  softWrap: true,
-                  style: g.theme.consoleTextStyle),
-            ],
-          ),
-        ),
-        SizedBox(width: g.sizes.w * 0.05),
-      ],
-    );
+    final hGapper = g.sizes.w * 0.05;
+    final vGapper = hGapper / golden;
+    final _gapper = vGapper / golden;
 
-    return (w, tp.height + singleRowHeight());
+    final bool hasText = textNoteInput.value.isNotEmpty;
+    final h = hasText ? (_gapper * 2) + 1 + tNoteTp.height : 0;
+
+    return (
+      Padding(
+          padding: EdgeInsets.symmetric(horizontal: hGapper, vertical: vGapper),
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...doublers,
+              hasText
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                          SizedBox(height: _gapper),
+                          Container(color: tStyle.color, height: 1),
+                          SizedBox(height: _gapper),
+                          Text(textNoteInput.value, style: tStyle),
+                        ])
+                  : const SizedBox.shrink(),
+            ],
+          )),
+      (singleRowHeight() * ins.length) + (2 * vGapper) + h
+    );
   }
 
-  (Column, double?) get importWidget {
+  (Widget, double?) get importWidget {
     return doublerWidget([("FOUND", formattedWithIcon(_importAmount))]);
   }
 
-  (Column, double?) get quantityWidget {
+  (Widget, double?) get quantityWidget {
     List<(String, String)> children() => [
           ("INPUT", formattedWithIcon(_satsInput)),
           ..._tipAmount > 0

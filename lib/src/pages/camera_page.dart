@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/data_objects/_data_utils.dart';
@@ -451,12 +450,21 @@ class _SnipCameraState extends State<SnipCamera>
   Widget previewChild() {
     Widget widg() {
       if (filePath != null) {
+        final cs_ = applyBoxFit(BoxFit.contain, _camSize, snipSize);
+        final cs = cs_.destination;
+        final (k, _, _) = kds(cs, snipSize);        
         if (isVideo) {
-          return VideoPlayer(vpc!);
+          return Transform(
+              alignment: FractionalOffset.bottomCenter,
+              transform: Matrix4.identity()
+                ..scale(1 / k)
+                ..rotateY(toReverse ? math.pi : 0),
+              child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child:
+                      SizedBox.fromSize(size: cs, child: VideoPlayer(vpc!))));
         } else {
           final im = Image.file(File(filePath!));
-          final cs = applyBoxFit(BoxFit.contain, _camSize, snipSize);
-          final (k, _, _) = kds(cs.destination, snipSize);
           return Transform(
             alignment: FractionalOffset.bottomCenter,
             transform: Matrix4.identity()
@@ -479,22 +487,22 @@ class _SnipCameraState extends State<SnipCamera>
         children: [
           child,
           ...sticks.reversed,
-          ...sticks.map((e) {
-            final o = trueOffset[e.tid] ?? e.inita;
-            return Positioned(
-                left: o.dx,
-                top: o.dy,
-                child: Container(color: Colors.red, height: 10, width: 10));
-          }),
+          // ...sticks.map((e) {
+          //   final o = trueOffset[e.tid] ?? e.inita;
+          //   return Positioned(
+          //       left: o.dx,
+          //       top: o.dy,
+          //       child: Container(color: Colors.red, height: 10, width: 10));
+          // }),
           hasInput
               ? input.snipInput2((p0) => setState(() => so += p0))
               : const SizedBox.shrink(),
-          hasInput
-              ? Positioned(
-                  left: sio.dx,
-                  top: sio.dy,
-                  child: Container(color: Colors.blue, height: 5, width: 5))
-              : const SizedBox.shrink(),
+          // hasInput
+          //     ? Positioned(
+          //         left: sio.dx,
+          //         top: sio.dy,
+          //         child: Container(color: Colors.blue, height: 5, width: 5))
+          //     : const SizedBox.shrink(),
         ],
       ),
     );
@@ -657,19 +665,10 @@ class _SnipCameraState extends State<SnipCamera>
                     if (hasInput && input.value.isNotEmpty) {
                       final relo = sio + d;
                       final pos = Offset(0, relo.dy / s.height);
-                      txt = "${pos.dy / s.height} ${input.value}";
+                      txt = "${pos.dy} ${input.value}";
                     }
-                    // for (final st in stx) {
-                    //   print("""
-                    //     stxid=${st.mediaID}
-                    //     initS=${st.initSize}
-                    //     pos  =${st.pos}
-                    //     rot  =${st.rotation}
-                    //     scl  =${st.scale}
-                    //     """);
-                    // }
+                    
                     vpc?.dispose();
-                    print("ps=$s\ntxt=$txt\n");
                     widget.cameraCallBack(
                         ps: s,
                         backgroundMedia: m?..cache(),

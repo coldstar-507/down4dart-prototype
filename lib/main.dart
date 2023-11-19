@@ -123,12 +123,10 @@ Future<void> fcmHandler(FcmSilentData silentData) async {
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
   final loc = await Down4Local().initDb();
-  final r = loc.db.select("SELECT id FROM nodes WHERE type = 'self'");
+
   final r2 =
       loc.db.select("SELECT currentPage FROM personals WHERE id = 'single'");
 
-  print("got ${r.length} self");
-  final id = ComposedID.fromString(r.single["id"])!;
   ComposedID? rtID;
   final String? currentPage = r2.single["currentPage"];
   if ((currentPage?.length ?? 0) > 5) {
@@ -136,17 +134,14 @@ Future<void> fcmHandler(FcmSilentData silentData) async {
     if (e1 == "chat") rtID = ComposedID.fromString(e2);
   }
 
-  if (currentPage != null) {
-    print("""
-      \t APP IS LIVE, WAITING 2 SECONDS TO SHOW NOTIFICATION
-      \t TO AVOID DOUBLE FETCHING OF DATA
-      """);
-    await Future.delayed(const Duration(seconds: 3));
+  if (currentPage == null) {
+    print("\tAPP NOT LIVE, SHOWING NOTIFICATION");
+    final r = loc.db.select("SELECT id FROM nodes WHERE type = 'self'");  
+    final id = ComposedID.fromString(r.single["id"])!;    
+    await showMessageNotification(data, selfID: id, currentRoot: rtID);
+  } else {
+    print("\tAPP IS LIVE, NOT DOING ANYTHING");
   }
-
-  print("should be showing notification");
-  await showMessageNotification(data, selfID: id, currentRoot: rtID);
-  print("should have shown notification");
 }
 
 Future<void> main() async {
@@ -228,5 +223,7 @@ Future<void> main() async {
   }
 
   // debugRepaintRainbowEnabled = true;
-  runApp(const MaterialApp(home: Material(child: Down4())));
+  runApp(MaterialApp(
+      theme: ThemeData(useMaterial3: false),
+      home: const Material(child: Down4())));
 }

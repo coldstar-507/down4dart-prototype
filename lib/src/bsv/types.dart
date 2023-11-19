@@ -104,7 +104,7 @@ extension on List<Down4TXIN> {
 
 class Down4Payment with Down4Object, Jsons, Locals, Temps {
   @override
-  final Down4ID id;
+  Down4ID get id => Down4ID(unik: txid.asBase64);
 
   final ComposedID? spender;
 
@@ -259,8 +259,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     return true;
   }
 
-  Down4Payment(
-    this.id, {
+  Down4Payment({
     required this.txid,
     required List<Down4TX>? txs,
     required this.spender,
@@ -424,7 +423,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     final tsString = String.fromCharCodes(tsBuf);
     final ts = int.parse(tsString, radix: 34);
 
-    return Down4Payment(Down4ID(),
+    return Down4Payment( // Down4ID(),
         spender: spender,
         txid: txs.last.txID,
         txs: txs,
@@ -512,7 +511,7 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   }
 
   factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
-    return Down4Payment(Down4ID.fromString(decodedJson["id"])!,
+    return Down4Payment( // Down4ID.fromString(decodedJson["id"])!,
         txs: null,
         plusMinus: int.tryParse(decodedJson["plusMinus"] ?? ""),
         spender: ComposedID.fromString(decodedJson["spender"]),
@@ -1020,7 +1019,8 @@ class Down4TX with Down4Object, Jsons, Locals {
       // TODO: SAME PROBLEM OF ORDER WITH TRANSACTIONS IN PAYMENTS!!
       // this doesn't specify the order! order is important dummy!!
       final q = "SELECT * FROM txins WHERE id IN (${sbuf.toString()})";
-      return Down4Local().db
+      return Down4Local()
+          .db
           .select(q)
           .map((e) {
             final jsns = Map<String, String?>.from(e);
@@ -1039,7 +1039,8 @@ class Down4TX with Down4Object, Jsons, Locals {
       final sbuf = StringBuffer();
       sbuf.writeAll(outs.map((e) => e.value.sqlReady), ",");
       final q = "SELECT * FROM txouts WHERE id IN (${sbuf.toString()})";
-      return Down4Local().db
+      return Down4Local()
+          .db
           .select(q)
           .map((e) {
             final jsns = Map<String, String?>.from(e);

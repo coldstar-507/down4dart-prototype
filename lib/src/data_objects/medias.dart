@@ -433,8 +433,17 @@ class Down4Image extends Down4Media {
 
   @override
   int get sizeInBytes {
-    final mainBytes = mainCachedFile?.readAsBytesSync();
-    final profBytes = profileFile?.readAsBytesSync();
+    Uint8List? mainBytes, profBytes;
+    try {
+      mainBytes = mainCachedFile?.readAsBytesSync();
+    } catch (_) {
+      print("error reading main bytes");
+    }
+    try {
+      profBytes = profileFile?.readAsBytesSync();
+    } catch (_) {
+      print("error reading prof bytes");
+    }
     return (mainBytes?.length ?? 0) + (profBytes?.length ?? 0);
   }
 
@@ -550,6 +559,7 @@ class Down4Image extends Down4Media {
 
   @override
   String? delete({bool stmt = false}) {
+    print("deleting media=${id.unik}");
     super.delete(stmt: stmt);
     try {
       mainFile?.delete();
@@ -557,7 +567,7 @@ class Down4Image extends Down4Media {
       print("error deleting main file");
     }
     try {
-      File(_profilePath).delete();
+      profileFile?.delete();
     } catch (_) {
       print("error deleting profile file");
     }
@@ -586,8 +596,17 @@ class Down4Video extends Down4Media {
 
   @override
   int get sizeInBytes {
-    final mainBytes = mainCachedFile?.readAsBytesSync();
-    final thumBytes = thumbnailFile?.readAsBytesSync();
+    Uint8List? mainBytes, thumBytes;
+    try {
+      mainBytes = mainCachedFile?.readAsBytesSync();
+    } catch (_) {
+      print("error reading main bytes");
+    }
+    try {
+      thumBytes = thumbnailFile?.readAsBytesSync();
+    } catch (_) {
+      print("error reading thum bytes");
+    }
     return (mainBytes?.length ?? 0) + (thumBytes?.length ?? 0);
   }
 
@@ -635,9 +654,11 @@ class Down4Video extends Down4Media {
   VideoPlayerController? newReadyController() {
     final f = mainCachedFile ?? mainFile;
     if (f != null) {
+      print("returning video player from file!");
       return VideoPlayerController.file(f);
     }
     if (_cachedUrl != null) {
+      print("returning videoplayer from cached url");
       final uri = Uri.parse(_cachedUrl!);
       return VideoPlayerController.networkUrl(uri);
     }
@@ -648,8 +669,10 @@ class Down4Video extends Down4Media {
     final url_ = await url;
     if (url_ != null) {
       final uri = Uri.parse(url_);
+      print("returning future videoplayer from network");
       return VideoPlayerController.networkUrl(uri);
     }
+    print("no videoplayer found");
     return null;
   }
 
