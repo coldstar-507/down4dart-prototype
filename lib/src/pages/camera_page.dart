@@ -408,7 +408,7 @@ class _SnipCameraState extends State<SnipCamera>
   Widget cameraChild() {
     Widget readyCam() {
       final cs = applyBoxFit(BoxFit.contain, _camSize, snipSize).destination;
-      final (k, d, s) = kds(cs, snipSize);
+      final (k, _, _) = kds(cs, snipSize);
       return Transform.scale(
         alignment: FractionalOffset.bottomCenter,
         scale: 1 / k,

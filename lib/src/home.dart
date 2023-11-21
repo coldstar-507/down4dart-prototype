@@ -58,6 +58,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   late Down4PageWidget page = const LoadingPage2();
   ViewManager get viewManager => g.vm;
 
+  // this will be used to not show toast when notification was received
+  late int _lastLiveTimestamp;
+
   Set<Down4Object> get forwardingObjects => viewManager.forwardingObjects;
   Iterable<String> get route => viewManager.route;
   ViewState get homeView => viewManager.home;
@@ -171,6 +174,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _lastLiveTimestamp = makeTimestamp();
     WidgetsBinding.instance.addObserver(this);
     final homeChats = PageState();
     final homeConns = PageState();
@@ -195,6 +199,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _lastLiveTimestamp = makeTimestamp();
       Down4Local()
           .db
           .execute("UPDATE personals SET currentPage = ?", [page.id]);
@@ -394,7 +399,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
           final viewID = "chat@${rootNode.id.value}";
           final currentlyInChat = page is ChatPage && currentView.id == viewID;
-          final dontShowToast = currentlyInChat && msg is Chat;
+          final dontShowToast = currentlyInChat &&
+              msg is Chat &&
+              msg.timestamp < _lastLiveTimestamp;
 
           if (msg is Chat) {
             final refView = viewManager.views[viewID];
@@ -406,7 +413,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
           if (page is HomePage) setPage(homePage());
           if (!dontShowToast && senderNode != null) {
-            print("showing toast");
             final firstName = senderNode.displayName.split(" ")[0];
             final isChat = msg is Chat;
             var tst = "${isChat ? 'Chat' : 'Snip'} from $firstName";
@@ -460,11 +466,13 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           print("compressed payment:\n${payment.compressed}");
           g.wallet.parsePayment3(g.self.id, payment, callback: () {
             afterPayment(payment);
-            Fluttertoast.showToast(
-                msg: "Payment received",
-                gravity: ToastGravity.TOP,
-                backgroundColor: g.theme.inputColor,
-                textColor: g.theme.inputTextStyle.color);
+            if (payment.timestamp < _lastLiveTimestamp) {
+              Fluttertoast.showToast(
+                  msg: "Payment received",
+                  gravity: ToastGravity.TOP,
+                  backgroundColor: g.theme.inputColor,
+                  textColor: g.theme.inputTextStyle.color);
+            }
           });
 
           break;
@@ -551,11 +559,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         .map((e) => e.members)
         .expand((element) => element)
         .toSet();
-
     final forwardables = ps.whereNodeIs<BranchN>().asIDs();
-
     final all = forwardables.followedBy(idsInGroups).toSet();
-
     return all.map((id) => _chats[id]).whereType<Palette>().toList();
   }
 
@@ -1342,170 +1347,170 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     setPage(SnipViewPage2(node: node, snip: snip, back: back_, next: next_));
   }
 
-  Future<void> viewSnips(ChatN node, [List<Down4ID>? l]) async {
-    // snip view can calls it self, so we do this for the universal back func
-    if (viewManager.route.last != "snipView") {
-      viewManager.push(ViewState(id: "snipView", pages: []));
-    }
+  // Future<void> viewSnips(ChatN node, [List<Down4ID>? l]) async {
+  //   // snip view can calls it self, so we do this for the universal back func
+  //   if (viewManager.route.last != "snipView") {
+  //     viewManager.push(ViewState(id: "snipView", pages: []));
+  //   }
 
-    final unreadSnips = l ?? node.unreadSnipIDs().toList();
-    VideoPlayerController? vpc;
+  //   final unreadSnips = l ?? node.unreadSnipIDs().toList();
+  //   VideoPlayerController? vpc;
 
-    void back_() {
-      vpc?.dispose();
-      writePalette(node, _chats, bGen, rfHome, home: true);
-      return back();
-    }
+  //   void back_() {
+  //     vpc?.dispose();
+  //     writePalette(node, _chats, bGen, rfHome, home: true);
+  //     return back();
+  //   }
 
-    void next_() async {
-      vpc?.dispose();
-      final sl = unreadSnips.sublist(1);
-      if (sl.isEmpty) {
-        return back_();
-      } else {
-        return viewSnips(node, sl);
-      }
-    }
+  //   void next_() async {
+  //     vpc?.dispose();
+  //     final sl = unreadSnips.sublist(1);
+  //     if (sl.isEmpty) {
+  //       return back_();
+  //     } else {
+  //       return viewSnips(node, sl);
+  //     }
+  //   }
 
-    print("Unread snips=$unreadSnips");
-    if (unreadSnips.isEmpty) {
-      writePalette(node, _chats, bGen, rfHome, home: true);
-      return setPage(homePage());
-    }
+  //   print("Unread snips=$unreadSnips");
+  //   if (unreadSnips.isEmpty) {
+  //     writePalette(node, _chats, bGen, rfHome, home: true);
+  //     return setPage(homePage());
+  //   }
 
-    final snip = await global<Snip>(unreadSnips.first, doCache: false);
-    snip!.markRead();
+  //   final snip = await global<Snip>(unreadSnips.first, doCache: false);
+  //   snip!.markRead();
 
-    final bm = await global<Down4Media>(snip.mediaID,
-        doCache: false, doFetch: true, tempID: snip.tempMediaID);
+  //   final bm = await global<Down4Media>(snip.mediaID,
+  //       doCache: false, doFetch: true, tempID: snip.tempMediaID);
 
-    if (snip.tempMediaID != null && snip.tempMediaTS != null) {
-      bm?.updateTempReferences(snip.tempMediaID!, snip.tempMediaTS!);
-    }
+  //   if (snip.tempMediaID != null && snip.tempMediaTS != null) {
+  //     bm?.updateTempReferences(snip.tempMediaID!, snip.tempMediaTS!);
+  //   }
 
-    await globall<Down4Media>(snip.sticks.map((e) => e.mediaID),
-        doFetch: true,
-        doMergeIfFetch: true,
-        tempIDs: snip.sticks.map((e) => e.tempID));
+  //   await globall<Down4Media>(snip.sticks.map((e) => e.mediaID),
+  //       doFetch: true,
+  //       doMergeIfFetch: true,
+  //       tempIDs: snip.sticks.map((e) => e.tempID));
 
-    Future<Widget> makeSnip2() async {
-      final (start, goal) = (snip.snipSize, g.sizes.snipSize);
+  //   Future<Widget> makeSnip2() async {
+  //     final (start, goal) = (snip.snipSize, g.sizes.snipSize);
 
-      final cs = applyBoxFit(BoxFit.contain, start, goal).destination;
-      final (k_, _, _) = kds(snip.snipSize, g.sizes.snipSize);
-      final (k, d, s) = kds(cs, goal);
-      final hasText = snip.txt != null;
-      final jeff = snip.txt?.split(" ");
-      final txt = jeff?.sublist(1).join(" ");
-      final ro = double.parse(jeff?[0] ?? "0.0"); // relative offset for txt
+  //     final cs = applyBoxFit(BoxFit.contain, start, goal).destination;
+  //     final (k_, _, _) = kds(snip.snipSize, g.sizes.snipSize);
+  //     final (k, d, s) = kds(cs, goal);
+  //     final hasText = snip.txt != null;
+  //     final jeff = snip.txt?.split(" ");
+  //     final txt = jeff?.sublist(1).join(" ");
+  //     final ro = double.parse(jeff?[0] ?? "0.0"); // relative offset for txt
 
-      double boxHeight() {
-        final tp = TextPainter(
-          text: TextSpan(text: txt, style: g.theme.snipInputTextStyle),
-          textDirection: TextDirection.ltr,
-        )..layout(maxWidth: g.sizes.w);
-        return tp.height;
-      }
+  //     double boxHeight() {
+  //       final tp = TextPainter(
+  //         text: TextSpan(text: txt, style: g.theme.snipInputTextStyle),
+  //         textDirection: TextDirection.ltr,
+  //       )..layout(maxWidth: g.sizes.w);
+  //       return tp.height;
+  //     }
 
-      Widget ct() {
-        if (!hasText) return const SizedBox.shrink();
-        final ros = Offset(0, ro * s.height);
-        final pos = ros - Offset(0, d.dy);
-        return Positioned(
-            top: pos.dy,
-            child: SizedBox(
-                width: g.sizes.w,
-                height: boxHeight() + 4,
-                child: ColoredBox(
-                    color: g.theme.snipRibbon,
-                    child: Center(
-                        child: Text(txt ?? "",
-                            textAlign: TextAlign.center,
-                            style: g.theme.snipInputTextStyle)))));
-      }
+  //     Widget ct() {
+  //       if (!hasText) return const SizedBox.shrink();
+  //       final ros = Offset(0, ro * s.height);
+  //       final pos = ros - Offset(0, d.dy);
+  //       return Positioned(
+  //           top: pos.dy,
+  //           child: SizedBox(
+  //               width: g.sizes.w,
+  //               height: boxHeight() + 4,
+  //               child: ColoredBox(
+  //                   color: g.theme.snipRibbon,
+  //                   child: Center(
+  //                       child: Text(txt ?? "",
+  //                           textAlign: TextAlign.center,
+  //                           style: g.theme.snipInputTextStyle)))));
+  //     }
 
-      Future<Widget> backGroundMedia() async {
-        final rv = bm?.isReversed ?? false;
-        if (bm is Down4Image) {
-          final im = bm.basicImage();
-          if (im != null) {
-            await precacheImage(im.image, context);
-          }
-          return Transform(
-              alignment: FractionalOffset.bottomCenter,
-              transform: Matrix4.identity()
-                ..scale(1 / k)
-                ..rotateY(rv ? math.pi : 0),
-              child: Align(alignment: Alignment.bottomCenter, child: im));
-        } else if (bm is Down4Video) {
-          vpc = bm.newReadyController() ?? await bm.futureController();
-          if (vpc != null) {
-            await vpc!.initialize();
-            return Transform(
-                alignment: FractionalOffset.bottomCenter,
-                transform: Matrix4.identity()
-                  ..scale(1 / k)
-                  ..rotateY(rv ? math.pi : 0),
-                child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: SizedBox.fromSize(
-                        size: cs,
-                        child: VideoPlayer(vpc!
-                          ..setLooping(true)
-                          ..play()))));
-          }
-        }
-        return const SizedBox.shrink();
-      }
+  //     Future<Widget> backGroundMedia() async {
+  //       final rv = bm?.isReversed ?? false;
+  //       if (bm is Down4Image) {
+  //         final im = bm.basicImage();
+  //         if (im != null) {
+  //           await precacheImage(im.image, context);
+  //         }
+  //         return Transform(
+  //             alignment: FractionalOffset.bottomCenter,
+  //             transform: Matrix4.identity()
+  //               ..scale(1 / k)
+  //               ..rotateY(rv ? math.pi : 0),
+  //             child: Align(alignment: Alignment.bottomCenter, child: im));
+  //       } else if (bm is Down4Video) {
+  //         vpc = bm.newReadyController() ?? await bm.futureController();
+  //         if (vpc != null) {
+  //           await vpc!.initialize();
+  //           return Transform(
+  //               alignment: FractionalOffset.bottomCenter,
+  //               transform: Matrix4.identity()
+  //                 ..scale(1 / k)
+  //                 ..rotateY(rv ? math.pi : 0),
+  //               child: Align(
+  //                   alignment: Alignment.bottomCenter,
+  //                   child: SizedBox.fromSize(
+  //                       size: cs,
+  //                       child: VideoPlayer(vpc!
+  //                         ..setLooping(true)
+  //                         ..play()))));
+  //         }
+  //       }
+  //       return const SizedBox.shrink();
+  //     }
 
-      Future<List<Widget>> stxs() async {
-        return await Future.wait(snip.sticks.reversed.map((stx) async {
-          final m = local<Down4Media>(stx.mediaID);
-          if (m == null) return const SizedBox.shrink();
-          m.updateTempReferences(stx.tempID!, stx.tempTS!);
-          if (m is Down4Image) {
-            final rm = m.readyImage(stx.initSize);
-            if (rm == null) return const SizedBox.shrink();
-            await precacheImage(rm.image, context);
-          }
+  //     Future<List<Widget>> stxs() async {
+  //       return await Future.wait(snip.sticks.reversed.map((stx) async {
+  //         final m = local<Down4Media>(stx.mediaID);
+  //         if (m == null) return const SizedBox.shrink();
+  //         m.updateTempReferences(stx.tempID!, stx.tempTS!);
+  //         if (m is Down4Image) {
+  //           final rm = m.readyImage(stx.initSize);
+  //           if (rm == null) return const SizedBox.shrink();
+  //           await precacheImage(rm.image, context);
+  //         }
 
-          final spos = Offset(stx.pos.dx * s.width, stx.pos.dy * s.height);
-          final pos = spos - d;
+  //         final spos = Offset(stx.pos.dx * s.width, stx.pos.dy * s.height);
+  //         final pos = spos - d;
 
-          return Positioned(
-              left: pos.dx,
-              top: pos.dy,
-              child: Stack(children: [
-                Transform(
-                    alignment: FractionalOffset.topLeft,
-                    transform: Matrix4.identity()
-                      // ..translate(pw, ph)
-                      ..rotateZ(stx.rotation)
-                      ..scale(stx.scale / k_),
-                    child: m.display(size: stx.initSize)),
-                Container(height: 5, width: 5, color: Colors.red)
-              ]));
-        }));
-      }
+  //         return Positioned(
+  //             left: pos.dx,
+  //             top: pos.dy,
+  //             child: Stack(children: [
+  //               Transform(
+  //                   alignment: FractionalOffset.topLeft,
+  //                   transform: Matrix4.identity()
+  //                     // ..translate(pw, ph)
+  //                     ..rotateZ(stx.rotation)
+  //                     ..scale(stx.scale / k_),
+  //                   child: m.display(size: stx.initSize)),
+  //               Container(height: 5, width: 5, color: Colors.red)
+  //             ]));
+  //       }));
+  //     }
 
-      return SizedBox.fromSize(
-        size: goal,
-        child: Stack(
-          children: [
-            await backGroundMedia(),
-            ...await stxs(),
-            ct(),
-          ],
-        ),
-      );
-    }
+  //     return SizedBox.fromSize(
+  //       size: goal,
+  //       child: Stack(
+  //         children: [
+  //           await backGroundMedia(),
+  //           ...await stxs(),
+  //           ct(),
+  //         ],
+  //       ),
+  //     );
+  //   }
 
-    setPage(SnipViewPage(
-      displayMedia: await makeSnip2(),
-      back: back_,
-      next: next_,
-    ));
-  }
+  //   setPage(SnipViewPage(
+  //     displayMedia: await makeSnip2(),
+  //     back: back_,
+  //     next: next_,
+  //   ));
+  // }
 
   // // this page doesn't work in theory, but it works in practice
   // Future<Down4PageWidget> snipView(ChatN node, [List<Down4ID>? l]) async {
