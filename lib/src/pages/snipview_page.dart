@@ -103,8 +103,8 @@ class _SnipViewPage2 extends State<SnipViewPage2> with Pager2 {
     final (start, goal) = (snip.snipSize, g.sizes.snipSize);
 
     final cs = applyBoxFit(BoxFit.contain, start, goal).destination;
-    final (k_, _, _) = kds(snip.snipSize, g.sizes.snipSize);
-    final (k, d, s) = kds(cs, goal);
+    final (k_, _, _) = kds_(snip.snipSize, g.sizes.snipSize);
+    final (k, d, s) = kds_(cs, goal);
     final hasText = snip.txt != null;
     final jeff = snip.txt?.split(" ");
     final txt = jeff?.sublist(1).join(" ");
@@ -143,22 +143,22 @@ class _SnipViewPage2 extends State<SnipViewPage2> with Pager2 {
           await precacheImage(im.image, context);
         }
         return Transform(
-            alignment: FractionalOffset.bottomCenter,
+            alignment: FractionalOffset.center,
             transform: Matrix4.identity()
               ..scale(1 / k)
               ..rotateY(rv ? math.pi : 0),
-            child: Align(alignment: Alignment.bottomCenter, child: im));
+            child: Align(alignment: Alignment.center, child: im));
       } else if (bm is Down4Video) {
         vpc = bm.newReadyController() ?? await bm.futureController();
         if (vpc != null) {
           await vpc!.initialize();
           return Transform(
-              alignment: FractionalOffset.bottomCenter,
+              alignment: FractionalOffset.center,
               transform: Matrix4.identity()
                 ..scale(1 / k)
                 ..rotateY(rv ? math.pi : 0),
               child: Align(
-                  alignment: Alignment.bottomCenter,
+                  alignment: Alignment.center,
                   child: SizedBox.fromSize(
                       size: cs,
                       child: VideoPlayer(vpc!

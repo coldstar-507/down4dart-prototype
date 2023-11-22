@@ -108,7 +108,8 @@ class ViewManager {
 
   Set<Down4Object> forwardingObjects = {};
 
-  Modes mode = Modes.def;
+  bool appending = false;
+  // Modes mode = Modes.def;
 
   void push(ViewState view) {
     route.add(view.id);
@@ -318,6 +319,7 @@ void writePalette<T extends PaletteN>(
   List<ButtonsInfo2> Function(T n)? bGen,
   void Function()? onSel, {
   bool home = false,
+  bool hidePreview = false,
   bool? sel,
 }) {
   // isSelected will check first if it's an argument, else it will check
@@ -334,7 +336,8 @@ void writePalette<T extends PaletteN>(
   void Function()? onSelect = onSel == null || hide
       ? null
       : () {
-          writePalette(c, s, bGen, onSel, sel: !isSelected, home: home);
+          writePalette(c, s, bGen, onSel,
+              sel: !isSelected, home: home, hidePreview: hidePreview);
           onSel.call();
         };
 
@@ -343,6 +346,7 @@ void writePalette<T extends PaletteN>(
       node: c,
       selected: isSelected,
       imPress: onSelect,
+      hidePreview: hidePreview,
       show: !hide,
       bodyPress: onSelect,
       buttonsInfo2: hide ? [] : bGen?.call(c) ?? []);

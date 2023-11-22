@@ -319,7 +319,7 @@ class _ChatPageState extends State<ChatPage>
   void forward() {
     final sel = vs.allPageSelection();
     g.vm.forwardingObjects.addAll(sel);
-    g.vm.mode = Modes.forward;
+    // g.vm.mode = Modes.forward;
     widget.forward();
   }
 

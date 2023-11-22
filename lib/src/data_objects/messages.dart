@@ -575,7 +575,7 @@ class Chat extends Down4Message
   // puts a new timestamp and forwarderID as forwarder and a new ID
   Chat forwarded(ComposedID newSenderID, String newRoot) {
     return Chat(ComposedID(),
-        root: root,
+        root: newRoot,
         senderID: newSenderID,
         forwardedFromID: forwardedFromID ?? senderID,
         txt: txt,

@@ -213,7 +213,7 @@ class _SnipCameraState extends State<SnipCamera>
         (m) {
           final s = applyBoxFit(BoxFit.fitWidth, m.size, g.sizes.snipSize)
               .destination;
-          final scl = s * 0.9;
+          final scl = s * 0.8;
           final gx = (s.width - scl.width) / 2;
           final gy = (s.height - scl.height) / 2;
 
@@ -222,15 +222,15 @@ class _SnipCameraState extends State<SnipCamera>
           print("""
             initSize: $s
             inita: $inita
-            scaledInitSize: ${s * 0.9}
+            scaledInitSize: $scl
             """);
 
           final tw = TW2(
               inita: inita,
               tid: randomMediaID(),
               mediaID: m.id,
-              initSize: s * 0.9,
-              child: m.display(size: s * 0.9, key: GlobalKey()),
+              initSize: scl,
+              child: m.display(size: scl, key: GlobalKey()),
               ona: (a, tid) => trueOffset[tid] = a,
               pressing: (tid, p, dp) {
                 pressing[tid] = p;
@@ -408,12 +408,12 @@ class _SnipCameraState extends State<SnipCamera>
   Widget cameraChild() {
     Widget readyCam() {
       final cs = applyBoxFit(BoxFit.contain, _camSize, snipSize).destination;
-      final (k, _, _) = kds(cs, snipSize);
+      final (k, _, _) = kds_(cs, snipSize);
       return Transform.scale(
-        alignment: FractionalOffset.bottomCenter,
+        alignment: FractionalOffset.center,
         scale: 1 / k,
         child: Align(
-          alignment: Alignment.bottomCenter,
+          alignment: Alignment.center,
           child: SizedBox.fromSize(
             size: cs,
             child: CameraPreview(ctrl),
@@ -452,25 +452,25 @@ class _SnipCameraState extends State<SnipCamera>
       if (filePath != null) {
         final cs_ = applyBoxFit(BoxFit.contain, _camSize, snipSize);
         final cs = cs_.destination;
-        final (k, _, _) = kds(cs, snipSize);        
+        final (k, _, _) = kds_(cs, snipSize);
         if (isVideo) {
           return Transform(
-              alignment: FractionalOffset.bottomCenter,
+              alignment: FractionalOffset.center,
               transform: Matrix4.identity()
                 ..scale(1 / k)
                 ..rotateY(toReverse ? math.pi : 0),
               child: Align(
-                  alignment: Alignment.bottomCenter,
+                  alignment: Alignment.center,
                   child:
                       SizedBox.fromSize(size: cs, child: VideoPlayer(vpc!))));
         } else {
           final im = Image.file(File(filePath!));
           return Transform(
-            alignment: FractionalOffset.bottomCenter,
+            alignment: FractionalOffset.center,
             transform: Matrix4.identity()
               ..scale(1 / k)
               ..rotateY(toReverse ? math.pi : 0),
-            child: Align(alignment: Alignment.bottomCenter, child: im),
+            child: Align(alignment: Alignment.center, child: im),
           );
         }
       }
@@ -512,7 +512,7 @@ class _SnipCameraState extends State<SnipCamera>
   Size get start => _blank ? snipSize : _camSize;
   (Size, Offset, List<SnipStick>) relativeGs() {
     final s_ = applyBoxFit(BoxFit.contain, start, snipSize).destination;
-    final (_, d, s) = kds(s_, snipSize);
+    final (_, d, s) = kds_(s_, snipSize);
     print("s from snip $s");
     return (
       s,

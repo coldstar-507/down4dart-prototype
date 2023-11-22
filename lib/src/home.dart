@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/firebase.dart';
@@ -9,7 +8,6 @@ import 'package:down4/src/themes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:video_player/video_player.dart';
 
 import 'data_objects/couch.dart';
 import 'data_objects/_data_utils.dart';
@@ -134,7 +132,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   void openPreview() async => setPage(await previewPage(isPush: true));
 
   StreamSubscription? _forgroundMessageListener, _notificationListener;
-
+ 
   final Map<ComposedID, StreamSubscription> _nodeConnections = {};
 
   void homeScrollToZero() => homePageState.scroll = 0;
@@ -649,7 +647,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     return HomePage(
       formattedChats: _chats.values.formatted(),
       openPreview: openPreview,
-      forward: () => setPage(forwardPage(isPush: true)),
+      forward: () {
+        viewManager.forwardingObjects.addAll(chats.selected());
+        setPage(forwardPage(isPush: true));
+      },
       openChat: (n, f) => setPage(chatPage(n, isPush: true)),
       send: processChats,
       add: () async {
@@ -703,7 +704,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.push(ViewState(id: "preview", pages: [PageState()]));
 
       for (final n in fo().palettes().map((p) => p.node)) {
-        writePalette(n, s(), null, rf, home: false);
+        writePalette(n, s(), null, rf, home: false, hidePreview: true);
       }
 
       final fs = fo()
@@ -742,7 +743,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       viewManager.popUntilHome();
       viewManager.push(ViewState(id: "forward", pages: [PageState()]));
       for (final c in formattedHome.asNodes<ChatN>()) {
-        writePalette(c, _fState(), fbGen, rf, home: false);
+        writePalette(c, _fState(), fbGen, rf, home: true);
       }
     }
 
@@ -1098,14 +1099,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         back: back);
   }
 
-  Down4PageWidget chatPage(
-    ChatN c, {
-    bool isPush = false,
-    bool isReload = false,
-    bool rewriteMsgWithNodes = false,
-    Chat? msgRe,
-    Chat? reactingTo,
-  }) {
+  Down4PageWidget chatPage(ChatN c,
+      {bool isPush = false,
+      bool isReload = false,
+      bool rewriteMsgWithNodes = false,
+      Chat? msgRe,
+      Chat? reactingTo}) {
     String chatID() => "chat@${c.id.value}";
     ViewState chat() => viewManager.at(chatID());
 

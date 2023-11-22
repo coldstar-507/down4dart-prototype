@@ -545,7 +545,7 @@ mixin Sender2 {
 
 mixin Boost2 {
   void boost();
-  ConsoleButton get boostButton => ConsoleButton(name: "BOOST", onPress: boost);
+  static ConsoleButton get boostButton => ConsoleButton(name: "BOOST", onPress: boost);
 }
 
 mixin Append2 on Pager2, Forward2, Boost2 {
@@ -563,13 +563,13 @@ mixin Append2 on Pager2, Forward2, Boost2 {
     setTheState();
   }
 
-  ConsoleButton get cancelButton =>
+  static ConsoleButton get cancelButton =>
       ConsoleButton(name: "CANCEL", onPress: clearForwards);
 
-  ConsoleButton get appendButton =>
+   static ConsoleButton get appendButton =>
       ConsoleButton(name: "APPEND", onPress: append);
 
-  ConsoleRow get basicAppendRow => ConsoleRow(
+   static ConsoleRow get basicAppendRow => ConsoleRow(
         widths: null,
         extension: null,
         inputMaxHeight: null,

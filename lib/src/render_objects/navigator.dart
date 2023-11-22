@@ -85,7 +85,7 @@ class Andrew extends StatefulWidget {
   final Function(int)? onPageChange;
   final void Function()? backFunction, previewFunction;
   final List<Widget>? extraHeaderWidgets;
-  final ConsoleRow? staticRow;
+  // final ConsoleRow? staticRow;
   static Duration get pageSwitchAnimationDuration =>
       const Duration(milliseconds: 200);
   static Duration get pageSwitchOpacityDuration =>
@@ -94,7 +94,7 @@ class Andrew extends StatefulWidget {
   const Andrew({
     this.extraHeaderWidgets,
     this.themes,
-    this.staticRow,
+    // this.staticRow,
     this.addFriends,
     this.backFunction,
     this.previewFunction,
@@ -358,8 +358,8 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
       left: 0,
       child: AnimatedOpacity(
         duration: Console.animationDuration,
-        opacity: widget.staticRow == null ? 0 : 1,
-        child: widget.staticRow != null
+        opacity: g.vm.appending ? 1 : 0,// widget.staticRow == null ? 0 : 1,
+        child: g.vm.appending // widget.staticRow != null
             ? Console.staticRow(widget.staticRow!)
             : SizedBox(width: g.sizes.w),
       ),
