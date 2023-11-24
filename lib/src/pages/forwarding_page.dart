@@ -153,7 +153,7 @@ class _ForwadingPageState extends State<ForwardingPage>
       chts.addAll(chats);
     }
     if (chts.isNotEmpty) {
-      g.vm.mode = Modes.def;
+      // g.vm.mode = Modes.def;
       g.vm.forwardingObjects.clear();
       widget.forward(chts);
     }
@@ -172,10 +172,7 @@ class _ForwadingPageState extends State<ForwardingPage>
     final ps = _fList.toList(growable: false);
     return Andrew(
       previewFunction: widget.openPreview,
-      backFunction: () {
-        g.vm.mode = Modes.def;
-        widget.back();
-      },
+      backFunction: widget.back,
       pages: [
         Down4Page(
             staticList: true,

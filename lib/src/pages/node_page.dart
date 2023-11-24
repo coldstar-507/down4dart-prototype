@@ -58,7 +58,7 @@ class _NodePageState extends State<NodePage>
   Widget build(BuildContext context) {
     return Andrew(
       previewFunction: widget.openPreview,
-      staticRow: g.vm.mode == Modes.append ? basicAppendRow : null,
+      staticRow: basicAppendRow,
       backFunction: widget.back,
       pages: [
         Down4Page(
@@ -112,7 +112,7 @@ class _NodePageState extends State<NodePage>
   void forward() {
     final sel = g.vm.currentView.allPageSelection();
     g.vm.forwardingObjects.addAll(sel);
-    g.vm.mode = Modes.forward;
+    // g.vm.mode = Modes.forward;
     widget.forward();
   }
 }

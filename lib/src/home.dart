@@ -132,7 +132,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   void openPreview() async => setPage(await previewPage(isPush: true));
 
   StreamSubscription? _forgroundMessageListener, _notificationListener;
- 
+
   final Map<ComposedID, StreamSubscription> _nodeConnections = {};
 
   void homeScrollToZero() => homePageState.scroll = 0;
@@ -700,7 +700,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
     if (isPush) {
       // we put our self in default mode for preview
-      g.vm.mode = Modes.def;
+      // g.vm.mode = Modes.def;
       viewManager.push(ViewState(id: "preview", pages: [PageState()]));
 
       for (final n in fo().palettes().map((p) => p.node)) {
@@ -716,11 +716,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       }
     }
 
-    return PreviewPage(back: () {
-      final wasForwarding = g.vm.route.contains("forward");
-      g.vm.mode = wasForwarding ? Modes.forward : Modes.append;
-      back();
-    });
+    return PreviewPage(back: back);
   }
 
   Down4PageWidget forwardPage({bool isPush = false}) {
@@ -959,7 +955,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             chats.add(chat);
           }
 
-          g.vm.mode = Modes.def;
+          // g.vm.mode = Modes.def;
           g.vm.forwardingObjects.clear();
           processChats(chats);
         }
@@ -1114,7 +1110,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     Set<Down4ID> msgsWithVideos() => chat().refs("messages_with_videos");
     Set<Down4ID> msgsWithNodes() => chat().refs("messages_with_nodes");
 
-    bool forwarding() => viewManager.mode == Modes.forward;
+    bool forwarding() => viewManager.route.contains("forward");
 
     void opn(Down4Node n_) => setPage(nodePage(n_, isPush: true));
     void Function(Down4Node)? openNode() => forwarding() ? null : opn;
@@ -1283,15 +1279,15 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       },
       openNode: opn,
       send: (chats) {
-        processChats(chats);
-        final wasForwarding = viewManager.mode == Modes.forward;
-        final ref = viewManager.currentView.orderedChats!;
-        final or = chats.map((c) => c.id).followedBy(ref).toList();
+        final wasForwarding = viewManager.route.contains("forward");
+        final curChats = viewManager.currentView.orderedChats!;
+        final or = chats.map((c) => c.id).followedBy(curChats).toList();
         viewManager.currentView.orderedChats = or;
         // poping the forwarding page
         if (wasForwarding) viewManager.popInBetween();
         setPage(
             chatPage(c, isReload: true, rewriteMsgWithNodes: wasForwarding));
+        processChats(chats);          
       }, // TODO, will need future nodes
       back: back,
       add: () {

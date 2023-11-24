@@ -97,7 +97,7 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     return Andrew(
       previewFunction: widget.openPreview,
-      staticRow: g.vm.mode == Modes.append ? basicAppendRow : null,
+      staticRow: basicAppendRow,
       addFriends: widget.search,
       themes: widget.themes,
       pages: [
@@ -217,7 +217,7 @@ class _HomePageState extends State<HomePage>
     }
 
     if (chts.isNotEmpty) {
-      g.vm.mode = Modes.def;
+      // g.vm.mode = Modes.def;
       g.vm.forwardingObjects.clear();
       widget.send(chts);
       input.clear();
@@ -264,7 +264,7 @@ class _HomePageState extends State<HomePage>
   void forward() {
     final sel = g.vm.currentView.allPageSelection();
     g.vm.forwardingObjects.addAll(sel);
-    g.vm.mode = Modes.forward;
+    // g.vm.mode = Modes.forward;
     widget.forward();
   }
 

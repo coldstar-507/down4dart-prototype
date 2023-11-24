@@ -545,13 +545,14 @@ mixin Sender2 {
 
 mixin Boost2 {
   void boost();
-  static ConsoleButton get boostButton => ConsoleButton(name: "BOOST", onPress: boost);
+  ConsoleButton get boostButton => ConsoleButton(name: "BOOST", onPress: boost);
 }
 
 mixin Append2 on Pager2, Forward2, Boost2 {
   void clearForwards() {
     g.vm.forwardingObjects.clear();
-    g.vm.mode = Modes.def;
+    g.vm.appending = false;
+    // g.vm.mode = Modes.def;
     setTheState();
   }
 
@@ -559,17 +560,18 @@ mixin Append2 on Pager2, Forward2, Boost2 {
     turnOffExtras();
     g.vm.forwardingObjects.addAll(g.vm.currentView.allPageSelection());
     g.vm.currentView.unselectEverything();
-    g.vm.mode = Modes.append;
+    g.vm.appending = true;
+    // g.vm.mode = Modes.append;
     setTheState();
   }
 
-  static ConsoleButton get cancelButton =>
+  ConsoleButton get cancelButton =>
       ConsoleButton(name: "CANCEL", onPress: clearForwards);
 
-   static ConsoleButton get appendButton =>
+  ConsoleButton get appendButton =>
       ConsoleButton(name: "APPEND", onPress: append);
 
-   static ConsoleRow get basicAppendRow => ConsoleRow(
+  ConsoleRow get basicAppendRow => ConsoleRow(
         widths: null,
         extension: null,
         inputMaxHeight: null,

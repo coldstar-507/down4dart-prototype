@@ -61,12 +61,7 @@ class _PreviewPageState extends State<PreviewPage> {
   @override
   Widget build(BuildContext context) {
     return Andrew(
-      backFunction: () {
-        if (g.vm.forwardingObjects.isEmpty) {
-          g.vm.mode = Modes.def;
-        }
-        widget.back();
-      },
+      backFunction: widget.back,
       pages: [
         Down4Page(
           title: "Preview",

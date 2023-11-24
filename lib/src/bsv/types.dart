@@ -4,7 +4,6 @@ import 'dart:io' as io;
 
 import 'package:convert/convert.dart';
 import 'package:down4/src/bsv/wallet.dart';
-import 'package:down4/src/data_objects/couch.dart';
 import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/data_objects/nodes.dart';
 import 'package:flutter/material.dart';

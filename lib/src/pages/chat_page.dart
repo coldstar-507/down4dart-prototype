@@ -193,7 +193,7 @@ class _ChatPageState extends State<ChatPage>
     }
 
     if (chts.isNotEmpty) {
-      g.vm.mode = Modes.def;
+      // g.vm.mode = Modes.def;
       g.vm.forwardingObjects.clear();
       await doneWrite;
       widget.send(chts);
@@ -282,7 +282,7 @@ class _ChatPageState extends State<ChatPage>
           ];
 
     return Andrew(
-      staticRow: g.vm.mode == Modes.append ? basicAppendRow : null,
+      staticRow: basicAppendRow,
       previewFunction: widget.openPreview,
       backFunction: widget.back,
       pages: pages,
