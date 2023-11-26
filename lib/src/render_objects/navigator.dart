@@ -352,14 +352,20 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
       setState(() {});
     });
 
+  bool get showAppendConsole {
+    bool forwarding = g.vm.route.contains("forward");
+    bool previewing = g.vm.route.last == "preview";
+    return g.vm.appending && !forwarding && !previewing;
+  }
+
   Widget get staticConsole {
     return Positioned(
       bottom: 0,
       left: 0,
       child: AnimatedOpacity(
         duration: Console.animationDuration,
-        opacity: g.vm.appending ? 1 : 0,// widget.staticRow == null ? 0 : 1,
-        child: g.vm.appending // widget.staticRow != null
+        opacity: showAppendConsole ? 1 : 0, // widget.staticRow == null ? 0 : 1,
+        child: showAppendConsole // widget.staticRow != null
             ? Console.staticRow(widget.staticRow!)
             : SizedBox(width: g.sizes.w),
       ),
@@ -417,8 +423,8 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
                                       iterableLen: page.iterableLen,
                                       list: page.list),
                             ),
-                        page.console
-                            .rowOfPage(index: index, staticRow: g.vm.appending),
+                        page.console.rowOfPage(
+                            index: index, staticRow: showAppendConsole),
                         SizedBox(
                             height: MediaQuery.of(context).viewInsets.bottom),
                       ],
@@ -431,13 +437,12 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
         ),
       );
 
-  Future<bool> onWillPop() async {
+  Future<void> onWillPop(bool pop) async {
     if (widget.backFunction == null) {
       SystemNavigator.pop();
     } else {
       widget.backFunction!.call();
     }
-    return false;
   }
 
   Widget buildAgain() {
@@ -445,8 +450,8 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
       color: g.theme.backGroundColor,
       width: g.sizes.w,
       height: g.sizes.fullHeight,
-      child: WillPopScope(
-        onWillPop: onWillPop,
+      child: PopScope(
+        onPopInvoked: onWillPop,
         child: Stack(
           children: [
             pageBody2,

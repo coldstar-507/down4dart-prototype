@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/firebase.dart';
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/pages/preview_page.dart';
 import 'package:down4/src/themes.dart';
 
@@ -565,6 +566,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   // =========================== PAGES FUNCTIONS ======================== //
 
   Future<void> processChats(Iterable<Chat> chats) async {
+    g.vm.appending = false;
+    g.vm.forwardingObjects.clear();
+
     if (chats.isEmpty) return;
 
     for (final root in chats.map((e) => e.root)) {
@@ -645,7 +649,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
 
   Down4PageWidget homePage({String? prompt}) {
     return HomePage(
-      formattedChats: _chats.values.formatted(),
+      // formattedChats: _chats.values.formatted(),
       openPreview: openPreview,
       forward: () {
         viewManager.forwardingObjects.addAll(chats.selected());
@@ -928,35 +932,35 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ..cache()
             ..merge();
 
-          var chats = <Chat>[];
+          var chats = makeChats(media: media, text: text, targets: [hyper]);
 
-          final fmsgs = forwardingObjects
-              .chatMsgs()
-              .toList()
-              .reversed
-              .map((cm) => cm.message)
-              .map((fm) => fm.forwarded(g.self.id, hyper.root_)
-                ..cache()
-                ..merge());
+          // var chats = <Chat>[];
 
-          chats.addAll(fmsgs);
+          // final fmsgs = forwardingObjects
+          //     .chatMsgs()
+          //     .toList()
+          //     .reversed
+          //     .map((cm) => cm.message)
+          //     .map((fm) => fm.forwarded(g.self.id, hyper.root_)
+          //       ..cache()
+          //       ..merge());
 
-          if (media != null || (text ?? "").isNotEmpty) {
-            final chat = Chat(ComposedID(),
-                senderID: g.self.id,
-                root: hyper.root_,
-                txt: text,
-                mediaID: media?.id,
-                timestamp: makeTimestamp(),
-                nodes: forwardingObjects.palettes().asComposedIDs().toSet())
-              ..cache()
-              ..merge();
+          // chats.addAll(fmsgs);
 
-            chats.add(chat);
-          }
+          // if (media != null || (text ?? "").isNotEmpty) {
+          //   final chat = Chat(ComposedID(),
+          //       senderID: g.self.id,
+          //       root: hyper.root_,
+          //       txt: text,
+          //       mediaID: media?.id,
+          //       timestamp: makeTimestamp(),
+          //       nodes: forwardingObjects.palettes().asComposedIDs().toSet())
+          //     ..cache()
+          //     ..merge();
 
-          // g.vm.mode = Modes.def;
-          g.vm.forwardingObjects.clear();
+          //   chats.add(chat);
+          // }
+
           processChats(chats);
         }
 
@@ -1281,13 +1285,20 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       send: (chats) {
         final wasForwarding = viewManager.route.contains("forward");
         final curChats = viewManager.currentView.orderedChats!;
-        final or = chats.map((c) => c.id).followedBy(curChats).toList();
+        // final chatl = chats.toList();
+        // final lastChat = chatl.last;
+        // final chats_ = [...chatl.sublist(1), lastChat];
+        final chats_ = chats;
+        // final chats_ = [...t, h];
+//         final s =
+//            chats.toList().sort((a, b) => a.id.value.compareTo(b.id.value));
+        final or = chats_.map((c) => c.id).followedBy(curChats).toList();
         viewManager.currentView.orderedChats = or;
         // poping the forwarding page
         if (wasForwarding) viewManager.popInBetween();
         setPage(
             chatPage(c, isReload: true, rewriteMsgWithNodes: wasForwarding));
-        processChats(chats);          
+        processChats(chats);
       }, // TODO, will need future nodes
       back: back,
       add: () {

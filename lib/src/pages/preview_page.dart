@@ -1,3 +1,4 @@
+import 'package:down4/src/pages/_page_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:flutter/material.dart';
 
@@ -20,15 +21,23 @@ class PreviewPage extends StatefulWidget with Down4PageWidget {
   State<PreviewPage> createState() => _PreviewPageState();
 }
 
-class _PreviewPageState extends State<PreviewPage> {
+class _PreviewPageState extends State<PreviewPage> with Pager2 {
   Map<Down4ID, Down4SelectionWidget> get previewObjects =>
-    widget.vs.pages[0].state.cast();
+      widget.vs.pages[0].state.cast();
 
+  @override
+  List<Extra> extras = [];
+
+  @override
+  List<String> currentConsolesName = ["base"];
+
+  @override
   void setTheState() => setState(() {});
 
+  @override
   Console get console => Console(
         currentPageIndex: 0,
-        currentConsolesName: const ["base"],
+        currentConsolesName: currentConsolesName,
         rows: [
           {
             "base": ConsoleRow(

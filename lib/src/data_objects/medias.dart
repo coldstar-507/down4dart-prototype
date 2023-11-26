@@ -286,7 +286,7 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
 
   Future<void> writeFromCachedPath() async {
     final File? f = mainCachedFile;
-    if (f != null) {
+    if (f != null && mainFile == null) {
       if (metadata.isSquared && !metadata.isVideo) {
         print("CROPPING IMAGE BRO");
         const idealSize = 512;

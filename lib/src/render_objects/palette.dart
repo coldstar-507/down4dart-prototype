@@ -77,7 +77,7 @@ class Palette<T extends PaletteN> extends StatelessWidget
   final bool selected;
 
   @override
-  final void Function()? select;
+  final void Function(bool refresh)? select;
   final T node;
   final bool show;
   final void Function()? imPress, imLongPress, bodyPress, bodyLongPress;
@@ -103,28 +103,28 @@ class Palette<T extends PaletteN> extends StatelessWidget
   })  : _image = node.nodeImage(Size.square(fullHeight - (2 * padding))),
         super(key: key);
 
-  @override
-  Palette invertedSelection() {
-    return Palette(
-      key: GlobalKey(),
-      node: node,
-      show: show,
-      fadeAnim: fadeAnim,
-      bFadeAnim: bFadeAnim,
-      sizeAnim: sizeAnim,
-      hidePreview: hidePreview,
-      buttonsInfo2: buttonsInfo2,
-      select: select,
-      imPress: imPress,
-      bodyPress: bodyPress,
-      imLongPress: imLongPress,
-      bodyLongPress: bodyLongPress,
-      selected: !selected,
-    );
-  }
+  // @override
+  // Palette<T> invertedSelection() {
+  //   return Palette<T>(
+  //     key: GlobalKey(),
+  //     node: node,
+  //     show: show,
+  //     fadeAnim: fadeAnim,
+  //     bFadeAnim: bFadeAnim,
+  //     sizeAnim: sizeAnim,
+  //     hidePreview: hidePreview,
+  //     buttonsInfo2: buttonsInfo2,
+  //     select: select,
+  //     imPress: imPress,
+  //     bodyPress: bodyPress,
+  //     imLongPress: imLongPress,
+  //     bodyLongPress: bodyLongPress,
+  //     selected: !selected,
+  //   );
+  // }
 
-  Palette invertedShow() {
-    return Palette(
+  Palette<T> invertedShow() {
+    return Palette<T>(
       key: GlobalKey(),
       node: node,
       show: !show,

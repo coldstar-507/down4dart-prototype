@@ -89,8 +89,8 @@ class ViewManager {
   // HyperchatPage -> 'hyper'
   // SearchPage    -> 'search'
   // SnipPage      -> 'snip'
-  // ChatPage      -> 'c-{nodeID}'
-  // NodePage      -> 'n-{nodeID}'
+  // ChatPage      -> 'chat@{nodeID}'
+  // NodePage      -> 'node@{nodeID}'
   // ForwardPage   -> 'forward'
   // MoneyPage     -> 'money'
   // LoadingPage   -> 'loading'
@@ -150,25 +150,20 @@ class PageState {
   double scroll;
   // a page has a state of objects
   Map<Down4ID, Down4Object> state;
-
+  // unsafe palettes get
   Map<Down4ID, Palette<T>> pals<T extends PaletteN>() => state.cast();
-
+  // unsafe chats get
   Map<Down4ID, ChatMessage> chats() => state.cast();
 
   Iterable<Down4SelectionWidget> get pageSelection =>
       state.values.selectable().selected();
+
   PageState({double? scroll})
       : scroll = scroll ?? 0.0,
         state = {};
 }
 
 class ViewState {
-  // A view can have a single chat
-  // A chat is a List<ID> of every messages and a stream subscription that
-  // listens to changes
-  // Pair<List<Down4ID>, StreamSubscription<QueryChange<ResultSet>>>? chat;
-  // A view can be from a single node (chatPage, nodePage) both require a node
-  // final Down4Node? node;
   // Every view has an ID
   final String id;
   // A view has a least 1 page, limited to 3
@@ -178,8 +173,9 @@ class ViewState {
   // A view can have maps of special references, ex: messagesWithVideos
   Map<String, Set<Down4ID>> notableReferences;
 
-  Set<Down4ID> refs(String name) =>
-      notableReferences[name] ??= Set<Down4ID>.identity();
+  Set<Down4ID> refs(String name) {
+    return notableReferences[name] ??= Set<Down4ID>.identity();
+  }
 
   Set<Down4Widget> allPageSelection() {
     return pages.map((p) => p.pageSelection).expand((s) => s).toSet();
@@ -188,8 +184,16 @@ class ViewState {
   void unselectEverything() {
     for (final p in pages) {
       for (final e in p.state.values.selectable()) {
-        if (e.selected) p.state[e.id] = e.invertedSelection();
+        if (e.selected) e.select?.call(false);
       }
+    }
+  }
+
+  Iterable<ChatMessage> selectedChats() {
+    if (id.length > 5 && id.substring(0, 4) == "chat") {
+      return pages[0].chats().values.selected();
+    } else {
+      return [];
     }
   }
 
@@ -199,7 +203,6 @@ class ViewState {
     required this.id,
     required this.pages,
     int? ix,
-    // this.node,
     this.orderedChats,
   })  : currentIndex = ix ?? 0,
         notableReferences = {};
@@ -305,19 +308,13 @@ class Singletons {
       Icon(Icons.arrow_forward_ios_rounded, color: theme.messageArrowColor);
 }
 
-void unselectedSelectedPalettes(Map<Down4ID, Palette> state) {
-  for (final p in state.values) {
-    if (p.selected) state[p.id] = p.invertedSelection();
-  }
-}
-
 typedef BGen<T extends PaletteN> = List<ButtonsInfo2> Function(T n);
 
 void writePalette<T extends PaletteN>(
   T c,
   Map<Down4ID, Down4Widget> s,
   List<ButtonsInfo2> Function(T n)? bGen,
-  void Function()? onSel, {
+  void Function()? refresh, {
   bool home = false,
   bool hidePreview = false,
   bool? sel,
@@ -333,22 +330,24 @@ void writePalette<T extends PaletteN>(
 
   final hide = home && node is User && !node.isConnected && !node.hasMessages();
 
-  void Function()? onSelect = onSel == null || hide
-      ? null
-      : () {
-          writePalette(c, s, bGen, onSel,
-              sel: !isSelected, home: home, hidePreview: hidePreview);
-          onSel.call();
-        };
+  void Function(bool)? select;
+  if (!(refresh == null || hide)) {
+    select = (bool doRefresh) {
+      writePalette(c, s, bGen, refresh,
+          sel: !isSelected, home: home, hidePreview: hidePreview);
+      if (doRefresh) refresh.call();
+    };
+  }
 
   s[c.id] = Palette(
       key: GlobalKey(),
       node: c,
       selected: isSelected,
-      imPress: onSelect,
+      imPress: () => select?.call(true),
       hidePreview: hidePreview,
       show: !hide,
-      bodyPress: onSelect,
+      select: select,
+      bodyPress: () => select?.call(true),
       buttonsInfo2: hide ? [] : bGen?.call(c) ?? []);
 }
 
@@ -412,10 +411,10 @@ Future<ChatMessage?> getChatMessage({
       hasHeader: hasHeader,
       openNode: openNode,
       myMessage: g.self.id == msg.senderID,
-      select: () {
+      select: (refresh) {
         final ref = state[msgID] as ChatMessage;
         state[msgID] = ref.invertedSelection();
-        refreshCallback();
+        if (refresh) refreshCallback();
       });
 
   await globall<Down4Media>(msg.reactions.values.map((e) => e.mediaID));
@@ -458,10 +457,10 @@ Future<void> writePost({
       hasHeader: false,
       openNode: openNode,
       myMessage: g.self.id == msg.senderID,
-      select: () {
+      select: (refresh) {
         final ref = state[msg.id] as ChatMessage;
         state[msg.id] = ref.invertedSelection();
-        refreshCallback();
+        if (refresh) refreshCallback();
       });
 }
 

@@ -19,7 +19,6 @@ class HomePage extends StatefulWidget with Down4PageWidget {
   @override
   String get id => "home";
   final String? promptMessage;
-  // ViewState get homeState => g.vm.currentView;
 
   final void Function(String text) ping;
   final void Function(ChatN, List<Locals>) openChat; // TODO what is this?
@@ -27,10 +26,8 @@ class HomePage extends StatefulWidget with Down4PageWidget {
   final void Function() forward;
   final void Function() hyperchat, themes, openPreview;
   final void Function() group, money, search, delete, snip, add;
-  final List<Palette<ChatN>> formattedChats;
 
   const HomePage({
-    required this.formattedChats,
     required this.themes,
     required this.hyperchat,
     required this.group,
@@ -67,6 +64,7 @@ class _HomePageState extends State<HomePage>
         Boost2,
         Append2,
         Add2 {
+          
   late String placeHolder = widget.promptMessage ?? ":)";
 
   ViewState get vs => widget.vs;
@@ -78,7 +76,8 @@ class _HomePageState extends State<HomePage>
   @override
   void setTheState() => setState(() {});
 
-  List<Palette<ChatN>> get palettes => widget.formattedChats;
+  Iterable<Palette<ChatN>> get palettes => vs.pages[0].state.values.cast();
+  // List<Palette<ChatN>> get palettes => widget.formattedChats;
 
   @override
   void initState() {
@@ -105,7 +104,7 @@ class _HomePageState extends State<HomePage>
             scrollController: scroller,
             staticList: true,
             title: "Down4",
-            list: palettes,
+            list: palettes.toList().formatted(),
             console: console)
       ],
     );
@@ -189,6 +188,20 @@ class _HomePageState extends State<HomePage>
           ..merge()
           ..writeFromCachedPath());
 
+    final fnds = fo.palettes().asComposedIDs().toSet();
+    if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
+      final messages = sel.map((n) => Chat(ComposedID(),
+          root: n.root_,
+          senderID: g.self.id,
+          nodes: fnds,
+          txt: input.value,
+          timestamp: makeTimestamp(),
+          mediaID: media?.id)
+        ..cache()
+        ..merge());
+      chts.addAll(messages);
+    }        
+
     final fmsgs = fo.whereType<ChatMessage>().map((cm) => cm.message);
     if (fmsgs.isNotEmpty) {
       final fm = sel
@@ -202,22 +215,9 @@ class _HomePageState extends State<HomePage>
       chts.addAll(fm);
     }
 
-    final fnds = fo.palettes().asComposedIDs().toSet();
-    if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
-      final messages = sel.map((n) => Chat(ComposedID(),
-          root: n.root_,
-          senderID: g.self.id,
-          nodes: fnds,
-          txt: input.value,
-          timestamp: makeTimestamp(),
-          mediaID: media?.id)
-        ..cache()
-        ..merge());
-      chts.addAll(messages);
-    }
+
 
     if (chts.isNotEmpty) {
-      // g.vm.mode = Modes.def;
       g.vm.forwardingObjects.clear();
       widget.send(chts);
       input.clear();
@@ -264,7 +264,6 @@ class _HomePageState extends State<HomePage>
   void forward() {
     final sel = g.vm.currentView.allPageSelection();
     g.vm.forwardingObjects.addAll(sel);
-    // g.vm.mode = Modes.forward;
     widget.forward();
   }
 

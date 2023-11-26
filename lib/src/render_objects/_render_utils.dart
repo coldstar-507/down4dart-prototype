@@ -34,8 +34,8 @@ mixin Down4Widget on Down4Object, Widget {}
 
 mixin Down4SelectionWidget on Down4Widget {
   bool get selected;
-  void Function()? get select;
-  Down4Widget invertedSelection();
+  void Function(bool refresh)? get select;
+  // Down4Widget invertedSelection();
 }
 
 extension InvertedSize on Size {

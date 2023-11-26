@@ -205,12 +205,12 @@ class Down4Local {
 
   late sql.Database db;
   late String appDirPath, cacheDirPath, dbPath;
-  Future<Down4Local> initDb() async {
+  Future<Down4Local> initDb({bool walMode = false}) async {
     appDirPath = (await getApplicationDocumentsDirectory()).path;
     cacheDirPath = (await getApplicationCacheDirectory()).path;
     dbPath = "$appDirPath${Platform.pathSeparator}down4.db";
     db = sql.sqlite3.open(dbPath);
-    db.execute("PRAGMA journal_mode=WAL;");
+    if (walMode) db.execute("PRAGMA journal_mode=WAL;");
     createDbIfNotExists();
     return _instance;
   }

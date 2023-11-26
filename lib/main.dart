@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:sqlite3/sqlite3.dart';
 
 import 'src/login.dart';
 import 'src/globals.dart';
@@ -56,24 +57,28 @@ Future<void> showMessageNotification(
   GroupN? group;
   Down4Image? senderImage, groupImage;
 
-  print("### getting the sender");
-  sender = await global<PersonN>(sdrID, doFetch: true, doMergeIfFetch: true);
+  try {
+    print("### getting the sender");
+    sender = await global<PersonN>(sdrID, doFetch: true, doMergeIfFetch: true);
 
-  if (sender != null) {
-    print("### getting senderMedia");
-    senderImage = await global<Down4Image>(sender.mediaID,
-        doFetch: true, doMergeIfFetch: true);
-  }
-
-  if (rtID != null) {
-    final rootNode =
-        await global<ChatN>(rtID, doFetch: true, doMergeIfFetch: true);
-    if (rootNode is GroupN) {
-      group = rootNode;
-      print("### getting groupMedia");
-      groupImage = await global<Down4Image>(group.mediaID,
+    if (sender != null) {
+      print("### getting senderMedia");
+      senderImage = await global<Down4Image>(sender.mediaID,
           doFetch: true, doMergeIfFetch: true);
     }
+
+    if (rtID != null) {
+      final rootNode =
+          await global<ChatN>(rtID, doFetch: true, doMergeIfFetch: true);
+      if (rootNode is GroupN) {
+        group = rootNode;
+        print("### getting groupMedia");
+        groupImage = await global<Down4Image>(group.mediaID,
+            doFetch: true, doMergeIfFetch: true);
+      }
+    }
+  } catch (e) {
+    return print("error quering infos in showMessageNotification: $e");
   }
 
   // final senderImagePath = senderImage?.mainPath;
@@ -122,10 +127,15 @@ Future<void> fcmHandler(FcmSilentData silentData) async {
 
   print("NEW SILENT DATA BABY");
   final data = silentData.data!;
-  final loc = await Down4Local().initDb();
+  final loc = await Down4Local().initDb(walMode: true);
 
-  final r2 =
-      loc.db.select("SELECT currentPage FROM personals WHERE id = 'single'");
+  ResultSet r2;
+  try {
+    const q = "SELECT currentPage FROM personals WHERE id = 'single'";
+    r2 = loc.db.select(q);
+  } catch (e) {
+    return print("error selecting currentPage in fcmHandler: $e");
+  }
 
   ComposedID? rtID;
   final String? currentPage = r2.single["currentPage"];
@@ -134,14 +144,17 @@ Future<void> fcmHandler(FcmSilentData silentData) async {
     if (e1 == "chat") rtID = ComposedID.fromString(e2);
   }
 
-  if (currentPage == null) {
-    print("\tAPP NOT LIVE, SHOWING NOTIFICATION");
-    final r = loc.db.select("SELECT id FROM nodes WHERE type = 'self'");  
-    final id = ComposedID.fromString(r.single["id"])!;    
-    await showMessageNotification(data, selfID: id, currentRoot: rtID);
-  } else {
-    print("\tAPP IS LIVE, NOT DOING ANYTHING");
+  if (currentPage != null) return print("\tAPP IS LIVE, NOT DOING ANYTHING");
+  print("\tAPP NOT LIVE, SHOWING NOTIFICATION");
+  ComposedID selfID;
+  try {
+    final r = loc.db.select("SELECT id FROM nodes WHERE type = 'self'");
+    selfID = ComposedID.fromString(r.single["id"])!;
+  } catch (e) {
+    return print("error reading selfID in fcmHandler: $e");
   }
+
+  await showMessageNotification(data, selfID: selfID, currentRoot: rtID);
 }
 
 Future<void> main() async {
@@ -155,7 +168,7 @@ Future<void> main() async {
     print(e);
   }
 
-  await Down4Local().initDb();
+  await Down4Local().initDb(walMode: true);
 
   {
     // inits notifications settings

@@ -1,6 +1,7 @@
 // import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:down4/src/data_objects/nodes.dart';
+import 'package:down4/src/render_objects/chat_message.dart';
 // import 'package:down4/src/render_objects/navigator.dart';
 import 'package:down4/src/render_objects/palette.dart';
 import 'package:flutter_video_info/flutter_video_info.dart';
@@ -17,7 +18,6 @@ import 'package:qr_code_scanner/qr_code_scanner.dart';
 
 import '../_dart_utils.dart';
 
-import '../data_objects/couch.dart';
 import '../data_objects/_data_utils.dart';
 import '../data_objects/medias.dart';
 import '../data_objects/messages.dart';
@@ -511,17 +511,6 @@ mixin Pager2 {
   }
 
   void changeConsole(String consoleName) async {
-    // shit's just slow, need better alternative
-    // if (consoleName == "medias") {
-    //   final mediaIDs = g.savedMediasIDs[MediaType.images]!;
-    //   final l = mediaIDs.length > 40 ? 40 : mediaIDs.length;
-    //   for (int i = 0; i < l; i++) {
-    //     final m = local<Down4Image>(mediaIDs[i]);
-    //     final imProvider = m?.localImage(Size.square(Medias2.mediaCelSize));
-    //     if (imProvider != null) await precacheImage(imProvider, context!);
-    //   }
-    // }
-
     currentConsolesName[currentPageIndex] = consoleName;
     turnOffExtras();
     setTheState();
@@ -537,9 +526,54 @@ mixin Pager2 {
   Console get console;
 }
 
+List<Chat> makeChats({
+  required Down4Media? media,
+  required String? text,
+  required Iterable<ChatN> targets,
+}) {
+  var chats = <Chat>[];
+
+  final fms = g.vm.forwardingObjects
+      .whereType<ChatMessage>()
+      .map((cm) => cm.message)
+      .toList()
+      .reversed;
+
+  final fm = targets
+      .map((s) => fms
+          .map((m) => m.forwarded(g.self.id, s.root_)
+            ..cache()
+            ..merge())
+          .toList())
+      .expand((e) => e);
+
+  chats.addAll(fm);
+
+  final fPals = g.vm.forwardingObjects.palettes().asComposedIDs().toSet();
+  if (media != null || (text ?? "").isNotEmpty || fPals.isNotEmpty) {
+    final cs = targets.map((t) => Chat(ComposedID(),
+        root: t.root_,
+        txt: text,
+        mediaID: media?.id,
+        nodes: fPals,
+        replies: g.vm.currentView
+            .selectedChats()
+            .asIDs()
+            .toSet(), //  _replies.asIDs().toSet(),
+        senderID: g.self.id,
+        timestamp: makeTimestamp())
+      ..cache()
+      ..merge());
+
+    chats.addAll(cs);
+  }
+  
+
+  return chats.reversed.toList();
+}
+
 mixin Sender2 {
   void send({Down4Media? mediaInput});
-
   ConsoleButton get sendButton => ConsoleButton(name: "SEND", onPress: send);
 }
 
@@ -552,7 +586,6 @@ mixin Append2 on Pager2, Forward2, Boost2 {
   void clearForwards() {
     g.vm.forwardingObjects.clear();
     g.vm.appending = false;
-    // g.vm.mode = Modes.def;
     setTheState();
   }
 
@@ -561,7 +594,6 @@ mixin Append2 on Pager2, Forward2, Boost2 {
     g.vm.forwardingObjects.addAll(g.vm.currentView.allPageSelection());
     g.vm.currentView.unselectEverything();
     g.vm.appending = true;
-    // g.vm.mode = Modes.append;
     setTheState();
   }
 

@@ -157,45 +157,47 @@ class _ChatPageState extends State<ChatPage>
   }
 
   @override
-  Future<void> send({Down4Media? mediaInput}) async {
+  // Future<void> send({Down4Media? mediaInput}) async {
+  void send({Down4Media? mediaInput}) {
     final media = mediaInput ??
         (cameraInput
           ?..cache()
           ..merge());
-    final doneWrite = media?.writeFromCachedPath();
 
-    var chts = <Chat>[];
+    // final doneWrite = media?.writeFromCachedPath();
 
-    final fm = g.vm.forwardingObjects
-        .whereType<ChatMessage>()
-        .map((e) => e.message)
-        .map((m) => m.forwarded(g.self.id, node.root_)
-          ..cache()
-          ..merge())
-        .toList();
+    // var chts = <Chat>[];
 
-    chts.addAll(fm.reversed);
+    // final fnds = g.vm.forwardingObjects.palettes().asComposedIDs().toSet();
+    // if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
+    //   final c = Chat(ComposedID(),
+    //       root: node.root_,
+    //       txt: input.value,
+    //       mediaID: media?.id,
+    //       nodes: fnds,
+    //       replies: _messages.values.selected().asIDs().toSet(),
+    //       senderID: g.self.id,
+    //       timestamp: makeTimestamp())
+    //     ..cache()
+    //     ..merge();
 
-    final fnds = g.vm.forwardingObjects.palettes().asComposedIDs().toSet();
-    if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
-      final c = Chat(ComposedID(),
-          root: node.root_,
-          txt: input.value,
-          mediaID: media?.id,
-          nodes: fnds,
-          replies: _messages.values.selected().asIDs().toSet(),
-          senderID: g.self.id,
-          timestamp: makeTimestamp())
-        ..cache()
-        ..merge();
+    //   chts.add(c);
+    // }
 
-      chts.add(c);
-    }
+    // final fm = g.vm.forwardingObjects
+    //     .whereType<ChatMessage>()
+    //     .map((e) => e.message)
+    //     .map((m) => m.forwarded(g.self.id, node.root_)
+    //       ..cache()
+    //       ..merge())
+    //     .toList();
+
+    // chts.addAll(fm.reversed);
+
+    final chts = makeChats(media: media, text: input.value, targets: [node]);
 
     if (chts.isNotEmpty) {
-      // g.vm.mode = Modes.def;
-      g.vm.forwardingObjects.clear();
-      await doneWrite;
+      // await doneWrite;
       widget.send(chts);
       unselectSelectedMessage();
       input.clear();

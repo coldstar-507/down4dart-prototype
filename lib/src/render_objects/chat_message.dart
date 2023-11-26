@@ -64,7 +64,7 @@ class ChatMessage extends StatelessWidget
   final bool selected;
 
   @override
-  final void Function()? select;
+  final void Function(bool refresh)? select;
 
   final Chat message;
   final bool hasGap, hasHeader;
@@ -304,8 +304,7 @@ class ChatMessage extends StatelessWidget
         doFetch: true, doMergeIfFetch: true, tempID: message.tempMediaID);
     if (media == null) return null;
     if (message.tempMediaID != null) {
-      media.updateTempReferences(
-          message.tempMediaID!, message.tempMediaTS!);
+      media.updateTempReferences(message.tempMediaID!, message.tempMediaTS!);
     }
 
     mediaWidth = maxMessageWidth - (bodyBorderWidth * 2);
@@ -402,8 +401,8 @@ class ChatMessage extends StatelessWidget
     if (ri == null) return null;
     return Container(
       clipBehavior: Clip.hardEdge,
-      decoration: BoxDecoration(
-          borderRadius: BorderRadius.vertical(top: innerRadius)),
+      decoration:
+          BoxDecoration(borderRadius: BorderRadius.vertical(top: innerRadius)),
       child: Column(
         textDirection: TextDirection.ltr,
         children: ri.map((r) => reply(r)).toList(),
@@ -489,7 +488,7 @@ class ChatMessage extends StatelessWidget
     }
 
     return GestureDetector(
-      onTap: select,
+      onTap: () => select?.call(true),
       onLongPress: () => react(message),
       child: Container(
           clipBehavior: Clip.hardEdge,
@@ -512,14 +511,14 @@ class ChatMessage extends StatelessWidget
 
     Widget mediaBody({required Widget child}) {
       return GestureDetector(
-          onTap: select,
+          onTap: () => select?.call(true),
           onLongPress: () => react(message),
           child: Container(
               clipBehavior: Clip.hardEdge,
               height: mi.precalculatedMediaSize.height,
               width: mi.precalculatedMediaSize.width,
               decoration: BoxDecoration(
-                color: messageColor,
+                  color: messageColor,
                   borderRadius: BorderRadius.vertical(
                       top: innerRadius,
                       bottom: hasText || hasPalettes
@@ -540,15 +539,15 @@ class ChatMessage extends StatelessWidget
   Widget? get text {
     if (!hasText) return null;
     return GestureDetector(
-        onTap: select,
+        onTap: () => select?.call(true),
         onLongPress: () => react(message),
         child: Container(
             padding: EdgeInsets.all(textPadding),
             clipBehavior: Clip.hardEdge,
             decoration: BoxDecoration(
-                color: myMessage
-                    ? g.theme.myBubblesColor
-                    : g.theme.otherBubblesColor,
+              color: myMessage
+                  ? g.theme.myBubblesColor
+                  : g.theme.otherBubblesColor,
               borderRadius: BorderRadius.vertical(
                 top: hasMedia ? const Radius.circular(0) : innerRadius,
                 bottom: hasPalettes ? const Radius.circular(0) : innerRadius,
@@ -594,7 +593,7 @@ class ChatMessage extends StatelessWidget
   bool get hasMoreHeightForReactions => heightForReaction > widthForReactions;
 
   double get sizeForReactions => max(heightForReaction, widthForReactions);
-  
+
   double get messageWidth =>
       hasMedia ? maxMessageWidth : bubbleWidth ?? maxMessageWidth;
 
@@ -693,13 +692,13 @@ class ChatMessage extends StatelessWidget
                       : reactionsRow
                   : const SizedBox.shrink(),
               Container(
-                  constraints: BoxConstraints(maxWidth: messageWidth),
-                  decoration: BoxDecoration(
-                      borderRadius: BorderRadius.all(borderRadius),
-                      border: Border.all(
-                        width: bodyBorderWidth,
-                        color: selected
-                            ? g.theme.messageSelectionBorderColor
+                constraints: BoxConstraints(maxWidth: messageWidth),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.all(borderRadius),
+                    border: Border.all(
+                      width: bodyBorderWidth,
+                      color: selected
+                          ? g.theme.messageSelectionBorderColor
                           : Colors.transparent,
                     )),
                 child: Stack(children: [
@@ -752,6 +751,9 @@ class ChatMessage extends StatelessWidget
       return 1;
     } else if (message.isSent) {
       // else we check the sent status
+      return 1;
+    } else if (g.vm.route.last == "preview") {
+      // in preview, message opacity should always be 1
       return 1;
     } else {
       // if it's not sent yet, usually takes less than a sec, message has
