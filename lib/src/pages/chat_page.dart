@@ -166,34 +166,6 @@ class _ChatPageState extends State<ChatPage>
 
     // final doneWrite = media?.writeFromCachedPath();
 
-    // var chts = <Chat>[];
-
-    // final fnds = g.vm.forwardingObjects.palettes().asComposedIDs().toSet();
-    // if (media != null || input.value.isNotEmpty || fnds.isNotEmpty) {
-    //   final c = Chat(ComposedID(),
-    //       root: node.root_,
-    //       txt: input.value,
-    //       mediaID: media?.id,
-    //       nodes: fnds,
-    //       replies: _messages.values.selected().asIDs().toSet(),
-    //       senderID: g.self.id,
-    //       timestamp: makeTimestamp())
-    //     ..cache()
-    //     ..merge();
-
-    //   chts.add(c);
-    // }
-
-    // final fm = g.vm.forwardingObjects
-    //     .whereType<ChatMessage>()
-    //     .map((e) => e.message)
-    //     .map((m) => m.forwarded(g.self.id, node.root_)
-    //       ..cache()
-    //       ..merge())
-    //     .toList();
-
-    // chts.addAll(fm.reversed);
-
     final chts = makeChats(media: media, text: input.value, targets: [node]);
 
     if (chts.isNotEmpty) {

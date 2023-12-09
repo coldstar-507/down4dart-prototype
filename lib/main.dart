@@ -223,6 +223,7 @@ Future<void> main() async {
   // INIT THE THEME
   {
     g.loadTheme(await CurrentTheme.currentTheme);
+    await g.theme.readMapStyle();
 
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(

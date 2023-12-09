@@ -332,11 +332,17 @@ abstract class Down4Media with Down4Object, Jsons, Locals, Temps {
     }
   }
 
-  Future<void> staticDelete() async {
+  Future<bool> staticDelete() async {
     try {
       await id.staticStoreRef.delete();
-    } catch (e) {
-      print("error deleting media id=${id.value}, err=$e");
+      return true;
+    } on FirebaseException catch (e) {
+      if (e.code == "storage/object-not-found") {
+        return true;
+      } else {
+        print("error deleting mediaID=${id.value}, err=$e");
+        return false;
+      }
     }
   }
 

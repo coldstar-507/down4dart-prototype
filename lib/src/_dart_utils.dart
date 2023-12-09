@@ -217,6 +217,23 @@ extension ListExtensions<T> on List<T> {
   (T head, List<T> tail) headTail() {
     return (this[0], sublist(1));
   }
+
+  void updateWhere(T k, bool Function(T) test) {
+    for (final (i, e) in indexed) {
+      if (test(e)) this[i] = k;
+    }
+  }
+
+  T? popWhere(bool Function(T) test) {
+    T? e;
+    for (final (i, k) in List.from(this).indexed) {
+      if (test(k)) {
+        e = k;
+        removeAt(i);
+      }
+    }
+    return e;
+  }
 }
 
 extension AsUint8List on List<int> {

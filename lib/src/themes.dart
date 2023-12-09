@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'package:vector_map_tiles/vector_map_tiles.dart' as map
+    show Style, StyleReader;
 import 'data_objects/nodes.dart';
 
 /// Flutter icons Down4Icon
@@ -36,9 +37,19 @@ class Down4Icon {
 }
 
 abstract class Down4Theme {
+  String get mapStyleName;
+  map.Style? mapStyle;
+  static const apiKey = "ce6a87a0-f7fd-4e69-b2d1-203ff218076b";
+  String styleUrl({String? key}) =>
+      "https://tiles.stadiamaps.com/styles/$mapStyleName.json?api_key={${key ?? 'key'}}";
+  Future<map.Style> readMapStyle() async =>
+      mapStyle = await map.StyleReader(uri: styleUrl(), apiKey: apiKey).read();
+
   Icon down4Icon(Color color);
 
   Color get extensionBackdropColor;
+
+  Color get mapCircleArea;
 
   String get name;
   String get font;
@@ -59,16 +70,11 @@ abstract class Down4Theme {
   Color get snipArrowColor;
   Color get messageArrowColor;
   Color get noMessageArrowColor;
-  // Color get idColor;
   Color get refreshIndicatorColor;
   Color get cursorColor;
   Color buttonColor({bool isActivated = true, bool isInverted = false});
   Color get myBubblesColor;
   Color get otherBubblesColor;
-  // Color get consoleBorderColor;
-
-  // Color get bubbleTextColor;
-  // Color get bubbleTimestampTextColor;
 
   TextStyle headerTextStyle2(Color c);
 
@@ -94,9 +100,6 @@ abstract class Down4Theme {
   Color get selectedRegionColor;
   Color get inputBorderColor;
   Color get consoleBorderColor;
-
-  // Color get inputTextColor;
-  // Color get buttonTextColor;
 
   Color get qrColor;
 
@@ -131,7 +134,6 @@ abstract class Down4Theme {
 
   Map<NodesColor, Color> get nodeColors;
   Color get messageSelectionBorderColor;
-  // Color get messageSelectionOverlayColor;
   Color get messageShadowColor;
   Brightness get keyBoardTheme;
 
@@ -151,6 +153,9 @@ abstract class Down4Theme {
 }
 
 class BlackTheme extends Down4Theme {
+  @override
+  String get mapStyleName => "alidade_smooth_dark";
+
   @override
   Color get extensionBackdropColor => Colors.white10;
 
@@ -184,7 +189,7 @@ class BlackTheme extends Down4Theme {
 
   @override
   TextStyle get chatBubbleDateTextStyle => TextStyle(
-      fontFamily: font, fontSize: 12, color: Colors.black45, height: 0.8);
+      fontFamily: font, fontSize: 12, color: Colors.black38, height: 0.8);
 
   @override
   TextStyle get chatReactionCounterTextStyle => TextStyle(
@@ -213,26 +218,11 @@ class BlackTheme extends Down4Theme {
   @override
   Color get cursorColor => Colors.black;
 
-  // @override
-  // Color get bubbleTextColor => Colors.black;
-
-  // @override
-  // Color get bubbleTimestampTextColor => const Color.fromARGB(255, 73, 73, 73);
-
-  // @override
-  // Color get buttonTextColor => const Color.fromARGB(110, 255, 255, 255);
-
-  // @override
-  // Color get headerTextColor => Colors.white;
-
   @override
   Color get inputBorderColor => const Color.fromARGB(255, 0, 0, 0);
 
   @override
   Color get inputColor => const Color.fromARGB(255, 37, 37, 37);
-
-  // @override
-  // Color get inputTextColor => const Color.fromARGB(255, 161, 161, 161);
 
   @override
   Color get paletteBorderColor => const Color.fromARGB(255, 255, 255, 255);
@@ -253,9 +243,6 @@ class BlackTheme extends Down4Theme {
 
   @override
   Color get otherBubblesColor => Colors.grey.shade500;
-
-  // @override
-  // Color get inactivatedButtonColor => const Color.fromARGB(255, 73, 73, 73);
 
   @override
   Color get backGroundColor => const Color.fromARGB(255, 0, 0, 0);
@@ -285,12 +272,6 @@ class BlackTheme extends Down4Theme {
         NodesColor.safeTx: Colors.green,
       };
 
-  // @override
-  // Color get messageForwarderColor => Colors.white60;
-  //
-  // @override
-  // Color get messageSenderColor => Colors.white60;
-
   @override
   Color get messageArrowColor => const Color.fromARGB(116, 255, 241, 242);
 
@@ -302,9 +283,6 @@ class BlackTheme extends Down4Theme {
 
   @override
   Color get messageSelectionBorderColor => Colors.blue;
-
-  // @override
-  // Color get messageSelectionOverlayColor => Colors.black38;
 
   @override
   Color get messageShadowColor => Colors.transparent;
@@ -431,9 +409,15 @@ class BlackTheme extends Down4Theme {
 
   @override
   Color get selectedRegionColor => const Color.fromARGB(255, 56, 56, 56);
+
+  @override
+  Color get mapCircleArea => Colors.black45;
 }
 
 class PinkTheme extends Down4Theme {
+  @override
+  String get mapStyleName => "alidade_smooth";
+
   @override
   Color get extensionBackdropColor => inputColor;
 
@@ -491,9 +475,6 @@ class PinkTheme extends Down4Theme {
   Color get consoleBorderColor =>
       buttonColor(isActivated: true, isInverted: false);
 
-  // @override
-  // Color get consoleBorderColor => Colors.black;
-
   @override
   Color get refreshIndicatorColor => qrColor;
 
@@ -511,9 +492,6 @@ class PinkTheme extends Down4Theme {
   @override
   Color get myBubblesColor => const Color.fromARGB(255, 252, 213, 216);
 
-  // @override
-  // Color get inactivatedButtonColor => const Color.fromARGB(255, 219, 214, 214);
-
   @override
   Color get backGroundColor => _buttonColor;
 
@@ -523,18 +501,6 @@ class PinkTheme extends Down4Theme {
   @override
   Color get qrColor => const Color.fromARGB(255, 56, 3, 17);
 
-  // @override
-  // Color get bubbleTextColor => Colors.black;
-
-  // @override
-  // Color get bubbleTimestampTextColor => Colors.black26;
-
-  // @override
-  // Color get buttonTextColor => Colors.black;
-
-  // @override
-  // Color get headerTextColor => Colors.white;
-
   @override
   Color get inputBorderColor =>
       buttonColor(isActivated: true, isInverted: false);
@@ -542,12 +508,8 @@ class PinkTheme extends Down4Theme {
   @override
   Color get inputColor => paletteColor;
 
-  // @override
-  // Color get inputTextColor => Colors.black;
-
   @override
-  Color get otherBubblesColor =>
-      paletteColor; //c// onst  Color.fromARGB(255, 255, 230, 231);
+  Color get otherBubblesColor => paletteColor;
 
   @override
   Color get paletteBorderColor => Colors.black;
@@ -564,15 +526,10 @@ class PinkTheme extends Down4Theme {
         NodesColor.journal: const Color.fromARGB(255, 90, 62, 134),
         NodesColor.market: const Color.fromARGB(255, 34, 134, 64),
         NodesColor.ticket: const Color.fromARGB(255, 233, 220, 30),
-        // NodesColor.hyperchat: Color.fromARGB(255, 212, 168, 182),
         NodesColor.hyperchat: paletteTextColor,
-        // NodesColor.friend: Color.fromARGB(255, 230, 174, 193),
         NodesColor.friend: paletteTextColor,
-        // NodesColor.self: Color.fromARGB(255, 199, 118, 132),
         NodesColor.self: qrColor,
-        // NodesColor.group: Color.fromARGB(255, 175, 134, 209),
         NodesColor.group: paletteTextColor,
-        // NodesColor.nonFriend: Color.fromARGB(255, 158, 92, 114),
         NodesColor.nonFriend: Colors.black45,
         NodesColor.unsafeTx: Colors.red,
         NodesColor.mediumTx: Colors.yellow,
@@ -581,9 +538,6 @@ class PinkTheme extends Down4Theme {
 
   @override
   Color get messageSelectionBorderColor => Colors.black;
-
-  // @override
-  // Color get messageSelectionOverlayColor => Colors.transparent;
 
   @override
   Color get messageShadowColor => Colors.black38;
@@ -663,12 +617,6 @@ class PinkTheme extends Down4Theme {
   @override
   Color get _unactivatedButtonTextColor => buttonTextColor.withOpacity(0.8);
 
-  // @override
-  // Color get messageForwarderColor => qrColor;
-  //
-  // @override
-  // Color get messageSenderColor => qrColor;
-
   @override
   TextStyle get messageForwarderTextStyle =>
       TextStyle(color: qrColor, fontSize: 13, fontFamily: font);
@@ -735,4 +683,7 @@ class PinkTheme extends Down4Theme {
 
   @override
   Color get selectedRegionColor => _darkerDarkerPink;
+
+  @override
+  Color get mapCircleArea => qrColor.withOpacity(0.4);    
 }

@@ -184,7 +184,6 @@ class ChatMessage extends StatelessWidget
     );
   }
 
-  @override
   ChatMessage invertedSelection() {
     return ChatMessage(
       message: message,
@@ -239,16 +238,29 @@ class ChatMessage extends StatelessWidget
   Color get messageColor =>
       myMessage ? g.theme.myBubblesColor : g.theme.otherBubblesColor;
 
-  Down4TextBubble? get bubble => !hasText
-      ? null
-      : Down4TextBubble(
-          text: message.txt!,
-          dateText: timeString(message),
-          inheritedWidth: hasMedia ? maxTextWidth : null);
+  Down4TextBubble? get bubble {
+    if (!hasText) return null;
+    const fourDays = Duration(days: 4);
+    final dateTs = DateTime.fromMillisecondsSinceEpoch(message.timestamp);
+    final expireTs = dateTs.add(fourDays);
 
-  static double get smallestBubbleHeight =>
-      Down4TextBubble(text: " ", dateText: " ", inheritedWidth: null)
-          .calcHeight;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // the closer to expiration, the closer diff gets to 0
+    final diff = expireTs.millisecondsSinceEpoch - now;
+    final fraction = diff / fourDays.inMilliseconds;
+    print("FRACTION = $fraction");
+
+    return Down4TextBubble(
+        fraction: fraction,
+        text: message.txt!,
+        dateText: timeString(message),
+        inheritedWidth: hasMedia ? maxTextWidth : null);
+  }
+
+  static double get smallestBubbleHeight => Down4TextBubble(
+          text: " ", dateText: " ", inheritedWidth: null, fraction: null)
+      .calcHeight;
 
   double get bodyHeight {
     final double bubbleHeight = bubble?.calcHeight ?? 0.0;

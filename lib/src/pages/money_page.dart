@@ -49,6 +49,12 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
   var qrs = <Widget Function(int)>[];
   var qrs2 = <Widget>[];
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   widget.payment.compressed;
+  // }
+
   List<String>? _paymentAsList;
   List<String> get paymentAsList {
     return _paymentAsList ??= payment.asQrData;
@@ -142,10 +148,6 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
     final smaller = tst.copyWith(fontSize: tst.fontSize! - 2);
     final bolded = tst.copyWith(fontWeight: FontWeight.bold);
     final urltst = smaller.copyWith(color: Colors.blue);
-
-    // final sender = payment.spender?.unik ?? "";
-    // TextPainter(text: TextSpan(text: sender, style: bolded));
-
     return Andrew(
       backFunction: widget.back,
       pages: [
@@ -153,50 +155,14 @@ class _PaymentPageState extends State<PaymentPage> with Pager2 {
           title: md5(widget.payment.id.value.codeUnits).toBase58(),
           stackWidgets: qrs.map((e) => e(listIndex)).toList(growable: false),
           list: [
-            // Padding(
-            //   padding: const EdgeInsets.all(40),
-            //   child: Column(
-            //       crossAxisAlignment: CrossAxisAlignment.start,
-            //       children: [
-            //         Text(note,
-            //             style: tst,
-            //             maxLines: 10,
-            //             overflow: TextOverflow.ellipsis),
-            //         const SizedBox(height: 20),
-            //         Row(
-            //           children: [
-            //             Text("TXID: ", style: tst),
-            //             Expanded(
-            //               child: GestureDetector(
-            //                 onTap: () => launchUrl(
-            //                   Uri.parse(
-            //                     "https://test.whatsonchain.com/tx/${widget.payment.txid.asHex}",
-            //                   ),
-            //                 ),
-            //                 child: Text(
-            //                   widget.payment.txid.asHex,
-            //                   maxLines: 1,
-            //                   style: urltst,
-            //                   overflow: TextOverflow.ellipsis,
-            //                 ),
-            //               ),
-            //             ),
-            //           ],
-            //         ),
-            //         Row(children: [
-            //           Text("Confirmations: ", style: tst),
-            //           Text(widget.payment.confirmationsFmt,
-            //               style: tst.copyWith(color: widget.payment.color))
-            //         ]),
-            //       ]),
-            // ),
             Padding(
               padding: const EdgeInsets.all(40),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(payment.spender?.unik ?? "", style: bolded),
-                    Text(payment.textNote, style: smaller),
+                    Text(payment.textNote,
+                        style: smaller, maxLines: 10, softWrap: true),
                     const SizedBox(height: 20),
                     Text("Transaction ID", style: bolded),
                     GestureDetector(

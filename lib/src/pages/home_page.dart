@@ -20,6 +20,7 @@ class HomePage extends StatefulWidget with Down4PageWidget {
   String get id => "home";
   final String? promptMessage;
 
+  final List<(void Function(), String)> drawerOptions;
   final void Function(String text) ping;
   final void Function(ChatN, List<Locals>) openChat; // TODO what is this?
   final void Function(Iterable<Chat>) send;
@@ -28,6 +29,7 @@ class HomePage extends StatefulWidget with Down4PageWidget {
   final void Function() group, money, search, delete, snip, add;
 
   const HomePage({
+    required this.drawerOptions,
     required this.themes,
     required this.hyperchat,
     required this.group,
@@ -64,7 +66,6 @@ class _HomePageState extends State<HomePage>
         Boost2,
         Append2,
         Add2 {
-          
   late String placeHolder = widget.promptMessage ?? ":)";
 
   ViewState get vs => widget.vs;
@@ -95,6 +96,7 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     return Andrew(
+      drawerOptions: widget.drawerOptions,
       previewFunction: widget.openPreview,
       staticRow: basicAppendRow,
       addFriends: widget.search,
@@ -200,7 +202,7 @@ class _HomePageState extends State<HomePage>
         ..cache()
         ..merge());
       chts.addAll(messages);
-    }        
+    }
 
     final fmsgs = fo.whereType<ChatMessage>().map((cm) => cm.message);
     if (fmsgs.isNotEmpty) {
@@ -214,8 +216,6 @@ class _HomePageState extends State<HomePage>
           .expand((e) => e);
       chts.addAll(fm);
     }
-
-
 
     if (chts.isNotEmpty) {
       g.vm.forwardingObjects.clear();

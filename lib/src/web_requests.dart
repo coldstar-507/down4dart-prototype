@@ -11,38 +11,6 @@ import 'data_objects/medias.dart';
 import 'data_objects/messages.dart';
 import 'data_objects/nodes.dart';
 
-// Future<bool> usernameIsValid(String username) async {
-//   if (username.length < 3) {
-//     return false;
-//   }
-//   if (username.length > 15) {
-//     return false;
-//   }
-//   final uri = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/IsValidUsername",
-//   );
-//   final res = await http.post(uri, body: username);
-//   return res.statusCode == 200;
-// }
-
-// Future<String?> generateMnemonic() async {
-//   final uri = Uri.parse(
-//       "https://us-east1-down4-26ee1.cloudfunctions.net/GenerateMnemonic");
-//   final res = await http.post(uri);
-//   if (res.statusCode == 200) {
-//     return res.body;
-//   }
-//   return null;
-// }
-
-// Future<bool> initUser(String encodedJson) async {
-//   final uri = Uri.parse(
-//     "https://us-east1-down4-26ee1.cloudfunctions.net/InitUser",
-//   );
-//   final res = await http.post(uri, body: encodedJson);
-//   return res.statusCode == 200;
-// }
-
 Future<Pair<Uint8List, Pair<String, String>>?> getHyperchat(
   List<String> pairs,
 ) async {
@@ -153,12 +121,7 @@ Future<int> refreshTokenRequest(String newToken) async {
   return res.statusCode;
 }
 
-Future<List<Chat>?> getPosts(List<String> ids) async {
-  // TODO: getPosts
-  return null;
-}
-
-Future<Iterable<PersonN>?> getUsers(Iterable<String> uniques) async {
+Future<List<PersonN>?> getUsers(Iterable<String> uniques) async {
   const url = "https://us-central1-down4-26ee1.cloudfunctions.net/GetNodes";
   final response = await http.post(Uri.parse(url), body: uniques.join(" "));
   if (response.statusCode != 200) return null;

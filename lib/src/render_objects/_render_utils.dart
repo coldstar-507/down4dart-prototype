@@ -35,11 +35,60 @@ mixin Down4Widget on Down4Object, Widget {}
 mixin Down4SelectionWidget on Down4Widget {
   bool get selected;
   void Function(bool refresh)? get select;
-  // Down4Widget invertedSelection();
 }
 
 extension InvertedSize on Size {
   Size get inverted => Size(height, width);
+}
+
+class FractionalCircleWidget extends StatelessWidget {
+  final double fraction;
+  final Size size;
+
+  const FractionalCircleWidget({
+    Key? key,
+    required this.fraction,
+    required this.size,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: size,
+      painter: FractionalCirclePainter(fraction: fraction),
+    );
+  }
+}
+
+class FractionalCirclePainter extends CustomPainter {
+  final double fraction;
+
+  FractionalCirclePainter({required this.fraction});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.fill;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    const startAngle = -math.pi / 2; // Start angle at 12 o'clock position
+    final sweepAngle = fraction * 2 * math.pi; // Sweep based on the fraction
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      true,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
+  }
 }
 
 class ImageRendererWidget extends SingleChildRenderObjectWidget {
@@ -202,18 +251,39 @@ class Down4TextPainter extends CustomPainter {
 
 class Down4TextBubblePainter extends CustomPainter {
   final TextPainter textPainter, datePainter;
+  final double? fraction;
   final Offset dateOffset;
 
   const Down4TextBubblePainter({
     required this.textPainter,
     required this.datePainter,
     required this.dateOffset,
+    required this.fraction,
   });
+
+  Size get pieSize => Size.square(datePainter.height);
 
   @override
   void paint(Canvas canvas, Size size) {
     textPainter.paint(canvas, const Offset(0, 0));
-    datePainter.paint(canvas, dateOffset);
+    datePainter.paint(canvas, dateOffset - const Offset(7, 0));
+
+    final paint = Paint()
+      ..color = g.theme.chatBubbleDateTextStyle.color!
+      ..style = PaintingStyle.fill;
+
+    // final center = Offset(size.width / 2, size.height / 2);
+    if (fraction != null) {
+      final ps = pieSize;
+      final radius = ps.width / 2;
+      const startAngle = -math.pi / 2; // Start angle at 12 o'clock position
+      final sweepAngle = fraction! * 2 * math.pi; // Sweep based on the fraction
+      final pieOffset = dateOffset + Offset(datePainter.width, 0);
+      final center = Offset(pieOffset.dx, pieOffset.dy + radius);
+      final arcRect = Rect.fromCircle(center: center, radius: radius - 1);
+      final arcRect_ = Rect.fromCircle(center: center, radius: radius - 1);      
+      canvas.drawArc(arcRect, startAngle, sweepAngle, true, paint);
+    }
   }
 
   @override
@@ -225,6 +295,7 @@ class Down4TextBubblePainter extends CustomPainter {
 
 class Down4TextBubble extends StatelessWidget {
   final String text, dateText;
+  final double? fraction;
   final double? inheritedWidth;
   late final TextPainter textPainter, datePainter;
   late final double calcWidth, calcHeight;
@@ -234,6 +305,7 @@ class Down4TextBubble extends StatelessWidget {
   Down4TextBubble({
     required this.text,
     required this.dateText,
+    required this.fraction,
     this.inheritedWidth,
     Key? key,
   }) : super(key: key) {
@@ -275,7 +347,8 @@ class Down4TextBubble extends StatelessWidget {
             painter: Down4TextBubblePainter(
                 textPainter: textPainter,
                 datePainter: datePainter,
-                dateOffset: dateOffset),
+                dateOffset: dateOffset,
+                fraction: fraction),
             isComplex: true,
             size: Size(inheritedWidth ?? calcWidth, calcHeight)));
   }
@@ -1107,22 +1180,13 @@ Future<void> cropAndSaveToSquare(
   print(
       "\n====================\nCROP AND SAVE TO SQUARE\n====================\n");
   if (ogImage == null) return;
-  
+
   final xf = await exif.readExifFromFile(from);
   final ori = xf["Image Orientation"]?.values.firstAsInt() ?? 1;
   print("PICTURE ORIENTATION = $ori");
-  // for (final x in xf.entries) {
-  //   print("""
-  //     key=${x.key}
-  //     tag=${x.value.tag}
-  //     tgt=${x.value.tagType}
-  //     vls=${x.value.values.toList()}
-  //     prt=${x.value.printable}
-  //     """);
-  // }
   final minSize = math.min(ogImage.height, ogImage.width);
   final resize = size > minSize ? minSize : size;
-  final cropRz = img.copyResizeCropSquare(ogImage, resize);
+  final cropRz = img.copyResizeCropSquare(ogImage, size: resize);
 
   img.Image res;
   switch (ori) {
@@ -1139,23 +1203,23 @@ Future<void> cropAndSaveToSquare(
       print("flipped");
       break;
     case 4:
-      res = img.flip(cropRz, img.Flip.both);
+      res = img.flip(cropRz, direction: img.FlipDirection.both);
       print("flipped mirrored");
       break;
     case 5:
-      res = img.flipHorizontal(img.copyRotate(cropRz, 90));
+      res = img.flipHorizontal(img.copyRotate(cropRz, angle: 90));
       print("90-CW mirrored");
       break;
     case 6:
-      res = img.copyRotate(cropRz, 90);
+      res = img.copyRotate(cropRz, angle: 90);
       print("90-CW");
       break;
     case 7:
-      res = img.flipHorizontal(img.copyRotate(cropRz, 270));
+      res = img.flipHorizontal(img.copyRotate(cropRz, angle: 270));
       print("90 mirrored");
       break;
     case 8:
-      res = img.copyRotate(cropRz, 270);
+      res = img.copyRotate(cropRz, angle: 270);
       print("90");
       break;
     default:
@@ -1200,7 +1264,6 @@ Future<img.Image> applyCircularMask(img.Image inputImage, int radius) async {
   }
   return inputImage;
 }
-
 
 Size calculateSnipFit(Size source, Size target) {
   Size sourceSize, destinationSize;

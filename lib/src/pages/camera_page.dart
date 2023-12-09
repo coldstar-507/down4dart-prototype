@@ -198,12 +198,6 @@ class _SnipCameraState extends State<SnipCamera>
   Map<String, bool> pressing = {};
   Map<String, (Offset, double, double)> positions = {};
   Map<String, Offset> trueOffset = {};
-  List<(ComposedID, Offset, Size, double, double)> get sticksInfo {
-    return sticks.map((e) {
-      final (ofs, scl, rot) = positions[e.tid]!;
-      return (e.mediaID, ofs, e.initSize, scl, rot);
-    }).toList();
-  }
 
   @override
   List<(String, void Function(Down4Media))> get mediasMode {
@@ -298,6 +292,7 @@ class _SnipCameraState extends State<SnipCamera>
       return;
     }
     await ctrl.initialize();
+    ctrl.setZoomLevel(_scale);    
     _ar = ctrl.value.aspectRatio;
     _camSize = ctrl.value.previewSize!.inverted;
     maxZoom = await ctrl.getMaxZoomLevel();
@@ -314,11 +309,9 @@ class _SnipCameraState extends State<SnipCamera>
 
   bool get readyCamera => ctrl.value.isInitialized;
 
-  double get scale => g.sizes.fullAspectRatio * _ar; // ctrl.value.aspectRatio;
+  double get scale => g.sizes.fullAspectRatio * _ar;
 
   bool get toReverse => camNum != 0;
-
-  // Widget get inputBody => hasInput ? snipInput : const SizedBox.shrink();
 
   (String, String, bool, Size)? get m {
     if (filePath == null) return null;
@@ -385,17 +378,15 @@ class _SnipCameraState extends State<SnipCamera>
       vpc = await initVPC(f.path);
       mimetype = lookupMimeType(f.path);
       await killCamera();
-      // ctrl.dispose();
       changeConsole("preview");
     } catch (e) {
-      // throw "ERROR WHEN STOPPING TO RECORD $e";
       print("ERROR WHEN STOPPING TO RECORD $e");
       widget.cameraBack();
     }
   }
 
-  Future<VideoPlayerController> initVPC(String filePath) async {
-    final vpc = VideoPlayerController.file(File(filePath));
+  Future<VideoPlayerController> initVPC(String filePath_) async {
+    final vpc = VideoPlayerController.file(File(filePath_));
     await vpc.initialize();
     return vpc
       ..setLooping(true)
@@ -425,8 +416,6 @@ class _SnipCameraState extends State<SnipCamera>
     if (!readyCamera) {
       return const SizedBox.shrink();
     } else {
-      final scl = _camSize.aspectRatio / snipSize.aspectRatio;
-      print("SCLL = $scl");
       return GestureDetector(
         onTap: () => print("LALALALALAL"),
         onScaleStart: (details) => _baseScale = _scale,
@@ -466,12 +455,11 @@ class _SnipCameraState extends State<SnipCamera>
         } else {
           final im = Image.file(File(filePath!));
           return Transform(
-            alignment: FractionalOffset.center,
-            transform: Matrix4.identity()
-              ..scale(1 / k)
-              ..rotateY(toReverse ? math.pi : 0),
-            child: Align(alignment: Alignment.center, child: im),
-          );
+              alignment: FractionalOffset.center,
+              transform: Matrix4.identity()
+                ..scale(1 / k)
+                ..rotateY(toReverse ? math.pi : 0),
+              child: Align(alignment: Alignment.center, child: im));
         }
       }
       return const SizedBox.shrink();
@@ -487,33 +475,18 @@ class _SnipCameraState extends State<SnipCamera>
         children: [
           child,
           ...sticks.reversed,
-          // ...sticks.map((e) {
-          //   final o = trueOffset[e.tid] ?? e.inita;
-          //   return Positioned(
-          //       left: o.dx,
-          //       top: o.dy,
-          //       child: Container(color: Colors.red, height: 10, width: 10));
-          // }),
           hasInput
               ? input.snipInput2((p0) => setState(() => so += p0))
               : const SizedBox.shrink(),
-          // hasInput
-          //     ? Positioned(
-          //         left: sio.dx,
-          //         top: sio.dy,
-          //         child: Container(color: Colors.blue, height: 5, width: 5))
-          //     : const SizedBox.shrink(),
         ],
       ),
     );
   }
 
-  // Size get ps_ => _blank ? snipSize : scaledCamSize;
   Size get start => _blank ? snipSize : _camSize;
   (Size, Offset, List<SnipStick>) relativeGs() {
     final s_ = applyBoxFit(BoxFit.contain, start, snipSize).destination;
     final (_, d, s) = kds_(s_, snipSize);
-    print("s from snip $s");
     return (
       s,
       d,
@@ -557,7 +530,6 @@ class _SnipCameraState extends State<SnipCamera>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     killCamera();
-    // ctrl.dispose();
     super.dispose();
   }
 
@@ -619,64 +591,58 @@ class _SnipCameraState extends State<SnipCamera>
               ], extension: null, widths: null, inputMaxHeight: null),
               "preview": ConsoleRow(widgets: [
                 ConsoleButton(
-                  name: "RETRY",
-                  onPress: () async {
-                    sticks.clear();
-                    _blank = false;
-                    if (filePath != null) {
-                      File(filePath!).delete();
-                    }
-                    filePath = null;
-                    hasInput = false;
-                    input.clear();
-                    vpc?.dispose();
-                    vpc = null;
-                    await killCamera();
-                    // ctrl.dispose();
-                    initCamera();
-                    changeConsole("base");
-                    setState(() {});
-                  },
-                ),
+                    name: "RETRY",
+                    onPress: () async {
+                      sticks.clear();
+                      _blank = false;
+                      if (filePath != null) File(filePath!).delete();
+                      filePath = null;
+                      hasInput = false;
+                      input.clear();
+                      vpc?.dispose();
+                      vpc = null;
+                      await killCamera();
+                      initCamera();
+                      changeConsole("base");
+                      setState(() {});
+                    }),
                 mediasButton,
                 ConsoleButton(
-                  name: "TEXT",
-                  isMode: hasInput,
-                  onPress: () => setState(() => hasInput = !hasInput),
-                ),
+                    name: "TEXT",
+                    isMode: hasInput,
+                    onPress: () => setState(() => hasInput = !hasInput)),
                 ConsoleButton(
-                  name: "SEND",
-                  onPress: () {
-                    Down4Media? m;
-                    if (filePath != null) {
-                      m = Down4Media.fromLocal(ComposedID(),
-                          mainCachedPath: filePath,
-                          metadata: Down4MediaMetadata(
-                              ownerID: g.self.id,
-                              timestamp: makeTimestamp(),
-                              isReversed: toReverse,
-                              width: _camSize.width,
-                              height: _camSize.height,
-                              mime: mimetype!));
-                    }
+                    name: "SEND",
+                    onPress: () {
+                      Down4Media? m;
+                      if (filePath != null) {
+                        m = Down4Media.fromLocal(ComposedID(),
+                            mainCachedPath: filePath,
+                            metadata: Down4MediaMetadata(
+                                ownerID: g.self.id,
+                                timestamp: makeTimestamp(),
+                                isReversed: toReverse,
+                                width: _camSize.width,
+                                height: _camSize.height,
+                                mime: mimetype!));
+                      }
 
-                    final (s, d, stx) = relativeGs();
-                    String? txt;
-                    if (hasInput && input.value.isNotEmpty) {
-                      final relo = sio + d;
-                      final pos = Offset(0, relo.dy / s.height);
-                      txt = "${pos.dy} ${input.value}";
-                    }
-                    
-                    vpc?.dispose();
-                    widget.cameraCallBack(
-                        ps: s,
-                        backgroundMedia: m?..cache(),
-                        pdy: so.dy,
-                        text: txt,
-                        sticks: stx);
-                  },
-                ),
+                      final (s, d, stx) = relativeGs();
+                      String? txt;
+                      if (hasInput && input.value.isNotEmpty) {
+                        final relo = sio + d;
+                        final pos = Offset(0, relo.dy / s.height);
+                        txt = "${pos.dy} ${input.value}";
+                      }
+
+                      vpc?.dispose();
+                      widget.cameraCallBack(
+                          ps: s,
+                          backgroundMedia: m?..cache(),
+                          pdy: so.dy,
+                          text: txt,
+                          sticks: stx);
+                    }),
               ], extension: null, widths: null, inputMaxHeight: null),
               "medias": basicMediasRow,
             }

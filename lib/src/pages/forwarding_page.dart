@@ -122,46 +122,15 @@ class _ForwadingPageState extends State<ForwardingPage>
           ..merge()
           ..writeFromCachedPath());
 
-    // var chts = <Chat>[];
-
     final sel = selection.asNodes<ChatN>();
-    // final fnds = fo.whereType<Palette>().asComposedIDs().toSet();
-    // if (input.value.isNotEmpty || fnds.isNotEmpty || media != null) {
-    //   final chats = sel.map((n) => Chat(ComposedID(),
-    //       root: n.root_,
-    //       senderID: g.self.id,
-    //       txt: input.value,
-    //       nodes: fo.whereType<Palette>().asComposedIDs().toSet(),
-    //       timestamp: makeTimestamp(),
-    //       mediaID: media?.id)
-    //     ..cache()
-    //     ..merge());
-    //   chts.addAll(chats);
-    // }
-
-    // final fms = fo.whereType<ChatMessage>().map((cm) => cm.message);
-
-    // final fm = sel
-    //     .map((s) => fms
-    //         .map((m) => m.forwarded(g.self.id, s.root_)
-    //           ..cache()
-    //           ..merge())
-    //         .toList()
-    //         .reversed)
-    //     .expand((e) => e);
-
-    // chts.addAll(fm);
     final chts = makeChats(media: media, text: input.value, targets: sel);
 
-    if (chts.isNotEmpty) {
-      widget.forward(chts);
-    }
+    if (chts.isNotEmpty) widget.forward(chts);
   }
 
   @override
-  void setTheState() {
-    setState(() {});
-  }
+  void setTheState() => setState(() {});
+  
 
   @override
   void hyper() => widget.hyper();

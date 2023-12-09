@@ -294,9 +294,13 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
 
   List<int> get compressed {
     final t1 = makeTimestamp();
-    final tNote = textNote.codeUnits;
+    final tNote = textNote.toUtf8();
+    // text note can have non-ascii chars, needs to be encoded to utf8
+    // to then be made into a uint8list required for upload
     final spenderCodes = spender?.value.codeUnits;
     final spenderLen = spenderCodes?.length ?? 0x00;
+
+    print("TO COMPRESSED TEXT NOTE CHAR CODES: $tNote");
 
     print("compressing ${txs.length} txs");
     final buf = [
@@ -403,7 +407,9 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     String textNote = "";
     if (textNoteLen != 0) {
       textNoteData = buf.sublist(textOffset, textOffset + textNoteLen);
-      textNote = String.fromCharCodes(textNoteData);
+      print("FROM COMPRESSED TEXT NOTE CHAR CODES: $textNoteData");
+      textNote = utf8.decode(textNoteData);
+      // String.fromCharCodes(textNoteData);
     }
 
     print("payment textnote: $textNote");
@@ -422,7 +428,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
     final tsString = String.fromCharCodes(tsBuf);
     final ts = int.parse(tsString, radix: 34);
 
-    return Down4Payment( // Down4ID(),
+    return Down4Payment(
+        // Down4ID(),
         spender: spender,
         txid: txs.last.txID,
         txs: txs,
@@ -510,7 +517,8 @@ class Down4Payment with Down4Object, Jsons, Locals, Temps {
   }
 
   factory Down4Payment.fromJson(Map<String, String?> decodedJson) {
-    return Down4Payment( // Down4ID.fromString(decodedJson["id"])!,
+    return Down4Payment(
+        // Down4ID.fromString(decodedJson["id"])!,
         txs: null,
         plusMinus: int.tryParse(decodedJson["plusMinus"] ?? ""),
         spender: ComposedID.fromString(decodedJson["spender"]),

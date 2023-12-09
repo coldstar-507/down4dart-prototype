@@ -7,6 +7,7 @@ import 'package:down4/src/data_objects/firebase.dart';
 import 'package:down4/src/globals.dart';
 import 'package:down4/src/themes.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart' show Color;
 
 import '../_dart_utils.dart';
@@ -458,6 +459,7 @@ mixin ChatN on Down4Node, Locals {
     for (final m in msgs) {
       m.delete();
     }
+
     super.delete();
     return null;
   }
@@ -531,6 +533,8 @@ mixin ChatN on Down4Node, Locals {
     return Down4Message.fromJson(jsns) as Chat;
   }
 
+  bool get isEmptyChat => lastChatMessage() == null;
+
   bool lastChatFromOtherIsUnread() {
     final q = """
             SELECT * FROM messages
@@ -546,7 +550,7 @@ mixin ChatN on Down4Node, Locals {
   }
 }
 
-mixin GroupN on ChatN, ChildN {
+mixin GroupN on RemoteN, ChatN, ChildN {
   Iterable<ComposedID> get members;
   @override
   String get displayID => members.map((id) => "@${id.unik}").join(" ");
@@ -647,13 +651,15 @@ mixin RemoteN on Down4Node {
     return ref is Self || (ref is ChildN && ref.ownerID == g.self.id);
   }
 
-  Future<void> remoteDelete() async {
+  Future<bool> remoteDelete() async {
     if (isRemoteMutable) {
       try {
         await id.nodeRef.remove();
-      } catch (e) {
-        print(
-            "error deleting node id=${id.value}, node type=$runtimeType, err=$e");
+        return true;
+      } on FirebaseException catch (e) {
+        if (e.code == "storage/object-not-found") return true;
+        print("error deleting node id=${id.value}, type=$runtimeType: $e");
+        return false;
       }
     } else {
       throw "node type=$runtimeType, id=${id.unik} isn't remoteMutable";
@@ -928,6 +934,27 @@ class Hyperchat extends Down4Node
             name: firstWord,
             lastName: secondWord,
             ownerID: ownerID);
+
+  Future<bool> expire() async {
+    if (!isRemoteMutable) {
+      super.delete();
+      return true;
+    }
+
+    final m = local<Down4Image>(mediaID);
+    final d1 = (await m?.staticDelete()) ?? false;
+    if (!d1) return false;
+    print("deleted hyperchat media from remote database");
+    final d2 = await remoteDelete();
+    if (d2) {
+      print("deleted hyperchat from remote database");      
+      m?.delete();
+      super.delete();
+      return true;
+    } else {
+      return false;
+    }
+  }
 
   @override
   ComposedID get ownerID => _ownerID!;

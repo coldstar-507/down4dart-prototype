@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:down4/src/_dart_utils.dart';
 import 'package:down4/src/render_objects/_render_utils.dart';
 import 'package:down4/src/render_objects/chat_message.dart';
 import 'package:down4/src/render_objects/palette.dart';
@@ -45,10 +48,9 @@ class Down4Page {
   final List<Down4ID>? orderedKeys;
   final Iterable<Widget>? _iterables;
   final int? iterableLen, trueLen;
-  final List<Widget>? stackWidgets; //, backgroundStackWidgets;
+  final List<Widget>? stackWidgets;
   final Console console;
   final bool isChatPage, centerStackItems, reversedList, staticList;
-  // avoidKeyboardResize;
   Down4Page({
     required this.title,
     this.simplePageWidget,
@@ -56,8 +58,6 @@ class Down4Page {
     this.asMap,
     this.stream,
     this.orderedKeys,
-    // this.backgroundStackWidgets,
-    // this.avoidKeyboardResize = false,
     this.trueLen,
     this.onRefresh,
     this.isChatPage = false,
@@ -80,6 +80,7 @@ class Down4Page {
 class Andrew extends StatefulWidget {
   final List<Down4Page> pages;
   final int initialPageIndex;
+  final List<(void Function(), String)>? drawerOptions;
   final void Function()? addFriends, themes;
   final bool transparentHeader;
   final Function(int)? onPageChange;
@@ -92,6 +93,7 @@ class Andrew extends StatefulWidget {
       const Duration(milliseconds: 160);
 
   const Andrew({
+    this.drawerOptions,
     this.extraHeaderWidgets,
     this.themes,
     this.staticRow,
@@ -372,6 +374,19 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
     );
   }
 
+  Widget get simplePage {
+    final page = widget.pages.single;
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        page.simplePageWidget ?? const SizedBox.shrink(),
+        page.console.rowOfPage(index: 0, staticRow: showAppendConsole),
+        SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+      ],
+    );
+  }
+
   Widget get pageBody2 => ScrollConfiguration(
         behavior: NoGlow(),
         child: PageView(
@@ -445,24 +460,121 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
     }
   }
 
+  bool openedDrawer = false;
+
+  Widget get drawerOpener {
+    final transparentWidth = g.sizes.w * pow(1 / golden, 6);
+    return Positioned(
+      top: g.sizes.statusBarHeight + headerHeight,
+      left: 0,
+      child: GestureDetector(
+          onHorizontalDragUpdate: (d) {
+            setState(() => openedDrawer = d.delta.dx > 0);
+          },
+          child: SizedBox(
+              width: transparentWidth,
+              height: g.sizes.bodySize.height,
+              child: const ColoredBox(color: Colors.transparent))),
+    );
+  }
+
+  Widget get drawer {
+    final options = widget.drawerOptions;
+    if (options == null) return const SizedBox.shrink();
+    final filledWidth = g.sizes.w / golden;
+    final transparentWidth = g.sizes.w * pow(1 / golden, 4);
+    return AnimatedPositioned(
+      duration: Console.animationDuration,
+      top: 0,
+      left: openedDrawer ? 0 : -filledWidth,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) {
+          setState(() => openedDrawer = d.delta.dx > 0);
+        },
+        child: Container(
+          color: const Color.fromRGBO(15, 15, 15, 1),
+          width: filledWidth,
+          height: g.sizes.fullHeight,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: transparentWidth),
+              Container(height: 1.0, color: Colors.black26),
+              ...options.map((e) {
+                final (f, n) = e;
+                return GestureDetector(
+                  onTap: f,
+                  child: SizedBox(
+                    width: filledWidth,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.symmetric(
+                          horizontal: BorderSide(
+                            color: Colors.black26,
+                            width: 1.0,
+                          ),
+                        ),
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: g.sizes.fullHeight / 20,
+                            vertical: g.sizes.fullHeight / (20 * golden),
+                          ),
+                          child: Text(
+                            n,
+                            style: g.theme
+                                .paletteNameStyle(selected: false)
+                                .copyWith(fontSize: 20),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              Container(height: 1.0, color: Colors.black26),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget get header {
+    return Positioned(
+      top: 0,
+      left: 0,
+      child: pageHeader([...?widget.extraHeaderWidgets, forwardingIndicator]),
+    );
+  }
+
+  Widget get page {
+    final isSimplePager = widget.pages.length == 1 &&
+        widget.pages.single.simplePageWidget != null;
+    if (isSimplePager) return simplePage;
+    return pageBody2;
+  }
+
   Widget buildAgain() {
     return Container(
       color: g.theme.backGroundColor,
       width: g.sizes.w,
       height: g.sizes.fullHeight,
       child: PopScope(
+        canPop: false,
         onPopInvoked: onWillPop,
         child: Stack(
+          // fit: StackFit.expand,
           children: [
-            pageBody2,
+            page,
             ...curPage.console.extraButtons,
             staticConsole,
-            Positioned(
-              top: 0,
-              left: 0,
-              child: pageHeader(
-                  [...?widget.extraHeaderWidgets, forwardingIndicator]),
-            ),
+            header,
+            drawerOpener,
+            drawer,
           ],
         ),
       ),
@@ -473,136 +585,4 @@ class _AndrewState extends State<Andrew> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return buildAgain();
   }
-
-  //   return Container(
-  //     decoration: BoxDecoration(
-  //       color: g.theme.backGroundColor,
-  //       // image: DecorationImage(
-  //       //     image: MemoryImage(g.background), fit: BoxFit.cover),
-  //     ),
-  //     child: WillPopScope(
-  //       onWillPop: onWillPop,
-  //       child: Stack(
-  //         children: [
-  //           // ...?curPage.backgroundStackWidgets,
-  //           Scaffold(
-  //             // resizeToAvoidBottomInset: !curPage.avoidKeyboardResize,
-  //             backgroundColor: Colors.transparent,
-  //             appBar: AppBar(
-  //               toolbarHeight: g.sizes.headerHeight,
-  //               elevation: 0.0,
-  //               backgroundColor: widget.transparentHeader
-  //                   ? Colors.transparent
-  //                   : g.theme.headerColor,
-  //               leading: pageHeader([forwardingIndicator]),
-  //               leadingWidth: g.sizes.w,
-  //             ),
-  //             body: SafeArea(
-  //               child: Stack(
-  //                 children: [
-  //                   pageBody2,
-  //                   ...curPage.console.extraButtons,
-  //                   staticConsole
-  //                 ],
-  //               ),
-  //             ),
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
 }
-
-// class MyScreenWithoutScaffold extends StatefulWidget {
-//   @override
-//   _MyScreenWithoutScaffoldState createState() =>
-//       _MyScreenWithoutScaffoldState();
-// }
-
-// class _MyScreenWithoutScaffoldState extends State<MyScreenWithoutScaffold>
-//     with WidgetsBindingObserver {
-//   double _keyboardHeight = 0.0;
-
-//   @override
-//   void initState() {
-//     super.initState();
-
-//     // Add a listener to the MediaQuery for keyboard changes
-
-//     MediaQuery.of(context).removeObserver(_handleMediaQueryChange);
-//     MediaQuery.of(context).addObserver(_handleMediaQueryChange);
-//   }
-
-//   @override
-//   void dispose() {
-//     // Remove the MediaQuery listener to prevent memory leaks
-//     MediaQuery.of(context).removeObserver(_handleMediaQueryChange);
-//     super.dispose();
-//   }
-
-//   void _handleMediaQueryChange() {
-//     // Calculate the keyboard height by subtracting the screen height from the viewInsets
-//     setState(() {
-//       _keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-//     });
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       decoration: BoxDecoration(
-//         gradient: LinearGradient(
-//           begin: Alignment.topCenter,
-//           end: Alignment.bottomCenter,
-//           colors: [Colors.blue, Colors.green],
-//         ),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.stretch,
-//         children: [
-//           Container(
-//             padding: EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0),
-//             child: Text(
-//               'Title',
-//               style: TextStyle(
-//                 color: Colors.white,
-//                 fontSize: 24.0,
-//                 fontWeight: FontWeight.bold,
-//               ),
-//             ),
-//           ),
-//           Expanded(
-//             child: SingleChildScrollView(
-//               // Adjust the padding to account for the keyboard height
-//               padding: EdgeInsets.only(bottom: _keyboardHeight),
-//               child: Column(
-//                 mainAxisAlignment: MainAxisAlignment.center,
-//                 children: [
-//                   TextField(
-//                     decoration: InputDecoration(
-//                       labelText: 'Input',
-//                     ),
-//                   ),
-//                   SizedBox(height: 20.0),
-//                   Container(
-//                     width: double.infinity,
-//                     height: 200.0,
-//                     color: Colors.blue,
-//                     child: Center(
-//                       child: Text(
-//                         'Resizable Content',
-//                         style: TextStyle(color: Colors.white),
-//                       ),
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-

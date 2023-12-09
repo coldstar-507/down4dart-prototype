@@ -52,7 +52,7 @@ class _UserMakerPageState extends State<UserMakerPage>
     with WidgetsBindingObserver, Pager2, Camera2, Input2 {
   late String mainPlaceHolder = widget.errorMessage ?? "@username";
 
-  String get id => idInput.value;
+  String get id => idInput.value.toLowerCase();
   String get firstName => firstNameInput.value;
   String get lastName => lastNameInput.value;
   late Region region = widget.closestRegion ?? Region.america;
@@ -189,7 +189,7 @@ class _UserMakerPageState extends State<UserMakerPage>
   @override
   late List<MyTextEditor> inputs = [
     MyTextEditor(
-      onInput: (s, h) => _calls.add(isUsernameValid(s)),
+      onInput: (s, h) => _calls.add(isUsernameValid(s.toLowerCase())),
       onFocusChange: onFocusChange,
       config: Input2.singleLine,
       placeHolder: "username",
